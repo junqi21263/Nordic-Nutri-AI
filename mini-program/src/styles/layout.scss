@@ -1,0 +1,122 @@
+@use "./tokens" as *;
+
+.app-layout {
+  min-height: 100vh;
+  background: $color-background;
+}
+.page-layout {
+  min-height: 100vh;
+}
+.app-safe-area {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding-top: $safe-area-top;
+}
+.app-safe-area.page-layout--custom-navigation {
+  padding-top: 0;
+}
+.page-layout__scroll {
+  box-sizing: border-box;
+  min-height: 100vh;
+}
+.page-layout__content {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: $page-top $page-horizontal calc($tabbar-height + $safe-area-bottom + $section-gap);
+}
+.page-layout__content--enter {
+  animation: page-enter $duration-page $ease-standard both;
+}
+.page-layout--without-tabs .page-layout__content {
+  padding-bottom: calc($safe-area-bottom + $section-gap);
+}
+.page-layout--onboarding .page-layout__content {
+  padding: $space-8 $stitch-page-gutter
+    calc($stitch-action-height + $space-12 + $safe-area-bottom + $space-16);
+}
+.page-layout--home .page-layout__content {
+  // Give the greeting a further 12px visual clearance below Dynamic Island devices.
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+}
+.page-layout--meal-records .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+}
+.page-layout--meal-records .page-layout__content--enter {
+  // Keep the floating add action viewport-fixed instead of trapping it in the page-enter transform.
+  animation: none;
+}
+.page-layout--food-scanner .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+}
+.page-layout--analysis-result .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+  padding-bottom: calc($safe-area-bottom + $space-32);
+}
+.page-layout--portion-adjustment .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+  padding-bottom: calc($safe-area-bottom + $space-32);
+}
+.page-layout--meal-detail .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+  padding-bottom: calc($safe-area-bottom + 132px);
+}
+.page-layout--ingredient-detail .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+  padding-bottom: calc($safe-area-bottom + $space-32);
+}
+.page-layout--meal-detail .page-layout__content--enter,
+.page-layout--ingredient-detail .page-layout__content--enter {
+  animation: none;
+}
+.page-layout--coach-chat .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+  padding-bottom: calc($tabbar-height + $safe-area-bottom + $space-48 + $space-40);
+}
+.page-layout--manual-meal .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+  padding-bottom: calc($safe-area-bottom + 176px);
+}
+.page-layout--profile .page-layout__content,
+.page-layout--achievements .page-layout__content,
+.page-layout--weekly-review .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+}
+.page-layout--profile-edit .page-layout__content {
+  padding-bottom: calc($safe-area-bottom + $space-48 + $space-48 + $space-24);
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+}
+.page-layout--coach-chat .page-layout__content--enter {
+  animation: none;
+}
+.page-layout--nutrition-plan .page-layout__content {
+  padding-bottom: calc(
+    ($stitch-action-height * 2) + $space-8 + ($space-8 * 2) + env(safe-area-inset-bottom) +
+      $space-16
+  );
+}
+.content-stack {
+  display: flex;
+  flex-direction: column;
+  gap: $space-20;
+}
+.content-stack--compact {
+  gap: $space-12;
+}
+.card-grid {
+  display: grid;
+  gap: $space-12;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.safe-bottom {
+  height: $safe-area-bottom;
+}
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY($space-4);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

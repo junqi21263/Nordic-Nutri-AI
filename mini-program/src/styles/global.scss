@@ -1,0 +1,36 @@
+@use "./tokens" as *;
+
+page {
+  background: $color-background;
+  color: $color-text-primary;
+  font-family: $font-family;
+  font-size: $font-body;
+  line-height: $line-body;
+  overflow-x: hidden;
+}
+
+page,
+view,
+text,
+button,
+input,
+textarea,
+scroll-view {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button::after {
+  border: 0;
+}
+
+.theme-dark,
+[data-theme="dark"] {
+  background: $color-dark-forest;
+  color: $color-warm-white;
+}

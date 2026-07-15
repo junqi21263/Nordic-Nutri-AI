@@ -1,0 +1,21 @@
+{
+  "name": "nordic-nutri-ai",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "pnpm": ">=10.0.0 <11"
+  },
+  "scripts": {
+    "check": "pnpm run test:initialization",
+    "test:initialization": "node --test scripts/verify-initialization.test.mjs",
+    "typecheck:mini-program": "tsc --project mini-program/tsconfig.json --noEmit",
+    "test:auth:static": "python3 -m unittest discover -s supabase/tests -p 'test_*.py' -v",
+    "test:auth:local": "bash supabase/tests/auth_rls_integration.sh"
+  },
+  "devDependencies": {
+    "supabase": "^2.81.3",
+    "typescript": "~5.9.0"
+  }
+}

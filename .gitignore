@@ -1,0 +1,33 @@
+# Dependencies and package-manager state
+node_modules/
+mini-program/dist/
+mini-program/.temp/
+mini-program/.swc/
+.pnpm-store/
+
+# Environment files and Supabase local state
+.env
+.env*
+.env.*
+!.env.example
+.supabase/
+supabase/.temp/
+supabase/functions/.env
+
+# WeChat developer-tool local files
+mini-program/project.private.config.json
+mini-program/miniprogram_npm/
+
+# Build, test, and runtime artifacts
+coverage/
+dist/
+*.log
+__pycache__/
+*.py[cod]
+
+# OS, IDE, and Codex local artifacts
+.DS_Store
+.idea/
+.vscode/
+.superpowers/
+.agents/

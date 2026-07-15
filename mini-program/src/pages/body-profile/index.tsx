@@ -1,0 +1,228 @@
+import { Input, Text, View } from "@tarojs/components";
+import Taro from "@tarojs/taro";
+import { AppButton } from "../../components/app-button";
+import { AppCard } from "../../components/app-card";
+import { BottomActionLayout } from "../../components/bottom-action-layout";
+import { NordicIcon, type NordicIconName } from "../../components/nordic-icon";
+import { OnboardingHeader } from "../../components/onboarding-header";
+import {
+  type ActivityLevel,
+  type Gender,
+  getLocalDateString,
+  normalizeAgeInput,
+  normalizeOneDecimalInput,
+  validateBodyProfile,
+} from "../../features/onboarding/domain";
+import { PageLayout } from "../../layouts/page-layout";
+import { navigateBackOrHome } from "../../utils/navigation";
+import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
+
+const today = getLocalDateString();
+const activityOptions: Array<{
+  value: ActivityLevel;
+  title: string;
+  description: string;
+  trainingDays: string;
+  icon: NordicIconName;
+}> = [
+  {
+    value: "sedentary",
+    title: "低活动",
+    description: "久坐为主，日常活动较少。",
+    trainingDays: "0",
+    icon: "activity-low",
+  },
+  {
+    value: "light",
+    title: "轻度活动",
+    description: "有少量日常活动或偶尔训练。",
+    trainingDays: "2",
+    icon: "activity-light",
+  },
+  {
+    value: "moderate",
+    title: "中等活动",
+    description: "有一定日常活动或每周规律训练。",
+    trainingDays: "4",
+    icon: "activity-moderate",
+  },
+  {
+    value: "high",
+    title: "高活动",
+    description: "日常活动较多或训练频率较高。",
+    trainingDays: "6",
+    icon: "activity-high",
+  },
+];
+
+function FormError({ message }: { message?: string }) {
+  return message ? <Text className="form-field__error">{message}</Text> : null;
+}
+
+export default function BodyProfilePage() {
+  const { draft, errors, setField, setDraft, setErrors } = useOnboardingDraftStore();
+  const validation = validateBodyProfile(draft, today);
+  const validate = () => setErrors(validation.errors);
+  const continueToDietPreferences = () => {
+    validate();
+    if (validation.valid) Taro.navigateTo({ url: "/pages/diet-preferences/index" });
+  };
+
+  return (
+    <PageLayout
+      title="身体资料"
+      showTabs={false}
+      hideNavigation
+      className="page-layout--onboarding"
+    >
+      <View className="body-profile-page">
+        <OnboardingHeader
+        brand="Nordic Nutri AI"
+        step="第 2 步，共 4 步"
+        progress={0.5}
+        progressAriaLabel="当前为第 2 步，共 4 步"
+        backAriaLabel="返回目标选择"
+        onBack={() => navigateBackOrHome("/pages/onboarding/index")}
+        />
+        <View className="onboarding-heading body-profile__heading">
+        <Text className="onboarding-heading__title">告诉我们你的身体情况</Text>
+        <Text className="onboarding-heading__copy">
+          这些信息将帮助 AI 为你制定更合适的营养计划。
+        </Text>
+        </View>
+
+        <View className="body-profile__content">
+          <AppCard className="body-profile__foundation-card">
+            <View className="body-profile__foundation-heading">
+              <View className="body-profile__foundation-icon-ground">
+                <NordicIcon name="user-round" size={20} ariaLabel="基础信息" />
+              </View>
+              <Text className="body-profile__foundation-title">基础信息与生活方式</Text>
+            </View>
+
+            <View className="body-profile__metrics body-profile__metrics--three-up">
+              <View className="body-profile__metric-card">
+                <Text className="body-profile__metric-label">年龄</Text>
+                <View className="body-profile__metric-icon-ground">
+                  <NordicIcon name="calendar-days" size={18} ariaLabel="年龄" />
+                </View>
+                <View className="body-profile__metric-input-row">
+                  <Input
+                    className="body-profile__metric-input"
+                    type="number"
+                    value={draft.age}
+                    placeholder="28"
+                    adjustPosition
+                    onInput={(event) => setField("age", normalizeAgeInput(event.detail.value))}
+                    onBlur={validate}
+                  />
+                </View>
+                <Text className="body-profile__metric-unit">岁</Text>
+                <FormError message={errors.age} />
+              </View>
+              <View className="body-profile__metric-card">
+                <Text className="body-profile__metric-label">身高</Text>
+                <View className="body-profile__metric-icon-ground">
+                  <NordicIcon name="ruler" size={18} ariaLabel="身高" />
+                </View>
+                <View className="body-profile__metric-input-row">
+                  <Input
+                    className="body-profile__metric-input"
+                    type="digit"
+                    value={draft.heightCm}
+                    placeholder="175"
+                    adjustPosition
+                    onInput={(event) => setField("heightCm", normalizeOneDecimalInput(event.detail.value))}
+                    onBlur={validate}
+                  />
+                </View>
+                <Text className="body-profile__metric-unit">cm</Text>
+                <FormError message={errors.heightCm} />
+              </View>
+              <View className="body-profile__metric-card">
+                <Text className="body-profile__metric-label">体重</Text>
+                <View className="body-profile__metric-icon-ground">
+                  <NordicIcon name="weight" size={18} ariaLabel="体重" />
+                </View>
+                <View className="body-profile__metric-input-row">
+                  <Input
+                    className="body-profile__metric-input"
+                    type="digit"
+                    value={draft.weightKg}
+                    placeholder="72"
+                    adjustPosition
+                    onInput={(event) => setField("weightKg", normalizeOneDecimalInput(event.detail.value))}
+                    onBlur={validate}
+                  />
+                </View>
+                <Text className="body-profile__metric-unit">kg</Text>
+                <FormError message={errors.weightKg} />
+              </View>
+            </View>
+
+            <View className="body-profile__foundation-gender">
+              <Text className="body-profile__section-label">生理性别</Text>
+              <View className="body-profile__segmented-control">
+                {(
+                  [
+                    ["male", "男"],
+                    ["female", "女"],
+                  ] as Array<[Gender, string]>
+                ).map(([value, label]) => (
+                  <View
+                    key={value}
+                    className={`body-profile__segment ${draft.gender === value ? "body-profile__segment--active" : ""}`}
+                    onClick={() => setField("gender", value)}
+                  >
+                    <NordicIcon
+                      name={value === "male" ? "mars" : "venus"}
+                      size={18}
+                      ariaLabel={label}
+                    />
+                    <Text>{label}</Text>
+                  </View>
+                ))}
+              </View>
+              <FormError message={errors.gender} />
+            </View>
+          </AppCard>
+
+          <View className="body-profile__section">
+            <Text className="body-profile__section-label">日常活动量</Text>
+            <View className="body-profile__activity-list">
+              {activityOptions.map((option) => (
+                <View
+                  key={option.value}
+                  className={`body-profile__activity-card ${draft.activityLevel === option.value ? "body-profile__activity-card--active" : ""}`}
+                  onClick={() =>
+                    setDraft({ activityLevel: option.value, trainingDays: option.trainingDays })
+                  }
+                >
+                  <View className="body-profile__activity-icon-ground">
+                    <NordicIcon name={option.icon} ariaLabel={option.title} />
+                  </View>
+                  <View className="body-profile__activity-copy">
+                    <Text className="body-profile__activity-title">{option.title}</Text>
+                    <Text className="body-profile__activity-description">{option.description}</Text>
+                  </View>
+                  <View className="body-profile__activity-indicator">
+                    {draft.activityLevel === option.value ? (
+                      <NordicIcon name="check-inverse" size={15} ariaLabel="已选择" />
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+            <FormError message={errors.activityLevel ?? errors.trainingDays} />
+          </View>
+        </View>
+
+        <BottomActionLayout>
+          <AppButton size="large" disabled={!validation.valid} onClick={continueToDietPreferences}>
+            继续
+          </AppButton>
+        </BottomActionLayout>
+      </View>
+    </PageLayout>
+  );
+}

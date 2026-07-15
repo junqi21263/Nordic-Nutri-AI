@@ -1,0 +1,167 @@
+$color-forest-green: #163422;
+$color-dark-forest: #0c1f14;
+$color-primary-container: #2d4b37;
+$color-sage: #b5ccba;
+$color-sage-light: #e8f0e8;
+$color-warm-white: #faf9f6;
+$color-soft-beige: #f2ebe1;
+$color-neutral-gray: #727972;
+$color-text-primary: #1a1c1a;
+$color-text-secondary: #424843;
+$color-text-tertiary: $color-neutral-gray;
+$color-divider: #c2c8c0;
+$color-background: $color-warm-white;
+$color-surface: #ffffff;
+$color-card: #ffffff;
+$color-success: #2f6b45;
+$color-warning: #9a6700;
+$color-error: #ba1a1a;
+$color-disabled-surface: #e3e3df;
+$color-disabled-bg: $color-disabled-surface;
+$color-disabled-text: $color-neutral-gray;
+$color-overlay: rgba($color-text-primary, 0.42);
+$color-selected-surface: #f5f8f4;
+$color-selected-border: $color-forest-green;
+$color-primary: $color-forest-green;
+$color-primary-dark: $color-dark-forest;
+$color-beige: $color-soft-beige;
+$color-border: $color-divider;
+$color-border-light: $color-divider;
+$color-disabled: $color-disabled-surface;
+
+$font-display: 46px;
+$font-h1: 40px;
+$font-h2: 34px;
+$font-h3: 30px;
+$font-body: 26px;
+$font-caption: 22px;
+$font-overline: 18px;
+$font-brand: 22px;
+$font-page-title: $font-h1;
+$font-section-title: $font-h3;
+$font-card-title: $font-caption;
+$font-body-small: $font-overline;
+$font-button: $font-body;
+$font-number-large: 48px;
+$font-number-medium: $font-h2;
+$font-weight-regular: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-button: 600;
+$line-display: 1.12;
+$line-heading: 1.24;
+$line-body: 1.55;
+$line-caption: 1.35;
+$font-family:
+  "PingFang SC",
+  -apple-system,
+  BlinkMacSystemFont,
+  "Helvetica Neue",
+  Arial,
+  sans-serif;
+
+$radius-4: 4px;
+$radius-8: 8px;
+$radius-12: 12px;
+$radius-16: 16px;
+$radius-24: 24px;
+$radius-full: 999px;
+
+$shadow-none: none;
+$shadow-subtle: 0 4px 20px rgba($color-text-primary, 0.04);
+$shadow-card: 0 8px 30px rgba($color-forest-green, 0.08);
+$shadow-floating: 0 12px 36px rgba($color-forest-green, 0.14);
+$shadow-overlay: 0 16px 36px rgba($color-text-primary, 0.16);
+$shadow-small: $shadow-subtle;
+$shadow-medium: $shadow-card;
+$shadow-large: $shadow-floating;
+$shadow-fixed-footer: 0 -4px 16px rgba($color-text-primary, 0.04);
+
+// Canonical values for the three Stitch-calibrated onboarding screens.
+$stitch-page-gutter: 40px;
+$stitch-card-radius: 32px;
+$stitch-action-height: 108px;
+$stitch-page-bg: #fbfaf7;
+$stitch-surface: #ffffff;
+$stitch-surface-warm: #f2ebe1;
+$stitch-surface-green: #eef3ec;
+$stitch-text-primary: #19201c;
+$stitch-text-secondary: #69716b;
+$stitch-brand-green: #153f2b;
+$stitch-border: #cbd2cc;
+
+// Onboarding uses the 375px Stitch frame as its rpx calibration baseline.
+$onboarding-page-gutter: 40px;
+$onboarding-card-height: 176px;
+$onboarding-card-gap: 16px;
+$onboarding-card-padding: 32px;
+$onboarding-card-radius: 24px;
+$onboarding-icon-size: 88px;
+$onboarding-title-size: 48px;
+$onboarding-subtitle-size: 30px;
+$onboarding-button-height: 108px;
+$onboarding-button-radius: 54px;
+$onboarding-footer-padding: 24px;
+
+$space-4: 8px;
+$space-8: 16px;
+$space-12: 24px;
+$space-16: 32px;
+$space-20: 40px;
+$space-24: 48px;
+$space-28: 56px;
+$space-32: 64px;
+$space-40: 80px;
+$space-48: 96px;
+
+$duration-fast: 160ms;
+$duration-base: 240ms;
+$duration-normal: $duration-base;
+$duration-slow: 360ms;
+$duration-page: 240ms;
+$duration-overlay: 200ms;
+$ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+$ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+$reduced-motion-duration: 0ms;
+
+$safe-area-top: env(safe-area-inset-top);
+$safe-area-bottom: env(safe-area-inset-bottom);
+$page-gutter: $space-20;
+$page-horizontal: $page-gutter;
+$page-top: $space-16;
+$section-gap: $space-20;
+$card-gap: $space-8;
+$card-padding: $space-16;
+$bottom-action-height: 96px;
+$bottom-tab-height: 120px;
+$tabbar-height: $bottom-tab-height;
+$safe-bottom-spacing: $space-12;
+$radius-small: $radius-8;
+$radius-medium: $radius-12;
+$radius-large: $radius-16;
+$radius-card: $radius-24;
+$radius-button: $radius-full;
+
+// Backward-compatible aliases while the foundation is introduced.
+$color-dark-forest-green: $color-dark-forest;
+$color-sage-green: $color-sage;
+$color-border: $color-divider;
+$font-size-caption: $font-caption;
+$font-size-label: $font-body;
+$font-size-body: $font-body;
+$font-size-heading: $font-h3;
+$font-size-display: $font-display;
+$line-height-caption: $line-caption;
+$line-height-body: $line-body;
+$line-height-heading: $line-heading;
+$radius-sm: $radius-12;
+$radius-md: $radius-16;
+$radius-lg: $radius-24;
+$radius-pill: $radius-full;
+$shadow-float: $shadow-large;
+$space-1: $space-4;
+$space-2: $space-8;
+$space-3: $space-12;
+$space-5: $space-24;
+$space-6: $space-32;
+$space-7: $space-40;

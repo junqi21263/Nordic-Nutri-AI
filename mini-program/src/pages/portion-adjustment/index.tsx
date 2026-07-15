@@ -1,0 +1,160 @@
+import { Text, View } from "@tarojs/components";
+import Taro from "@tarojs/taro";
+import { AppButton } from "../../components/app-button";
+import { AppCard } from "../../components/app-card";
+import { ErrorState } from "../../components/error-state";
+import { MacroProgress } from "../../components/macro-progress";
+import { NordicIcon } from "../../components/nordic-icon";
+import { PageLayout } from "../../layouts/page-layout";
+import { createMealFromAnalysis } from "../../features/scanner/domain";
+import { getLocalDateString } from "../../features/onboarding/domain";
+import { useMealStore } from "../../stores/meal-store";
+import { usePortionDraftStore } from "../../stores/portion-draft-store";
+import { useFeedbackStore } from "../../stores/feedback-store";
+import { navigateBackOrHome } from "../../utils/navigation";
+
+const nowTime = () => {
+  const date = new Date();
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+};
+
+const portionPresets = [25, 50, 75, 100, 125, 150, 175, 200];
+
+export default function PortionAdjustmentPage() {
+  const portion = usePortionDraftStore();
+  const meals = useMealStore();
+  const feedback = useFeedbackStore();
+  const adjusted = portion.getAdjusted();
+  if (!portion.meal || !adjusted)
+    return (
+      <PageLayout
+        title="调整份量"
+        subtitle="没有可调整的本地分析结果。"
+        eyebrow="确认餐食"
+        showTabs={false}
+        leading="‹"
+        onLeadingClick={() => navigateBackOrHome("/pages/analysis-result/index")}
+      >
+        <ErrorState title="份量草稿不存在" description="请从分析结果进入份量调整。" />
+      </PageLayout>
+    );
+  const percentage = Math.round(portion.multiplier * 100);
+  const trackProgress = ((percentage - 25) / 175) * 100;
+  const adjustmentCopy =
+    percentage === 100
+      ? "与原始识别份量一致"
+      : percentage > 100
+        ? `比原始份量增加 ${percentage - 100}%`
+        : `比原始份量减少 ${100 - percentage}%`;
+  const canDecrease = portion.multiplier > 0.25;
+  const canIncrease = portion.multiplier < 2;
+  const save = () => {
+    const editingId = portion.editingMealId;
+    if (editingId) {
+      meals.updateMeal(editingId, { items: adjusted.items, insight: portion.meal!.insight });
+      feedback.show({ message: "份量已更新，本地汇总已同步", tone: "success" });
+    }
+    const id =
+      editingId ??
+      meals.addMeal(
+        createMealFromAnalysis(portion.meal!, portion.multiplier, getLocalDateString(), nowTime()),
+      );
+    if (!editingId) feedback.show({ message: "已保存到本地饮食记录", tone: "success" });
+    portion.reset();
+    Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });
+  };
+  return (
+    <PageLayout
+      title="调整份量"
+      showTabs={false}
+      hideNavigation
+      className="page-layout--portion-adjustment"
+    >
+      <View className="portion-adjustment-page">
+        <View className="portion-adjustment-page__page-title">
+          <View
+            className="portion-adjustment-page__back"
+            ariaLabel="返回分析结果"
+            onClick={() => navigateBackOrHome("/pages/analysis-result/index")}
+          >
+            <NordicIcon name="back" size={24} ariaLabel="返回分析结果" />
+          </View>
+          <Text>调整份量</Text>
+        </View>
+        <Text className="portion-adjustment-page__subtitle">每一步都会即时重算本地营养数据。</Text>
+        <AppCard tone="beige" className="portion-summary">
+          <View className="portion-summary__meal">
+            <Text className="portion-summary__label">当前餐食</Text>
+            <Text className="portion-summary__meal-title">{adjusted.title}</Text>
+          </View>
+          <View className="portion-summary__energy">
+            <Text className="portion-summary__label">调整后热量</Text>
+            <Text className="portion-summary__value">{adjusted.calories} kcal</Text>
+          </View>
+        </AppCard>
+        <AppCard className="content-stack content-stack--compact">
+          <View className="portion-stepper">
+            <View>
+              <Text className="section-title__title">份量比例</Text>
+              <Text className="portion-stepper__hint">按 25% 微调，本地营养将即时同步</Text>
+            </View>
+            <Text className="portion-stepper__value">{percentage}%</Text>
+          </View>
+          <View className="portion-track" ariaLabel={`当前份量比例 ${percentage}%`}>
+            <View className="portion-track__rail" />
+            <View className="portion-track__fill" style={{ width: `${trackProgress}%` }} />
+            <View className="portion-track__thumb" style={{ left: `${trackProgress}%` }} />
+          </View>
+          <View className="portion-control" ariaLabel="份量比例控制">
+            <View
+              ariaLabel="减少份量 25%"
+              className={`portion-control__button ${canDecrease ? "" : "portion-control__button--disabled"}`}
+              onClick={() => canDecrease && portion.adjustBy(-0.25)}
+            >
+              <Text>−</Text>
+            </View>
+            <View className="portion-control__value">
+              <Text className="portion-control__copy">{adjustmentCopy}</Text>
+            </View>
+            <View
+              ariaLabel="增加份量 25%"
+              className={`portion-control__button ${canIncrease ? "" : "portion-control__button--disabled"}`}
+              onClick={() => canIncrease && portion.adjustBy(0.25)}
+            >
+              <NordicIcon name="circle-plus" size={24} ariaLabel="增加份量 25%" />
+            </View>
+          </View>
+          <View className="portion-presets" ariaLabel="快速选择份量比例">
+            {portionPresets.map((percent) => (
+              <View
+                key={percent}
+                ariaLabel={`设为 ${percent}% 份量`}
+                className={`portion-presets__item ${percent === percentage ? "portion-presets__item--active" : ""}`}
+                onClick={() => portion.setMultiplier(percent / 100)}
+              >
+                <Text>{percent}%</Text>
+              </View>
+            ))}
+          </View>
+          <View
+            ariaLabel="恢复原始份量"
+            className={`portion-reset ${percentage === 100 ? "portion-reset--disabled" : ""}`}
+            onClick={() => percentage !== 100 && portion.setMultiplier(1)}
+          >
+            <Text>恢复原始份量</Text>
+          </View>
+        </AppCard>
+        <AppCard className="content-stack content-stack--compact">
+          <Text className="section-title__title">实时营养</Text>
+          <MacroProgress label="蛋白质" value={adjusted.protein} target={60} />
+          <MacroProgress label="碳水" value={adjusted.carbs} target={90} tone="carbs" />
+          <MacroProgress label="脂肪" value={adjusted.fat} target={25} tone="fat" />
+          <Text className="portion-score">Meal Score · {adjusted.score}</Text>
+        </AppCard>
+        <AppButton size="large" onClick={save}>
+          {portion.editingMealId ? "保存调整" : "保存本餐"} · {adjusted.calories} kcal
+        </AppButton>
+      </View>
+    </PageLayout>
+  );
+}

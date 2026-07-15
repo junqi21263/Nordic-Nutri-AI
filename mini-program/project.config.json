@@ -1,0 +1,13 @@
+{
+  "compileType": "miniprogram",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "lazyCodeLoading": "requiredComponents",
+    "postcss": true,
+    "minified": true,
+    "urlCheck": false
+  },
+  "miniprogramRoot": "dist/weapp/",
+  "projectname": "Nordic Nutri AI"
+}
