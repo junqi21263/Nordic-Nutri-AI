@@ -1,7 +1,8 @@
 type Row = Record<string, unknown>;
 
 export interface BodyProfileInput {
-  birthDate: string;
+  age?: number;
+  birthDate: string | null;
   sex: "female" | "male" | "undisclosed";
   heightCm: number;
   weightKg: number;
@@ -24,9 +25,11 @@ export function ageOnDate(birthDate: string, today: string): number {
 export function createBodyProfileRepository(client: BodyProfileRepositoryClient) {
   return {
     async saveVersion(userId: string, input: BodyProfileInput, today: string) {
+      const age = input.birthDate ? ageOnDate(input.birthDate, today) : input.age;
+      if (typeof age !== "number" || !Number.isInteger(age) || age < 14 || age > 80) throw new Error("年龄需在 14–80 岁之间");
       const payload: Row = {
         user_id: userId,
-        age: ageOnDate(input.birthDate, today),
+        age,
         birth_date: input.birthDate,
         sex: input.sex,
         height_cm: input.heightCm,

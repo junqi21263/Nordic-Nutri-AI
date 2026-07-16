@@ -24,4 +24,21 @@ describe("body profile and goal repositories", () => {
     expect(toDatabaseGoalType("maintenance")).toBe("maintain");
     expect(() => validateGoalInput({ goalType: "muscle_gain", targetWeightKg: 74, targetDate: "2026-07-16" }, "2026-07-16")).toThrow("目标日期必须晚于今天");
   });
+
+  it("allows the current age-only onboarding form to create a version without inventing a birth date", async () => {
+    const insert = vi.fn((payload: unknown) => ({ select: () => ({ single: async () => ({ data: payload, error: null }) }) }));
+    const repository = createBodyProfileRepository({ from: vi.fn(() => ({ insert })) });
+
+    await repository.saveVersion("u1", {
+      age: 28,
+      birthDate: null,
+      sex: "male",
+      heightCm: 175,
+      weightKg: 70,
+      activityLevel: "moderate",
+      trainingDays: 3,
+    }, "2026-07-16");
+
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ age: 28, birth_date: null }));
+  });
 });
