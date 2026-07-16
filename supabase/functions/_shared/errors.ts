@@ -6,6 +6,7 @@ export class AppError extends Error {
     message: string,
     public readonly status: number,
     public readonly retryable = false,
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "AppError";
@@ -13,7 +14,10 @@ export class AppError extends Error {
 }
 
 export const badRequest = (message: string) =>
-  new AppError("BAD_REQUEST", message, 400);
+  new AppError("VALIDATION_ERROR", message, 400);
+
+export const validationError = (message: string, details?: Record<string, unknown>) =>
+  new AppError("VALIDATION_ERROR", message, 400, false, details);
 
 export const methodNotAllowed = (message = "Method not allowed") =>
   new AppError("METHOD_NOT_ALLOWED", message, 405);
@@ -21,5 +25,5 @@ export const methodNotAllowed = (message = "Method not allowed") =>
 export const unauthorized = (message = "Authentication is required") =>
   new AppError("UNAUTHORIZED", message, 401);
 
-export const notImplementedError = () =>
-  new AppError("NOT_IMPLEMENTED", "This endpoint is not implemented", 501);
+export const notImplementedError = (message = "This endpoint is not implemented") =>
+  new AppError("NOT_IMPLEMENTED", message, 501);

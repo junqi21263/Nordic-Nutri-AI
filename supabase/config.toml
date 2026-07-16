@@ -417,3 +417,34 @@ enabled = true
 # creating a Supabase session in a later task.
 [functions.wechat-login]
 verify_jwt = false
+
+# Protected functions verify the caller inside `_shared/auth.ts` so every
+# failure uses the common API response envelope rather than a platform 401.
+[functions.analyze-food]
+verify_jwt = false
+
+[functions.generate-plan]
+verify_jwt = false
+
+[functions.coach-answer]
+verify_jwt = false
+
+[functions.calculate-nutrition]
+verify_jwt = false
+
+[functions.meal-summary]
+verify_jwt = false
+
+[functions.save-meal]
+verify_jwt = false
+
+[functions.health]
+enabled = true
+verify_jwt = false
+import_map = "./functions/health/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/health/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/health/*.html" ]

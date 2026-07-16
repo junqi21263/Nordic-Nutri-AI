@@ -32,5 +32,7 @@ class EdgeFunctionsSkeletonStaticTest(unittest.TestCase):
         self.assertTrue(auth_helper.exists(), "auth-helper")
 
         response = (ROOT / "_shared" / "response.ts").read_text(encoding="utf-8")
-        self.assertIn("request_id", response)
+        self.assertIn("requestId", response)
+        self.assertIn("success: true", response)
+        self.assertIn("success: false", response)
         self.assertIn("error", response)
