@@ -38,6 +38,11 @@ class BackendPhaseTwoPointFiveStaticTest(unittest.TestCase):
         content = (ROOT / "functions" / "save-meal" / "index.ts").read_text(encoding="utf-8")
         self.assertIn('new AppError("FORBIDDEN"', content)
 
+    def test_client_database_types_cover_remote_phase_two_schema(self):
+        content = (ROOT.parents[0] / "mini-program" / "src" / "api" / "database.types.ts").read_text(encoding="utf-8")
+        for token in ("wechat_identities", "wechat_login_codes", "active_meal_records", "save_meal_atomic"):
+            self.assertIn(token, content)
+
     def test_otp_contract_exposes_email_verification_type(self):
         content = FUNCTION.read_text(encoding="utf-8")
         self.assertIn('type: "email"', content)
