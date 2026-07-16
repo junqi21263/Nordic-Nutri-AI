@@ -4,6 +4,7 @@ import { useState } from "react";
 import { loginWithWechat } from "../../api/auth-api";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
+import { BottomSheet } from "../../components/bottom-sheet";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 
@@ -32,12 +33,16 @@ export default function AuthEntryPage() {
           <Text className="auth-entry-page__title">继续你的营养节奏</Text>
           <Text className="auth-entry-page__copy">登录后即可安全保存餐次、身体数据和目标设置。</Text>
         </View>
+        <Text className="auth-entry-page__copy">请登录以继续保存你的健康数据。</Text>
+      </View>
+      <BottomSheet open className="auth-entry-sheet">
         <AppCard className="auth-entry-page__card">
-          <Text className="auth-entry-page__card-title">使用微信登录</Text>
-          <Text className="auth-entry-page__card-copy">首次登录会自动创建你的专属数据档案。</Text>
+          <Text className="auth-entry-page__eyebrow">NORDIC NUTRI AI</Text>
+          <Text className="auth-entry-page__card-title">继续你的营养节奏</Text>
+          <Text className="auth-entry-page__card-copy">登录后即可安全保存餐次、身体数据和目标设置。</Text>
           <AppButton size="large" loading={isLoggingIn} onClick={login}>登录并开始使用</AppButton>
         </AppCard>
-      </View>
+      </BottomSheet>
     </PageLayout>
   );
 }

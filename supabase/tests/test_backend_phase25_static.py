@@ -8,6 +8,22 @@ MIGRATION = ROOT / "migrations" / "20260716022627_backend_phase25_auth_hardening
 
 
 class BackendPhaseTwoPointFiveStaticTest(unittest.TestCase):
+    def test_atomic_meal_update_is_security_invoker_and_checks_ownership(self):
+        matches = list((ROOT / "migrations").glob("*_phase3a_meal_atomic_update.sql"))
+        self.assertEqual(len(matches), 1, "missing Phase 3A atomic meal update migration")
+        content = matches[0].read_text(encoding="utf-8")
+        for token in (
+            "create or replace function public.update_meal_atomic(p_input jsonb)",
+            "security invoker",
+            "set search_path = ''",
+            "v_user_id uuid := auth.uid()",
+            "raise exception 'UNAUTHORIZED'",
+            "raise exception 'NOT_FOUND'",
+            "delete from public.meal_items where meal_record_id = v_meal_id",
+            "grant execute on function public.update_meal_atomic(jsonb) to authenticated",
+        ):
+            self.assertIn(token, content)
+
     def test_wechat_identity_and_replay_digests_use_server_only_hmac(self):
         content = FUNCTION.read_text(encoding="utf-8")
         self.assertIn('name: "HMAC", hash: "SHA-256"', content)
