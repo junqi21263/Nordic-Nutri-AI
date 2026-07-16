@@ -1,5 +1,4 @@
-export default defineAppConfig({
-  pages: [
+const pages = [
     "pages/onboarding/index",
     "pages/body-profile/index",
     "pages/diet-preferences/index",
@@ -18,7 +17,12 @@ export default defineAppConfig({
     "pages/goal-adjust/index",
     "pages/achievements/index",
     "pages/weekly-review/index",
-  ],
+];
+
+if (process.env.TARO_APP_ENV === "development") pages.push("pages/dev-auth-harness/index");
+
+export default defineAppConfig({
+  pages,
   window: {
     navigationStyle: "custom",
     navigationBarBackgroundColor: "#faf9f6",
