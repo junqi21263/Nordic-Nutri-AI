@@ -1,5 +1,8 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useState } from "react";
+import { getPublicRuntimeConfig } from "../../api/environment";
+import { useAuthStore } from "../../auth/auth-store";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomActionLayout } from "../../components/bottom-action-layout";
@@ -14,6 +17,10 @@ import {
   validateBodyProfile,
 } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
+import { getSupabaseClient } from "../../lib/supabase-client";
+import { createBodyProfileRepository, type BodyProfileRepositoryClient } from "../../repositories/body-profile-repository";
+import { selectRuntimeAdapter } from "../../repositories/runtime-adapter";
+import { useFeedbackStore } from "../../stores/feedback-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 
@@ -61,11 +68,37 @@ function FormError({ message }: { message?: string }) {
 
 export default function BodyProfilePage() {
   const { draft, errors, setField, setDraft, setErrors } = useOnboardingDraftStore();
+  const auth = useAuthStore();
+  const feedback = useFeedbackStore();
+  const [isSaving, setIsSaving] = useState(false);
   const validation = validateBodyProfile(draft, today);
   const validate = () => setErrors(validation.errors);
-  const continueToDietPreferences = () => {
+  const continueToDietPreferences = async () => {
     validate();
-    if (validation.valid) Taro.navigateTo({ url: "/pages/diet-preferences/index" });
+    if (!validation.valid || !validation.profile) return;
+    setIsSaving(true);
+    try {
+      if (selectRuntimeAdapter(getPublicRuntimeConfig()) === "supabase") {
+        if (!auth.user?.id) {
+          feedback.show({ message: "登录状态已失效，请重新登录", tone: "error" });
+          return;
+        }
+        await createBodyProfileRepository(getSupabaseClient() as unknown as BodyProfileRepositoryClient).saveVersion(auth.user.id, {
+          age: validation.profile.age,
+          birthDate: null,
+          sex: validation.profile.gender,
+          heightCm: validation.profile.heightCm,
+          weightKg: validation.profile.weightKg,
+          activityLevel: validation.profile.activityLevel,
+          trainingDays: validation.profile.trainingDays,
+        }, today);
+      }
+      await Taro.navigateTo({ url: "/pages/diet-preferences/index" });
+    } catch {
+      feedback.show({ message: "身体资料保存失败，请稍后重试", tone: "error" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -218,7 +251,7 @@ export default function BodyProfilePage() {
         </View>
 
         <BottomActionLayout>
-          <AppButton size="large" disabled={!validation.valid} onClick={continueToDietPreferences}>
+          <AppButton size="large" disabled={!validation.valid} loading={isSaving} onClick={() => void continueToDietPreferences()}>
             继续
           </AppButton>
         </BottomActionLayout>

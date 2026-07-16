@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ageOnDate, createBodyProfileRepository } from "../src/repositories/body-profile-repository";
-import { toDatabaseGoalType, validateGoalInput } from "../src/repositories/health-goal-repository";
+import { createHealthGoalRepository, toDatabaseGoalType, validateGoalInput } from "../src/repositories/health-goal-repository";
 
 describe("body profile and goal repositories", () => {
   it("derives age with a month/day boundary for a new version", async () => {
@@ -40,5 +40,19 @@ describe("body profile and goal repositories", () => {
     }, "2026-07-16");
 
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ age: 28, birth_date: null }));
+  });
+
+  it("inserts a new current goal version and maps maintenance to the database enum", async () => {
+    const insert = vi.fn((payload: unknown) => ({ select: () => ({ single: async () => ({ data: payload, error: null }) }) }));
+    const repository = createHealthGoalRepository({ from: vi.fn(() => ({ insert })) });
+
+    await repository.saveVersion("u1", { goalType: "maintenance", targetWeightKg: 70, targetDate: "2026-08-16" }, "2026-07-16");
+
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      user_id: "u1",
+      goal_type: "maintain",
+      target_weight_kg: 70,
+      is_current: true,
+    }));
   });
 });
