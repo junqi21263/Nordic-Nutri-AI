@@ -19,6 +19,7 @@ describe("authentication request infrastructure", () => {
       },
       async () => {
         refreshes += 1;
+        return { accessToken: "refreshed" };
       },
     );
 
@@ -43,5 +44,27 @@ describe("authentication request infrastructure", () => {
     ).rejects.toBe(networkError);
 
     expect(refreshes).toBe(0);
+  });
+
+  it("does not retry an unauthorized request when refresh cannot restore a session", async () => {
+    let attempts = 0;
+    let refreshes = 0;
+    const unauthorized = { status: 401 };
+
+    await expect(
+      withAuthRefresh(
+        async () => {
+          attempts += 1;
+          throw unauthorized;
+        },
+        async () => {
+          refreshes += 1;
+          return null;
+        },
+      ),
+    ).rejects.toBe(unauthorized);
+
+    expect(attempts).toBe(1);
+    expect(refreshes).toBe(1);
   });
 });

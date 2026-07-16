@@ -6,7 +6,7 @@ export async function withAuthRefresh<T>(request: () => Promise<T>, refresh: () 
     return await request();
   } catch (error) {
     if (!isUnauthorizedRequestError(error)) throw error;
-    await refresh();
+    if (!(await refresh())) throw error;
     return request();
   }
 }
