@@ -6,7 +6,7 @@
 
 | 模块 | 职责 | 调用方式 |
 | --- | --- | --- |
-| Auth/身份 | 微信 code 换取 Supabase 会话、用户投影 | `wechat-login` Edge Function；现为安全占位 |
+| Auth/身份 | 微信 code 换取 Supabase 会话、用户投影 | `wechat-login` Edge Function；local mock 闭环已验证，开发环境待部署 |
 | 资料与偏好 | profiles、user_settings、body_profiles、user_goals | 客户端 Supabase Data API + RLS |
 | 餐食 | meal_records、meal_items、uploaded_assets；按日期/餐次/关键词分页 | 客户端 Data API + RLS；原子多项保存预留 `save-meal` |
 | 计划 | nutrition_plans（领域名“健康计划”）及 health_plan_items | 读取走 RLS，生成/激活走 Edge Function |
@@ -17,11 +17,11 @@
 
 ## 身份、图片与调用流
 
-`小程序 → wechat-login → 微信 code2Session → Auth/Admin → JWT → Data API/RLS`。真实微信交换尚未配置，当前函数只校验 code 并返回 `NOT_IMPLEMENTED`。
+`小程序 → wechat-login → 微信 code2Session → Auth/Admin → JWT → Data API/RLS`。local/test 可使用显式 mock code；development/production 必须配置微信服务端密钥并调用真实 code2Session。
 
-Phase 2 已将该链路实现为官方 OTP bridge：Function 通过 `generateLink` 返回一次性 token hash，小程序用 `verifyOtp` 换取 Supabase 标准 session；绝不由 Function 自制 JWT。
+Phase 2.5 已将该链路验证为官方 OTP bridge：Function 通过 `generateLink` 返回一次性 token hash，小程序用 `verifyOtp({ token_hash, type: 'email' })` 换取 Supabase 标准 session；绝不由 Function 自制 JWT。请求层只对 401 合并一次 refresh/retry；失败清理本地 session。
 
-图片先直传私有 `food-images`（`{uid}/{yyyy}/{mm}/{uuid}.jpg|webp`），再写 uploaded_assets，最后调用 `analyze-food`。分析草稿使用已有 ai_analysis；用户可在确认保存前编辑候选食材，最终 meal_items 保存用户确认数量与营养快照。原图不进入日志，临时未保存分析可在 24 小时后清理。
+图片先直传私有 `food-images`（`{uid}/{yyyy}/{mm}/{uuid}.jpg|webp`），再写 uploaded_assets，最后调用 `analyze-food`。分析草稿使用已有 ai_analysis；用户可在确认保存前编辑候选食材，最终 meal_items 保存用户确认数量与营养快照。`save_meal_atomic` 会拒绝非本人 plan、asset 路径或 analysis 引用。原图不进入日志，临时未保存分析可在 24 小时后清理。
 
 ## 运行规范
 

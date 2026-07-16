@@ -4,7 +4,7 @@
 
 | 能力/页面 | 方法与路径 | 登录 | Edge | 请求/结果 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 微信登录/启动恢复 | POST `/wechat-login` | 否 | 是 | `{code}` → `{tokenHash,type,userId}`；客户端 verifyOtp 换 session | 已实现 Function；需配置微信 Secrets |
+| 微信登录/启动恢复 | POST `/wechat-login` | 否 | 是 | `{code}` → `{tokenHash,type:'email',userId}`；客户端 verifyOtp 换 session | 已实现 Function；需配置微信 Secrets |
 | 当前用户 | GET `/auth/v1/user` | 是 | 否 | JWT → Auth user | Supabase 标准能力 |
 | 个人资料/Profile 编辑 | GET/PATCH `/rest/v1/profiles` | 是 | 否 | ProfileInput → profile | 可用 RLS CRUD |
 | 偏好/引导饮食页 | GET/PATCH `/rest/v1/user_settings` | 是 | 否 | 饮食模式、忌口、餐数、设置 | 可用 RLS CRUD |

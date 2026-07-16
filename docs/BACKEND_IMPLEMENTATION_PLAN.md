@@ -13,4 +13,4 @@
 
 本阶段已完成 1–3 的数据库/RLS/契约基础及 4–7 的安全函数骨架。每次迁移执行 `supabase db reset --local`、静态测试、RLS 集成测试；部署前补 Function 实测与安全审计。
 
-Phase 2 已完成认证 Function、会话契约与原子手工餐食保存；下一步仅在视觉冻结后，以 feature flag 接入独立 auth/API adapter。
+Phase 2.5 已完成 Node 24 实机验收、OTP `type:'email'` 契约修正、HMAC 身份摘要、local mock → Supabase Auth session → 真实 JWT/RLS → save-meal 闭环，以及未接入页面的认证适配层。development 部署与真实微信 code2Session 仍依赖项目 ref 与服务端 Secrets；下一步仅在视觉冻结后，以 feature flag 接入独立 auth/API adapter。

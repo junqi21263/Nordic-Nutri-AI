@@ -4,6 +4,8 @@ export interface PublicRuntimeConfig {
   environment: AppEnvironment;
   supabaseUrl: string;
   supabasePublishableKey: string;
+  useRealBackend: boolean;
+  enableRealAuth: boolean;
 }
 
 function getEnvironment(): AppEnvironment {
@@ -16,5 +18,7 @@ export function getPublicRuntimeConfig(): PublicRuntimeConfig {
     environment: getEnvironment(),
     supabaseUrl: process.env.TARO_APP_SUPABASE_URL ?? "",
     supabasePublishableKey: process.env.TARO_APP_SUPABASE_PUBLISHABLE_KEY ?? "",
+    useRealBackend: process.env.TARO_APP_USE_REAL_BACKEND === "true",
+    enableRealAuth: process.env.TARO_APP_ENABLE_REAL_AUTH === "true",
   };
 }

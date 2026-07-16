@@ -7,9 +7,10 @@ import { assertString, parseJsonBody } from "../_shared/validation.ts";
 
 type WechatIdentity = { openid: string; unionid?: string };
 
-async function sha256(value: string) {
+async function identityDigest(value: string) {
   const bytes = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(getServerEnv("WECHAT_IDENTITY_PEPPER")), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const digest = await crypto.subtle.sign("HMAC", key, bytes);
   return [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
 }
 
@@ -45,8 +46,8 @@ Deno.serve(withRequestContext(async (request, context) => {
   const body = await parseJsonBody(request);
   const code = assertString(body, "code", { minLength: 8, maxLength: 2048 });
   const identity = await exchangeCode(code);
-  const openidHash = await sha256(identity.openid);
-  const codeHash = await sha256(code);
+  const openidHash = await identityDigest(`openid:${identity.openid}`);
+  const codeHash = await identityDigest(`code:${code}`);
   const admin = createClient(getServerEnv("SUPABASE_URL"), getServerEnv("SUPABASE_SERVICE_ROLE_KEY"));
 
   const { data: used } = await admin.from("wechat_login_codes").select("code_hash").eq("code_hash", codeHash).maybeSingle();
@@ -66,5 +67,5 @@ Deno.serve(withRequestContext(async (request, context) => {
   const { error: codeError } = await admin.from("wechat_login_codes").insert({ code_hash: codeHash, user_id: userId });
   if (codeError) throw new AppError("CONFLICT", "WeChat code has already been used", 409);
   await admin.from("profiles").update({ last_login_at: new Date().toISOString() }).eq("id", userId);
-  return success({ tokenHash: link.properties.hashed_token, type: "magiclink", userId }, context.requestId);
+  return success({ tokenHash: link.properties.hashed_token, type: "email", userId }, context.requestId);
 }));
