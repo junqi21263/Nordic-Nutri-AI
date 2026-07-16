@@ -1,3 +1,11 @@
+import type { AuthStorageInspection } from "../lib/wechat-storage";
+import type { WechatUrlCompatibilityDiagnostics } from "../lib/wechat-url";
+import {
+  createInitializationMatrix,
+  type InitializationProbeEntry,
+  type InitializationProbeStep,
+} from "./supabase-initialization-probe";
+
 export type HarnessStep =
   | "configCheck"
   | "wxLogin"
@@ -11,7 +19,7 @@ export type HarnessStep =
   | "activeMeals"
   | "saveMeal";
 export type HarnessStatus = "idle" | "running" | "success" | "error";
-export type SessionStatus = "unknown" | "anonymous" | "authenticated";
+export type SessionStatus = "unknown" | "none" | "anonymous" | "authenticated";
 
 export interface AuthHarnessSnapshot {
   requestId: string | null;
@@ -32,6 +40,9 @@ export interface AuthHarnessSnapshot {
   errorFile: string | null;
   errorFunction: string | null;
   initializationMatrix: Record<InitializationProbeStep, InitializationProbeEntry>;
+  supabaseClientInstanceCount: number;
+  authStorageInspection: AuthStorageInspection;
+  urlCompatibility: WechatUrlCompatibilityDiagnostics | null;
   currentStage: HarnessStep | null;
   userId: string | null;
   sessionStatus: SessionStatus;
@@ -59,6 +70,9 @@ export function createAuthHarnessSnapshot(): AuthHarnessSnapshot {
     errorFile: null,
     errorFunction: null,
     initializationMatrix: createInitializationMatrix(),
+    supabaseClientInstanceCount: 0,
+    authStorageInspection: { valueExists: false, valueType: "none", jsonParseSucceeded: false, hasAccessToken: false, hasRefreshToken: false, shouldClear: false },
+    urlCompatibility: null,
     currentStage: null,
     userId: null,
     sessionStatus: "unknown",
@@ -78,8 +92,3 @@ export function createAuthHarnessSnapshot(): AuthHarnessSnapshot {
     },
   };
 }
-import {
-  createInitializationMatrix,
-  type InitializationProbeEntry,
-  type InitializationProbeStep,
-} from "./supabase-initialization-probe";

@@ -1,9 +1,16 @@
 import { getCurrentProfile, loginWithWechat } from "../api/auth-api";
 import { getPublicRuntimeConfig } from "../api/environment";
 import { extractFunctionDiagnostics, truncateProjectRef, truncateUserId } from "../api/function-request-id";
-import { getSupabaseClient, wechatStorage } from "../lib/supabase-client";
+import {
+  clearSupabaseAuthCache,
+  getSupabaseClient,
+  getSupabaseClientInstanceCount,
+  inspectSupabaseAuthCache,
+  wechatStorage,
+} from "../lib/supabase-client";
 import { getWechatFetch, installWechatHeadersCompat } from "../lib/wechat-fetch";
-import { unavailableWechatRealtimeTransport } from "../lib/wechat-realtime-transport";
+import { getWechatUrlCompatibilityDiagnostics, installWechatUrlCompatibility } from "../lib/wechat-url";
+import { useAuthStore } from "../auth/auth-store";
 import { getCurrentUser, refreshSession, restoreSession, signOut } from "../auth/session-manager";
 import {
   createAuthHarnessSnapshot,
@@ -180,11 +187,11 @@ export class DevelopmentAuthHarness {
     try {
       this.begin();
       installWechatHeadersCompat();
+      installWechatUrlCompatibility();
       const initializationMatrix = await probeSupabaseInitialization({
         config: getPublicRuntimeConfig(),
-        fetch: getWechatFetch(),
+        fetch: getWechatFetch(getPublicRuntimeConfig().supabaseUrl),
         storage: wechatStorage,
-        realtimeTransport: unavailableWechatRealtimeTransport,
         getFullClient: getSupabaseClient,
       });
       const firstFailure = (Object.keys(initializationMatrix) as InitializationProbeStep[])
@@ -192,6 +199,9 @@ export class DevelopmentAuthHarness {
         .find((result) => result.status === "error");
       this.update({
         initializationMatrix,
+        supabaseClientInstanceCount: getSupabaseClientInstanceCount(),
+        authStorageInspection: inspectSupabaseAuthCache(),
+        urlCompatibility: getWechatUrlCompatibilityDiagnostics(),
         ...(firstFailure?.error ? {
           rawErrorName: firstFailure.error.rawErrorName,
           rawErrorMessage: firstFailure.error.rawErrorMessage,
@@ -313,6 +323,18 @@ export class DevelopmentAuthHarness {
       assertDevelopmentAuthHarness();
       await signOut();
       this.update({ operationStatus: "success", sessionStatus: "anonymous", userId: null });
+    } catch (error) {
+      await this.failRequest(error);
+    }
+  }
+
+  async clearAuthenticationCache(): Promise<void> {
+    try {
+      this.begin();
+      if (!clearSupabaseAuthCache()) throw new Error("Authentication storage key is unavailable");
+      useAuthStore.getState().clear();
+      this.update({ sessionStatus: "none", userId: null, authStorageInspection: inspectSupabaseAuthCache() });
+      this.complete();
     } catch (error) {
       await this.failRequest(error);
     }

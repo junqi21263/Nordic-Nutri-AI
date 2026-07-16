@@ -77,6 +77,18 @@ export default function DevelopmentAuthHarnessPage() {
             <Text>{statusLabel[snapshot.initializationMatrix[step.key].status]}</Text>
           </View>
         ))}
+        <View className="list-item"><Text>Auth 缓存存在</Text><Text>{String(snapshot.authStorageInspection.valueExists)}</Text></View>
+        <View className="list-item"><Text>Auth 缓存类型</Text><Text>{snapshot.authStorageInspection.valueType}</Text></View>
+        <View className="list-item"><Text>Auth 缓存 JSON 有效</Text><Text>{String(snapshot.authStorageInspection.jsonParseSucceeded)}</Text></View>
+        <View className="list-item"><Text>Session 访问字段存在</Text><Text>{String(snapshot.authStorageInspection.hasAccessToken)}</Text></View>
+        <View className="list-item"><Text>Session 刷新字段存在</Text><Text>{String(snapshot.authStorageInspection.hasRefreshToken)}</Text></View>
+        <View className="list-item"><Text>Auth 缓存需清理</Text><Text>{String(snapshot.authStorageInspection.shouldClear)}</Text></View>
+        <View className="list-item"><Text>URL input 类型</Text><Text>{snapshot.urlCompatibility?.inputType ?? "—"}</Text></View>
+        <View className="list-item"><Text>URL 为相对路径</Text><Text>{snapshot.urlCompatibility ? String(snapshot.urlCompatibility.isRelative) : "—"}</Text></View>
+        <View className="list-item"><Text>URL protocol</Text><Text>{snapshot.urlCompatibility?.protocol ?? "—"}</Text></View>
+        <View className="list-item"><Text>URL hostname</Text><Text>{snapshot.urlCompatibility?.hostname ? `${snapshot.urlCompatibility.hostname.slice(0, 4)}…${snapshot.urlCompatibility.hostname.slice(-4)}` : "—"}</Text></View>
+        <View className="list-item"><Text>URL pathname</Text><Text>{snapshot.urlCompatibility?.pathname ?? "—"}</Text></View>
+        <View className="list-item"><Text>URL 阶段</Text><Text>{snapshot.urlCompatibility?.stage ?? "—"}</Text></View>
       </AppCard>
 
       <AppCard className="content-stack content-stack--compact">
@@ -107,6 +119,10 @@ export default function DevelopmentAuthHarnessPage() {
         <View className="list-item">
           <Text>Session 状态</Text>
           <Text>{snapshot.sessionStatus}</Text>
+        </View>
+        <View className="list-item">
+          <Text>Supabase Client 实例</Text>
+          <Text>{snapshot.supabaseClientInstanceCount}</Text>
         </View>
         <View className="list-item">
           <Text>错误类型</Text>
@@ -163,6 +179,7 @@ export default function DevelopmentAuthHarnessPage() {
 
       <View className="content-stack content-stack--compact">
         <AppButton variant="outline" loading={isRunning} onClick={run(() => harness.runInitializationProbe())}>运行初始化诊断</AppButton>
+        <AppButton variant="outline" loading={isRunning} onClick={run(() => harness.clearAuthenticationCache())}>清理认证缓存</AppButton>
         <AppButton loading={isRunning} onClick={run(() => harness.login())}>执行微信登录</AppButton>
         <AppButton variant="outline" loading={isRunning} onClick={run(() => harness.getSessionStatus())}>获取当前 Session 状态</AppButton>
         <AppButton variant="outline" loading={isRunning} onClick={run(() => harness.currentUser())}>获取 auth.getUser</AppButton>

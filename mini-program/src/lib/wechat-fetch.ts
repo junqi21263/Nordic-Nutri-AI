@@ -20,6 +20,18 @@ export interface WechatRequestOptions {
 
 export type WechatRequest = (options: WechatRequestOptions) => WechatRequestTask;
 
+export type WechatUrlInputType = "string" | "url-like" | "request-like" | "unknown";
+
+export interface WechatUrlDiagnostics {
+  inputType: WechatUrlInputType;
+  hasInputUrl: boolean;
+  isAbsolute: boolean;
+  protocol: string | null;
+  hostname: string | null;
+  pathname: string | null;
+  stage: "normalize";
+}
+
 type HeadersLike = { forEach?: (callback: (value: string, key: string) => void) => void };
 
 /**
@@ -119,6 +131,65 @@ function requestStartError(): Error {
   return error;
 }
 
+export class WechatFetchInvalidUrlError extends Error {
+  readonly diagnostics: WechatUrlDiagnostics;
+
+  constructor(diagnostics: WechatUrlDiagnostics) {
+    super("微信请求 URL 无效");
+    this.name = "WechatFetchInvalidUrlError";
+    this.diagnostics = diagnostics;
+  }
+}
+
+function isAbsoluteHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+
+function safeUrlDiagnostics(inputType: WechatUrlInputType, hasInputUrl: boolean, value: string | null): WechatUrlDiagnostics {
+  if (!value || !isAbsoluteHttpUrl(value)) {
+    return { inputType, hasInputUrl, isAbsolute: false, protocol: null, hostname: null, pathname: null, stage: "normalize" };
+  }
+  const match = value.trim().match(/^(https?):\/\/([^/?#:]+)(\/[^?#]*)?/i);
+  return {
+    inputType,
+    hasInputUrl,
+    isAbsolute: true,
+    protocol: match ? `${match[1].toLowerCase()}:` : null,
+    hostname: match?.[2] ?? null,
+    pathname: match?.[3] ?? "/",
+    stage: "normalize",
+  };
+}
+
+/**
+ * Normalizes the RequestInfo variants used by Supabase without ever coercing
+ * an object to "[object Object]". Relative paths are only valid with an
+ * explicit Supabase base URL.
+ */
+export function normalizeWechatRequestUrl(input: unknown, baseUrl?: string): { url: string; diagnostics: WechatUrlDiagnostics } {
+  let inputType: WechatUrlInputType = "unknown";
+  let value: string | null = null;
+  let hasInputUrl = false;
+  if (typeof input === "string") {
+    inputType = "string";
+    value = input;
+  } else if (input && typeof (input as { url?: unknown }).url === "string") {
+    inputType = "request-like";
+    hasInputUrl = true;
+    value = (input as { url: string }).url;
+  } else if (input && typeof (input as { href?: unknown }).href === "string") {
+    inputType = "url-like";
+    value = (input as { href: string }).href;
+  }
+  const initial = safeUrlDiagnostics(inputType, hasInputUrl, value);
+  if (!value) throw new WechatFetchInvalidUrlError(initial);
+  if (initial.isAbsolute) return { url: value.trim(), diagnostics: initial };
+  if (!baseUrl || !isAbsoluteHttpUrl(baseUrl)) throw new WechatFetchInvalidUrlError(initial);
+  const normalizedBase = baseUrl.trim().replace(/\/+$/, "");
+  const url = `${normalizedBase}/${value.replace(/^\/+/, "")}`;
+  return { url, diagnostics: safeUrlDiagnostics(inputType, hasInputUrl, url) };
+}
+
 function responseFrom(result: WechatRequestResult, url: string): Response {
   const body = toText(result.data);
   const headers = new WechatHeaders(result.header as Record<string, string> | undefined) as unknown as Headers;
@@ -142,9 +213,15 @@ function responseFrom(result: WechatRequestResult, url: string): Response {
  * Adapts the WeChat mini-program request API to the fetch surface consumed by
  * supabase-js. The adapter deliberately never logs request input or headers.
  */
-export function createWechatFetch(request: WechatRequest, defaultTimeoutMs = 15_000): typeof fetch {
+export function createWechatFetch(request: WechatRequest, defaultTimeoutMs = 15_000, baseUrl?: string): typeof fetch {
   return ((input: RequestInfo | URL, init: RequestInit = {}) => new Promise<Response>((resolve, reject) => {
-    const url = typeof input === "string" ? input : input.toString();
+    let url: string;
+    try {
+      url = normalizeWechatRequestUrl(input, baseUrl).url;
+    } catch (error) {
+      reject(error);
+      return;
+    }
     const signal = init.signal;
     if (signal?.aborted) {
       reject(abortError());
@@ -181,12 +258,12 @@ export function createWechatFetch(request: WechatRequest, defaultTimeoutMs = 15_
   })) as typeof fetch;
 }
 
-export function getWechatFetch(): typeof fetch {
+export function getWechatFetch(baseUrl?: string): typeof fetch {
   const miniProgram = globalThis as typeof globalThis & { wx?: { request?: WechatRequest } };
   if (typeof miniProgram.wx?.request !== "function") {
     const error = new Error("微信网络能力不可用");
     error.name = "WechatFetchUnavailableError";
     throw error;
   }
-  return createWechatFetch(miniProgram.wx.request.bind(miniProgram.wx));
+  return createWechatFetch(miniProgram.wx.request.bind(miniProgram.wx), 15_000, baseUrl);
 }

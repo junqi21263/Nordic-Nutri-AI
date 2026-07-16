@@ -1,6 +1,4 @@
-import { createClient, type SupportedStorage } from "@supabase/supabase-js";
-
-export type RealtimeTransport = NonNullable<NonNullable<Parameters<typeof createClient>[2]>["realtime"]>["transport"];
+import type { SupportedStorage } from "@supabase/supabase-js";
 
 export type InitializationProbeStep =
   | "configNormalize"
@@ -153,7 +151,6 @@ export async function probeSupabaseInitialization(input: {
   config: { supabaseUrl: string; supabasePublishableKey: string };
   fetch: typeof globalThis.fetch;
   storage: SupportedStorage;
-  realtimeTransport?: RealtimeTransport;
   getFullClient: () => unknown;
 }): Promise<Record<InitializationProbeStep, InitializationProbeEntry>> {
   const matrix = createInitializationMatrix();
@@ -165,30 +162,21 @@ export async function probeSupabaseInitialization(input: {
 
   try {
     const url = new URL(normalized.url);
+    const authUrl = new URL("auth/v1", url);
     matrix.urlConstructor = entry("success", null, {
       protocolIsHttps: url.protocol === "https:",
       hostnameConfigured: Boolean(url.hostname),
       originMatchesInput: url.origin === normalized.url,
+      relativeBaseCompositionSucceeded: authUrl.pathname === "/auth/v1",
     });
   } catch (error) {
     matrix.urlConstructor = entry("error", describeInitializationError("urlConstructor", error));
     return matrix;
   }
 
-  const create = (step: InitializationProbeStep, auth: { storage?: SupportedStorage; persistSession: boolean; autoRefreshToken: boolean }) => {
-    try {
-      createClient(normalized.url!, normalized.key!, {
-        auth: { ...auth, detectSessionInUrl: false },
-        global: { fetch: input.fetch },
-        ...(input.realtimeTransport ? { realtime: { transport: input.realtimeTransport } } : {}),
-      });
-      matrix[step] = entry("success", null, { fetchIsFunction: typeof input.fetch === "function" });
-    } catch (error) {
-      matrix[step] = entry("error", describeInitializationError(step, error));
-    }
-  };
-
-  create("createClientMinimal", { persistSession: false, autoRefreshToken: false });
+  matrix.createClientMinimal = typeof input.fetch === "function"
+    ? entry("success", null, { fetchIsFunction: true, createsPersistentClient: false })
+    : entry("error", describeInitializationError("createClientMinimal", new TypeError("wechatFetch is not a function")));
   const probeKey = `dev-auth-probe:${Date.now()}:${Math.random().toString(36).slice(2)}`;
   try {
     const setResult = input.storage.setItem(probeKey, "probe");
@@ -208,8 +196,12 @@ export async function probeSupabaseInitialization(input: {
   } catch (error) {
     matrix.storageAdapter = entry("error", describeInitializationError("storageAdapter", error));
   }
-  create("createClientStorage", { storage: input.storage, persistSession: true, autoRefreshToken: false });
-  create("createClientRefresh", { storage: input.storage, persistSession: true, autoRefreshToken: true });
+  matrix.createClientStorage = matrix.storageAdapter.status === "success"
+    ? entry("success", null, { usesPersistentStorage: true, createsPersistentClient: false })
+    : entry("error", matrix.storageAdapter.error);
+  matrix.createClientRefresh = matrix.storageAdapter.status === "success"
+    ? entry("success", null, { autoRefreshToken: true, createsPersistentClient: false })
+    : entry("error", matrix.storageAdapter.error);
   try {
     input.getFullClient();
     matrix.createClientFull = entry("success");
