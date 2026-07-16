@@ -1,13 +1,19 @@
 import { getCurrentProfile, loginWithWechat } from "../api/auth-api";
 import { getPublicRuntimeConfig } from "../api/environment";
 import { extractFunctionDiagnostics, truncateProjectRef, truncateUserId } from "../api/function-request-id";
-import { getSupabaseClient } from "../lib/supabase-client";
+import { getSupabaseClient, wechatStorage } from "../lib/supabase-client";
+import { getWechatFetch, installWechatHeadersCompat } from "../lib/wechat-fetch";
+import { unavailableWechatRealtimeTransport } from "../lib/wechat-realtime-transport";
 import { getCurrentUser, refreshSession, restoreSession, signOut } from "../auth/session-manager";
 import {
   createAuthHarnessSnapshot,
   type AuthHarnessSnapshot,
   type HarnessStep,
 } from "./auth-harness-state";
+import {
+  probeSupabaseInitialization,
+  type InitializationProbeStep,
+} from "./supabase-initialization-probe";
 export { getAuthHarnessRuntimeDiagnostics } from "./runtime-diagnostics";
 
 const loginSteps: HarnessStep[] = [
@@ -108,6 +114,13 @@ export class DevelopmentAuthHarness {
       causeName: null,
       causeMessage: null,
       missingCapability: null,
+      rawErrorName: null,
+      rawErrorMessage: null,
+      rawCauseName: null,
+      rawCauseMessage: null,
+      stackFrames: [],
+      errorFile: null,
+      errorFunction: null,
       currentStage: step ?? null,
       ...(step ? { steps: { [step]: "running" } } : {}),
     });
@@ -146,6 +159,13 @@ export class DevelopmentAuthHarness {
           ...(event.causeName !== undefined ? { causeName: event.causeName } : {}),
           ...(event.causeMessage !== undefined ? { causeMessage: event.causeMessage } : {}),
           ...(event.missingCapability !== undefined ? { missingCapability: event.missingCapability } : {}),
+          ...(event.rawErrorName !== undefined ? { rawErrorName: event.rawErrorName } : {}),
+          ...(event.rawErrorMessage !== undefined ? { rawErrorMessage: event.rawErrorMessage } : {}),
+          ...(event.rawCauseName !== undefined ? { rawCauseName: event.rawCauseName } : {}),
+          ...(event.rawCauseMessage !== undefined ? { rawCauseMessage: event.rawCauseMessage } : {}),
+          ...(event.stackFrames !== undefined ? { stackFrames: event.stackFrames } : {}),
+          ...(event.errorFile !== undefined ? { errorFile: event.errorFile } : {}),
+          ...(event.errorFunction !== undefined ? { errorFunction: event.errorFunction } : {}),
           steps: { [event.stage]: event.status },
         });
       });
@@ -153,6 +173,38 @@ export class DevelopmentAuthHarness {
     } catch (error) {
       if (this.snapshot.errorCode || this.snapshot.requestId || this.snapshot.httpStatus) this.fail(this.activeLoginStep);
       else await this.failRequest(error, this.activeLoginStep);
+    }
+  }
+
+  async runInitializationProbe(): Promise<void> {
+    try {
+      this.begin();
+      installWechatHeadersCompat();
+      const initializationMatrix = await probeSupabaseInitialization({
+        config: getPublicRuntimeConfig(),
+        fetch: getWechatFetch(),
+        storage: wechatStorage,
+        realtimeTransport: unavailableWechatRealtimeTransport,
+        getFullClient: getSupabaseClient,
+      });
+      const firstFailure = (Object.keys(initializationMatrix) as InitializationProbeStep[])
+        .map((step) => initializationMatrix[step])
+        .find((result) => result.status === "error");
+      this.update({
+        initializationMatrix,
+        ...(firstFailure?.error ? {
+          rawErrorName: firstFailure.error.rawErrorName,
+          rawErrorMessage: firstFailure.error.rawErrorMessage,
+          rawCauseName: firstFailure.error.rawCauseName,
+          rawCauseMessage: firstFailure.error.rawCauseMessage,
+          stackFrames: firstFailure.error.stackFrames,
+          errorFile: firstFailure.error.errorFile,
+          errorFunction: firstFailure.error.errorFunction,
+        } : {}),
+      });
+      if (firstFailure) this.fail(); else this.complete();
+    } catch (error) {
+      await this.failRequest(error);
     }
   }
 

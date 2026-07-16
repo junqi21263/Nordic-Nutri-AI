@@ -24,6 +24,14 @@ export interface AuthHarnessSnapshot {
   causeName: string | null;
   causeMessage: string | null;
   missingCapability: string | null;
+  rawErrorName: string | null;
+  rawErrorMessage: string | null;
+  rawCauseName: string | null;
+  rawCauseMessage: string | null;
+  stackFrames: string[];
+  errorFile: string | null;
+  errorFunction: string | null;
+  initializationMatrix: Record<InitializationProbeStep, InitializationProbeEntry>;
   currentStage: HarnessStep | null;
   userId: string | null;
   sessionStatus: SessionStatus;
@@ -43,6 +51,14 @@ export function createAuthHarnessSnapshot(): AuthHarnessSnapshot {
     causeName: null,
     causeMessage: null,
     missingCapability: null,
+    rawErrorName: null,
+    rawErrorMessage: null,
+    rawCauseName: null,
+    rawCauseMessage: null,
+    stackFrames: [],
+    errorFile: null,
+    errorFunction: null,
+    initializationMatrix: createInitializationMatrix(),
     currentStage: null,
     userId: null,
     sessionStatus: "unknown",
@@ -62,3 +78,8 @@ export function createAuthHarnessSnapshot(): AuthHarnessSnapshot {
     },
   };
 }
+import {
+  createInitializationMatrix,
+  type InitializationProbeEntry,
+  type InitializationProbeStep,
+} from "./supabase-initialization-probe";

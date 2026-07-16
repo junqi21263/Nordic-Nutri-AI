@@ -1,9 +1,11 @@
 import { createClient, type SupabaseClient, type SupportedStorage } from "@supabase/supabase-js";
 import Taro from "@tarojs/taro";
 import { getPublicRuntimeConfig } from "../api/environment";
+import { describeInitializationError } from "../dev/supabase-initialization-probe";
 import { getWechatFetch, installWechatHeadersCompat } from "./wechat-fetch";
+import { unavailableWechatRealtimeTransport } from "./wechat-realtime-transport";
 
-const storage: SupportedStorage = {
+export const wechatStorage: SupportedStorage = {
   getItem: (key) => {
     try { return Taro.getStorageSync(key) || null; } catch { return null; }
   },
@@ -95,12 +97,15 @@ export function getSupabaseClient(): SupabaseClient {
   try {
     installWechatHeadersCompat();
     singleton = createClient(config.supabaseUrl, config.supabasePublishableKey, {
-      auth: { storage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+      auth: { storage: wechatStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
       global: { fetch },
+      realtime: { transport: unavailableWechatRealtimeTransport },
     });
   } catch (error) {
     const cause = classifyClientCreateError(error);
-    throw initializationError("client-create", cause.causeName, cause.causeMessage, cause.missingCapability);
+    const wrapped = initializationError("client-create", cause.causeName, cause.causeMessage, cause.missingCapability);
+    Object.assign(wrapped, { localDiagnosticSafe: true, ...describeInitializationError("createClientFull", error) });
+    throw wrapped;
   }
   return singleton;
 }

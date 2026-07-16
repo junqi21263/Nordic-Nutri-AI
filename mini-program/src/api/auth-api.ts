@@ -37,6 +37,13 @@ export type WechatLoginObserver = (update: {
   causeName?: string | null;
   causeMessage?: string | null;
   missingCapability?: string | null;
+  rawErrorName?: string | null;
+  rawErrorMessage?: string | null;
+  rawCauseName?: string | null;
+  rawCauseMessage?: string | null;
+  stackFrames?: string[];
+  errorFile?: string | null;
+  errorFunction?: string | null;
 }) => void;
 
 function logFunctionEvent(event: "started" | "completed" | "failed", diagnostics?: {

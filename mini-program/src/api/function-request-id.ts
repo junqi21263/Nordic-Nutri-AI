@@ -12,6 +12,13 @@ export interface FunctionDiagnostics {
   causeName?: string | null;
   causeMessage?: string | null;
   missingCapability?: string | null;
+  rawErrorName?: string | null;
+  rawErrorMessage?: string | null;
+  rawCauseName?: string | null;
+  rawCauseMessage?: string | null;
+  stackFrames?: string[];
+  errorFile?: string | null;
+  errorFunction?: string | null;
 }
 
 const safeMessages: Record<string, string> = {
@@ -103,6 +110,29 @@ function readInitializationDiagnostics(error: unknown) {
   };
 }
 
+function readSafeLocalDiagnostics(error: unknown) {
+  if (!isRecord(error) || error.localDiagnosticSafe !== true) {
+    return {
+      rawErrorName: null,
+      rawErrorMessage: null,
+      rawCauseName: null,
+      rawCauseMessage: null,
+      stackFrames: [],
+      errorFile: null,
+      errorFunction: null,
+    };
+  }
+  return {
+    rawErrorName: typeof error.rawErrorName === "string" ? error.rawErrorName : null,
+    rawErrorMessage: typeof error.rawErrorMessage === "string" ? error.rawErrorMessage : null,
+    rawCauseName: typeof error.rawCauseName === "string" ? error.rawCauseName : null,
+    rawCauseMessage: typeof error.rawCauseMessage === "string" ? error.rawCauseMessage : null,
+    stackFrames: Array.isArray(error.stackFrames) ? error.stackFrames.filter((frame): frame is string => typeof frame === "string").slice(0, 3) : [],
+    errorFile: typeof error.errorFile === "string" ? error.errorFile : null,
+    errorFunction: typeof error.errorFunction === "string" ? error.errorFunction : null,
+  };
+}
+
 function safeMessageForErrorKind(errorKind: string | null): string | null {
   if (errorKind === "AbortError") return "请求已取消";
   if (errorKind === "WechatRequestStartError") return "微信网络请求未能启动";
@@ -140,6 +170,7 @@ export async function extractFunctionDiagnostics(error: unknown): Promise<Functi
     errorName: readSafeErrorName(error),
     errorKind: readSafeErrorName(error),
     ...readInitializationDiagnostics(error),
+    ...readSafeLocalDiagnostics(error),
   };
   if (!isRecord(error) || !isCloneableResponse(error.context)) return fallback;
 

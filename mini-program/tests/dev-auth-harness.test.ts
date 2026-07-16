@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   extractFunctionDiagnostics,
   truncateUserId,
@@ -8,6 +8,13 @@ import {
 import { createWechatFetch, installWechatHeadersCompat } from "../src/lib/wechat-fetch";
 import { createAuthHarnessSnapshot } from "../src/dev/auth-harness-state";
 import { getAuthHarnessRuntimeDiagnostics } from "../src/dev/runtime-diagnostics";
+import {
+  describeInitializationError,
+  normalizeSupabasePublicConfig,
+  probeSupabaseInitialization,
+} from "../src/dev/supabase-initialization-probe";
+
+afterEach(() => vi.unstubAllGlobals());
 
 const root = resolve(__dirname, "..");
 
@@ -25,7 +32,7 @@ describe("development auth harness boundary", () => {
   });
 
   it("initializes a redacted snapshot without session or identity data", () => {
-    expect(createAuthHarnessSnapshot()).toEqual({
+    expect(createAuthHarnessSnapshot()).toMatchObject({
       requestId: null,
       httpStatus: null,
       errorCode: null,
@@ -36,6 +43,13 @@ describe("development auth harness boundary", () => {
       causeName: null,
       causeMessage: null,
       missingCapability: null,
+      rawErrorName: null,
+      rawErrorMessage: null,
+      rawCauseName: null,
+      rawCauseMessage: null,
+      stackFrames: [],
+      errorFile: null,
+      errorFunction: null,
       currentStage: null,
       userId: null,
       sessionStatus: "unknown",
@@ -68,6 +82,8 @@ describe("development auth harness boundary", () => {
     expect(page).toContain("auth.getUser");
     expect(page).toContain("获取 user_settings");
     expect(page).toContain("测试 save-meal");
+    expect(page).toContain("运行初始化诊断");
+    expect(page).toContain("create-client-minimal");
     expect(page).toContain("HTTP 状态");
     expect(page).toContain("错误码");
     expect(page).toContain("用户 ID");
@@ -112,6 +128,13 @@ describe("development auth harness boundary", () => {
       causeName: null,
       causeMessage: null,
       missingCapability: null,
+      rawErrorName: null,
+      rawErrorMessage: null,
+      rawCauseName: null,
+      rawCauseMessage: null,
+      stackFrames: [],
+      errorFile: null,
+      errorFunction: null,
     });
   });
 
@@ -131,6 +154,13 @@ describe("development auth harness boundary", () => {
       causeName: null,
       causeMessage: null,
       missingCapability: null,
+      rawErrorName: null,
+      rawErrorMessage: null,
+      rawCauseName: null,
+      rawCauseMessage: null,
+      stackFrames: [],
+      errorFile: null,
+      errorFunction: null,
     });
   });
 
@@ -168,6 +198,28 @@ describe("development auth harness boundary", () => {
       missingCapability: "Headers",
     });
     expect(JSON.stringify(diagnostics)).not.toContain("native detail with a secret");
+  });
+
+  it("forwards only diagnostics explicitly marked safe by local initialization code", async () => {
+    const diagnostics = await extractFunctionDiagnostics(Object.assign(new Error("generic wrapper"), {
+      name: "SupabaseClientInitializationError",
+      localDiagnosticSafe: true,
+      rawErrorName: "Error",
+      rawErrorMessage: "Unknown JavaScript runtime without WebSocket support.",
+      rawCauseName: null,
+      rawCauseMessage: null,
+      stackFrames: ["at RealtimeClient._initializeOptions (vendors.js:1:101)"],
+      errorFile: "vendors.js",
+      errorFunction: "RealtimeClient._initializeOptions",
+    }));
+
+    expect(diagnostics).toMatchObject({
+      rawErrorName: "Error",
+      rawErrorMessage: "Unknown JavaScript runtime without WebSocket support.",
+      stackFrames: ["at RealtimeClient._initializeOptions (vendors.js:1:101)"],
+      errorFile: "vendors.js",
+      errorFunction: "RealtimeClient._initializeOptions",
+    });
   });
 
   it("bridges Supabase fetch calls to the WeChat request API without exposing request bodies", async () => {
@@ -261,5 +313,83 @@ describe("development auth harness boundary", () => {
       wxGetStorage: "available",
       wxSetStorage: "available",
     });
+  });
+
+  it("keeps a non-sensitive initialization TypeError and its local stack frames observable", () => {
+    const error = new TypeError("WebSocket is not a constructor");
+    error.stack = [
+      "TypeError: WebSocket is not a constructor",
+      "    at RealtimeClient._initializeOptions (vendors.js:1:101)",
+      "    at new RealtimeClient (vendors.js:1:202)",
+      "    at new SupabaseClient (vendors.js:1:303)",
+    ].join("\n");
+
+    expect(describeInitializationError("create-client-minimal", error)).toEqual({
+      initializationSubstage: "create-client-minimal",
+      rawErrorName: "TypeError",
+      rawErrorMessage: "WebSocket is not a constructor",
+      rawCauseName: null,
+      rawCauseMessage: null,
+      stackFrames: [
+        "at RealtimeClient._initializeOptions (vendors.js:1:101)",
+        "at new RealtimeClient (vendors.js:1:202)",
+        "at new SupabaseClient (vendors.js:1:303)",
+      ],
+      errorFile: "vendors.js",
+      errorFunction: "RealtimeClient._initializeOptions",
+    });
+  });
+
+  it("rejects quoted or semicolon-terminated public configuration instead of silently accepting it", () => {
+    expect(normalizeSupabasePublicConfig({
+      supabaseUrl: " 'https://example.supabase.co'; ",
+      supabasePublishableKey: "sb_publishable_example",
+    })).toMatchObject({ valid: false, reason: "URL contains quotes or a semicolon" });
+  });
+
+  it("identifies the Realtime WebSocket constructor as the first createClient failure when WebSocket is unavailable", async () => {
+    vi.stubGlobal("WebSocket", undefined);
+    const storage = {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    };
+    const matrix = await probeSupabaseInitialization({
+      config: {
+        supabaseUrl: "https://example.supabase.co",
+        supabasePublishableKey: "sb_publishable_example",
+      },
+      fetch: (() => Promise.resolve({})) as typeof fetch,
+      storage,
+      getFullClient: () => { throw new Error("full client intentionally not used in this probe"); },
+    });
+
+    expect(matrix.createClientMinimal).toMatchObject({
+      status: "error",
+      error: {
+        rawErrorMessage: expect.stringContaining("WebSocket"),
+      },
+    });
+    expect(matrix.storageAdapter.status).toBe("success");
+  });
+
+  it("allows Auth and Functions client initialization without WebSocket when Realtime has an explicit unavailable transport", async () => {
+    vi.stubGlobal("WebSocket", undefined);
+    const storage = { getItem: () => null, setItem: () => undefined, removeItem: () => undefined };
+    const unavailableTransport = class { constructor() { throw new Error("Realtime is unavailable in WeChat"); } };
+    const matrix = await probeSupabaseInitialization({
+      config: {
+        supabaseUrl: "https://example.supabase.co",
+        supabasePublishableKey: "sb_publishable_example",
+      },
+      fetch: (() => Promise.resolve({})) as typeof fetch,
+      storage,
+      realtimeTransport: unavailableTransport,
+      getFullClient: () => ({}),
+    });
+
+    expect(matrix.createClientMinimal.status).toBe("success");
+    expect(matrix.createClientStorage.status).toBe("success");
+    expect(matrix.createClientRefresh.status).toBe("success");
   });
 });

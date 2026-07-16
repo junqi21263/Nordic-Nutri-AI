@@ -13,6 +13,7 @@ import {
   type HarnessStatus,
   type HarnessStep,
 } from "../../dev/auth-harness-state";
+import type { InitializationProbeStep } from "../../dev/supabase-initialization-probe";
 import { PageLayout } from "../../layouts/page-layout";
 
 const steps: Array<{ key: HarnessStep; label: string }> = [
@@ -36,6 +37,17 @@ const statusLabel: Record<HarnessStatus, string> = {
   error: "失败",
 };
 
+const initializationSteps: Array<{ key: InitializationProbeStep; label: string }> = [
+  { key: "configNormalize", label: "config-normalize" },
+  { key: "urlConstructor", label: "url-constructor" },
+  { key: "createClientMinimal", label: "create-client-minimal" },
+  { key: "storageAdapter", label: "storage-adapter" },
+  { key: "createClientStorage", label: "create-client-storage" },
+  { key: "createClientRefresh", label: "create-client-refresh" },
+  { key: "createClientFull", label: "create-client-full" },
+  { key: "functionInvoke", label: "function-invoke" },
+];
+
 export default function DevelopmentAuthHarnessPage() {
   const [snapshot, setSnapshot] = useState<AuthHarnessSnapshot>(() => createAuthHarnessSnapshot());
   const harness = useMemo(() => new DevelopmentAuthHarness(setSnapshot), []);
@@ -55,6 +67,16 @@ export default function DevelopmentAuthHarnessPage() {
         <View className="list-item"><Text>realAuthEnabled</Text><Text>{String(configDiagnostics.realAuthEnabled)}</Text></View>
         <View className="list-item"><Text>realBackendEnabled</Text><Text>{String(configDiagnostics.realBackendEnabled)}</Text></View>
         <View className="list-item"><Text>runtimeEnv</Text><Text>{configDiagnostics.runtimeEnv}</Text></View>
+      </AppCard>
+
+      <AppCard className="content-stack content-stack--compact">
+        <Text className="section-title__title">初始化矩阵</Text>
+        {initializationSteps.map((step) => (
+          <View className="list-item" key={step.key}>
+            <Text>{step.label}</Text>
+            <Text>{statusLabel[snapshot.initializationMatrix[step.key].status]}</Text>
+          </View>
+        ))}
       </AppCard>
 
       <AppCard className="content-stack content-stack--compact">
@@ -110,6 +132,13 @@ export default function DevelopmentAuthHarnessPage() {
           <Text>缺失能力</Text>
           <Text>{snapshot.missingCapability ?? "—"}</Text>
         </View>
+        <View className="list-item"><Text>raw error.name</Text><Text>{snapshot.rawErrorName ?? "—"}</Text></View>
+        <View className="list-item"><Text>raw error.message</Text><Text>{snapshot.rawErrorMessage ?? "—"}</Text></View>
+        <View className="list-item"><Text>raw cause.name</Text><Text>{snapshot.rawCauseName ?? "—"}</Text></View>
+        <View className="list-item"><Text>raw cause.message</Text><Text>{snapshot.rawCauseMessage ?? "—"}</Text></View>
+        <View className="list-item"><Text>抛错文件</Text><Text>{snapshot.errorFile ?? "—"}</Text></View>
+        <View className="list-item"><Text>抛错函数</Text><Text>{snapshot.errorFunction ?? "—"}</Text></View>
+        {snapshot.stackFrames.map((frame, index) => <View className="list-item" key={`${frame}-${index}`}><Text>stack {index + 1}</Text><Text>{frame}</Text></View>)}
         <View className="list-item">
           <Text>HTTP 状态</Text>
           <Text>{snapshot.httpStatus ?? "—"}</Text>
@@ -133,6 +162,7 @@ export default function DevelopmentAuthHarnessPage() {
       </AppCard>
 
       <View className="content-stack content-stack--compact">
+        <AppButton variant="outline" loading={isRunning} onClick={run(() => harness.runInitializationProbe())}>运行初始化诊断</AppButton>
         <AppButton loading={isRunning} onClick={run(() => harness.login())}>执行微信登录</AppButton>
         <AppButton variant="outline" loading={isRunning} onClick={run(() => harness.getSessionStatus())}>获取当前 Session 状态</AppButton>
         <AppButton variant="outline" loading={isRunning} onClick={run(() => harness.currentUser())}>获取 auth.getUser</AppButton>
