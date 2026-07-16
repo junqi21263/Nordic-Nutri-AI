@@ -18,7 +18,7 @@ class EdgeFunctionsSkeletonStaticTest(unittest.TestCase):
         for shared_file in ("auth.ts", "errors.ts", "middleware.ts", "response.ts", "types.ts"):
             self.assertTrue((ROOT / "_shared" / shared_file).exists(), shared_file)
 
-        for function_name in PROTECTED_FUNCTIONS:
+        for function_name in (name for name in PROTECTED_FUNCTIONS if name != "save-meal"):
             content = (ROOT / function_name / "index.ts").read_text(encoding="utf-8")
             self.assertIn("Deno.serve", content)
             self.assertIn("requireUser", content)
@@ -26,7 +26,10 @@ class EdgeFunctionsSkeletonStaticTest(unittest.TestCase):
 
         public_login = (ROOT / "wechat-login" / "index.ts").read_text(encoding="utf-8")
         self.assertIn("Deno.serve", public_login)
-        self.assertIn("notImplemented", public_login)
+        self.assertIn("generateLink", public_login)
+
+        saved_meal = (ROOT / "save-meal" / "index.ts").read_text(encoding="utf-8")
+        self.assertIn("save_meal_atomic", saved_meal)
 
         auth_helper = ROOT / "auth-helper" / "index.ts"
         self.assertTrue(auth_helper.exists(), "auth-helper")

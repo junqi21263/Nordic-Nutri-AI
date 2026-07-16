@@ -4,7 +4,7 @@
 
 | 能力/页面 | 方法与路径 | 登录 | Edge | 请求/结果 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 微信登录/启动恢复 | POST `/wechat-login` | 否 | 是 | `{code}` → 会话 OTP/JWT | 占位：校验后 NOT_IMPLEMENTED |
+| 微信登录/启动恢复 | POST `/wechat-login` | 否 | 是 | `{code}` → `{tokenHash,type,userId}`；客户端 verifyOtp 换 session | 已实现 Function；需配置微信 Secrets |
 | 当前用户 | GET `/auth/v1/user` | 是 | 否 | JWT → Auth user | Supabase 标准能力 |
 | 个人资料/Profile 编辑 | GET/PATCH `/rest/v1/profiles` | 是 | 否 | ProfileInput → profile | 可用 RLS CRUD |
 | 偏好/引导饮食页 | GET/PATCH `/rest/v1/user_settings` | 是 | 否 | 饮食模式、忌口、餐数、设置 | 可用 RLS CRUD |
@@ -14,7 +14,7 @@
 | 餐食详情/手工编辑 | POST/PATCH `/rest/v1/meal_records` | 是 | 否 | MealRecordInput header；`client_request_id` 去重 | 可用 |
 | 餐食明细 | POST/PATCH/DELETE `/rest/v1/meal_items` | 是 | 否 | MealItemInput；触发器重算总量 | 可用 |
 | 餐食归档 | PATCH `/rest/v1/meal_records?id=eq.<id>` | 是 | 否 | `{deleted_at}` | 可用；不硬删除 |
-| 原子确认餐食 | POST `/save-meal` | 是 | 是 | MealRecordInput → record | 骨架；NOT_IMPLEMENTED |
+| 原子确认餐食 | POST `/save-meal` | 是 | 是 | MealRecordInput → 完整餐食 | 已实现：JWT 范围 RPC + 幂等 |
 | 上传/分析 | Storage upload；POST `/analyze-food` | 是 | 是 | `{objectPath,sha256}` → analysis | 骨架；NOT_IMPLEMENTED |
 | 当前/历史计划 | GET `/rest/v1/nutrition_plans` | 是 | 否 | status/effective_from 分页 | 只读可用 |
 | 生成/激活计划 | POST `/generate-plan` | 是 | 是 | `{bodyProfileId,healthGoalId}` → plan | 骨架；NOT_IMPLEMENTED |

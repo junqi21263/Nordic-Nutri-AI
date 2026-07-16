@@ -33,7 +33,7 @@ class BackendPhaseOneStaticTest(unittest.TestCase):
         self.assertIn("meal items: users update own items", sql)
 
     def test_edge_functions_expose_contract_validation_and_safe_not_implemented_errors(self):
-        for name in ("wechat-login", "analyze-food", "generate-plan", "coach-answer"):
+        for name in ("analyze-food", "generate-plan", "coach-answer"):
             content = (FUNCTIONS / name / "index.ts").read_text(encoding="utf-8")
             self.assertIn("parseJsonBody", content)
             self.assertIn("notImplemented", content)

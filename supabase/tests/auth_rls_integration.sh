@@ -227,6 +227,16 @@ paged_meals="$(curl -sS --fail-with-body "$api_url/rest/v1/meal_records?select=i
   -H "apikey: $anon_key" -H "authorization: Bearer $access_token_a")"
 [[ "$(jq -er 'length' <<<"$paged_meals")" == "2" ]]
 
+atomic_request_id="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+atomic_payload="$(jq -nc --arg request_id "$atomic_request_id" '{p_input: {clientRequestId: $request_id, name: "Atomic meal", mealType: "dinner", recordedAt: "2026-07-16T19:00:00Z", items: [{name: "Atomic salmon", confirmedQuantityG: 100, caloriesPer100g: 200, proteinGPer100g: 20, carbsGPer100g: 0, fatGPer100g: 12}]}}')"
+atomic_response="$(curl -sS -w $'\n%{http_code}' "$api_url/rest/v1/rpc/save_meal_atomic" \
+  -H "apikey: $anon_key" -H "authorization: Bearer $access_token_a" \
+  -H 'content-type: application/json' --data "$atomic_payload")"
+atomic_status="${atomic_response##*$'\n'}"
+atomic_result="${atomic_response%$'\n'*}"
+if [[ "$atomic_status" != "200" ]]; then echo "atomic meal failed ($atomic_status): $atomic_result" >&2; exit 1; fi
+jq -e '.meal.name == "Atomic meal" and (.items | length) == 1' >/dev/null <<<"$atomic_result"
+
 curl -sS --fail-with-body -X PATCH "$api_url/rest/v1/meal_records?id=eq.$meal_id" \
   -H "apikey: $anon_key" -H "authorization: Bearer $access_token_a" \
   -H 'content-type: application/json' --data '{"deleted_at":"2026-07-16T13:00:00Z"}' >/dev/null

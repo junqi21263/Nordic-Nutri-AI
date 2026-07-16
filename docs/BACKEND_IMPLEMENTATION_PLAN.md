@@ -12,3 +12,5 @@
 | 8 联调/移除 fixture | inactive API adapter 接到页面 | 视觉回归、真实/fixture 切换、灰度 | 必须先完成视觉冻结；本阶段禁止启用 |
 
 本阶段已完成 1–3 的数据库/RLS/契约基础及 4–7 的安全函数骨架。每次迁移执行 `supabase db reset --local`、静态测试、RLS 集成测试；部署前补 Function 实测与安全审计。
+
+Phase 2 已完成认证 Function、会话契约与原子手工餐食保存；下一步仅在视觉冻结后，以 feature flag 接入独立 auth/API adapter。

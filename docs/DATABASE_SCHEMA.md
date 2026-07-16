@@ -13,7 +13,10 @@
 | uploaded_assets, ai_analysis | 私有对象元数据；分析草稿关联 asset、hash、请求幂等 | `(bucket_id,object_path)` 唯一；分析不与最终餐食混淆 |
 | meal_records, meal_items | 餐次及用户确认的数量/营养快照 | `client_request_id` 每用户唯一；明细触发器重算总量；`deleted_at` 软删除 |
 | coach_conversations, coach_messages | 会话与消息两级；role/content/status | 会话按 `(user_id,last_message_at)`；消息按 conversation 游标分页 |
+| wechat_identities, wechat_login_codes | openid SHA-256 映射与 code 重放记录 | 无 anon/authenticated 权限；仅 Edge service role 使用 |
 
 餐食采用软删除/归档，不做物理删除；列表必须 `deleted_at=is.null`。首页在 Phase 1 从未删除餐次实时汇总，`daily_health_summaries` 仅在性能数据证明必要时引入。
+
+Phase 2 新增 `active_meal_records` security-invoker 视图，普通列表应查询该视图；归档与恢复明确查询/更新基表的 owner 行。Body Profile 新增 `birth_date`，真实接入后以生日替代会自然过期的 age 输入。
 
 RLS：profiles/settings/body/goals/assets/计划/会话均用 `(select auth.uid()) = owner`；meal_items 通过所属 meal_records 的 owner 判定。INSERT 与 UPDATE 均有 `WITH CHECK`，UPDATE 同时有 SELECT/USING；跨用户读写返回空或拒绝。Storage bucket `food-images` 私有，首级目录必须等于 uid；仅 jpeg/webp、5MB，禁止客户端 upsert。

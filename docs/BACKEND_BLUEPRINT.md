@@ -19,6 +19,8 @@
 
 `小程序 → wechat-login → 微信 code2Session → Auth/Admin → JWT → Data API/RLS`。真实微信交换尚未配置，当前函数只校验 code 并返回 `NOT_IMPLEMENTED`。
 
+Phase 2 已将该链路实现为官方 OTP bridge：Function 通过 `generateLink` 返回一次性 token hash，小程序用 `verifyOtp` 换取 Supabase 标准 session；绝不由 Function 自制 JWT。
+
 图片先直传私有 `food-images`（`{uid}/{yyyy}/{mm}/{uuid}.jpg|webp`），再写 uploaded_assets，最后调用 `analyze-food`。分析草稿使用已有 ai_analysis；用户可在确认保存前编辑候选食材，最终 meal_items 保存用户确认数量与营养快照。原图不进入日志，临时未保存分析可在 24 小时后清理。
 
 ## 运行规范
