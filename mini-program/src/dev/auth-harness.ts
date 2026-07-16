@@ -8,6 +8,7 @@ import {
   type AuthHarnessSnapshot,
   type HarnessStep,
 } from "./auth-harness-state";
+export { getAuthHarnessRuntimeDiagnostics } from "./runtime-diagnostics";
 
 const loginSteps: HarnessStep[] = [
   "configCheck",
@@ -103,6 +104,10 @@ export class DevelopmentAuthHarness {
       message: null,
       errorName: null,
       errorKind: null,
+      initializationStage: null,
+      causeName: null,
+      causeMessage: null,
+      missingCapability: null,
       currentStage: step ?? null,
       ...(step ? { steps: { [step]: "running" } } : {}),
     });
@@ -137,6 +142,10 @@ export class DevelopmentAuthHarness {
           ...(event.message !== undefined ? { message: event.message } : {}),
           ...(event.errorName !== undefined ? { errorName: event.errorName } : {}),
           ...(event.errorKind !== undefined ? { errorKind: event.errorKind } : {}),
+          ...(event.initializationStage !== undefined ? { initializationStage: event.initializationStage } : {}),
+          ...(event.causeName !== undefined ? { causeName: event.causeName } : {}),
+          ...(event.causeMessage !== undefined ? { causeMessage: event.causeMessage } : {}),
+          ...(event.missingCapability !== undefined ? { missingCapability: event.missingCapability } : {}),
           steps: { [event.stage]: event.status },
         });
       });

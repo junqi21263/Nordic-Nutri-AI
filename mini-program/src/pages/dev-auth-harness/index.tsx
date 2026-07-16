@@ -2,7 +2,11 @@ import { Text, View } from "@tarojs/components";
 import { useMemo, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
-import { DevelopmentAuthHarness, getAuthHarnessConfigDiagnostics } from "../../dev/auth-harness";
+import {
+  DevelopmentAuthHarness,
+  getAuthHarnessConfigDiagnostics,
+  getAuthHarnessRuntimeDiagnostics,
+} from "../../dev/auth-harness";
 import {
   createAuthHarnessSnapshot,
   type AuthHarnessSnapshot,
@@ -36,6 +40,7 @@ export default function DevelopmentAuthHarnessPage() {
   const [snapshot, setSnapshot] = useState<AuthHarnessSnapshot>(() => createAuthHarnessSnapshot());
   const harness = useMemo(() => new DevelopmentAuthHarness(setSnapshot), []);
   const configDiagnostics = useMemo(() => getAuthHarnessConfigDiagnostics(), []);
+  const runtimeDiagnostics = useMemo(() => getAuthHarnessRuntimeDiagnostics(), []);
   const isRunning = snapshot.operationStatus === "running";
 
   const run = (action: () => Promise<void>) => () => void action();
@@ -50,6 +55,19 @@ export default function DevelopmentAuthHarnessPage() {
         <View className="list-item"><Text>realAuthEnabled</Text><Text>{String(configDiagnostics.realAuthEnabled)}</Text></View>
         <View className="list-item"><Text>realBackendEnabled</Text><Text>{String(configDiagnostics.realBackendEnabled)}</Text></View>
         <View className="list-item"><Text>runtimeEnv</Text><Text>{configDiagnostics.runtimeEnv}</Text></View>
+      </AppCard>
+
+      <AppCard className="content-stack content-stack--compact">
+        <Text className="section-title__title">运行时能力检查</Text>
+        <View className="list-item"><Text>globalThis.fetch</Text><Text>{runtimeDiagnostics.fetch}</Text></View>
+        <View className="list-item"><Text>globalThis.Headers</Text><Text>{runtimeDiagnostics.Headers}</Text></View>
+        <View className="list-item"><Text>globalThis.Request</Text><Text>{runtimeDiagnostics.Request}</Text></View>
+        <View className="list-item"><Text>globalThis.Response</Text><Text>{runtimeDiagnostics.Response}</Text></View>
+        <View className="list-item"><Text>globalThis.URL</Text><Text>{runtimeDiagnostics.URL}</Text></View>
+        <View className="list-item"><Text>globalThis.AbortController</Text><Text>{runtimeDiagnostics.AbortController}</Text></View>
+        <View className="list-item"><Text>wx.request</Text><Text>{runtimeDiagnostics.wxRequest}</Text></View>
+        <View className="list-item"><Text>wx.getStorage</Text><Text>{runtimeDiagnostics.wxGetStorage}</Text></View>
+        <View className="list-item"><Text>wx.setStorage</Text><Text>{runtimeDiagnostics.wxSetStorage}</Text></View>
       </AppCard>
 
       <AppCard className="content-stack content-stack--compact">
@@ -75,6 +93,22 @@ export default function DevelopmentAuthHarnessPage() {
         <View className="list-item">
           <Text>错误名称</Text>
           <Text>{snapshot.errorName ?? "—"}</Text>
+        </View>
+        <View className="list-item">
+          <Text>初始化阶段</Text>
+          <Text>{snapshot.initializationStage ?? "—"}</Text>
+        </View>
+        <View className="list-item">
+          <Text>cause.name</Text>
+          <Text>{snapshot.causeName ?? "—"}</Text>
+        </View>
+        <View className="list-item">
+          <Text>cause.message</Text>
+          <Text>{snapshot.causeMessage ?? "—"}</Text>
+        </View>
+        <View className="list-item">
+          <Text>缺失能力</Text>
+          <Text>{snapshot.missingCapability ?? "—"}</Text>
         </View>
         <View className="list-item">
           <Text>HTTP 状态</Text>

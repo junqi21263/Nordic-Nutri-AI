@@ -20,6 +20,10 @@ export interface AuthHarnessSnapshot {
   message: string | null;
   errorName: string | null;
   errorKind: string | null;
+  initializationStage: string | null;
+  causeName: string | null;
+  causeMessage: string | null;
+  missingCapability: string | null;
   currentStage: HarnessStep | null;
   userId: string | null;
   sessionStatus: SessionStatus;
@@ -35,6 +39,10 @@ export function createAuthHarnessSnapshot(): AuthHarnessSnapshot {
     message: null,
     errorName: null,
     errorKind: null,
+    initializationStage: null,
+    causeName: null,
+    causeMessage: null,
+    missingCapability: null,
     currentStage: null,
     userId: null,
     sessionStatus: "unknown",

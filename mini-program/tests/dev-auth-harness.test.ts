@@ -5,8 +5,9 @@ import {
   extractFunctionDiagnostics,
   truncateUserId,
 } from "../src/api/function-request-id";
-import { createWechatFetch } from "../src/lib/wechat-fetch";
+import { createWechatFetch, installWechatHeadersCompat } from "../src/lib/wechat-fetch";
 import { createAuthHarnessSnapshot } from "../src/dev/auth-harness-state";
+import { getAuthHarnessRuntimeDiagnostics } from "../src/dev/runtime-diagnostics";
 
 const root = resolve(__dirname, "..");
 
@@ -20,7 +21,7 @@ describe("development auth harness boundary", () => {
     expect(appConfig).toContain('process.env.TARO_APP_ENV === "development"');
     expect(config).toContain('"process.env.TARO_APP_ENABLE_REAL_AUTH"');
     expect(config).toContain('"process.env.TARO_APP_USE_REAL_BACKEND"');
-    expect(supabaseClient).toContain('global: { fetch: getWechatFetch() }');
+    expect(supabaseClient).toContain("global: { fetch }");
   });
 
   it("initializes a redacted snapshot without session or identity data", () => {
@@ -31,6 +32,10 @@ describe("development auth harness boundary", () => {
       message: null,
       errorName: null,
       errorKind: null,
+      initializationStage: null,
+      causeName: null,
+      causeMessage: null,
+      missingCapability: null,
       currentStage: null,
       userId: null,
       sessionStatus: "unknown",
@@ -91,6 +96,80 @@ describe("development auth harness boundary", () => {
     expect(truncateUserId("12345678-1234-1234-1234-1234567890ab")).toBe("12345678…90ab");
   });
 
+  it("keeps local Function invocation failures observable without exposing their raw details", async () => {
+    const diagnostics = await extractFunctionDiagnostics(Object.assign(new Error("sensitive native detail"), {
+      name: "FunctionInvokeRuntimeError",
+    }));
+
+    expect(diagnostics).toEqual({
+      httpStatus: null,
+      errorCode: null,
+      message: "函数调用未到达 HTTP 响应层",
+      requestId: null,
+      errorName: "FunctionInvokeRuntimeError",
+      errorKind: "FunctionInvokeRuntimeError",
+      initializationStage: null,
+      causeName: null,
+      causeMessage: null,
+      missingCapability: null,
+    });
+  });
+
+  it("distinguishes Supabase client initialization from a Function runtime failure", async () => {
+    const diagnostics = await extractFunctionDiagnostics(Object.assign(new Error("sensitive setup detail"), {
+      name: "SupabaseClientInitializationError",
+    }));
+
+    expect(diagnostics).toEqual({
+      httpStatus: null,
+      errorCode: null,
+      message: "Supabase 客户端初始化失败",
+      requestId: null,
+      errorName: "SupabaseClientInitializationError",
+      errorKind: "SupabaseClientInitializationError",
+      initializationStage: null,
+      causeName: null,
+      causeMessage: null,
+      missingCapability: null,
+    });
+  });
+
+  it("surfaces only the safe initialization cause fields required by the development harness", async () => {
+    const diagnostics = await extractFunctionDiagnostics(Object.assign(new Error("native detail with a secret"), {
+      name: "SupabaseClientInitializationError",
+      initializationStage: "fetch-adapter",
+      causeName: "WechatFetchUnavailableError",
+      causeMessage: "微信网络能力不可用",
+      missingCapability: "wx.request",
+    }));
+
+    expect(diagnostics).toMatchObject({
+      initializationStage: "fetch-adapter",
+      causeName: "WechatFetchUnavailableError",
+      causeMessage: "微信网络能力不可用",
+      missingCapability: "wx.request",
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain("native detail with a secret");
+  });
+
+  it("allows the known missing Headers capability but still redacts unknown native details", async () => {
+    const diagnostics = await extractFunctionDiagnostics(Object.assign(new Error("native detail with a secret"), {
+      name: "SupabaseClientInitializationError",
+      initializationStage: "client-create",
+      causeName: "ReferenceError",
+      causeMessage: "Headers is not defined",
+      missingCapability: "Headers",
+    }));
+
+    expect(diagnostics).toMatchObject({
+      initializationStage: "client-create",
+      causeName: "ReferenceError",
+      causeMessage: "Headers is not defined",
+      missingCapability: "Headers",
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain("native detail with a secret");
+  });
+
   it("bridges Supabase fetch calls to the WeChat request API without exposing request bodies", async () => {
     const requests: Array<{ url: string; method?: string; header?: Record<string, string>; data?: unknown }> = [];
     const fetch = createWechatFetch((options) => {
@@ -130,6 +209,15 @@ describe("development auth harness boundary", () => {
       .rejects.toMatchObject({ name: "WechatFetchError", message: "微信网络请求失败" });
   });
 
+  it("classifies a synchronous wx.request startup failure without exposing native details", async () => {
+    const fetch = createWechatFetch(() => {
+      throw new Error("request:fail native implementation detail");
+    });
+
+    await expect(fetch("https://example.supabase.co/functions/v1/wechat-login"))
+      .rejects.toMatchObject({ name: "WechatRequestStartError", message: "微信网络请求未能启动" });
+  });
+
   it("supports controlled cancellation through the WeChat request task", async () => {
     let aborted = false;
     const fetch = createWechatFetch(() => ({ abort: () => { aborted = true; } }));
@@ -139,5 +227,39 @@ describe("development auth harness boundary", () => {
 
     await expect(pending).rejects.toMatchObject({ name: "AbortError", message: "请求已取消" });
     expect(aborted).toBe(true);
+  });
+
+  it("installs the minimal Headers constructor required by supabase-js when WeChat omits it", () => {
+    const runtime = {} as typeof globalThis;
+
+    const installed = installWechatHeadersCompat(runtime);
+    const headers = new runtime.Headers([["X-Request-Id", "request-123"]]);
+    headers.set("Authorization", "redacted");
+
+    expect(installed).toBe(true);
+    expect(headers.get("x-request-id")).toBe("request-123");
+    expect(headers.has("authorization")).toBe(true);
+  });
+
+  it("reports WeChat runtime capabilities as available or missing without exposing runtime objects", () => {
+    expect(getAuthHarnessRuntimeDiagnostics({
+      fetch: undefined,
+      Headers: undefined,
+      Request: class Request {},
+      Response: undefined,
+      URL: class URL {},
+      AbortController: undefined,
+      wx: { request: () => ({ abort: () => undefined }), getStorage: () => undefined, setStorage: () => undefined },
+    })).toEqual({
+      fetch: "missing",
+      Headers: "missing",
+      Request: "available",
+      Response: "missing",
+      URL: "available",
+      AbortController: "missing",
+      wxRequest: "available",
+      wxGetStorage: "available",
+      wxSetStorage: "available",
+    });
   });
 });

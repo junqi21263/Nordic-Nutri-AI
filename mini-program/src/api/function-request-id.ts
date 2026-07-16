@@ -8,6 +8,10 @@ export interface FunctionDiagnostics {
   requestId: string | null;
   errorName: string | null;
   errorKind: string | null;
+  initializationStage?: string | null;
+  causeName?: string | null;
+  causeMessage?: string | null;
+  missingCapability?: string | null;
 }
 
 const safeMessages: Record<string, string> = {
@@ -30,9 +34,35 @@ const safeErrorKinds = new Set([
   "FunctionsRelayError",
   "FunctionsFetchError",
   "WechatFetchError",
+  "WechatRequestStartError",
   "WechatFetchUnavailableError",
+  "SupabaseClientInitializationError",
+  "FunctionInvokeRuntimeError",
   "AbortError",
 ]);
+
+const safeInitializationStages = new Set(["config-validation", "url-validation", "fetch-adapter", "client-create"]);
+const safeInitializationCauseNames = new Set([
+  "ConfigurationError",
+  "InvalidSupabaseUrlError",
+  "ReferenceError",
+  "TypeError",
+  "WechatFetchUnavailableError",
+]);
+const safeInitializationMessages = new Set([
+  "Supabase public configuration is missing",
+  "Supabase URL is invalid",
+  "URL is not defined",
+  "URL is not a constructor",
+  "Headers is not defined",
+  "Headers is not a constructor",
+  "Request is not defined",
+  "Response is not defined",
+  "AbortController is not defined",
+  "微信网络能力不可用",
+  "初始化依赖抛出了本地异常",
+]);
+const safeMissingCapabilities = new Set(["URL", "Headers", "Request", "Response", "AbortController", "wx.request"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -56,8 +86,28 @@ function readSafeErrorName(value: unknown): string | null {
   return safeErrorKinds.has(value.name) ? value.name : "LocalError";
 }
 
+function readSafeString(value: unknown, key: string, allowed: Set<string>): string | null {
+  if (!isRecord(value) || typeof value[key] !== "string") return null;
+  return allowed.has(value[key]) ? value[key] : null;
+}
+
+function readInitializationDiagnostics(error: unknown) {
+  if (readSafeErrorName(error) !== "SupabaseClientInitializationError") {
+    return { initializationStage: null, causeName: null, causeMessage: null, missingCapability: null };
+  }
+  return {
+    initializationStage: readSafeString(error, "initializationStage", safeInitializationStages),
+    causeName: readSafeString(error, "causeName", safeInitializationCauseNames),
+    causeMessage: readSafeString(error, "causeMessage", safeInitializationMessages),
+    missingCapability: readSafeString(error, "missingCapability", safeMissingCapabilities),
+  };
+}
+
 function safeMessageForErrorKind(errorKind: string | null): string | null {
   if (errorKind === "AbortError") return "请求已取消";
+  if (errorKind === "WechatRequestStartError") return "微信网络请求未能启动";
+  if (errorKind === "SupabaseClientInitializationError") return "Supabase 客户端初始化失败";
+  if (errorKind === "FunctionInvokeRuntimeError") return "函数调用未到达 HTTP 响应层";
   if (errorKind === "FunctionsFetchError" || errorKind === "WechatFetchError" || errorKind === "WechatFetchUnavailableError") {
     return "网络请求未获得 HTTP 响应";
   }
@@ -89,6 +139,7 @@ export async function extractFunctionDiagnostics(error: unknown): Promise<Functi
     requestId: null,
     errorName: readSafeErrorName(error),
     errorKind: readSafeErrorName(error),
+    ...readInitializationDiagnostics(error),
   };
   if (!isRecord(error) || !isCloneableResponse(error.context)) return fallback;
 

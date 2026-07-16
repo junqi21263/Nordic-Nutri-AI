@@ -6,6 +6,16 @@ import { getCurrentUser, restoreSession } from "../auth/session-manager";
 
 let loginInFlight: Promise<Awaited<ReturnType<typeof getCurrentUser>>> | null = null;
 
+type WechatLoginFunctionResult = {
+  data: {
+    success: boolean;
+    data?: { tokenHash: string };
+    requestId?: string;
+  } | null;
+  error: unknown;
+  response: Response | undefined;
+};
+
 export type WechatLoginStage =
   | "wxLogin"
   | "functionInvokeStart"
@@ -23,6 +33,10 @@ export type WechatLoginObserver = (update: {
   message?: string | null;
   errorName?: string | null;
   errorKind?: string | null;
+  initializationStage?: string | null;
+  causeName?: string | null;
+  causeMessage?: string | null;
+  missingCapability?: string | null;
 }) => void;
 
 function logFunctionEvent(event: "started" | "completed" | "failed", diagnostics?: {
@@ -35,6 +49,12 @@ function logFunctionEvent(event: "started" | "completed" | "failed", diagnostics
     httpStatus: diagnostics?.httpStatus ?? null,
     requestId: diagnostics?.requestId ?? null,
   });
+}
+
+function functionInvokeRuntimeError(): Error {
+  const error = new Error("函数调用未到达 HTTP 响应层");
+  error.name = "FunctionInvokeRuntimeError";
+  return error;
 }
 
 export async function exchangeWechatTokenHash(tokenHash: string) {
@@ -58,11 +78,31 @@ export async function loginWithWechat(observer?: WechatLoginObserver) {
 
       observer?.({ stage: "functionInvokeStart", status: "running" });
       logFunctionEvent("started");
-      const { data, error, response } = await getSupabaseClient().functions.invoke<{
-        success: boolean;
-        data?: { tokenHash: string };
-        requestId?: string;
-      }>("wechat-login", { body: { code: login.code } });
+      let client: ReturnType<typeof getSupabaseClient>;
+      try {
+        client = getSupabaseClient();
+      } catch (error) {
+        const diagnostics = await extractFunctionDiagnostics(error);
+        observer?.({ stage: "functionInvokeStart", status: "error", ...diagnostics });
+        observer?.({ stage: "functionErrorParse", status: "success", ...diagnostics });
+        logFunctionEvent("failed", diagnostics);
+        throw error;
+      }
+      let functionResult: WechatLoginFunctionResult;
+      try {
+        functionResult = await client.functions.invoke<{
+          success: boolean;
+          data?: { tokenHash: string };
+          requestId?: string;
+        }>("wechat-login", { body: { code: login.code } }) as WechatLoginFunctionResult;
+      } catch {
+        const diagnostics = await extractFunctionDiagnostics(functionInvokeRuntimeError());
+        observer?.({ stage: "functionInvokeResponse", status: "error", ...diagnostics });
+        observer?.({ stage: "functionErrorParse", status: "success", ...diagnostics });
+        logFunctionEvent("failed", diagnostics);
+        throw functionInvokeRuntimeError();
+      }
+      const { data, error, response } = functionResult;
       const diagnostics = error
         ? await extractFunctionDiagnostics(error)
         : {
