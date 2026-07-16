@@ -927,6 +927,7 @@ export type Database = {
     }
     Functions: {
       save_meal_atomic: { Args: { p_input: Json }; Returns: Json }
+      update_meal_atomic: { Args: { p_input: Json }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
