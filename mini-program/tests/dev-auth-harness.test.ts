@@ -43,6 +43,12 @@ describe("development auth harness boundary", () => {
     expect(supabaseClient).toContain("global: { fetch }");
   });
 
+  it("keeps WeChat development watch output in place while the harness is registered", () => {
+    const devConfig = readFileSync(resolve(root, "config/dev.ts"), "utf8");
+
+    expect(devConfig).toContain('chain.output.set("clean", false)');
+  });
+
   it("initializes a redacted snapshot without session or identity data", () => {
     expect(createAuthHarnessSnapshot()).toMatchObject({
       requestId: null,
