@@ -74,4 +74,21 @@ describe("auth bootstrap", () => {
     expect(login).not.toHaveBeenCalled();
     expect(bootstrap.getState().status).toBe("unauthenticated");
   });
+
+  it("keeps a valid authenticated session when optional identity hydration fails", async () => {
+    const clear = vi.fn();
+    const bootstrap = createAuthBootstrap({
+      restore: vi.fn().mockResolvedValue(session),
+      getUser: vi.fn().mockResolvedValue(user),
+      refresh: vi.fn(),
+      login: vi.fn(),
+      loadIdentity: vi.fn().mockRejectedValue(new Error("profile network failure")),
+      clear,
+    });
+
+    await bootstrap.start();
+
+    expect(bootstrap.getState().status).toBe("authenticated");
+    expect(clear).not.toHaveBeenCalled();
+  });
 });

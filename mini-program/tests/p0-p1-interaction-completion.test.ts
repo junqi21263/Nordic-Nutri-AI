@@ -38,7 +38,7 @@ describe("P0 / P1 本地体验补全", () => {
     const manualMeal = read("pages/manual-meal/index.tsx");
 
     expect(config).toContain('"pages/manual-meal/index"');
-    expect(app).toContain("isOnboardingCompleted");
+    expect(app).toContain("startApplicationAuth");
     expect(plan).toContain("markOnboardingCompleted");
     expect(scanner).toContain("Taro.chooseMedia");
     expect(scanner).toContain("sourceType: [source]");

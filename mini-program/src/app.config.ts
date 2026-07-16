@@ -1,4 +1,5 @@
 const pages = [
+    "pages/auth-entry/index",
     "pages/onboarding/index",
     "pages/body-profile/index",
     "pages/diet-preferences/index",

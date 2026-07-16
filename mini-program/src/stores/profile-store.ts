@@ -1,5 +1,8 @@
 import { create } from "zustand";
 export interface ProfileSettings {
+  dietaryPattern: string | null;
+  foodAvoidances: string[];
+  mealsPerDay: number;
   theme: "light" | "dark" | "system";
   language: "zh-CN" | "en";
   notification: boolean;
@@ -14,8 +17,13 @@ export interface ProfilePreview {
   targetCalories: number;
 }
 export interface ProfileStore {
+  userId: string | null;
+  dataStatus: "idle" | "loading" | "ready" | "error";
   profile: ProfilePreview;
   settings: ProfileSettings;
+  beginUser: (userId: string) => void;
+  hydrate: (userId: string, profile: Partial<ProfilePreview>, settings: Partial<ProfileSettings>) => void;
+  resetUserData: () => void;
   setProfile: (profile: Partial<ProfilePreview>) => void;
   setSetting: <K extends keyof ProfileSettings>(key: K, value: ProfileSettings[K]) => void;
   reset: () => void;
@@ -33,6 +41,9 @@ const initialProfile = {
   targetCalories: 2600,
 };
 const initialSettings: ProfileSettings = {
+  dietaryPattern: null,
+  foodAvoidances: [],
+  mealsPerDay: 3,
   theme: "system",
   language: "zh-CN",
   notification: true,
@@ -75,8 +86,28 @@ const taroProfileStorage: ProfileStorage = {
 export const createProfileStore = (storage?: ProfileStorage) => {
   const profile = { ...initialProfile, ...storage?.read() };
   return create<ProfileStore>((set, get) => ({
+    userId: null,
+    dataStatus: "idle",
     profile,
     settings: initialSettings,
+    beginUser: (userId) => set({
+      userId,
+      dataStatus: "loading",
+      profile: { ...initialProfile },
+      settings: { ...initialSettings },
+    }),
+    hydrate: (userId, profileChanges, settingsChanges) => set({
+      userId,
+      dataStatus: "ready",
+      profile: { ...initialProfile, ...profileChanges },
+      settings: { ...initialSettings, ...settingsChanges },
+    }),
+    resetUserData: () => set({
+      userId: null,
+      dataStatus: "idle",
+      profile: { ...initialProfile },
+      settings: { ...initialSettings },
+    }),
     setProfile: (changes) => {
       const nextProfile = { ...get().profile, ...changes };
       storage?.write(nextProfile);
@@ -85,7 +116,7 @@ export const createProfileStore = (storage?: ProfileStorage) => {
     setSetting: (key, value) => set((s) => ({ settings: { ...s.settings, [key]: value } })),
     reset: () => {
       storage?.clear();
-      set({ profile: initialProfile, settings: initialSettings });
+      set({ profile: { ...initialProfile }, settings: { ...initialSettings } });
     },
   }));
 };

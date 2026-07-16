@@ -10,9 +10,16 @@ type UpdateQuery = {
   };
 };
 
+type ReadQuery = {
+  eq: (column: string, value: string) => {
+    single: () => Promise<{ data: Row | null; error: unknown }>;
+  };
+};
+
 export interface ProfileRepositoryClient {
   from: (table: "profiles" | "user_settings") => {
-    update: (payload: Row) => UpdateQuery;
+    update?: (payload: Row) => UpdateQuery;
+    select?: (columns: string) => ReadQuery;
   };
 }
 
@@ -60,13 +67,30 @@ function toSettingsPayload(input: SettingsUpdate): Row {
 }
 
 async function updateRow(client: ProfileRepositoryClient, table: "profiles" | "user_settings", userId: string, payload: Row) {
-  const { data, error } = await client.from(table).update(payload).eq("id", userId).select().single();
+  const update = client.from(table).update;
+  if (!update) throw repositoryError("保存能力不可用", "UNKNOWN");
+  const { data, error } = await update(payload).eq("id", userId).select().single();
   if (error || !data) throw repositoryError("保存失败，请稍后重试", "UNKNOWN");
+  return data;
+}
+
+async function selectRow(client: ProfileRepositoryClient, table: "profiles" | "user_settings", userId: string, columns: string) {
+  const select = client.from(table).select;
+  if (!select) throw repositoryError("读取能力不可用", "UNKNOWN");
+  const { data, error } = await select(columns).eq("id", userId).single();
+  if (error || !data) throw repositoryError("读取资料失败，请稍后重试", "UNKNOWN");
   return data;
 }
 
 export function createProfileRepository(client: ProfileRepositoryClient) {
   return {
+    async getIdentity(userId: string) {
+      const [profile, settings] = await Promise.all([
+        selectRow(client, "profiles", userId, "id,nickname,avatar_path,timezone,onboarding_completed_at"),
+        selectRow(client, "user_settings", userId, "id,dietary_pattern,food_avoidances,meals_per_day,theme,locale,unit_system,notification_enabled"),
+      ]);
+      return { profile, settings };
+    },
     async updateProfile(userId: string, input: ProfileUpdate) {
       return updateRow(client, "profiles", userId, toProfilePayload(input));
     },

@@ -1,10 +1,15 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useState } from "react";
+import { getPublicRuntimeConfig } from "../../api/environment";
+import { useAuthStore } from "../../auth/auth-store";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { NordicIcon } from "../../components/nordic-icon";
 import { PageLayout } from "../../layouts/page-layout";
+import { getSupabaseClient } from "../../lib/supabase-client";
+import { createProfileRepository, type ProfileRepositoryClient } from "../../repositories/profile-repository";
+import { selectRuntimeAdapter } from "../../repositories/runtime-adapter";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { navigateBackOrHome } from "../../utils/navigation";
@@ -13,24 +18,40 @@ const goalOptions = ["精益增肌", "轻盈减脂", "保持状态"];
 
 export default function ProfileEditPage() {
   const profile = useProfileStore();
+  const auth = useAuthStore();
   const feedback = useFeedbackStore();
   const [nickname, setNickname] = useState(profile.profile.nickname);
   const [weight, setWeight] = useState(String(profile.profile.weight));
   const [goalLabel, setGoalLabel] = useState(profile.profile.goalLabel);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const save = () => {
+  const save = async () => {
     const nextWeight = Number(weight);
     if (!Number.isFinite(nextWeight) || nextWeight < 30 || nextWeight > 300) {
       feedback.show({ message: "请输入 30–300 kg 的体重", tone: "error" });
       return;
     }
-    profile.setProfile({
-      nickname: nickname.trim() || profile.profile.nickname,
-      weight: nextWeight,
-      goalLabel,
-    });
-    feedback.show({ message: "个人资料已保存", tone: "success" });
-    navigateBackOrHome("/pages/profile/index");
+    const nextNickname = nickname.trim() || profile.profile.nickname;
+    setIsSaving(true);
+    try {
+      let savedNickname = nextNickname;
+      if (selectRuntimeAdapter(getPublicRuntimeConfig()) === "supabase") {
+        if (!auth.user?.id) {
+          feedback.show({ message: "登录状态已失效，请重新登录", tone: "error" });
+          return;
+        }
+        const saved = await createProfileRepository(getSupabaseClient() as unknown as ProfileRepositoryClient)
+          .updateProfile(auth.user.id, { nickname: nextNickname });
+        if (typeof saved.nickname === "string" && saved.nickname.trim()) savedNickname = saved.nickname;
+      }
+      profile.setProfile({ nickname: savedNickname, weight: nextWeight, goalLabel });
+      feedback.show({ message: "个人资料已保存", tone: "success" });
+      navigateBackOrHome("/pages/profile/index");
+    } catch {
+      feedback.show({ message: "个人资料保存失败，请稍后重试", tone: "error" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -114,7 +135,7 @@ export default function ProfileEditPage() {
         </View>
       </View>
       <View className="profile-edit__action">
-        <AppButton size="large" onClick={save}>
+        <AppButton size="large" loading={isSaving} onClick={() => void save()}>
           保存资料
         </AppButton>
       </View>

@@ -31,4 +31,23 @@ describe("profile and settings repository", () => {
 
     expect(update).not.toHaveBeenCalled();
   });
+
+  it("loads profile and settings separately for the authenticated user", async () => {
+    const select = vi.fn((columns: string) => ({
+      eq: (column: string, value: string) => ({
+        single: async () => ({ data: { id: value, columns }, error: null }),
+      }),
+    }));
+    const client = {
+      from: vi.fn(() => ({ select })),
+    };
+    const repository = createProfileRepository(client);
+
+    const identity = await repository.getIdentity("u1");
+
+    expect(client.from).toHaveBeenNthCalledWith(1, "profiles");
+    expect(client.from).toHaveBeenNthCalledWith(2, "user_settings");
+    expect(identity.profile.id).toBe("u1");
+    expect(identity.settings.id).toBe("u1");
+  });
 });

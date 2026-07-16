@@ -39,7 +39,11 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
       await clear();
       return;
     }
-    await dependencies.loadIdentity(user);
+    try {
+      await dependencies.loadIdentity(user);
+    } catch {
+      // A profile/settings read failure must not invalidate an already verified Auth session.
+    }
     setStatus("authenticated");
   };
 
