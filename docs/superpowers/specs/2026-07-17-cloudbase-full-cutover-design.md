@@ -21,13 +21,13 @@ Taro / React 小程序
   └─ wx.cloud.init({ env: "lewis-healthy-d4glgqqzv73a5bc10" })
       └─ wx.cloud.callFunction
           └─ CloudBase 事件云函数
-              ├─ cloud.getWXContext() 取得可信 OPENID
+              ├─ CloudBase Auth 取得可信 uid；上下文读取 OPENID 仅用于旧账户匹配
               ├─ 用户身份绑定与授权
               ├─ CloudBase PostgreSQL 事务 / SQL RPC
               └─ CloudBase Storage 私有对象
 ```
 
-不让小程序直接提交或信任 `user_id`、OPENID、数据库 owner 字段或管理凭据。云函数从平台上下文取得 OPENID，解析为内部用户 ID 后再执行所有读取和写入。
+不让小程序直接提交或信任 `user_id`、OPENID、数据库 owner 字段或管理凭据。云函数以 CloudBase `uid` 作为调用者身份，首次绑定后解析为内部用户 ID；仅在迁移绑定期间读取可信 OPENID 计算旧账户匹配哈希。
 
 选择云函数作为业务边界的原因是本项目保存健康数据且存在跨表事务、历史身份映射和 AI/上传扩展需求；它比在小程序端直接暴露 PostgreSQL CRUD 更容易保持最小权限和一致的授权规则。
 
@@ -37,14 +37,14 @@ Taro / React 小程序
 
 1. 小程序启动时执行一次 `wx.cloud.init`。
 2. 用户点击现有“登录并开始使用”按钮，调用 `bootstrap-user` 云函数。
-3. 云函数通过 `cloud.getWXContext()` 获得可信 OPENID；不需要 Supabase OTP、手工 JWT 或前端持久化 Token。
-4. 未找到映射用户时，创建 `app_users`、`profiles`、`user_settings` 默认记录并返回 `onboardingRequired: true`。
+3. 云函数读取 CloudBase Auth 的可信 `uid`；仅在首次绑定时从平台上下文取得 OPENID。两者均不由客户端传入；不需要 Supabase OTP、手工 JWT 或前端持久化 Token。
+4. 未找到映射用户时，创建 `app_users`、`profiles`、`user_settings` 默认记录，并将 CloudBase `uid` 绑定到内部用户 ID，返回 `onboardingRequired: true`。
 5. 小程序沿用现有 onboarding 路由；完成后进入首页。
 
 ### 已迁移用户
 
-1. `bootstrap-user` 对当前 OPENID 计算迁移匹配哈希。
-2. 命中历史身份映射后，将 CloudBase 身份绑定到保留的原业务用户 UUID。
+1. `bootstrap-user` 对当前可信 OPENID 计算迁移匹配哈希，并记录当前 CloudBase `uid`。
+2. 命中历史身份映射后，将 CloudBase `uid` 绑定到保留的原业务用户 UUID。
 3. 已迁移的 Profile、Settings、Body Profile、Goal 和餐食继续由该 UUID 归属；不复制、不拆分用户历史。
 4. 若映射不存在，绝不猜测或合并账户，而是创建新用户并记录可运营的人工合并事件。
 
@@ -57,7 +57,7 @@ Taro / React 小程序
 ### 业务主键和迁移映射
 
 - 现有业务表的 UUID 主键原样保留，确保餐食、餐次项、身体档案、目标和计划的外键关系不变。
-- 新增仅服务端可访问的 `identity_migrations` 表，至少保存 `legacy_supabase_user_id`、`legacy_openid_hash`、`cloudbase_openid_hash`、`bound_user_id`、`bound_at` 和审计时间。
+- 新增仅服务端可访问的 `identity_migrations` 表，至少保存 `legacy_supabase_user_id`、`legacy_openid_hash`、`cloudbase_uid`、`bound_user_id`、`bound_at` 和审计时间。
 - 迁移函数仅复制旧 OPENID 的匹配哈希，不复制 Supabase service role、微信 AppSecret、OTP 链接或客户端 Session。
 - CloudBase 云函数的密钥环境变量保存用于计算 OPENID 哈希的迁移 pepper；该 pepper 必须与现有 Supabase 身份哈希算法兼容，且只在切换期保留。
 
