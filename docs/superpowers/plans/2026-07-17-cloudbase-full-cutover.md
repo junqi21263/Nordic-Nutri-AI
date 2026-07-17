@@ -4,9 +4,9 @@
 
 **Goal:** 将 Nordic Nutri AI 的真实后端、身份、数据、文件和小程序运行时从 Supabase 完整迁移到 `lewis-healthy-d4glgqqzv73a5bc10`，并在验收后删除所有 Supabase 运行时依赖。
 
-**Architecture:** Taro 页面与领域 Store 保持不变，小程序只通过 `wx.cloud.callFunction` 调用 CloudBase 事件云函数。云函数以 CloudBase `uid` 为调用者身份、以可信 OPENID 做一次性历史账户匹配，并在 CloudBase PostgreSQL 中执行带 owner 限制的读写和原子事务；Supabase 只在一次性加密导出和校验窗口中作为源端。
+**Architecture:** Taro 页面与领域 Store 保持不变。小程序经 CloudBase 原生身份与 RDB SDK 直接访问 PostgreSQL；RLS 用 CloudBase `auth.uid()` 映射内部业务 UUID，PostgreSQL 安全 RPC 处理餐食原子事务。`wx.cloud.callFunction` 仅用于 `bootstrap-user` 的可信 OPENID 绑定、一次性迁移和未来私有计算；Supabase 只在一次性加密导出和校验窗口中作为源端。
 
-**Tech Stack:** Taro 4、React 18、TypeScript、Zustand、Vitest、CloudBase Event Functions（Nodejs18.15）、`wx-server-sdk`、`@cloudbase/node-sdk`、CloudBase PostgreSQL、CloudBase Storage、CloudBase MCP。
+**Tech Stack:** Taro 4、React 18、TypeScript、Zustand、Vitest、CloudBase 小程序 SDK/RDB/Storage、CloudBase Event Functions（仅 bootstrap/迁移）、`wx-server-sdk`、CloudBase PostgreSQL、CloudBase Storage、CloudBase MCP。
 
 ---
 
@@ -14,9 +14,22 @@
 
 - 目标环境只能使用 `lewis-healthy-d4glgqqzv73a5bc10`；每一个 CloudBase MCP 调用显式带入该 EnvId。
 - 新业务数据只能写入 CloudBase PostgreSQL；不得把关系型餐食、档案、目标或计划迁到 NoSQL。
-- `uid` 是运行时授权身份，OPENID 只在云函数内用于一次性历史账户匹配；客户端不得提交这两个字段。
+- CloudBase `auth.uid()` 是运行时授权身份；OPENID 只在 bootstrap 云函数内用于一次性历史账户匹配；客户端不得提交、保存或拼接二者。
+- 业务 CRUD 不经云函数代理。任何小程序直接数据访问都必须由 RLS 或 PostgreSQL `security definer` RPC 限定为当前 `auth.uid()` 映射出的内部用户。
 - 不做长期双写。切换窗口冻结 Supabase 写入，CloudBase 通过校验后才发布新小程序。
 - 任何切换前的 Supabase 数据导出、身份哈希和文件清单均是敏感数据，不进入 Git、日志或小程序产物。
+
+## 已确认的架构修订（优先于后文旧版任务细节）
+
+在部署原 Task 2 的事件函数 PG 探针前，已核对可用官方资料：没有足以安全实现 Node 事件函数 PostgreSQL 事务/RPC 网关的稳定受支持接口。故撤销“云函数承载所有业务 CRUD”的前提，**不得创建 `pg-capability-probe`、`profile-service`、`meal-service` 或 `asset-service` 来代理业务数据库操作**。
+
+实施时以下规则优先于 Task 2、Task 5–10 和 Task 12 中任何相冲突的旧表述：
+
+1. 小程序使用 CloudBase 官方 RDB SDK 查询/更新领域表，并使用 RDB RPC 调用 `save_meal_atomic`、`update_meal_atomic`；常规业务操作不得改走云函数。
+2. `0003_permissions.sql` 必须为已认证 RDB 会话建立 RLS：以 `auth.uid()` 通过 `app_users.cloudbase_uid` 解析内部 UUID；所有表策略和安全 RPC 均忽略客户端传入的 owner/userId。
+3. `bootstrap-user` 是唯一会由小程序调用的身份云函数；它从可信平台上下文读取 OPENID，绑定或创建 `app_users` 后返回最小产品状态。它不是通用数据网关。
+4. Storage 使用官方小程序 SDK 的私有 bucket 能力；对象路径使用内部用户 UUID，访问权限由平台存储规则和数据库的 owner 映射共同限制。
+5. 云函数只用于一次性迁移、可信 OPENID 绑定、AI 或私有管理任务。每增加一个云函数都要先确认其官方 API 支持范围，不猜测 PG 服务端连接或事务 API。
 
 ## 文件结构
 
@@ -25,15 +38,12 @@
 | `cloudbase/pg/migrations/0001_core_schema.sql` | 应用用户、资料、设置、档案、目标、计划、食品目录、AI、餐食、教练和审计表 |
 | `cloudbase/pg/migrations/0002_meal_atomic.sql` | 餐食总量触发器、`save_meal_atomic`、`update_meal_atomic`、活动餐食 view |
 | `cloudbase/pg/migrations/0003_permissions.sql` | Schema/table 权限、RLS、私有身份映射表和存储对象策略 |
-| `cloudbase/functions/_shared/*` | 云函数响应、身份解析、输入验证、数据库网关和 requestId |
+| `cloudbase/functions/_shared/*` | 云函数响应、身份解析、输入验证和 requestId；不包含业务数据库网关 |
 | `cloudbase/functions/bootstrap-user/` | 新建或绑定当前用户，返回首登状态 |
-| `cloudbase/functions/profile-service/` | Profile、Settings、Body Profile 与 Goal 操作 |
-| `cloudbase/functions/meal-service/` | 餐食查询、原子创建/编辑、归档与恢复 |
-| `cloudbase/functions/asset-service/` | 私有图片上传、下载授权与资产元数据 |
 | `cloudbase/functions/migration-admin/` | 仅运维调用的导入校验和身份绑定任务 |
 | `scripts/cloudbase/*` | 无密钥的迁移清单、校验和、导入/回退操作脚本 |
-| `mini-program/src/lib/cloudbase.ts` | 小程序 `wx.cloud` 初始化与统一函数调用 |
-| `mini-program/src/api/cloudbase-api.ts` | 从领域输入映射到云函数 action 的客户端 API |
+| `mini-program/src/lib/cloudbase.ts` | 小程序 CloudBase 初始化、原生身份、RDB/Storage 客户端与仅供 bootstrap 的函数调用 |
+| `mini-program/src/api/cloudbase-api.ts` | 从领域输入映射到 RDB 表操作、安全 RPC 与 bootstrap 调用的客户端 API |
 | `mini-program/src/auth/cloudbase-session-manager.ts` | 产品级 bootstrap 与本地退出清理，不保存 Supabase Session |
 | `mini-program/tests/cloudbase-*.test.ts` | CloudBase 调用、身份启动、资料与餐食 Repository 回归 |
 
@@ -100,57 +110,47 @@ git add scripts/cloudbase docs/cloudbase
 git commit -m "chore: record CloudBase PG baseline"
 ```
 
-### Task 2: 确认云函数访问 CloudBase PG 的受支持运行时边界
+### Task 2: 验证小程序 CloudBase Auth 与 RDB SDK 的受支持边界
 
 **Files:**
-- Create: `cloudbase/functions/_shared/pg-runtime.js`
-- Create: `cloudbase/functions/_shared/pg-runtime.test.mjs`
-- Create: `cloudbase/functions/pg-capability-probe/index.js`
-- Create: `cloudbase/functions/pg-capability-probe/package.json`
+- Create: `mini-program/src/lib/cloudbase.ts`
+- Create: `mini-program/src/lib/cloudbase-rdb.ts`
+- Create: `mini-program/tests/cloudbase-client.test.ts`
 
-- [ ] **Step 1: 写失败测试，拒绝没有 `query` 与 `transaction` 两个能力的 PG 适配器。**
+- [ ] **Step 1: 写失败测试，拒绝缺少 EnvId、RDB 客户端或带认证上下文的 RPC 调用器。**
 
 ```js
-import test from "node:test";
-import assert from "node:assert/strict";
-import { assertPgGateway } from "./pg-runtime.js";
-
-test("rejects an incomplete PostgreSQL gateway", () => {
-  assert.throws(() => assertPgGateway({ query() {} }), /transaction/);
-});
+expect(() => createCloudbaseRdbClient({ envId: "" })).toThrow(/env/i);
+expect(createCloudbaseRdbClient({ envId: "lewis-healthy-d4glgqqzv73a5bc10" }).rpc).toBeTypeOf("function");
 ```
 
 - [ ] **Step 2: 运行测试确认失败。**
 
-Run: `node --test cloudbase/functions/_shared/pg-runtime.test.mjs`
+Run: `pnpm --dir mini-program test:unit -- cloudbase-client.test.ts`
 
 Expected: 模块不存在。
 
-- [ ] **Step 3: 实现网关断言，并部署只读 capability probe。**
+- [ ] **Step 3: 以官方小程序 API 实现一次性 CloudBase 初始化、认证会话检查、RDB 表访问与 RPC 调用器。**
 
 ```js
-export function assertPgGateway(gateway) {
-  if (typeof gateway?.query !== "function") throw new Error("CloudBase PG query capability is required");
-  if (typeof gateway?.transaction !== "function") throw new Error("CloudBase PG transaction capability is required");
-  return gateway;
-}
+const app = cloudbase.init({ env: cloudbaseEnvId });
+const db = app.rdb();
+await db.rpc("save_meal_atomic", { input });
 ```
 
-`pg-capability-probe` 必须只执行 `SELECT 1 AS ok`，返回 `{ success: true, data: { pg: true }, requestId }`；实现时依据已安装 `@cloudbase/node-sdk` 的实际 API，不得猜测 HTTP URL 或把管理 API Key 放入函数代码。
+实现前先用 `queryAppAuth(action="getLoginConfig")`、`queryAppAuth(action="getPublishableKey")` 和 CloudBase 官方 SDK 文档确认本环境所需客户端配置。不得在小程序内放置管理 API key、数据库 URL、服务账号或自建 HTTP SQL 网关。
 
-Deploy with `manageFunctions(action="createFunction")`、`type="Event"`、`runtime="Nodejs18.15"`、`functionRootPath` 指向 `cloudbase/functions`。调用一次并读取函数日志，确认函数运行时具有真实 PG 查询和事务能力后才开始任何业务函数。
+- [ ] **Step 4: 运行测试、微信开发者工具认证检查与受 RLS 保护的只读 RDB 探针。**
 
-- [ ] **Step 4: 运行测试和线上只读探针。**
+Run: `pnpm --dir mini-program test:unit -- cloudbase-client.test.ts`
 
-Run: `node --test cloudbase/functions/_shared/pg-runtime.test.mjs`
-
-Expected: PASS；probe 返回 `pg: true`，不出现管理密钥、SQL 连接串或用户数据。
+Expected: PASS；已认证用户只可读自身的最小记录，未认证/无映射用户不得读到健康数据；不出现管理密钥、SQL 连接串或用户数据。
 
 - [ ] **Step 5: 提交。**
 
 ```bash
-git add cloudbase/functions
-git commit -m "feat: verify CloudBase PG function runtime"
+git add mini-program/src/lib mini-program/tests
+git commit -m "feat: verify CloudBase RDB client boundary"
 ```
 
 ### Task 3: 迁移完整 PostgreSQL Schema、约束和原子餐食逻辑
@@ -188,8 +188,8 @@ Expected: FAIL，列出缺失对象。
 - `public.users` 改名为 `public.app_users`，主键仍为原 UUID，并新增 `cloudbase_uid varchar(128) unique`。
 - `private.identity_migrations` 仅保存 `legacy_supabase_user_id uuid unique`、`legacy_openid_hash char(64) unique`、`bound_user_id uuid unique`、`cloudbase_uid varchar(128) unique null`、`bound_at timestamptz null` 与审计时间。
 - 保留所有现有外键、check、partial unique index、`set_updated_at`、current version triggers、meal total trigger、soft delete 和 `client_request_id` 幂等约束。
-- `save_meal_atomic(p_actor_id uuid, p_input jsonb)` 与 `update_meal_atomic(p_actor_id uuid, p_input jsonb)` 必须在函数内部验证 `meal_records.user_id = p_actor_id`，不从 JSON 读取 owner。
-- `0003_permissions.sql` 对业务表启用 RLS，撤销 `anon`/`authenticated` 的直接业务表访问；函数运行时使用受控服务边界。所有迁移须先用 `managePgDatabase(action="planMigration")` 预演，再用 `applyMigration` 应用。
+- `save_meal_atomic(p_input jsonb)` 与 `update_meal_atomic(p_input jsonb)` 必须从 `auth.uid()` 映射出 actor UUID，并在函数内部验证 `meal_records.user_id = actor`；不从 JSON 读取 owner。
+- `0003_permissions.sql` 对业务表启用 RLS，允许认证 RDB 会话仅访问自身数据，并拒绝匿名或不具映射用户的访问。所有迁移须先用 `managePgDatabase(action="planMigration")` 预演，再用 `applyMigration` 应用。
 
 - [ ] **Step 4: 执行迁移并复跑 schema/权限检查。**
 

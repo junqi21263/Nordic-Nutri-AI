@@ -14,22 +14,24 @@
 
 ## 架构选择
 
-采用 **CloudBase PostgreSQL + 事件云函数 + 小程序原生微信身份**。
+采用 **CloudBase PostgreSQL（小程序 RDB SDK + RLS/RPC）+ 小程序原生微信身份**。事件云函数只承担无法由 RDB SDK 安全、稳定完成的身份绑定、一次性迁移和未来私有计算任务。
 
 ```text
 Taro / React 小程序
   └─ wx.cloud.init({ env: "lewis-healthy-d4glgqqzv73a5bc10" })
+      ├─ CloudBase Auth / 小程序原生身份
+      ├─ CloudBase RDB SDK
+      │   ├─ PostgreSQL 表查询与写入（RLS 将 CloudBase uid 映射为内部用户 UUID）
+      │   └─ PostgreSQL RPC（餐食原子保存、原子编辑）
+      ├─ CloudBase Storage 私有对象
       └─ wx.cloud.callFunction
-          └─ CloudBase 事件云函数
-              ├─ CloudBase Auth 取得可信 uid；上下文读取 OPENID 仅用于旧账户匹配
-              ├─ 用户身份绑定与授权
-              ├─ CloudBase PostgreSQL 事务 / SQL RPC
-              └─ CloudBase Storage 私有对象
+          ├─ bootstrap-user：读取可信 OPENID，绑定历史账户或创建内部用户
+          └─ migration-admin / AI / 私有管理任务
 ```
 
-不让小程序直接提交或信任 `user_id`、OPENID、数据库 owner 字段或管理凭据。云函数以 CloudBase `uid` 作为调用者身份，首次绑定后解析为内部用户 ID；仅在迁移绑定期间读取可信 OPENID 计算旧账户匹配哈希。
+小程序绝不提交或信任 `user_id`、OPENID、数据库 owner 字段或管理凭据。CloudBase 身份会话提供受认证的 `auth.uid()`；RLS 通过 `app_users.cloudbase_uid` 将其映射为内部 UUID。客户端读取/写入由 RLS 限制，跨表餐食写入只允许经 PostgreSQL 安全函数完成。OPENID 只在 `bootstrap-user` 函数内用于一次性历史账户匹配。
 
-选择云函数作为业务边界的原因是本项目保存健康数据且存在跨表事务、历史身份映射和 AI/上传扩展需求；它比在小程序端直接暴露 PostgreSQL CRUD 更容易保持最小权限和一致的授权规则。
+此前规划的“所有业务操作均经事件云函数”不再采用：已确认 CloudBase 文档未提供可据以实现 Node 事件函数 PostgreSQL 事务/RPC 网关的稳定受支持接口。为避免猜测服务端数据库 API，业务 CRUD 改用官方 RDB SDK + RLS/RPC；云函数不再承担业务 CRUD。
 
 ## 认证与首次使用
 
@@ -73,28 +75,26 @@ CloudBase PostgreSQL 承载并迁移以下领域：
 - 上传与 AI：`uploaded_assets`、`ai_analysis`
 - 教练：`coach_conversations`、`coach_messages`
 
-所有表保留检查约束、外键、唯一索引、软删除、版本化 current 记录和 `updated_at` 触发器。`save_meal_atomic` 与 `update_meal_atomic` 迁移为 CloudBase PG 函数，并由云函数在单个数据库事务中调用。
+所有表保留检查约束、外键、唯一索引、软删除、版本化 current 记录和 `updated_at` 触发器。`save_meal_atomic` 与 `update_meal_atomic` 迁移为 CloudBase PG 安全函数，由已认证的小程序经 RDB SDK 调用；函数内从 `auth.uid()` 解析 owner，绝不接受客户端 owner 参数。
 
-业务表启用 RLS；`anon` 与 `authenticated` 不获得直接业务表访问权限。云函数使用受控服务端数据库边界执行读写，并把当前解析出的内部用户 ID 作为不可由客户端伪造的 actor。每一个查询、更新、归档、恢复和 RPC 都必须以 actor ID 限定 owner。
+业务表启用 RLS；匿名会话不得访问健康数据，认证会话只可访问其映射的内部用户记录。每一个查询、更新、归档、恢复和 RPC 都由 policy 或安全函数以 `auth.uid()` 映射出的 actor 限定 owner。
 
 ### 文件与敏感数据
 
 - 食物图片迁入 CloudBase Storage 的专用私有 bucket；路径使用 `userId/yyyy/mm/uuid.ext`。
 - 数据库只保存文件键、类型、大小、哈希和状态，不保存公开永久 URL。
-- 下载通过短期签名 URL 或云函数授权返回。
+- 下载使用 CloudBase Storage 的私有访问能力；如需签名 URL，必须由平台受支持的 SDK 方法生成，不自行拼接存储 URL。
 - OPENID、身份映射、健康数据和原图不写入前端日志、CLS 明文日志或错误 Toast。
 
 ## 云函数边界
 
-使用 CloudBase **事件云函数**，小程序通过 `wx.cloud.callFunction` 调用；不为小程序业务创建公开 HTTP 网关。
+使用 CloudBase **事件云函数**，小程序通过 `wx.cloud.callFunction` 调用；不为小程序业务创建公开 HTTP 网关。云函数不代理常规资料、目标、餐食或文件 CRUD。
 
 | 云函数 | 责任 |
 | --- | --- |
 | `bootstrap-user` | 解析 OPENID、绑定迁移身份或创建新用户、返回最小用户状态 |
-| `profile-service` | Profile、Settings、Body Profile、Goal 的读取与版本化写入 |
-| `meal-service` | 餐食列表、详情、原子创建、原子编辑、归档与恢复 |
-| `asset-service` | 私有图片上传授权、资产元数据与下载签名 |
 | `migration-admin` | 仅一次性受管控执行：导入、校验、身份映射和回滚标记；不向小程序开放 |
+| 后续 AI / 私有管理函数 | 仅在不能由 RDB/Storage SDK + RLS 安全完成时增加，并单独评审 |
 
 每个函数统一返回 `{ success, data, requestId }` 或 `{ success: false, error: { code, message }, requestId }`。错误信息不暴露 SQL、OPENID、密钥或第三方响应。
 
@@ -105,9 +105,9 @@ CloudBase PostgreSQL 承载并迁移以下领域：
 | 当前区域 | 切换后 |
 | --- | --- |
 | `src/api/environment.ts` | 改为公开 CloudBase EnvId 与切换期模式；删除 Supabase 公开配置 |
-| `src/lib/supabase-client.ts`、微信 URL/fetch/storage 兼容层 | 删除，替换为一次性 CloudBase 初始化与云函数调用器 |
+| `src/lib/supabase-client.ts`、微信 URL/fetch/storage 兼容层 | 删除，替换为一次性 CloudBase 初始化、RDB/Storage 客户端和仅供 bootstrap 的函数调用器 |
 | `src/api/auth-api.ts`、`src/auth/session-manager.ts` | 替换为 CloudBase bootstrap 与本地产品会话清理 |
-| Profile / Goal / Body Profile / Meal repositories | 保持领域方法签名，改为调用相应云函数 |
+| Profile / Goal / Body Profile / Meal repositories | 保持领域方法签名，改为调用 RDB 表查询、受 RLS 保护的写入和安全 RPC |
 | `src/repositories/runtime-adapter.ts` | 删除 Supabase mode；最终只保留 `cloudbase` 和受测试保护的 `fixture` |
 | `src/dev/auth-harness/*` | 替换为 CloudBase 环境、函数、用户 bootstrap 与 PG 权限诊断 |
 | `@supabase/supabase-js` 与 Supabase 类型 | 在全量验收通过后移除依赖与生成类型 |
