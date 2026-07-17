@@ -8,6 +8,12 @@ import {
   type MealType,
 } from "../features/meals/domain";
 import { getLocalDateString } from "../features/onboarding/domain";
+import type {
+  MealCreateInput,
+  MealListInput,
+  MealListResult,
+  MealMutationInput,
+} from "../repositories/meal-repository";
 
 export type MealTypeFilter = MealType | "all" | "favorite";
 let idCounter = 0;
@@ -16,6 +22,7 @@ const createLocalId = () => `local-meal-${Date.now()}-${++idCounter}`;
 export interface MealStore {
   meals: Meal[];
   fixtureMeals: Meal[];
+  dataSource: "fixture" | "supabase";
   initialDate: string;
   selectedDate: string;
   searchKeyword: string;
@@ -25,6 +32,9 @@ export interface MealStore {
   errorState: string | null;
   editingMealId: string | null;
   forceProgressFallback: boolean;
+  nextOffset: number;
+  hasMore: boolean;
+  requestGeneration: number;
   addMeal: (meal: Omit<Meal, "id"> & { id?: string }) => string;
   updateMeal: (id: string, changes: Partial<Omit<Meal, "id">>) => void;
   deleteMeal: (id: string) => void;
@@ -43,6 +53,21 @@ export interface MealStore {
   setErrorState: (error: string | null) => void;
   setEditingMealId: (id: string | null) => void;
   setForceProgressFallback: (value: boolean) => void;
+  loadRemote: () => Promise<void>;
+  loadMoreRemote: () => Promise<void>;
+  createRemote: (input: MealCreateInput) => Promise<Meal>;
+  updateRemote: (id: string, input: MealMutationInput) => Promise<Meal>;
+  archiveRemote: (id: string) => Promise<Meal>;
+  restoreRemote: (id: string) => Promise<Meal>;
+  resetUserData: () => void;
+}
+
+export interface MealRemoteRepository {
+  list: (input: MealListInput) => Promise<MealListResult>;
+  create: (input: MealCreateInput) => Promise<Meal>;
+  update: (id: string, input: MealMutationInput) => Promise<Meal>;
+  archive: (id: string) => Promise<Meal>;
+  restore: (id: string) => Promise<Meal>;
 }
 export interface MealStorage {
   read: () => Meal[] | null;
@@ -90,6 +115,7 @@ export function createMealStore(
   fixtures = createMealFixtures(getLocalDateString()),
   initialDate = getLocalDateString(),
   storage?: MealStorage,
+  remoteRepository?: MealRemoteRepository,
 ) {
   const initialFixtures = cloneMeals(fixtures);
   const persistedMeals = storage?.read();
@@ -97,9 +123,23 @@ export function createMealStore(
     ? cloneMeals(persistedMeals)
     : cloneMeals(initialFixtures);
   const persistMeals = (meals: Meal[]) => storage?.write(cloneMeals(meals));
+  const remoteListInput = (state: MealStore, offset: number): MealListInput => ({
+    date: state.selectedDate,
+    ...(state.mealTypeFilter !== "all" && state.mealTypeFilter !== "favorite"
+      ? { mealType: state.mealTypeFilter }
+      : {}),
+    ...(state.searchKeyword.trim() ? { keyword: state.searchKeyword.trim() } : {}),
+    offset,
+    limit: 12,
+  });
+  const replaceMeal = (meals: Meal[], meal: Meal) =>
+    meals.some((entry) => entry.id === meal.id)
+      ? meals.map((entry) => (entry.id === meal.id ? meal : entry))
+      : [...meals, meal];
   return create<MealStore>((set, get) => ({
     meals: initialMeals,
     fixtureMeals: initialFixtures,
+    dataSource: remoteRepository ? "supabase" : "fixture",
     initialDate,
     selectedDate: initialDate,
     searchKeyword: "",
@@ -109,6 +149,9 @@ export function createMealStore(
     errorState: null,
     editingMealId: null,
     forceProgressFallback: false,
+    nextOffset: 0,
+    hasMore: false,
+    requestGeneration: 0,
     addMeal: (meal) => {
       const id =
         meal.id && !get().meals.some((entry) => entry.id === meal.id) ? meal.id : createLocalId();
@@ -182,19 +225,148 @@ export function createMealStore(
         loadingState: "normal",
         errorState: null,
         editingMealId: null,
+        nextOffset: 0,
+        hasMore: false,
+        requestGeneration: state.requestGeneration + 1,
       }));
     },
     setSelectedDate: (selectedDate) =>
-      set({ selectedDate, visibleLimit: 12, searchKeyword: "", mealTypeFilter: "all" }),
-    setSearchKeyword: (searchKeyword) => set({ searchKeyword, visibleLimit: 12 }),
-    setMealTypeFilter: (mealTypeFilter) => set({ mealTypeFilter, visibleLimit: 12 }),
+      set((state) => ({
+        selectedDate,
+        visibleLimit: 12,
+        searchKeyword: "",
+        mealTypeFilter: "all",
+        nextOffset: 0,
+        hasMore: false,
+        requestGeneration: state.requestGeneration + 1,
+      })),
+    setSearchKeyword: (searchKeyword) => set((state) => ({
+      searchKeyword,
+      visibleLimit: 12,
+      nextOffset: 0,
+      hasMore: false,
+      requestGeneration: state.requestGeneration + 1,
+    })),
+    setMealTypeFilter: (mealTypeFilter) => set((state) => ({
+      mealTypeFilter,
+      visibleLimit: 12,
+      nextOffset: 0,
+      hasMore: false,
+      requestGeneration: state.requestGeneration + 1,
+    })),
     loadMore: () => set((state) => ({ visibleLimit: state.visibleLimit + 12 })),
     setLoadingState: (loadingState) => set({ loadingState }),
     setErrorState: (errorState) =>
       set({ errorState, loadingState: errorState ? "error" : "normal" }),
     setEditingMealId: (editingMealId) => set({ editingMealId }),
     setForceProgressFallback: (forceProgressFallback) => set({ forceProgressFallback }),
+    loadRemote: async () => {
+      if (!remoteRepository) return;
+      const state = get();
+      const generation = state.requestGeneration;
+      set({ loadingState: "loading", errorState: null });
+      try {
+        const result = await remoteRepository.list(remoteListInput(state, 0));
+        if (generation !== get().requestGeneration) return;
+        set({
+          meals: cloneMeals(result.meals),
+          nextOffset: result.meals.length,
+          hasMore: result.hasMore,
+          loadingState: result.meals.length ? "normal" : "empty",
+          errorState: null,
+        });
+      } catch {
+        if (generation !== get().requestGeneration) return;
+        set({ loadingState: "error", errorState: "餐次加载失败，请稍后重试" });
+      }
+    },
+    loadMoreRemote: async () => {
+      if (!remoteRepository) return;
+      const state = get();
+      if (!state.hasMore || state.loadingState === "loading") return;
+      const generation = state.requestGeneration;
+      set({ loadingState: "loading", errorState: null });
+      try {
+        const result = await remoteRepository.list(remoteListInput(state, state.nextOffset));
+        if (generation !== get().requestGeneration) return;
+        set((current) => ({
+          meals: replaceRemoteMeals(current.meals, result.meals),
+          nextOffset: current.nextOffset + result.meals.length,
+          hasMore: result.hasMore,
+          loadingState: "normal",
+        }));
+      } catch {
+        if (generation !== get().requestGeneration) return;
+        set({ loadingState: "error", errorState: "更多餐次加载失败，请稍后重试" });
+      }
+    },
+    createRemote: async (input) => {
+      if (!remoteRepository) throw new Error("远程餐次保存能力不可用");
+      const meal = await remoteRepository.create(input);
+      set((state) => ({
+        meals: replaceMeal(state.meals, meal),
+        loadingState: "normal",
+        errorState: null,
+      }));
+      return meal;
+    },
+    updateRemote: async (id, input) => {
+      if (!remoteRepository) throw new Error("远程餐次保存能力不可用");
+      const meal = await remoteRepository.update(id, input);
+      set((state) => ({ meals: replaceMeal(state.meals, meal), loadingState: "normal", errorState: null }));
+      return meal;
+    },
+    archiveRemote: async (id) => {
+      if (!remoteRepository) throw new Error("远程餐次保存能力不可用");
+      const meal = await remoteRepository.archive(id);
+      set((state) => ({
+        meals: state.meals.filter((entry) => entry.id !== id),
+        editingMealId: state.editingMealId === id ? null : state.editingMealId,
+        loadingState: "normal",
+        errorState: null,
+      }));
+      return meal;
+    },
+    restoreRemote: async (id) => {
+      if (!remoteRepository) throw new Error("远程餐次保存能力不可用");
+      const meal = await remoteRepository.restore(id);
+      set((state) => ({
+        meals: meal.date === state.selectedDate ? replaceMeal(state.meals, meal) : state.meals,
+        loadingState: "normal",
+        errorState: null,
+      }));
+      return meal;
+    },
+    resetUserData: () => {
+      storage?.clear();
+      set((state) => ({
+        meals: remoteRepository ? [] : cloneMeals(state.fixtureMeals),
+        selectedDate: state.initialDate,
+        searchKeyword: "",
+        mealTypeFilter: "all",
+        visibleLimit: 12,
+        loadingState: remoteRepository ? "empty" : "normal",
+        errorState: null,
+        editingMealId: null,
+        nextOffset: 0,
+        hasMore: false,
+        requestGeneration: state.requestGeneration + 1,
+      }));
+    },
   }));
+}
+
+function replaceRemoteMeals(current: Meal[], incoming: Meal[]) {
+  const incomingIds = new Set(incoming.map((meal) => meal.id));
+  return [...current.filter((meal) => !incomingIds.has(meal.id)), ...incoming];
+}
+
+export function createMealStoreWithRepository(
+  repository: MealRemoteRepository,
+  fixtures = createMealFixtures(getLocalDateString()),
+  initialDate = getLocalDateString(),
+) {
+  return createMealStore(fixtures, initialDate, undefined, repository);
 }
 
 export const useMealStore = createMealStore(undefined, undefined, taroMealStorage);
