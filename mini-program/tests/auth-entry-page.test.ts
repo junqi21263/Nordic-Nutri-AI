@@ -16,6 +16,8 @@ describe("manual authentication entry", () => {
     expect(page).toContain("startApplicationAuth");
     expect(page).toContain("await startApplicationAuth()");
     expect(page).not.toContain('Taro.switchTab({ url: "/pages/home/index" })');
+    expect(page).not.toContain("auth-entry-page__heading");
+    expect(page).not.toContain("请登录以继续保存你的健康数据。");
     expect(page).toContain("登录并开始使用");
   });
 });

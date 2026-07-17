@@ -1,4 +1,4 @@
-import { Text, View } from "@tarojs/components";
+import { Text } from "@tarojs/components";
 import { useState } from "react";
 import { loginWithWechat } from "../../api/auth-api";
 import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
@@ -27,14 +27,6 @@ export default function AuthEntryPage() {
 
   return (
     <PageLayout title="Nordic Nutri AI" showTabs={false} hideNavigation className="page-layout--auth-entry">
-      <View className="auth-entry-page">
-        <View className="auth-entry-page__heading">
-          <Text className="auth-entry-page__eyebrow">Nordic Nutri AI</Text>
-          <Text className="auth-entry-page__title">继续你的营养节奏</Text>
-          <Text className="auth-entry-page__copy">登录后即可安全保存餐次、身体数据和目标设置。</Text>
-        </View>
-        <Text className="auth-entry-page__copy">请登录以继续保存你的健康数据。</Text>
-      </View>
       <BottomSheet open className="auth-entry-sheet">
         <AppCard className="auth-entry-page__card">
           <Text className="auth-entry-page__eyebrow">NORDIC NUTRI AI</Text>
