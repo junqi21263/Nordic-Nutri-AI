@@ -4,9 +4,9 @@
 
 **Goal:** 将 Nordic Nutri AI 的真实后端、身份、数据、文件和小程序运行时从 Supabase 完整迁移到 `lewis-healthy-d4glgqqzv73a5bc10`，并在验收后删除所有 Supabase 运行时依赖。
 
-**Architecture:** Taro 页面与领域 Store 保持不变。小程序经 CloudBase 原生身份与 RDB SDK 直接访问 PostgreSQL；RLS 用 CloudBase `auth.uid()` 映射内部业务 UUID，PostgreSQL 安全 RPC 处理餐食原子事务。`wx.cloud.callFunction` 仅用于 `bootstrap-user` 的可信 OPENID 绑定、一次性迁移和未来私有计算；Supabase 只在一次性加密导出和校验窗口中作为源端。
+**Architecture:** Taro 页面与领域 Store 保持不变。小程序用 `@cloudbase/js-sdk@2.27.3` 与 `@cloudbase/adapter-wx_mp@1.3.1` 通过 Custom Ticket 登录独立 CloudBase 环境，再经 RDB SDK 直接访问 PostgreSQL；RLS 用 CloudBase `auth.uid()` 映射内部业务 UUID，PostgreSQL 安全 RPC 处理首次绑定和餐食原子事务。唯一 HTTP 函数 `get-login-ticket` 只处理 `wx.login` code、ticket 和 HMAC identityProof，绝不代理业务 CRUD；Supabase 只在一次性加密导出和校验窗口中作为源端。
 
-**Tech Stack:** Taro 4、React 18、TypeScript、Zustand、Vitest、CloudBase 小程序 SDK/RDB/Storage、CloudBase Event Functions（仅 bootstrap/迁移）、`wx-server-sdk`、CloudBase PostgreSQL、CloudBase Storage、CloudBase MCP。
+**Tech Stack:** Taro 4、React 18、TypeScript、Zustand、Vitest、`@cloudbase/js-sdk@2.27.3`、`@cloudbase/adapter-wx_mp@1.3.1`、CloudBase RDB/Storage、CloudBase HTTP Function（仅 Custom Ticket/迁移）、`@cloudbase/node-sdk@3.18.1`、CloudBase PostgreSQL、CloudBase MCP。
 
 ---
 
@@ -14,22 +14,22 @@
 
 - 目标环境只能使用 `lewis-healthy-d4glgqqzv73a5bc10`；每一个 CloudBase MCP 调用显式带入该 EnvId。
 - 新业务数据只能写入 CloudBase PostgreSQL；不得把关系型餐食、档案、目标或计划迁到 NoSQL。
-- CloudBase `auth.uid()` 是运行时授权身份；OPENID 只在 bootstrap 云函数内用于一次性历史账户匹配；客户端不得提交、保存或拼接二者。
+- CloudBase `auth.uid()` 是运行时授权身份；OPENID 只在 `get-login-ticket` 内用于一次性历史账户匹配；客户端不得提交、保存或拼接二者。
 - 业务 CRUD 不经云函数代理。任何小程序直接数据访问都必须由 RLS 或 PostgreSQL `security definer` RPC 限定为当前 `auth.uid()` 映射出的内部用户。
 - 不做长期双写。切换窗口冻结 Supabase 写入，CloudBase 通过校验后才发布新小程序。
 - 任何切换前的 Supabase 数据导出、身份哈希和文件清单均是敏感数据，不进入 Git、日志或小程序产物。
 
 ## 已确认的架构修订（优先于后文旧版任务细节）
 
-在部署原 Task 2 的事件函数 PG 探针前，已核对可用官方资料：没有足以安全实现 Node 事件函数 PostgreSQL 事务/RPC 网关的稳定受支持接口。故撤销“云函数承载所有业务 CRUD”的前提，**不得创建 `pg-capability-probe`、`profile-service`、`meal-service` 或 `asset-service` 来代理业务数据库操作**。
+在部署原 Task 2 的事件函数 PG 探针前，已核对可用官方资料：没有足以安全实现 Node 事件函数 PostgreSQL 事务/RPC 网关的稳定受支持接口。故撤销“云函数承载所有业务 CRUD”的前提，**不得创建 `pg-capability-probe`、`profile-service`、`meal-service` 或 `asset-service` 来代理业务数据库操作**。官方小程序独立环境认证文档同时确认：RDB 直连前必须通过 Custom Ticket 登录，故新增唯一 HTTP 函数 `get-login-ticket`。
 
 实施时以下规则优先于 Task 2、Task 5–10 和 Task 12 中任何相冲突的旧表述：
 
 1. 小程序使用 CloudBase 官方 RDB SDK 查询/更新领域表，并使用 RDB RPC 调用 `save_meal_atomic`、`update_meal_atomic`；常规业务操作不得改走云函数。
 2. `0003_permissions.sql` 必须为已认证 RDB 会话建立 RLS：以 `auth.uid()` 通过 `app_users.cloudbase_uid` 解析内部 UUID；所有表策略和安全 RPC 均忽略客户端传入的 owner/userId。
-3. `bootstrap-user` 是唯一会由小程序调用的身份云函数；它从可信平台上下文读取 OPENID，绑定或创建 `app_users` 后返回最小产品状态。它不是通用数据网关。
+3. `get-login-ticket` 是唯一由小程序访问的 HTTP 函数；它从一次性微信 code 取得可信 OPENID、签发 Custom Ticket 和 HMAC identityProof，不访问业务 PostgreSQL。小程序登录后调用 `bootstrap_current_user(identityProof)` 安全 RPC 完成绑定或创建 `app_users`。
 4. Storage 使用官方小程序 SDK 的私有 bucket 能力；对象路径使用内部用户 UUID，访问权限由平台存储规则和数据库的 owner 映射共同限制。
-5. 云函数只用于一次性迁移、可信 OPENID 绑定、AI 或私有管理任务。每增加一个云函数都要先确认其官方 API 支持范围，不猜测 PG 服务端连接或事务 API。
+5. 云函数只用于 Custom Ticket、一次性迁移、AI 或私有管理任务。`get-login-ticket` 必须配置为仅 POST 的 HTTP 访问并设置安全域名；每增加一个云函数都要先确认其官方 API 支持范围，不猜测 PG 服务端连接或事务 API。
 
 ## 文件结构
 
@@ -39,10 +39,10 @@
 | `cloudbase/pg/migrations/0002_meal_atomic.sql` | 餐食总量触发器、`save_meal_atomic`、`update_meal_atomic`、活动餐食 view |
 | `cloudbase/pg/migrations/0003_permissions.sql` | Schema/table 权限、RLS、私有身份映射表和存储对象策略 |
 | `cloudbase/functions/_shared/*` | 云函数响应、身份解析、输入验证和 requestId；不包含业务数据库网关 |
-| `cloudbase/functions/bootstrap-user/` | 新建或绑定当前用户，返回首登状态 |
+| `cloudbase/functions/get-login-ticket/` | 仅用微信 code 签发 Custom Ticket 与 identityProof，不访问业务 PG |
 | `cloudbase/functions/migration-admin/` | 仅运维调用的导入校验和身份绑定任务 |
 | `scripts/cloudbase/*` | 无密钥的迁移清单、校验和、导入/回退操作脚本 |
-| `mini-program/src/lib/cloudbase.ts` | 小程序 CloudBase 初始化、原生身份、RDB/Storage 客户端与仅供 bootstrap 的函数调用 |
+| `mini-program/src/lib/cloudbase.ts` | 小程序 SDK/adapter 初始化、Custom Ticket 登录、RDB/Storage 客户端与 ticket 调用器 |
 | `mini-program/src/api/cloudbase-api.ts` | 从领域输入映射到 RDB 表操作、安全 RPC 与 bootstrap 调用的客户端 API |
 | `mini-program/src/auth/cloudbase-session-manager.ts` | 产品级 bootstrap 与本地退出清理，不保存 Supabase Session |
 | `mini-program/tests/cloudbase-*.test.ts` | CloudBase 调用、身份启动、资料与餐食 Repository 回归 |
