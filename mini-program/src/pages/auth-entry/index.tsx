@@ -1,7 +1,7 @@
 import { Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
 import { useState } from "react";
 import { loginWithWechat } from "../../api/auth-api";
+import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomSheet } from "../../components/bottom-sheet";
@@ -17,7 +17,7 @@ export default function AuthEntryPage() {
     try {
       const user = await loginWithWechat();
       if (!user) throw new Error("微信登录未返回用户信息");
-      await Taro.switchTab({ url: "/pages/home/index" });
+      await startApplicationAuth();
     } catch {
       feedback.show({ message: "登录未完成，请稍后重试", tone: "error" });
     } finally {

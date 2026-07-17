@@ -13,7 +13,9 @@ describe("manual authentication entry", () => {
     expect(appConfig.slice(appConfig.indexOf("tabBar:"))).not.toContain("pages/auth-entry/index");
     expect(page).toContain("loginWithWechat");
     expect(page).toContain("BottomSheet");
-    expect(page).toContain('Taro.switchTab({ url: "/pages/home/index" })');
+    expect(page).toContain("startApplicationAuth");
+    expect(page).toContain("await startApplicationAuth()");
+    expect(page).not.toContain('Taro.switchTab({ url: "/pages/home/index" })');
     expect(page).toContain("登录并开始使用");
   });
 });
