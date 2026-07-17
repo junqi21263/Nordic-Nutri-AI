@@ -1,7 +1,7 @@
 # CloudBase 全量后端切换设计
 
 **状态：已确认，待实施**
-**目标环境：`test-d5g9fres1b7417fad`**
+**目标环境：`lewis-healthy-d4glgqqzv73a5bc10`（上海区，已验证为 CloudBase PostgreSQL 模式）**
 **决策：CloudBase 成为唯一运行时后端；Supabase 仅在迁移期作为只读导出源和回退快照，不再被小程序调用。**
 
 ## 目标与边界
@@ -18,7 +18,7 @@
 
 ```text
 Taro / React 小程序
-  └─ wx.cloud.init({ env: "test-d5g9fres1b7417fad" })
+  └─ wx.cloud.init({ env: "lewis-healthy-d4glgqqzv73a5bc10" })
       └─ wx.cloud.callFunction
           └─ CloudBase 事件云函数
               ├─ cloud.getWXContext() 取得可信 OPENID
