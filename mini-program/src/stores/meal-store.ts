@@ -273,6 +273,7 @@ export function createMealStore(
         set({
           dataSource: "supabase",
           meals: cloneMeals(result.meals),
+          visibleLimit: Math.max(12, result.meals.length),
           nextOffset: result.meals.length,
           hasMore: result.hasMore,
           loadingState: result.meals.length ? "normal" : "empty",
@@ -294,6 +295,7 @@ export function createMealStore(
         if (generation !== get().requestGeneration) return;
         set((current) => ({
           meals: replaceRemoteMeals(current.meals, result.meals),
+          visibleLimit: current.visibleLimit + result.meals.length,
           nextOffset: current.nextOffset + result.meals.length,
           hasMore: result.hasMore,
           loadingState: "normal",

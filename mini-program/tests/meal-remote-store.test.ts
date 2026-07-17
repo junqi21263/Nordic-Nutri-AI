@@ -56,4 +56,19 @@ describe("remote meal store", () => {
     await store.getState().archiveRemote(remoteMeal.id);
     expect(store.getState().getMealById(remoteMeal.id)).toBeUndefined();
   });
+
+  it("reveals the next remote page after it is loaded", async () => {
+    const firstPage = Array.from({ length: 12 }, (_, index) => ({ ...remoteMeal, id: `meal-${index}` }));
+    const secondPage = [{ ...remoteMeal, id: "meal-12" }];
+    const store = createMealStoreWithRepository({
+      list: vi.fn()
+        .mockResolvedValueOnce({ meals: firstPage, hasMore: true })
+        .mockResolvedValueOnce({ meals: secondPage, hasMore: false }),
+    } as never, undefined, today);
+
+    await store.getState().loadRemote();
+    await store.getState().loadMoreRemote();
+
+    expect(store.getState().filterMeals()).toHaveLength(13);
+  });
 });
