@@ -13,6 +13,7 @@ import type {
   MealListInput,
   MealListResult,
   MealMutationInput,
+  MealRepositoryClient,
 } from "../repositories/meal-repository";
 
 export type MealTypeFilter = MealType | "all" | "favorite";
@@ -116,6 +117,7 @@ export function createMealStore(
   initialDate = getLocalDateString(),
   storage?: MealStorage,
   remoteRepository?: MealRemoteRepository,
+  remoteDataSource = Boolean(remoteRepository),
 ) {
   const initialFixtures = cloneMeals(fixtures);
   const persistedMeals = storage?.read();
@@ -139,7 +141,7 @@ export function createMealStore(
   return create<MealStore>((set, get) => ({
     meals: initialMeals,
     fixtureMeals: initialFixtures,
-    dataSource: remoteRepository ? "supabase" : "fixture",
+    dataSource: remoteDataSource ? "supabase" : "fixture",
     initialDate,
     selectedDate: initialDate,
     searchKeyword: "",
@@ -264,11 +266,12 @@ export function createMealStore(
       if (!remoteRepository) return;
       const state = get();
       const generation = state.requestGeneration;
-      set({ loadingState: "loading", errorState: null });
+      set({ dataSource: "supabase", meals: [], loadingState: "loading", errorState: null });
       try {
         const result = await remoteRepository.list(remoteListInput(state, 0));
         if (generation !== get().requestGeneration) return;
         set({
+          dataSource: "supabase",
           meals: cloneMeals(result.meals),
           nextOffset: result.meals.length,
           hasMore: result.hasMore,
@@ -369,4 +372,26 @@ export function createMealStoreWithRepository(
   return createMealStore(fixtures, initialDate, undefined, repository);
 }
 
-export const useMealStore = createMealStore(undefined, undefined, taroMealStorage);
+async function getProductionMealRepository() {
+  const [{ getSupabaseClient }, { createMealRepository }] = await Promise.all([
+    import("../lib/supabase-client"),
+    import("../repositories/meal-repository"),
+  ]);
+  return createMealRepository(getSupabaseClient() as unknown as MealRepositoryClient);
+}
+
+const productionMealRepository: MealRemoteRepository = {
+  async list(input) { return (await getProductionMealRepository()).list(input); },
+  async create(input) { return (await getProductionMealRepository()).create(input); },
+  async update(id, input) { return (await getProductionMealRepository()).update(id, input); },
+  async archive(id) { return (await getProductionMealRepository()).archive(id); },
+  async restore(id) { return (await getProductionMealRepository()).restore(id); },
+};
+
+export const useMealStore = createMealStore(
+  undefined,
+  undefined,
+  taroMealStorage,
+  productionMealRepository,
+  false,
+);

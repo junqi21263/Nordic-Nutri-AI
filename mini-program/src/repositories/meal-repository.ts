@@ -38,6 +38,28 @@ export interface MealListResult {
   hasMore: boolean;
 }
 
+export function toMealMutationInput(meal: Meal, changes: Partial<Pick<Meal, "title" | "mealType" | "favorite" | "items">> = {}): MealMutationInput {
+  const items = changes.items ?? meal.items;
+  return {
+    title: changes.title ?? meal.title,
+    mealType: changes.mealType ?? meal.mealType,
+    recordedAt: `${meal.date}T${meal.time}:00`,
+    isFavorite: changes.favorite ?? meal.favorite,
+    items: items.map((item) => {
+      const quantity = Number.parseFloat(item.amount) || 100;
+      const per100 = (value: number) => Math.round((value * 10000) / quantity) / 100;
+      return {
+        name: item.name,
+        confirmedQuantityG: quantity,
+        caloriesPer100G: per100(item.calories),
+        proteinGPer100G: per100(item.protein),
+        carbsGPer100G: per100(item.carbs),
+        fatGPer100G: per100(item.fat),
+      };
+    }),
+  };
+}
+
 type QueryResult = { data: Row[] | Row | null; error: unknown };
 type QueryChain = {
   gte?: (column: string, value: string) => QueryChain;

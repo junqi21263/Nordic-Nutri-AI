@@ -26,4 +26,20 @@ describe("餐食详情交互", () => {
     expect(actionRule).toContain("flex-direction: row");
     expect(actionRule).toContain("min-height: 64px");
   });
+
+  it("在真实后端模式下让手动保存、列表加载、编辑和删除分别走远程状态", () => {
+    const manual = read("pages/manual-meal/index.tsx");
+    const records = read("pages/meal-records/index.tsx");
+    const detail = read("pages/meal-detail/index.tsx");
+    const portion = read("pages/portion-adjustment/index.tsx");
+
+    expect(manual).toContain("selectRuntimeAdapter");
+    expect(manual).toContain("meals.createRemote");
+    expect(manual).toContain("loading={isSaving}");
+    expect(records).toContain("store.loadRemote");
+    expect(records).toContain("store.loadMoreRemote");
+    expect(records).toContain("重新加载");
+    expect(detail).toContain("store.archiveRemote");
+    expect(portion).toContain("meals.updateRemote");
+  });
 });

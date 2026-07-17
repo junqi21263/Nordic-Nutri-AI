@@ -1,10 +1,13 @@
 import { Input, Text, View } from "@tarojs/components";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { getPublicRuntimeConfig } from "../../api/environment";
 import { AppButton } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
 import { type MealType } from "../../features/meals/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
+import { createClientRequestIds } from "../../repositories/client-request-id";
+import { selectRuntimeAdapter } from "../../repositories/runtime-adapter";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
 import { navigateBackOrHome } from "../../utils/navigation";
@@ -32,8 +35,12 @@ export default function ManualMealPage() {
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const draftKey = useRef(`manual-meal-${Date.now()}`);
+  const requestIds = useRef(createClientRequestIds(() => crypto.randomUUID()));
+  const usesRealBackend = selectRuntimeAdapter(getPublicRuntimeConfig()) === "supabase";
 
-  const save = () => {
+  const save = async () => {
     const nutrition = [calories, protein, carbs, fat].map(readNumber);
     if (!title.trim()) {
       feedback.show({ message: "请填写这一餐的名称", tone: "error" });
@@ -43,9 +50,11 @@ export default function ManualMealPage() {
       feedback.show({ message: "请填写有效的热量与营养数据", tone: "error" });
       return;
     }
-    const id = meals.addMeal({
-      date: getLocalDateString(),
-      time: nowTime(),
+    const date = getLocalDateString();
+    const time = nowTime();
+    const localMeal = {
+      date,
+      time,
       title: title.trim(),
       mealType,
       favorite: false,
@@ -62,9 +71,34 @@ export default function ManualMealPage() {
           fat: nutrition[3]!,
         },
       ],
-    });
-    feedback.show({ message: "已添加到今日饮食记录", tone: "success" });
-    navigateBackOrHome(`/pages/meal-detail/index?id=${id}`);
+    };
+    setIsSaving(true);
+    try {
+      const id = usesRealBackend
+        ? (await meals.createRemote({
+            clientRequestId: requestIds.current.forDraft(draftKey.current),
+            title: localMeal.title,
+            mealType: localMeal.mealType,
+            recordedAt: `${date}T${time}:00`,
+            isFavorite: false,
+            items: [{
+              name: localMeal.title,
+              confirmedQuantityG: 100,
+              caloriesPer100G: nutrition[0]!,
+              proteinGPer100G: nutrition[1]!,
+              carbsGPer100G: nutrition[2]!,
+              fatGPer100G: nutrition[3]!,
+            }],
+          })).id
+        : meals.addMeal(localMeal);
+      if (usesRealBackend) requestIds.current.complete(draftKey.current);
+      feedback.show({ message: usesRealBackend ? "已同步到饮食记录" : "已添加到今日饮食记录", tone: "success" });
+      navigateBackOrHome(`/pages/meal-detail/index?id=${id}`);
+    } catch {
+      feedback.show({ message: "保存失败，请检查网络后重试", tone: "error" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -142,11 +176,11 @@ export default function ManualMealPage() {
         </View>
         <View className="manual-meal__notice">
           <NordicIcon name="check" size={18} ariaLabel="本地保存" />
-          <Text>记录会保存在当前设备，并同步到今日汇总。</Text>
+          <Text>{usesRealBackend ? "记录会同步到你的账号和今日汇总。" : "记录会保存在当前设备，并同步到今日汇总。"}</Text>
         </View>
       </View>
       <View className="manual-meal__action">
-        <AppButton size="large" onClick={save}>
+        <AppButton size="large" loading={isSaving} onClick={() => void save()}>
           保存这餐
         </AppButton>
       </View>
