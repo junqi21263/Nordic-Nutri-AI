@@ -25,8 +25,38 @@ export interface MealCreateInput extends MealMutationInput {
   clientRequestId: string;
 }
 
+export interface MealListInput {
+  date: string;
+  mealType?: MealType;
+  keyword?: string;
+  offset: number;
+  limit: number;
+}
+
+export interface MealListResult {
+  meals: Meal[];
+  hasMore: boolean;
+}
+
+type QueryResult = { data: Row[] | Row | null; error: unknown };
+type QueryChain = {
+  gte?: (column: string, value: string) => QueryChain;
+  lt?: (column: string, value: string) => QueryChain;
+  eq?: (column: string, value: string) => QueryChain;
+  ilike?: (column: string, value: string) => QueryChain;
+  in?: (column: string, values: string[]) => Promise<QueryResult>;
+  order?: (column: string, options?: { ascending?: boolean }) => QueryChain;
+  range?: (from: number, to: number) => Promise<QueryResult>;
+  select?: (columns?: string) => QueryChain;
+  single?: () => Promise<QueryResult>;
+};
+
 export interface MealRepositoryClient {
   rpc: (name: "save_meal_atomic" | "update_meal_atomic", args: { p_input: Row }) => Promise<{ data: unknown; error: unknown }>;
+  from?: (table: "active_meal_records" | "meal_records" | "meal_items") => {
+    select?: (columns: string) => QueryChain;
+    update?: (payload: Row) => QueryChain;
+  };
 }
 
 function number(value: unknown): number {
@@ -72,6 +102,38 @@ function mapResult(result: unknown): Meal {
   };
 }
 
+function mapRows(mealRows: Row[], itemRows: Row[]): Meal[] {
+  return mealRows.map((meal) =>
+    mapResult({
+      meal,
+      items: itemRows.filter((item) => String(item.meal_record_id) === String(meal.id)),
+    }),
+  );
+}
+
+function dayAfter(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const value = new Date(year, month - 1, day);
+  value.setDate(value.getDate() + 1);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}
+
+function clientFrom(client: MealRepositoryClient, table: "active_meal_records" | "meal_records" | "meal_items") {
+  if (!client.from) throw new Error("餐次读取能力不可用");
+  return client.from(table);
+}
+
+async function loadItems(client: MealRepositoryClient, mealIds: string[]): Promise<Row[]> {
+  if (mealIds.length === 0) return [];
+  const select = clientFrom(client, "meal_items").select;
+  if (!select) throw new Error("餐次读取能力不可用");
+  const query = select("id,meal_record_id,name,confirmed_quantity_g,calories_per_100g,protein_g_per_100g,carbs_g_per_100g,fat_g_per_100g");
+  if (!query.in) throw new Error("餐次读取能力不可用");
+  const { data, error } = await query.in("meal_record_id", mealIds);
+  if (error || !Array.isArray(data)) throw new Error("餐次读取失败，请稍后重试");
+  return data;
+}
+
 function toPayload(input: MealMutationInput): Row {
   return {
     name: input.title,
@@ -105,5 +167,50 @@ export function createMealRepository(client: MealRepositoryClient) {
     update(mealId: string, input: MealMutationInput) {
       return invoke(client, "update_meal_atomic", { ...toPayload(input), mealId });
     },
+    async list(input: MealListInput): Promise<MealListResult> {
+      const select = clientFrom(client, "active_meal_records").select;
+      if (!select) throw new Error("餐次读取能力不可用");
+      let query = select("id,name,meal_type,recorded_at,is_favorite,calories_kcal,protein_g,carbs_g,fat_g");
+      if (!query.gte) throw new Error("餐次读取能力不可用");
+      query = query.gte("recorded_at", `${input.date}T00:00:00`);
+      if (!query.lt) throw new Error("餐次读取能力不可用");
+      query = query.lt!("recorded_at", `${dayAfter(input.date)}T00:00:00`);
+      if (input.mealType) {
+        if (!query.eq) throw new Error("餐次读取能力不可用");
+        query = query.eq("meal_type", input.mealType);
+      }
+      if (input.keyword?.trim()) {
+        if (!query.ilike) throw new Error("餐次读取能力不可用");
+        query = query.ilike("name", `%${input.keyword.trim()}%`);
+      }
+      if (!query.order) throw new Error("餐次读取能力不可用");
+      const ordered = query.order("recorded_at", { ascending: false });
+      if (!ordered.range) throw new Error("餐次读取能力不可用");
+      const { data, error } = await ordered.range(input.offset, input.offset + input.limit - 1);
+      if (error || !Array.isArray(data)) throw new Error("餐次读取失败，请稍后重试");
+      const items = await loadItems(client, data.map((row) => String(row.id)));
+      return { meals: mapRows(data, items), hasMore: data.length === input.limit };
+    },
+    async archive(mealId: string): Promise<Meal> {
+      return setArchivedAt(client, mealId, new Date().toISOString());
+    },
+    async restore(mealId: string): Promise<Meal> {
+      return setArchivedAt(client, mealId, null);
+    },
   };
+}
+
+async function setArchivedAt(client: MealRepositoryClient, mealId: string, deletedAt: string | null): Promise<Meal> {
+  const update = clientFrom(client, "meal_records").update;
+  if (!update) throw new Error("餐次保存能力不可用");
+  const query = update({ deleted_at: deletedAt });
+  if (!query.eq) throw new Error("餐次保存能力不可用");
+  const selectQuery = query.eq("id", mealId);
+  if (!selectQuery.select) throw new Error("餐次保存能力不可用");
+  const singleQuery = selectQuery.select("id,name,meal_type,recorded_at,is_favorite,calories_kcal,protein_g,carbs_g,fat_g");
+  if (!singleQuery.single) throw new Error("餐次保存能力不可用");
+  const { data, error } = await singleQuery.single();
+  if (error || !data || Array.isArray(data)) throw new Error("餐次保存失败，请稍后重试");
+  const items = await loadItems(client, [mealId]);
+  return mapRows([data], items)[0]!;
 }

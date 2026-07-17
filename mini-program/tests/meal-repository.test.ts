@@ -36,4 +36,56 @@ describe("meal repository", () => {
 
     expect(rpc).toHaveBeenCalledWith("update_meal_atomic", expect.objectContaining({ p_input: expect.objectContaining({ mealId: "meal-1" }) }));
   });
+
+  it("reads active meals for one date with item rows and a page range", async () => {
+    const range = vi.fn().mockResolvedValue({ data: [response.meal], error: null });
+    const order = vi.fn().mockReturnValue({ range });
+    const lt = vi.fn().mockReturnValue({ order });
+    const gte = vi.fn().mockReturnValue({ lt });
+    const itemsIn = vi.fn().mockResolvedValue({ data: response.items, error: null });
+    const client = {
+      rpc: vi.fn(),
+      from: vi.fn((table: string) =>
+        table === "active_meal_records"
+          ? { select: vi.fn(() => ({ gte })) }
+          : { select: vi.fn(() => ({ in: itemsIn })) },
+      ),
+    };
+
+    const result = await createMealRepository(client).list({
+      date: "2026-07-16",
+      offset: 12,
+      limit: 12,
+    });
+
+    expect(client.from).toHaveBeenCalledWith("active_meal_records");
+    expect(range).toHaveBeenCalledWith(12, 23);
+    expect(client.from).toHaveBeenCalledWith("meal_items");
+    expect(result.meals).toMatchObject([{ id: "meal-1", title: "鸡胸肉沙拉" }]);
+  });
+
+  it("archives and restores only the requested meal", async () => {
+    const single = vi.fn().mockResolvedValue({ data: response.meal, error: null });
+    const select = vi.fn(() => ({ single }));
+    const eq = vi.fn(() => ({ select }));
+    const update = vi.fn(() => ({ eq }));
+    const itemsIn = vi.fn().mockResolvedValue({ data: response.items, error: null });
+    const client = {
+      rpc: vi.fn(),
+      from: vi.fn((table: string) =>
+        table === "meal_records"
+          ? { update }
+          : { select: vi.fn(() => ({ in: itemsIn })) },
+      ),
+    };
+    const repository = createMealRepository(client);
+
+    await repository.archive("meal-1");
+    await repository.restore("meal-1");
+
+    expect(client.from).toHaveBeenNthCalledWith(1, "meal_records");
+    expect(update).toHaveBeenNthCalledWith(1, expect.objectContaining({ deleted_at: expect.any(String) }));
+    expect(update).toHaveBeenNthCalledWith(2, { deleted_at: null });
+    expect(eq).toHaveBeenCalledWith("id", "meal-1");
+  });
 });
