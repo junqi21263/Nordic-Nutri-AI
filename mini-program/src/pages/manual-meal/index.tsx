@@ -6,7 +6,7 @@ import { NordicIcon } from "../../components/nordic-icon";
 import { type MealType } from "../../features/meals/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
-import { createClientRequestIds } from "../../repositories/client-request-id";
+import { createClientRequestId, createClientRequestIds } from "../../repositories/client-request-id";
 import { selectRuntimeAdapter } from "../../repositories/runtime-adapter";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
@@ -37,7 +37,7 @@ export default function ManualMealPage() {
   const [fat, setFat] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const draftKey = useRef(`manual-meal-${Date.now()}`);
-  const requestIds = useRef(createClientRequestIds(() => crypto.randomUUID()));
+  const requestIds = useRef(createClientRequestIds(createClientRequestId));
   const usesRealBackend = selectRuntimeAdapter(getPublicRuntimeConfig()) === "supabase";
 
   const save = async () => {
