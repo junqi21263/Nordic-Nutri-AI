@@ -26,4 +26,17 @@ describe("餐食详情交互", () => {
     expect(actionRule).toContain("flex-direction: row");
     expect(actionRule).toContain("min-height: 64px");
   });
+
+  it("让手动保存、列表编辑和删除都维持本地记录流程", () => {
+    const manual = read("pages/manual-meal/index.tsx");
+    const records = read("pages/meal-records/index.tsx");
+    const detail = read("pages/meal-detail/index.tsx");
+    const portion = read("pages/portion-adjustment/index.tsx");
+
+    expect(manual).toContain("meals.addMeal(localMeal)");
+    expect(manual).toContain("loading={isSaving}");
+    expect(records).not.toContain("loadRemote");
+    expect(detail).toContain("store.deleteMeal(meal.id)");
+    expect(portion).toContain("meals.updateMeal(editingId");
+  });
 });

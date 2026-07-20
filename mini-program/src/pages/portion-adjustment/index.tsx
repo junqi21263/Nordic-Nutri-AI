@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { ErrorState } from "../../components/error-state";
@@ -24,6 +25,7 @@ export default function PortionAdjustmentPage() {
   const portion = usePortionDraftStore();
   const meals = useMealStore();
   const feedback = useFeedbackStore();
+  const [isSaving, setIsSaving] = useState(false);
   const adjusted = portion.getAdjusted();
   if (!portion.meal || !adjusted)
     return (
@@ -48,20 +50,27 @@ export default function PortionAdjustmentPage() {
         : `比原始份量减少 ${100 - percentage}%`;
   const canDecrease = portion.multiplier > 0.25;
   const canIncrease = portion.multiplier < 2;
-  const save = () => {
+  const save = async () => {
     const editingId = portion.editingMealId;
-    if (editingId) {
-      meals.updateMeal(editingId, { items: adjusted.items, insight: portion.meal!.insight });
-      feedback.show({ message: "份量已更新，本地汇总已同步", tone: "success" });
+    setIsSaving(true);
+    try {
+      let id = editingId;
+      if (editingId) {
+        meals.updateMeal(editingId, { items: adjusted.items, insight: portion.meal!.insight });
+        feedback.show({ message: "份量已更新，本地汇总已同步", tone: "success" });
+      } else {
+        id = meals.addMeal(
+          createMealFromAnalysis(portion.meal!, portion.multiplier, getLocalDateString(), nowTime()),
+        );
+        feedback.show({ message: "已保存到本地饮食记录", tone: "success" });
+      }
+      portion.reset();
+      Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });
+    } catch {
+      feedback.show({ message: "保存调整失败，请稍后重试", tone: "error" });
+    } finally {
+      setIsSaving(false);
     }
-    const id =
-      editingId ??
-      meals.addMeal(
-        createMealFromAnalysis(portion.meal!, portion.multiplier, getLocalDateString(), nowTime()),
-      );
-    if (!editingId) feedback.show({ message: "已保存到本地饮食记录", tone: "success" });
-    portion.reset();
-    Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });
   };
   return (
     <PageLayout
@@ -151,7 +160,7 @@ export default function PortionAdjustmentPage() {
           <MacroProgress label="脂肪" value={adjusted.fat} target={25} tone="fat" />
           <Text className="portion-score">Meal Score · {adjusted.score}</Text>
         </AppCard>
-        <AppButton size="large" onClick={save}>
+        <AppButton size="large" loading={isSaving} onClick={() => void save()}>
           {portion.editingMealId ? "保存调整" : "保存本餐"} · {adjusted.calories} kcal
         </AppButton>
       </View>

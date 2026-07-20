@@ -82,14 +82,22 @@ export default function MealDetailPage() {
     portion.startMealEdit(meal);
     Taro.navigateTo({ url: `/pages/portion-adjustment/index?id=${meal.id}` });
   };
-  const remove = () => {
-    store.deleteMeal(meal.id);
-    feedback.show({ message: "餐次已从本地记录移除", tone: "success" });
-    Taro.switchTab({ url: "/pages/meal-records/index" });
+  const remove = async () => {
+    try {
+      store.deleteMeal(meal.id);
+      feedback.show({ message: "餐次已从本地记录移除", tone: "success" });
+      Taro.switchTab({ url: "/pages/meal-records/index" });
+    } catch {
+      feedback.show({ message: "删除失败，请稍后重试", tone: "error" });
+    }
   };
-  const toggleFavorite = () => {
-    store.toggleFavorite(meal.id);
-    feedback.show({ message: meal.favorite ? "已取消收藏" : "已加入收藏", tone: "success" });
+  const toggleFavorite = async () => {
+    try {
+      store.toggleFavorite(meal.id);
+      feedback.show({ message: meal.favorite ? "已取消收藏" : "已加入收藏", tone: "success" });
+    } catch {
+      feedback.show({ message: "收藏状态更新失败，请稍后重试", tone: "error" });
+    }
   };
   const openIngredient = (itemId: string) => {
     Taro.navigateTo({ url: `/pages/ingredient-detail/index?mealId=${meal.id}&itemId=${itemId}` });
@@ -231,7 +239,7 @@ export default function MealDetailPage() {
           <NordicIcon name="pencil" size={22} ariaLabel="编辑" />
           <Text>编辑</Text>
         </View>
-        <View className="meal-detail-page__action" ariaLabel={meal.favorite ? "取消收藏本餐" : "收藏本餐"} onClick={toggleFavorite}>
+        <View className="meal-detail-page__action" ariaLabel={meal.favorite ? "取消收藏本餐" : "收藏本餐"} onClick={() => void toggleFavorite()}>
           <NordicIcon name="heart" size={22} ariaLabel={meal.favorite ? "取消收藏" : "收藏"} />
           <Text>{meal.favorite ? "已收藏" : "收藏"}</Text>
         </View>
@@ -286,7 +294,7 @@ export default function MealDetailPage() {
         description="删除后，本地营养汇总会立即更新。"
         confirmLabel="删除"
         onCancel={() => setDeleteDialogOpen(false)}
-        onConfirm={remove}
+        onConfirm={() => void remove()}
       />
     </PageLayout>
   );

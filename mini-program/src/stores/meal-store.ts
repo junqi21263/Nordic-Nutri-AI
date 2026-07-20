@@ -16,6 +16,7 @@ const createLocalId = () => `local-meal-${Date.now()}-${++idCounter}`;
 export interface MealStore {
   meals: Meal[];
   fixtureMeals: Meal[];
+  dataSource: "fixture";
   initialDate: string;
   selectedDate: string;
   searchKeyword: string;
@@ -25,6 +26,9 @@ export interface MealStore {
   errorState: string | null;
   editingMealId: string | null;
   forceProgressFallback: boolean;
+  nextOffset: number;
+  hasMore: boolean;
+  requestGeneration: number;
   addMeal: (meal: Omit<Meal, "id"> & { id?: string }) => string;
   updateMeal: (id: string, changes: Partial<Omit<Meal, "id">>) => void;
   deleteMeal: (id: string) => void;
@@ -43,7 +47,9 @@ export interface MealStore {
   setErrorState: (error: string | null) => void;
   setEditingMealId: (id: string | null) => void;
   setForceProgressFallback: (value: boolean) => void;
+  resetUserData: () => void;
 }
+
 export interface MealStorage {
   read: () => Meal[] | null;
   write: (meals: Meal[]) => void;
@@ -100,6 +106,7 @@ export function createMealStore(
   return create<MealStore>((set, get) => ({
     meals: initialMeals,
     fixtureMeals: initialFixtures,
+    dataSource: "fixture",
     initialDate,
     selectedDate: initialDate,
     searchKeyword: "",
@@ -109,6 +116,9 @@ export function createMealStore(
     errorState: null,
     editingMealId: null,
     forceProgressFallback: false,
+    nextOffset: 0,
+    hasMore: false,
+    requestGeneration: 0,
     addMeal: (meal) => {
       const id =
         meal.id && !get().meals.some((entry) => entry.id === meal.id) ? meal.id : createLocalId();
@@ -182,18 +192,57 @@ export function createMealStore(
         loadingState: "normal",
         errorState: null,
         editingMealId: null,
+        nextOffset: 0,
+        hasMore: false,
+        requestGeneration: state.requestGeneration + 1,
       }));
     },
     setSelectedDate: (selectedDate) =>
-      set({ selectedDate, visibleLimit: 12, searchKeyword: "", mealTypeFilter: "all" }),
-    setSearchKeyword: (searchKeyword) => set({ searchKeyword, visibleLimit: 12 }),
-    setMealTypeFilter: (mealTypeFilter) => set({ mealTypeFilter, visibleLimit: 12 }),
+      set((state) => ({
+        selectedDate,
+        visibleLimit: 12,
+        searchKeyword: "",
+        mealTypeFilter: "all",
+        nextOffset: 0,
+        hasMore: false,
+        requestGeneration: state.requestGeneration + 1,
+      })),
+    setSearchKeyword: (searchKeyword) => set((state) => ({
+      searchKeyword,
+      visibleLimit: 12,
+      nextOffset: 0,
+      hasMore: false,
+      requestGeneration: state.requestGeneration + 1,
+    })),
+    setMealTypeFilter: (mealTypeFilter) => set((state) => ({
+      mealTypeFilter,
+      visibleLimit: 12,
+      nextOffset: 0,
+      hasMore: false,
+      requestGeneration: state.requestGeneration + 1,
+    })),
     loadMore: () => set((state) => ({ visibleLimit: state.visibleLimit + 12 })),
     setLoadingState: (loadingState) => set({ loadingState }),
     setErrorState: (errorState) =>
       set({ errorState, loadingState: errorState ? "error" : "normal" }),
     setEditingMealId: (editingMealId) => set({ editingMealId }),
     setForceProgressFallback: (forceProgressFallback) => set({ forceProgressFallback }),
+    resetUserData: () => {
+      storage?.clear();
+      set((state) => ({
+        meals: cloneMeals(state.fixtureMeals),
+        selectedDate: state.initialDate,
+        searchKeyword: "",
+        mealTypeFilter: "all",
+        visibleLimit: 12,
+        loadingState: "normal",
+        errorState: null,
+        editingMealId: null,
+        nextOffset: 0,
+        hasMore: false,
+        requestGeneration: state.requestGeneration + 1,
+      }));
+    },
   }));
 }
 

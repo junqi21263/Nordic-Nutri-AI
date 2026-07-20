@@ -1,5 +1,5 @@
-export default defineAppConfig({
-  pages: [
+const pages = [
+    "pages/auth-entry/index",
     "pages/onboarding/index",
     "pages/body-profile/index",
     "pages/diet-preferences/index",
@@ -18,7 +18,10 @@ export default defineAppConfig({
     "pages/goal-adjust/index",
     "pages/achievements/index",
     "pages/weekly-review/index",
-  ],
+];
+
+export default defineAppConfig({
+  pages,
   window: {
     navigationStyle: "custom",
     navigationBarBackgroundColor: "#faf9f6",

@@ -11,6 +11,8 @@ import { NordicIcon } from "../../components/nordic-icon";
 import { StatisticCard } from "../../components/statistic-card";
 import { createAchievements } from "../../features/coach/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
+import { createLogoutFlow } from "../../auth/logout-flow";
+import { signOut } from "../../auth/session-manager";
 import { PageLayout } from "../../layouts/page-layout";
 import { useAchievementStore } from "../../stores/achievement-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
@@ -36,6 +38,10 @@ export default function ProfilePage() {
   const [feedbackDraft, setFeedbackDraft] = useState("");
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
+  const logoutFlow = createLogoutFlow({
+    signOut,
+    openLogin: () => Taro.reLaunch({ url: "/pages/auth-entry/index" }),
+  });
 
   useEffect(() => {
     if (activeModal) {
@@ -66,6 +72,9 @@ export default function ProfilePage() {
     setFeedbackDraft("");
     setActiveModal(null);
     showNotice("感谢你的反馈");
+  };
+  const logout = () => {
+    void logoutFlow.run().catch(() => feedback.show({ message: "退出登录失败，请稍后重试", tone: "error" }));
   };
 
   return (
@@ -142,6 +151,9 @@ export default function ProfilePage() {
           </View>
           <View onClick={() => setActiveModal("about")}>
             <ListItem icon={<NordicIcon name="user-round" size={20} ariaLabel="关于我们" />} title="关于我们" description="Nordic Nutri AI 本地体验版" />
+          </View>
+          <View onClick={logout}>
+            <ListItem icon={<NordicIcon name="x" size={20} ariaLabel="退出登录" />} title="退出登录" description="仅退出当前设备" />
           </View>
         </View>
       </View>

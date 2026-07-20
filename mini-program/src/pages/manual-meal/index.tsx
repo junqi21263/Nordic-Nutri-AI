@@ -32,8 +32,9 @@ export default function ManualMealPage() {
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
-  const save = () => {
+  const save = async () => {
     const nutrition = [calories, protein, carbs, fat].map(readNumber);
     if (!title.trim()) {
       feedback.show({ message: "请填写这一餐的名称", tone: "error" });
@@ -43,9 +44,11 @@ export default function ManualMealPage() {
       feedback.show({ message: "请填写有效的热量与营养数据", tone: "error" });
       return;
     }
-    const id = meals.addMeal({
-      date: getLocalDateString(),
-      time: nowTime(),
+    const date = getLocalDateString();
+    const time = nowTime();
+    const localMeal = {
+      date,
+      time,
       title: title.trim(),
       mealType,
       favorite: false,
@@ -62,9 +65,17 @@ export default function ManualMealPage() {
           fat: nutrition[3]!,
         },
       ],
-    });
-    feedback.show({ message: "已添加到今日饮食记录", tone: "success" });
-    navigateBackOrHome(`/pages/meal-detail/index?id=${id}`);
+    };
+    setIsSaving(true);
+    try {
+      const id = meals.addMeal(localMeal);
+      feedback.show({ message: "已添加到今日饮食记录", tone: "success" });
+      navigateBackOrHome(`/pages/meal-detail/index?id=${id}`);
+    } catch {
+      feedback.show({ message: "保存失败，请检查网络后重试", tone: "error" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -146,7 +157,7 @@ export default function ManualMealPage() {
         </View>
       </View>
       <View className="manual-meal__action">
-        <AppButton size="large" onClick={save}>
+        <AppButton size="large" loading={isSaving} onClick={() => void save()}>
           保存这餐
         </AppButton>
       </View>

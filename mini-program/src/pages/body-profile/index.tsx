@@ -1,5 +1,7 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useState } from "react";
+import { saveProductBodyProfile } from "../../api/product-data-api";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomActionLayout } from "../../components/bottom-action-layout";
@@ -14,6 +16,7 @@ import {
   validateBodyProfile,
 } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
+import { useFeedbackStore } from "../../stores/feedback-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 
@@ -61,11 +64,26 @@ function FormError({ message }: { message?: string }) {
 
 export default function BodyProfilePage() {
   const { draft, errors, setField, setDraft, setErrors } = useOnboardingDraftStore();
+  const feedback = useFeedbackStore();
+  const [isSaving, setIsSaving] = useState(false);
   const validation = validateBodyProfile(draft, today);
   const validate = () => setErrors(validation.errors);
-  const continueToDietPreferences = () => {
+  const continueToDietPreferences = async () => {
     validate();
-    if (validation.valid) Taro.navigateTo({ url: "/pages/diet-preferences/index" });
+    if (!validation.valid || !validation.profile) return;
+    setIsSaving(true);
+    try {
+      await saveProductBodyProfile({
+        age: validation.profile.age, birthDate: null, sex: validation.profile.gender,
+        heightCm: validation.profile.heightCm, weightKg: validation.profile.weightKg,
+        activityLevel: validation.profile.activityLevel, trainingDays: validation.profile.trainingDays,
+      });
+      await Taro.navigateTo({ url: "/pages/diet-preferences/index" });
+    } catch {
+      feedback.show({ message: "身体资料保存失败，请稍后重试", tone: "error" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -98,6 +116,20 @@ export default function BodyProfilePage() {
                 <NordicIcon name="user-round" size={20} ariaLabel="基础信息" />
               </View>
               <Text className="body-profile__foundation-title">基础信息与生活方式</Text>
+            </View>
+
+            <View className="profile-form">
+              <View className="profile-form__field">
+                <Text>昵称</Text>
+                <Input
+                  value={draft.nickname}
+                  maxlength={16}
+                  placeholder="输入你的昵称"
+                  onInput={(event) => setField("nickname", event.detail.value)}
+                  onBlur={validate}
+                />
+                <FormError message={errors.nickname} />
+              </View>
             </View>
 
             <View className="body-profile__metrics body-profile__metrics--three-up">
@@ -185,6 +217,7 @@ export default function BodyProfilePage() {
               </View>
               <FormError message={errors.gender} />
             </View>
+
           </AppCard>
 
           <View className="body-profile__section">
@@ -218,7 +251,7 @@ export default function BodyProfilePage() {
         </View>
 
         <BottomActionLayout>
-          <AppButton size="large" disabled={!validation.valid} onClick={continueToDietPreferences}>
+          <AppButton size="large" disabled={!validation.valid} loading={isSaving} onClick={() => void continueToDietPreferences()}>
             继续
           </AppButton>
         </BottomActionLayout>

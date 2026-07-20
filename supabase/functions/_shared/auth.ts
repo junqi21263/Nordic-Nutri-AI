@@ -17,6 +17,16 @@ function getPublishableKey(): string {
   return key;
 }
 
+export function getServerEnv(name: string): string {
+  return getRequiredEnv(name);
+}
+
+export function createUserScopedClient(request: Request) {
+  return createClient(getRequiredEnv("SUPABASE_URL"), getPublishableKey(), {
+    global: { headers: { authorization: request.headers.get("authorization") ?? "" } },
+  });
+}
+
 function getBearerToken(request: Request): string {
   const authorization = request.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ")) throw unauthorized();

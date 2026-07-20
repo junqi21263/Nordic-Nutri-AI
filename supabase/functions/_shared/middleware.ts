@@ -24,10 +24,15 @@ export function withRequestContext(handler: FunctionHandler) {
 
     const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
     try {
-      return withCors(await handler(request, { requestId }));
+      const response = withCors(await handler(request, { requestId }));
+      console.info(JSON.stringify({ requestId, event: "function_request_completed", status: response.status }));
+      return response;
     } catch (error) {
-      if (error instanceof AppError) return withCors(failure(error, requestId));
-      console.error(JSON.stringify({ request_id: requestId, event: "unhandled_function_error" }));
+      if (error instanceof AppError) {
+        console.warn(JSON.stringify({ requestId, event: "function_request_rejected", code: error.code }));
+        return withCors(failure(error, requestId));
+      }
+      console.error(JSON.stringify({ requestId, event: "unhandled_function_error" }));
       return withCors(internalError(requestId));
     }
   };

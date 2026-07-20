@@ -22,6 +22,7 @@ export type FoodAvoidance =
   | "spicy";
 
 export interface OnboardingDraft {
+  nickname: string;
   goalType: GoalType | null;
   age: string;
   gender: Gender | null;
@@ -40,6 +41,7 @@ export type OnboardingField = keyof OnboardingDraft;
 export type FieldErrors = Partial<Record<OnboardingField, string>>;
 
 export interface ValidBodyProfile {
+  nickname: string;
   goalType: GoalType;
   age: number;
   gender: Gender;
@@ -83,6 +85,7 @@ const proteinPerKg: Record<GoalType, number> = {
 
 export function createInitialOnboardingDraft(): OnboardingDraft {
   return {
+    nickname: "",
     goalType: null,
     age: "",
     gender: null,
@@ -138,12 +141,14 @@ function integerInRange(value: string, min: number, max: number): number | undef
 
 export function validateBodyProfile(draft: OnboardingDraft, today: string): BodyProfileValidation {
   const errors: FieldErrors = {};
+  const nickname = draft.nickname.trim().slice(0, 40);
   const age = integerInRange(draft.age, 14, 80);
   const heightCm = numberInRange(draft.heightCm, 120, 230);
   const weightKg = numberInRange(draft.weightKg, 30, 300);
   const trainingDays = numberInRange(draft.trainingDays, 0, 7);
   const targetWeightKg = draft.targetWeightKg ? numberInRange(draft.targetWeightKg, 30, 300) : null;
 
+  if (!nickname) errors.nickname = "请输入昵称";
   if (age === undefined) errors.age = "年龄需在 14–80 岁之间";
   if (!draft.gender) errors.gender = "请选择性别";
   if (heightCm === undefined) errors.heightCm = "身高需在 120–230 cm 之间";
@@ -167,6 +172,7 @@ export function validateBodyProfile(draft: OnboardingDraft, today: string): Body
     errors,
     profile: {
       goalType: draft.goalType,
+      nickname,
       age: age!,
       gender: draft.gender,
       heightCm: heightCm!,

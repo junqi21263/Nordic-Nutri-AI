@@ -1,6 +1,11 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig } from "@tarojs/cli";
 import devConfig from "./dev";
 import prodConfig from "./prod";
+
+const localEnvFile = resolve(__dirname, "../../.env.local");
+if (existsSync(localEnvFile)) process.loadEnvFile(localEnvFile);
 
 const isDevelopment = process.env.NODE_ENV === "development";
 const outputRoot = process.env.TARO_ENV === "h5" ? "dist/h5" : "dist/weapp";
@@ -21,9 +26,14 @@ export default defineConfig({
   plugins: ["@tarojs/plugin-platform-weapp", "@tarojs/plugin-platform-h5"],
   defineConstants: {
     "process.env.TARO_APP_ENV": JSON.stringify(process.env.TARO_APP_ENV ?? "local"),
-    "process.env.TARO_APP_SUPABASE_URL": JSON.stringify(process.env.TARO_APP_SUPABASE_URL ?? ""),
-    "process.env.TARO_APP_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
-      process.env.TARO_APP_SUPABASE_PUBLISHABLE_KEY ?? "",
+    "process.env.TARO_APP_ENABLE_REAL_AUTH": JSON.stringify(
+      process.env.TARO_APP_ENABLE_REAL_AUTH ?? "false",
+    ),
+    "process.env.TARO_APP_USE_REAL_BACKEND": JSON.stringify(
+      process.env.TARO_APP_USE_REAL_BACKEND ?? "false",
+    ),
+    "process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY": JSON.stringify(
+      process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY ?? "",
     ),
   },
   mini: {
@@ -31,6 +41,17 @@ export default defineConfig({
       pxtransform: { enable: true },
       url: { enable: true, config: { limit: 1024 } },
       cssModules: { enable: false },
+    },
+    webpackChain(chain) {
+      if (isDevelopment) {
+        // Taro's watch build otherwise removes app.json before emitting the
+        // replacement files, which leaves WeChat DevTools on wx://not-found.
+        chain.output.set("clean", false);
+      }
+      chain.resolve.alias.set(
+        "@cloudbase/js-sdk$",
+        resolve(__dirname, "../node_modules/@cloudbase/js-sdk/miniprogram_dist/index.js"),
+      );
     },
   },
   h5: {

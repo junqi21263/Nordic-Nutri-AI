@@ -1,6 +1,7 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useState } from "react";
+import { getProductAccount, saveProductBodyProfile, saveProductGoal, saveProductProfile } from "../../api/product-data-api";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -10,6 +11,11 @@ import { useProfileStore } from "../../stores/profile-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 const goalOptions = ["精益增肌", "轻盈减脂", "保持状态"];
+const goalTypeByLabel: Record<string, "muscle_gain" | "fat_loss" | "maintain"> = {
+  "精益增肌": "muscle_gain",
+  "轻盈减脂": "fat_loss",
+  "保持状态": "maintain",
+};
 
 export default function ProfileEditPage() {
   const profile = useProfileStore();
@@ -17,20 +23,46 @@ export default function ProfileEditPage() {
   const [nickname, setNickname] = useState(profile.profile.nickname);
   const [weight, setWeight] = useState(String(profile.profile.weight));
   const [goalLabel, setGoalLabel] = useState(profile.profile.goalLabel);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const save = () => {
+  const save = async () => {
     const nextWeight = Number(weight);
     if (!Number.isFinite(nextWeight) || nextWeight < 30 || nextWeight > 300) {
       feedback.show({ message: "请输入 30–300 kg 的体重", tone: "error" });
       return;
     }
-    profile.setProfile({
-      nickname: nickname.trim() || profile.profile.nickname,
-      weight: nextWeight,
-      goalLabel,
-    });
-    feedback.show({ message: "个人资料已保存", tone: "success" });
-    navigateBackOrHome("/pages/profile/index");
+    const nextNickname = nickname.trim() || profile.profile.nickname;
+    setIsSaving(true);
+    try {
+      const account = await getProductAccount();
+      if (account.age === null || account.sex === null || account.heightCm === null || account.activityLevel === null || account.trainingDays === null) {
+        throw new Error("请先补全身体资料");
+      }
+      const saved = await saveProductProfile({ nickname: nextNickname });
+      await saveProductBodyProfile({
+        age: account.age,
+        birthDate: null,
+        sex: account.sex,
+        heightCm: account.heightCm,
+        weightKg: nextWeight,
+        activityLevel: account.activityLevel,
+        trainingDays: account.trainingDays,
+      });
+      await saveProductGoal({
+        goalType: goalTypeByLabel[goalLabel] ?? "muscle_gain",
+        targetWeightKg: account.targetWeightKg,
+        targetCaloriesKcal: account.targetCaloriesKcal,
+        targetDate: null,
+      });
+      const savedNickname = saved.nickname || nextNickname;
+      profile.setProfile({ nickname: savedNickname, weight: nextWeight, goalLabel });
+      feedback.show({ message: "个人资料已保存", tone: "success" });
+      navigateBackOrHome("/pages/profile/index");
+    } catch {
+      feedback.show({ message: "个人资料保存失败，请稍后重试", tone: "error" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -105,16 +137,16 @@ export default function ProfileEditPage() {
 
         <View className="profile-edit__notice">
           <View className="profile-edit__notice-icon">
-            <NordicIcon name="check" size={20} ariaLabel="本地保存" />
+            <NordicIcon name="check" size={20} ariaLabel="账号保存" />
           </View>
           <View>
-            <Text>本地资料说明</Text>
-            <Text>保存后会更新个人中心展示；数据仅保留在当前设备。</Text>
+            <Text>资料保存说明</Text>
+            <Text>昵称会保存到你的账号，并更新个人中心展示。</Text>
           </View>
         </View>
       </View>
       <View className="profile-edit__action">
-        <AppButton size="large" onClick={save}>
+        <AppButton size="large" loading={isSaving} onClick={() => void save()}>
           保存资料
         </AppButton>
       </View>
