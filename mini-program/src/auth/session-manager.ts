@@ -1,39 +1,35 @@
-import type { Session, User } from "@supabase/supabase-js";
-import { getSupabaseClient } from "../lib/supabase-client";
-import { useAuthStore } from "./auth-store";
+import { getCloudbaseAuth, getCloudbaseDatabase } from "../lib/cloudbase";
+import { type AppAuthSession, type AppAuthUser, useAuthStore } from "./auth-store";
+import { parseCloudbaseSession } from "./cloudbase-session";
+import { ensureCloudbaseProductUser, type CloudbaseProductSessionClient } from "./cloudbase-product-session";
 
-let refreshInFlight: Promise<Session | null> | null = null;
-export async function restoreSession(): Promise<Session | null> {
-  const { data, error } = await getSupabaseClient().auth.getSession();
-  if (error) {
-    useAuthStore.getState().clear();
+let refreshInFlight: Promise<AppAuthSession | null> | null = null;
+
+export async function getCurrentUser(): Promise<AppAuthUser | null> {
+  const user = parseCloudbaseSession(await getCloudbaseAuth().getSession())?.user ?? null;
+  if (!user) useAuthStore.getState().clear();
+  return user;
+}
+
+export async function restoreSession(): Promise<AppAuthSession | null> {
+  const cloudbaseSession = parseCloudbaseSession(await getCloudbaseAuth().getSession());
+  if (!cloudbaseSession) {
+    useAuthStore.getState().setSession(null);
     return null;
   }
-  useAuthStore.getState().setSession(data.session);
-  return data.session;
+  const userId = await ensureCloudbaseProductUser(getCloudbaseDatabase() as unknown as CloudbaseProductSessionClient);
+  const session: AppAuthSession = { user: { id: userId, email: cloudbaseSession.user.email } };
+  useAuthStore.getState().setSession(session);
+  return session;
 }
-export async function refreshSession(): Promise<Session | null> {
-  if (!refreshInFlight) refreshInFlight = getSupabaseClient().auth.refreshSession().then(({ data, error }) => {
-    if (error || !data.session) {
-      useAuthStore.getState().clear();
-      return null;
-    }
-    useAuthStore.getState().setSession(data.session);
-    return data.session;
-  }).finally(() => { refreshInFlight = null; });
+
+export async function refreshSession(): Promise<AppAuthSession | null> {
+  if (!refreshInFlight) refreshInFlight = restoreSession().finally(() => { refreshInFlight = null; });
   return refreshInFlight;
 }
+
 export async function clearInvalidSession() {
-  await getSupabaseClient().auth.signOut({ scope: "local" });
+  await getCloudbaseAuth().signOut();
   useAuthStore.getState().clear();
 }
 export async function signOut() { await clearInvalidSession(); }
-export async function getCurrentUser(): Promise<User | null> {
-  const { data, error } = await getSupabaseClient().auth.getUser();
-  if (error || !data.user) {
-    useAuthStore.getState().clear();
-    return null;
-  }
-  useAuthStore.getState().setSession((await getSupabaseClient().auth.getSession()).data.session);
-  return data.user;
-}

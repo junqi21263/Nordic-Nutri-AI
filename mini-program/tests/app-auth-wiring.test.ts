@@ -15,6 +15,7 @@ describe("app authentication wiring", () => {
     expect(bootstrap).toContain("loginWithWechat");
     expect(bootstrap).toContain("createProfileIdentityLoader");
     expect(bootstrap).toContain("selectRuntimeAdapter");
+    expect(bootstrap).toContain("authBootstrap.start({ allowSilentLogin: false })");
     expect(bootstrap).toContain('url: "/pages/auth-entry/index"');
   });
 });

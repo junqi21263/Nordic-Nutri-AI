@@ -33,7 +33,7 @@ const authBootstrap = createAuthBootstrap({
 });
 
 const applicationLaunch = createRuntimeApplicationLaunch({
-  start: authBootstrap.start,
+  start: () => authBootstrap.start({ allowSilentLogin: false }),
   getStatus: () => authBootstrap.getState().status,
 }, {
   isOnboardingCompleted,

@@ -1,20 +1,17 @@
 import Taro from "@tarojs/taro";
 import { extractFunctionDiagnostics, truncateProjectRef } from "./function-request-id";
 import { getPublicRuntimeConfig } from "./environment";
-import { getSupabaseClient } from "../lib/supabase-client";
-import { getCurrentUser, restoreSession } from "../auth/session-manager";
+import { requestCloudbaseLoginTicket } from "./cloudbase-ticket-api";
+import { createCloudbaseTicketLogin } from "../auth/cloudbase-ticket-login";
+import type { AppAuthUser } from "../auth/auth-store";
+import { getCloudbaseAuth } from "../lib/cloudbase";
+import {
+  assertCloudbaseSignInSucceeded,
+  readCloudbaseSessionCredentials,
+} from "../auth/cloudbase-session";
+import { restoreSession } from "../auth/session-manager";
 
-let loginInFlight: Promise<Awaited<ReturnType<typeof getCurrentUser>>> | null = null;
-
-type WechatLoginFunctionResult = {
-  data: {
-    success: boolean;
-    data?: { tokenHash: string };
-    requestId?: string;
-  } | null;
-  error: unknown;
-  response: Response | undefined;
-};
+let loginInFlight: Promise<AppAuthUser> | null = null;
 
 export type WechatLoginStage =
   | "wxLogin"
@@ -52,23 +49,51 @@ function logFunctionEvent(event: "started" | "completed" | "failed", diagnostics
 }): void {
   if (getPublicRuntimeConfig().environment !== "development") return;
   console.info("[dev-auth] function-invoke-" + event, {
-    targetProjectRef: truncateProjectRef(getPublicRuntimeConfig().supabaseUrl),
+    targetProjectRef: truncateProjectRef("https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com"),
     httpStatus: diagnostics?.httpStatus ?? null,
     requestId: diagnostics?.requestId ?? null,
   });
 }
 
-function functionInvokeRuntimeError(): Error {
-  const error = new Error("函数调用未到达 HTTP 响应层");
-  error.name = "FunctionInvokeRuntimeError";
-  return error;
+function summarizeCloudbaseLoginError(error: unknown): {
+  errorName: string | null;
+  errorCode: string | null;
+  message: string | null;
+} {
+  if (error instanceof Error) {
+    const value = error as Error & { code?: unknown };
+    return {
+      errorName: error.name || null,
+      errorCode: typeof value.code === "string" ? value.code : null,
+      message: error.message || null,
+    };
+  }
+
+  if (error && typeof error === "object") {
+    const value = error as { name?: unknown; code?: unknown; message?: unknown };
+    return {
+      errorName: typeof value.name === "string" ? value.name : null,
+      errorCode: typeof value.code === "string" ? value.code : null,
+      message: typeof value.message === "string" ? value.message : null,
+    };
+  }
+
+  return { errorName: null, errorCode: null, message: null };
 }
 
-export async function exchangeWechatTokenHash(tokenHash: string) {
-  const { data, error } = await getSupabaseClient().auth.verifyOtp({ token_hash: tokenHash, type: "email" });
-  if (error || !data.session) throw new Error("WeChat session exchange failed");
-  return data.session;
+function logCloudbaseLoginFailure(
+  error: unknown,
+  diagnostics: { httpStatus?: number | null; requestId?: string | null },
+): void {
+  if (getPublicRuntimeConfig().environment !== "development") return;
+  const summary = summarizeCloudbaseLoginError(error);
+  console.error("[dev-auth] cloudbase-login-failed", {
+    ...summary,
+    httpStatus: diagnostics.httpStatus ?? null,
+    requestId: diagnostics.requestId ?? null,
+  });
 }
+
 export async function loginWithWechat(observer?: WechatLoginObserver) {
   if (!loginInFlight) {
     loginInFlight = (async () => {
@@ -85,77 +110,55 @@ export async function loginWithWechat(observer?: WechatLoginObserver) {
 
       observer?.({ stage: "functionInvokeStart", status: "running" });
       logFunctionEvent("started");
-      let client: ReturnType<typeof getSupabaseClient>;
+      const signIn = createCloudbaseTicketLogin({
+        wxLogin: async () => login,
+        requestTicket: requestCloudbaseLoginTicket,
+        signInWithCustomTicket: async (ticket) => {
+          const auth = getCloudbaseAuth();
+          const result = await auth.signInWithCustomTicket(async () => ticket);
+          assertCloudbaseSignInSucceeded(result);
+          const credentials = readCloudbaseSessionCredentials(result);
+          if (!credentials) throw new Error("CloudBase 登录会话凭证缺失");
+          const reboundSession = await auth.setSession(credentials);
+          assertCloudbaseSignInSucceeded(reboundSession);
+          if (!readCloudbaseSessionCredentials(reboundSession)) {
+            throw new Error("CloudBase 登录会话未绑定到当前客户端");
+          }
+          const user = (await restoreSession())?.user ?? null;
+          if (!user) throw new Error("CloudBase session verification failed");
+          return { session: { user }, user };
+        },
+      });
       try {
-        client = getSupabaseClient();
+        const signedIn = await signIn();
+        observer?.({ stage: "functionInvokeResponse", status: "success" });
+        logFunctionEvent("completed");
+        observer?.({ stage: "verifyOtp", status: "success" });
+        observer?.({ stage: "getUser", status: "success" });
+        return signedIn.user;
       } catch (error) {
         const diagnostics = await extractFunctionDiagnostics(error);
-        observer?.({ stage: "functionInvokeStart", status: "error", ...diagnostics });
+        const summary = summarizeCloudbaseLoginError(error);
+        observer?.({
+          stage: "functionInvokeResponse",
+          status: "error",
+          ...diagnostics,
+          errorName: summary.errorName ?? diagnostics.errorName,
+          errorCode: summary.errorCode ?? diagnostics.errorCode,
+          message: summary.message ?? diagnostics.message,
+        });
         observer?.({ stage: "functionErrorParse", status: "success", ...diagnostics });
+        logCloudbaseLoginFailure(error, diagnostics);
         logFunctionEvent("failed", diagnostics);
+        observer?.({ stage: "verifyOtp", status: "error", ...diagnostics });
+        observer?.({ stage: "getUser", status: "error", ...diagnostics });
         throw error;
       }
-      let functionResult: WechatLoginFunctionResult;
-      try {
-        functionResult = await client.functions.invoke<{
-          success: boolean;
-          data?: { tokenHash: string };
-          requestId?: string;
-        }>("wechat-login", { body: { code: login.code } }) as WechatLoginFunctionResult;
-      } catch {
-        const diagnostics = await extractFunctionDiagnostics(functionInvokeRuntimeError());
-        observer?.({ stage: "functionInvokeResponse", status: "error", ...diagnostics });
-        observer?.({ stage: "functionErrorParse", status: "success", ...diagnostics });
-        logFunctionEvent("failed", diagnostics);
-        throw functionInvokeRuntimeError();
-      }
-      const { data, error, response } = functionResult;
-      const diagnostics = error
-        ? await extractFunctionDiagnostics(error)
-        : {
-          httpStatus: response?.status ?? null,
-          errorCode: null,
-          message: null,
-          requestId: data?.requestId ?? response?.headers.get("x-request-id") ?? null,
-          errorName: null,
-          errorKind: null,
-        };
-      if (error || !data?.success || !data.data?.tokenHash) {
-        observer?.({ stage: "functionInvokeResponse", status: "error", ...diagnostics });
-        observer?.({ stage: "functionErrorParse", status: "success", ...diagnostics });
-        logFunctionEvent("failed", diagnostics);
-        throw error ?? new Error("WeChat login failed");
-      }
-
-      observer?.({ stage: "functionInvokeResponse", status: "success", requestId: diagnostics.requestId ?? undefined });
-      logFunctionEvent("completed", diagnostics);
-      observer?.({ stage: "verifyOtp", status: "running" });
-      try {
-        await exchangeWechatTokenHash(data.data.tokenHash);
-        observer?.({ stage: "verifyOtp", status: "success" });
-      } catch (error) {
-        observer?.({ stage: "verifyOtp", status: "error", ...await extractFunctionDiagnostics(error) });
-        throw error;
-      }
-
-      observer?.({ stage: "getUser", status: "running" });
-      let user: Awaited<ReturnType<typeof getCurrentUser>>;
-      try {
-        user = await getCurrentUser();
-        if (!user) throw new Error("WeChat session verification failed");
-        observer?.({ stage: "getUser", status: "success" });
-      } catch (error) {
-        observer?.({ stage: "getUser", status: "error", ...await extractFunctionDiagnostics(error) });
-        throw error;
-      }
-      return user;
     })().finally(() => { loginInFlight = null; });
   }
   return loginInFlight;
 }
 export async function getCurrentProfile() {
-  const { data, error } = await getSupabaseClient().from("profiles").select("*").single();
-  if (error) throw new Error("Profile request failed");
-  return data;
+  throw new Error("CloudBase profile bootstrap is not deployed");
 }
 export { restoreSession };

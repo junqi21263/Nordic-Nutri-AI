@@ -22,4 +22,11 @@ describe("body and goal real save pages", () => {
     expect(page).toContain("saveVersion");
     expect(page).toContain("loading={isSaving}");
   });
+
+  it("persists the complete onboarding transaction before opening the home page", () => {
+    const page = source("nutrition-plan");
+
+    expect(page).toContain("completeCloudbaseOnboarding");
+    expect(page).toContain("loading={isSaving}");
+  });
 });

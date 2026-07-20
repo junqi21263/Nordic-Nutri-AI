@@ -31,6 +31,12 @@ afterEach(() => vi.unstubAllGlobals());
 const root = resolve(__dirname, "..");
 
 describe("development auth harness boundary", () => {
+  it("binds the development project to the WeChat AppID used by the login Function", () => {
+    const projectConfig = JSON.parse(readFileSync(resolve(root, "project.config.json"), "utf8")) as { appid?: string };
+
+    expect(projectConfig.appid).toBe("wx39395ebfd5b99a9a");
+  });
+
   it("registers the harness only through a development route and defines both public auth flags", () => {
     const config = readFileSync(resolve(root, "config/index.ts"), "utf8");
     const appConfig = readFileSync(resolve(root, "src/app.config.ts"), "utf8");
@@ -448,6 +454,32 @@ describe("development auth harness boundary", () => {
 
     expect(installWechatUrlCompatibility(runtime)).toBe(true);
     expect(new runtime.URL("pages/dev-auth-harness/index").toString()).toBe("https://mini-program.invalid/pages/dev-auth-harness/index");
+  });
+
+  it("gives Supabase initialization a temporary absolute Taro page URL without changing navigation", async () => {
+    const compatibility = await import("../src/lib/wechat-url") as unknown as {
+      withWechatAuthLocation?: <T>(runtimeWindow: { location?: { href?: unknown } }, callback: () => T) => T;
+    };
+    const originalLocation = { href: "pages/dev-auth-harness/index" };
+    const runtimeWindow: { location?: { href?: unknown } } = { location: originalLocation };
+
+    expect(compatibility.withWechatAuthLocation).toBeTypeOf("function");
+    const result = compatibility.withWechatAuthLocation!(runtimeWindow, () => runtimeWindow.location?.href);
+
+    expect(result).toBe("https://mini-program.invalid/pages/dev-auth-harness/index");
+    expect(runtimeWindow.location).toBe(originalLocation);
+  });
+
+  it("uses a Supabase URL implementation that supports the wss realtime endpoint", async () => {
+    const { URL: SupabaseURL } = await import("../src/lib/supabase-url");
+    const realtimeUrl = new SupabaseURL("wss://project.supabase.co/realtime/v1");
+
+    expect(realtimeUrl.protocol).toBe("wss:");
+    expect(realtimeUrl.hostname).toBe("project.supabase.co");
+    expect(realtimeUrl.pathname).toBe("/realtime/v1");
+
+    realtimeUrl.protocol = realtimeUrl.protocol.replace("ws", "http");
+    expect(realtimeUrl.href).toBe("https://project.supabase.co/realtime/v1");
   });
 
   it("sanitizes absent, malformed, legacy, and valid Auth storage without exposing session data", () => {

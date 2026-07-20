@@ -43,6 +43,24 @@ export default defineConfig({
       url: { enable: true, config: { limit: 1024 } },
       cssModules: { enable: false },
     },
+    webpackChain(chain) {
+      if (isDevelopment) {
+        // Taro's watch build otherwise removes app.json before emitting the
+        // replacement files, which leaves WeChat DevTools on wx://not-found.
+        chain.output.set("clean", false);
+      }
+      chain.plugin("providerPlugin").tap((args) => [{
+        ...args[0],
+        URL: [resolve(__dirname, "../src/lib/supabase-url"), "URL"],
+      }]);
+      // Webpack otherwise resolves the package's `module` field (the web build)
+      // before its `miniprogram` field. The Mini Program bundle supplies the
+      // correct request and binary adapters for wx.* APIs.
+      chain.resolve.alias.set(
+        "@cloudbase/js-sdk$",
+        resolve(__dirname, "../node_modules/@cloudbase/js-sdk/miniprogram_dist/index.js"),
+      );
+    },
   },
   h5: {
     staticDirectory: "static",

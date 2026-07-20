@@ -1,13 +1,21 @@
-import type { Session, User } from "@supabase/supabase-js";
 import { create } from "zustand";
 
 export type AuthStatus = "unknown" | "authenticated" | "anonymous";
 
+export interface AppAuthUser {
+  id: string;
+  email?: string | null;
+}
+
+export interface AppAuthSession {
+  user: AppAuthUser;
+}
+
 export interface AuthState {
   status: AuthStatus;
-  session: Session | null;
-  user: User | null;
-  setSession: (session: Session | null) => void;
+  session: AppAuthSession | null;
+  user: AppAuthUser | null;
+  setSession: (session: AppAuthSession | null) => void;
   clear: () => void;
 }
 

@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient, type SupportedStorage } from "@supabase/supabase-js";
+import { window as taroWindow } from "@tarojs/runtime";
 import Taro from "@tarojs/taro";
 import { getPublicRuntimeConfig } from "../api/environment";
 import { describeInitializationError } from "../dev/supabase-initialization-probe";
@@ -12,7 +13,11 @@ import {
   sanitizeWechatAuthStorage,
   type AuthStorageInspection,
 } from "./wechat-storage";
-import { getWechatUrlCompatibilityDiagnostics, installWechatUrlCompatibility } from "./wechat-url";
+import {
+  getWechatUrlCompatibilityDiagnostics,
+  installWechatUrlCompatibility,
+  withWechatAuthLocation,
+} from "./wechat-url";
 
 const wechatStorageApi = {
   getStorageSync: Taro.getStorageSync.bind(Taro),
@@ -101,11 +106,13 @@ export function getSupabaseClient(): SupabaseClient {
     installWechatHeadersCompat();
     const storageKey = getSupabaseAuthStorageKey(config.supabaseUrl);
     if (storageKey) sanitizeWechatAuthStorage(wechatStorageApi, storageKey);
-    singleton = createClient(config.supabaseUrl, config.supabasePublishableKey, {
-      auth: { storage: wechatStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
-      global: { fetch },
-      realtime: { transport: unavailableWechatRealtimeTransport },
-    });
+    singleton = withWechatAuthLocation(taroWindow, () =>
+      createClient(config.supabaseUrl, config.supabasePublishableKey, {
+        auth: { storage: wechatStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+        global: { fetch },
+        realtime: { transport: unavailableWechatRealtimeTransport },
+      }),
+    );
     createdClientCount += 1;
   } catch (error) {
     const cause = classifyClientCreateError(error);

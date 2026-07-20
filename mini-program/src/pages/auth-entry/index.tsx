@@ -18,8 +18,11 @@ export default function AuthEntryPage() {
       const user = await loginWithWechat();
       if (!user) throw new Error("微信登录未返回用户信息");
       await startApplicationAuth();
-    } catch {
-      feedback.show({ message: "登录未完成，请稍后重试", tone: "error" });
+    } catch (error) {
+      feedback.show({
+        message: error instanceof Error ? error.message : "登录未完成，请稍后重试",
+        tone: "error",
+      });
     } finally {
       setIsLoggingIn(false);
     }

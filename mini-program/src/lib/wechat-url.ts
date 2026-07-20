@@ -1,6 +1,7 @@
 const MINI_PROGRAM_URL_BASE = "https://mini-program.invalid";
 
 type UrlConstructor = new (url: string, base?: string) => URL;
+type RuntimeWindow = { location?: { href?: unknown } };
 
 export interface WechatUrlCompatibilityDiagnostics {
   inputType: "string" | "url-like" | "unknown";
@@ -21,6 +22,28 @@ function toUrlText(input: unknown): string {
 
 function isAbsoluteHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
+}
+
+/**
+ * Supabase Auth is compiled against Taro's static `window` and `URL` exports.
+ * A mini-program page path can be relative, which Taro's URL implementation
+ * rejects. Provide a synthetic origin only while the client is constructed,
+ * then restore the real navigation object immediately.
+ */
+export function withWechatAuthLocation<T>(runtimeWindow: RuntimeWindow, callback: () => T): T {
+  const originalLocation = runtimeWindow.location;
+  const href = typeof originalLocation?.href === "string" ? originalLocation.href : "";
+
+  if (isAbsoluteHttpUrl(href)) return callback();
+
+  const compatibleLocation = Object.create(originalLocation ?? null) as { href: string };
+  compatibleLocation.href = `${MINI_PROGRAM_URL_BASE}/${href.replace(/^\/+/, "")}`;
+  runtimeWindow.location = compatibleLocation;
+  try {
+    return callback();
+  } finally {
+    runtimeWindow.location = originalLocation;
+  }
 }
 
 function safeDiagnostics(input: unknown, url: URL): WechatUrlCompatibilityDiagnostics {

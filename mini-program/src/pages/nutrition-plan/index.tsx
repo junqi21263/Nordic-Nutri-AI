@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomActionLayout } from "../../components/bottom-action-layout";
@@ -14,6 +15,13 @@ import {
 } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { navigateBackOrHome } from "../../utils/navigation";
+import { useAuthStore } from "../../auth/auth-store";
+import { getCloudbaseDatabase } from "../../lib/cloudbase";
+import {
+  completeCloudbaseOnboarding,
+  type CloudbaseOnboardingClient,
+} from "../../repositories/cloudbase-onboarding-repository";
+import { useFeedbackStore } from "../../stores/feedback-store";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 import { markOnboardingCompleted } from "../../utils/local-experience";
 
@@ -27,6 +35,9 @@ const goalLabels = {
 
 export default function NutritionPlanPage() {
   const { draft } = useOnboardingDraftStore();
+  const auth = useAuthStore();
+  const feedback = useFeedbackStore();
+  const [isSaving, setIsSaving] = useState(false);
   const validation = validateBodyProfile(draft, today);
 
   if (!validation.valid || !validation.profile) {
@@ -47,7 +58,49 @@ export default function NutritionPlanPage() {
     );
   }
 
-  const plan = calculateNutritionPlan(validation.profile);
+  const profile = validation.profile;
+  const plan = calculateNutritionPlan(profile);
+  const completeOnboarding = async () => {
+    if (!auth.user?.id) {
+      feedback.show({ message: "登录状态已失效，请重新登录", tone: "error" });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await completeCloudbaseOnboarding(
+        getCloudbaseDatabase() as unknown as CloudbaseOnboardingClient,
+        auth.user.id,
+        {
+          goalType: profile.goalType,
+          targetWeightKg: profile.targetWeightKg,
+          targetDate: profile.targetDate,
+          age: profile.age,
+          sex: profile.gender,
+          heightCm: profile.heightCm,
+          weightKg: profile.weightKg,
+          activityLevel: profile.activityLevel,
+          trainingDays: profile.trainingDays,
+          dietaryPattern: draft.dietaryPattern,
+          foodAvoidances: draft.foodAvoidances,
+          mealsPerDay: Number(draft.mealsPerDay),
+          calories: plan.calories,
+          proteinG: plan.proteinG,
+          carbsG: plan.carbsG,
+          fatG: plan.fatG,
+        },
+      );
+      markOnboardingCompleted();
+      await Taro.switchTab({ url: "/pages/home/index" });
+    } catch (error) {
+      feedback.show({
+        message: error instanceof Error ? error.message : "计划保存失败，请稍后重试",
+        tone: "error",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
   const macros: Array<{
     label: string;
     value: number;
@@ -180,10 +233,8 @@ export default function NutritionPlanPage() {
         <BottomActionLayout>
           <AppButton
             size="large"
-            onClick={() => {
-              markOnboardingCompleted();
-              void Taro.switchTab({ url: "/pages/home/index" });
-            }}
+            loading={isSaving}
+            onClick={() => void completeOnboarding()}
           >
             开始我的计划
           </AppButton>
