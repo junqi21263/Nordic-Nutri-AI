@@ -9,6 +9,7 @@ export interface AppAuthUser {
 
 export interface AppAuthSession {
   user: AppAuthUser;
+  accessToken?: string;
 }
 
 export interface AuthState {

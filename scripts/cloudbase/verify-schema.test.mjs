@@ -71,3 +71,11 @@ test("nutrition plans receive owner identity from the authenticated CloudBase se
   assert.match(sql, /plans: insert own rows/i);
   assert.match(sql, /user_id = private\.current_app_user_id\(\)/i);
 });
+
+test("native Mini Program identity is stored only as a server-derived OpenID hash", async () => {
+  const sql = await readFile(new URL("../../cloudbase/pg/migrations/0006_openid_server_identity.sql", import.meta.url), "utf8");
+
+  assert.match(sql, /add column openid_hash char\(64\) unique/i);
+  assert.match(sql, /raw OpenID must never be persisted/i);
+  assert.doesNotMatch(sql, /openid text|openid varchar/i);
+});

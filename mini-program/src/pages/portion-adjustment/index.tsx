@@ -1,15 +1,12 @@
 import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useState } from "react";
-import { getPublicRuntimeConfig } from "../../api/environment";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { ErrorState } from "../../components/error-state";
 import { MacroProgress } from "../../components/macro-progress";
 import { NordicIcon } from "../../components/nordic-icon";
 import { PageLayout } from "../../layouts/page-layout";
-import { toMealMutationInput } from "../../repositories/meal-repository";
-import { selectRuntimeAdapter } from "../../repositories/runtime-adapter";
 import { createMealFromAnalysis } from "../../features/scanner/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { useMealStore } from "../../stores/meal-store";
@@ -29,7 +26,6 @@ export default function PortionAdjustmentPage() {
   const meals = useMealStore();
   const feedback = useFeedbackStore();
   const [isSaving, setIsSaving] = useState(false);
-  const usesRealBackend = selectRuntimeAdapter(getPublicRuntimeConfig()) === "supabase";
   const adjusted = portion.getAdjusted();
   if (!portion.meal || !adjusted)
     return (
@@ -60,15 +56,8 @@ export default function PortionAdjustmentPage() {
     try {
       let id = editingId;
       if (editingId) {
-        const currentMeal = meals.getMealById(editingId);
-        if (usesRealBackend && currentMeal) {
-          const saved = await meals.updateRemote(editingId, toMealMutationInput(currentMeal, { items: adjusted.items }));
-          id = saved.id;
-          feedback.show({ message: "份量已同步到饮食记录", tone: "success" });
-        } else {
-          meals.updateMeal(editingId, { items: adjusted.items, insight: portion.meal!.insight });
-          feedback.show({ message: "份量已更新，本地汇总已同步", tone: "success" });
-        }
+        meals.updateMeal(editingId, { items: adjusted.items, insight: portion.meal!.insight });
+        feedback.show({ message: "份量已更新，本地汇总已同步", tone: "success" });
       } else {
         id = meals.addMeal(
           createMealFromAnalysis(portion.meal!, portion.multiplier, getLocalDateString(), nowTime()),

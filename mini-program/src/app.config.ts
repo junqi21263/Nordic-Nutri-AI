@@ -20,8 +20,6 @@ const pages = [
     "pages/weekly-review/index",
 ];
 
-if (process.env.TARO_APP_ENV === "development") pages.push("pages/dev-auth-harness/index");
-
 export default defineAppConfig({
   pages,
   window: {

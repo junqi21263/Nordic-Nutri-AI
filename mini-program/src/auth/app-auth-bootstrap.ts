@@ -1,26 +1,22 @@
 import Taro from "@tarojs/taro";
 import { loginWithWechat } from "../api/auth-api";
-import { getPublicRuntimeConfig } from "../api/environment";
-import { getSupabaseClient } from "../lib/supabase-client";
-import { createProfileRepository, type ProfileRepositoryClient } from "../repositories/profile-repository";
-import { selectRuntimeAdapter } from "../repositories/runtime-adapter";
+import { getProductAccount } from "../api/product-data-api";
 import { useProfileStore } from "../stores/profile-store";
 import { isOnboardingCompleted } from "../utils/local-experience";
 import { createAuthBootstrap } from "./auth-bootstrap";
 import { createRuntimeApplicationLaunch } from "./application-launch";
-import { createProfileIdentityLoader } from "./profile-identity-loader";
 import { clearInvalidSession, getCurrentUser, refreshSession, restoreSession } from "./session-manager";
 
-const profileIdentityLoader = createProfileIdentityLoader({
-  beginUser: (userId) => useProfileStore.getState().beginUser(userId),
-  hydrate: (userId, profile, settings) => useProfileStore.getState().hydrate(userId, profile, settings),
-  getIdentity: (userId) => createProfileRepository(getSupabaseClient() as unknown as ProfileRepositoryClient).getIdentity(userId),
-});
-
 async function loadIdentity(user: { id: string }) {
-  const runtime = getPublicRuntimeConfig();
-  if (selectRuntimeAdapter(runtime) !== "supabase") return;
-  await profileIdentityLoader.load(user.id);
+  const account = await getProductAccount();
+  const labels: Record<string, string> = { muscle_gain: "精益增肌", fat_loss: "轻盈减脂", maintain: "保持状态", performance: "运动表现" };
+  useProfileStore.getState().hydrate(user.id, {
+    ...(account.nickname ? { nickname: account.nickname } : {}),
+    ...(account.weightKg ? { weight: account.weightKg } : {}),
+    ...(account.goalType ? { goalLabel: labels[account.goalType] ?? "精益增肌" } : {}),
+    ...(account.targetWeightKg ? { targetWeight: account.targetWeightKg } : {}),
+    ...(account.targetCaloriesKcal ? { targetCalories: account.targetCaloriesKcal } : {}),
+  }, {});
 }
 
 const authBootstrap = createAuthBootstrap({

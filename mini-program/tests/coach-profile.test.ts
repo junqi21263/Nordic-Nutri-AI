@@ -123,7 +123,7 @@ describe("local coach and profile", () => {
     expect(profileEdit).toContain('className="profile-subpage__page-title"');
     expect(profileEdit).toContain('className="profile-edit__notice"');
     expect(profileEdit).toContain('className="profile-edit__action"');
-    expect(profileEdit).toContain("数据仅保留在当前设备");
+    expect(profileEdit).toContain("昵称会保存到你的账号");
     expect(profileEdit).not.toContain('eyebrow="我的节奏"');
     expect(profileEdit).not.toContain("保留最重要的信息，让目标更贴合现在的你。");
     expect(goalAdjust).toContain("profile.setProfile");

@@ -681,6 +681,7 @@ export type Database = {
           goal_type: string
           id: string
           is_current: boolean
+          target_calories_kcal: number | null
           target_date: string | null
           target_weight_kg: number | null
           updated_at: string
@@ -691,6 +692,7 @@ export type Database = {
           goal_type: string
           id?: string
           is_current?: boolean
+          target_calories_kcal?: number | null
           target_date?: string | null
           target_weight_kg?: number | null
           updated_at?: string
@@ -701,6 +703,7 @@ export type Database = {
           goal_type?: string
           id?: string
           is_current?: boolean
+          target_calories_kcal?: number | null
           target_date?: string | null
           target_weight_kg?: number | null
           updated_at?: string

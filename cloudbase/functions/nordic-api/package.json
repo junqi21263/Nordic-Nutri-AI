@@ -1,9 +1,10 @@
 {
-  "name": "nordic-nutri-get-login-ticket",
+  "name": "nordic-nutri-api",
   "version": "1.0.0",
   "private": true,
   "dependencies": {
     "@cloudbase/js-sdk": "3.6.3",
-    "ws": "8.18.3"
+    "ws": "8.18.3",
+    "wx-server-sdk": "3.0.1"
   }
 }

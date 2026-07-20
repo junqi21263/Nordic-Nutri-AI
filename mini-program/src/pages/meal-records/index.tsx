@@ -15,8 +15,6 @@ import {
 } from "../../features/meals/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
-import { getPublicRuntimeConfig } from "../../api/environment";
-import { selectRuntimeAdapter } from "../../repositories/runtime-adapter";
 import { type MealTypeFilter, useMealStore } from "../../stores/meal-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 import bowlImage from "../../assets/meal-bowl.svg";
@@ -92,7 +90,6 @@ export default function MealRecordsPage() {
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
   const [filterOpen, setFilterOpen] = useState(false);
-  const usesRealBackend = selectRuntimeAdapter(getPublicRuntimeConfig()) === "supabase";
   const today = getLocalDateString();
   const summary = store.getDailySummary();
   const meals = store.filterMeals();
@@ -129,10 +126,6 @@ export default function MealRecordsPage() {
   }, [filterOpen, setTabBarVisible]);
 
   useEffect(() => () => setTabBarVisible(true), [setTabBarVisible]);
-
-  useEffect(() => {
-    if (usesRealBackend) void store.loadRemote();
-  }, [usesRealBackend, store.selectedDate, store.mealTypeFilter, store.searchKeyword]);
 
   return (
     <PageLayout
@@ -231,16 +224,7 @@ export default function MealRecordsPage() {
         </View>
 
         <Text className="meal-records-page__section-title">今日餐次</Text>
-        {usesRealBackend && store.loadingState === "loading" ? (
-          <EmptyState title="正在加载餐次" description="正在同步你的饮食记录。" />
-        ) : usesRealBackend && store.loadingState === "error" ? (
-          <EmptyState
-            title="餐次加载失败"
-            description={store.errorState ?? "网络连接不稳定，请稍后重试。"}
-            actionLabel="重新加载"
-            onAction={() => void store.loadRemote()}
-          />
-        ) : meals.length === 0 ? (
+        {meals.length === 0 ? (
           <EmptyState
             title={
               hasFilters
@@ -260,16 +244,6 @@ export default function MealRecordsPage() {
             ))}
           </View>
         )}
-        {usesRealBackend && store.hasMore ? (
-          <AppButton
-            variant="outline"
-            size="medium"
-            loading={store.loadingState === "loading"}
-            onClick={() => void store.loadMoreRemote()}
-          >
-            加载更多
-          </AppButton>
-        ) : null}
         <View className="meal-records-page__fab" onClick={addMeal} ariaLabel="新增餐次">
           <NordicIcon name="circle-plus" size={30} />
         </View>

@@ -13,8 +13,7 @@ describe("app authentication wiring", () => {
     expect(app).not.toContain("isOnboardingCompleted");
     expect(bootstrap).toContain("createAuthBootstrap");
     expect(bootstrap).toContain("loginWithWechat");
-    expect(bootstrap).toContain("createProfileIdentityLoader");
-    expect(bootstrap).toContain("selectRuntimeAdapter");
+    expect(bootstrap).not.toContain("getSupabaseClient");
     expect(bootstrap).toContain("authBootstrap.start({ allowSilentLogin: false })");
     expect(bootstrap).toContain('url: "/pages/auth-entry/index"');
   });

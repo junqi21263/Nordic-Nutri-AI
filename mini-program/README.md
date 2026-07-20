@@ -40,15 +40,13 @@ node scripts/verify-ui-foundation.mjs
 
 ## Public configuration
 
-Only these build-time variables are readable by client code:
+Only the environment label is readable by client code:
 
 ```text
 TARO_APP_ENV=local
-TARO_APP_SUPABASE_URL=
-TARO_APP_SUPABASE_PUBLISHABLE_KEY=
 ```
 
-They must be provided through ignored local environment files or CI variables. Do not put a Supabase secret/service key, WeChat AppSecret, AI key or database password in this package.
+Do not put a CloudBase API Key, WeChat AppSecret, AI key or database password in this package. Server-side credentials belong only in CloudBase function configuration.
 
 ## WeChat Developer Tools
 

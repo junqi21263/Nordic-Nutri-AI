@@ -26,15 +26,14 @@ export default defineConfig({
   plugins: ["@tarojs/plugin-platform-weapp", "@tarojs/plugin-platform-h5"],
   defineConstants: {
     "process.env.TARO_APP_ENV": JSON.stringify(process.env.TARO_APP_ENV ?? "local"),
-    "process.env.TARO_APP_SUPABASE_URL": JSON.stringify(process.env.TARO_APP_SUPABASE_URL ?? ""),
-    "process.env.TARO_APP_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
-      process.env.TARO_APP_SUPABASE_PUBLISHABLE_KEY ?? "",
-    ),
     "process.env.TARO_APP_ENABLE_REAL_AUTH": JSON.stringify(
       process.env.TARO_APP_ENABLE_REAL_AUTH ?? "false",
     ),
     "process.env.TARO_APP_USE_REAL_BACKEND": JSON.stringify(
       process.env.TARO_APP_USE_REAL_BACKEND ?? "false",
+    ),
+    "process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY": JSON.stringify(
+      process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY ?? "",
     ),
   },
   mini: {
@@ -49,13 +48,6 @@ export default defineConfig({
         // replacement files, which leaves WeChat DevTools on wx://not-found.
         chain.output.set("clean", false);
       }
-      chain.plugin("providerPlugin").tap((args) => [{
-        ...args[0],
-        URL: [resolve(__dirname, "../src/lib/supabase-url"), "URL"],
-      }]);
-      // Webpack otherwise resolves the package's `module` field (the web build)
-      // before its `miniprogram` field. The Mini Program bundle supplies the
-      // correct request and binary adapters for wx.* APIs.
       chain.resolve.alias.set(
         "@cloudbase/js-sdk$",
         resolve(__dirname, "../node_modules/@cloudbase/js-sdk/miniprogram_dist/index.js"),

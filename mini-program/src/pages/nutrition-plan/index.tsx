@@ -15,12 +15,7 @@ import {
 } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { navigateBackOrHome } from "../../utils/navigation";
-import { useAuthStore } from "../../auth/auth-store";
-import { getCloudbaseDatabase } from "../../lib/cloudbase";
-import {
-  completeCloudbaseOnboarding,
-  type CloudbaseOnboardingClient,
-} from "../../repositories/cloudbase-onboarding-repository";
+import { completeProductOnboarding } from "../../api/product-data-api";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 import { markOnboardingCompleted } from "../../utils/local-experience";
@@ -35,7 +30,6 @@ const goalLabels = {
 
 export default function NutritionPlanPage() {
   const { draft } = useOnboardingDraftStore();
-  const auth = useAuthStore();
   const feedback = useFeedbackStore();
   const [isSaving, setIsSaving] = useState(false);
   const validation = validateBodyProfile(draft, today);
@@ -61,18 +55,11 @@ export default function NutritionPlanPage() {
   const profile = validation.profile;
   const plan = calculateNutritionPlan(profile);
   const completeOnboarding = async () => {
-    if (!auth.user?.id) {
-      feedback.show({ message: "登录状态已失效，请重新登录", tone: "error" });
-      return;
-    }
-
     setIsSaving(true);
     try {
-      await completeCloudbaseOnboarding(
-        getCloudbaseDatabase() as unknown as CloudbaseOnboardingClient,
-        auth.user.id,
-        {
-          goalType: profile.goalType,
+      await completeProductOnboarding({
+          nickname: profile.nickname,
+          goalType: profile.goalType === "maintenance" ? "maintain" : profile.goalType,
           targetWeightKg: profile.targetWeightKg,
           targetDate: profile.targetDate,
           age: profile.age,
@@ -88,8 +75,7 @@ export default function NutritionPlanPage() {
           proteinG: plan.proteinG,
           carbsG: plan.carbsG,
           fatG: plan.fatG,
-        },
-      );
+      });
       markOnboardingCompleted();
       await Taro.switchTab({ url: "/pages/home/index" });
     } catch (error) {

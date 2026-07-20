@@ -8,11 +8,8 @@ import { MacroProgress } from "../../components/macro-progress";
 import { NordicIcon } from "../../components/nordic-icon";
 import { ConfirmDialog } from "../../components/confirm-dialog";
 import { Modal } from "../../components/modal";
-import { getPublicRuntimeConfig } from "../../api/environment";
 import { getMealNutrition, getMealScore } from "../../features/meals/domain";
 import { PageLayout } from "../../layouts/page-layout";
-import { toMealMutationInput } from "../../repositories/meal-repository";
-import { selectRuntimeAdapter } from "../../repositories/runtime-adapter";
 import { useMealStore } from "../../stores/meal-store";
 import { usePortionDraftStore } from "../../stores/portion-draft-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
@@ -52,7 +49,6 @@ export default function MealDetailPage() {
   const store = useMealStore();
   const portion = usePortionDraftStore();
   const feedback = useFeedbackStore();
-  const usesRealBackend = selectRuntimeAdapter(getPublicRuntimeConfig()) === "supabase";
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [detailModal, setDetailModal] = useState<"score" | "insight" | null>(null);
   const meal = store.getMealById(router.params.id);
@@ -88,12 +84,8 @@ export default function MealDetailPage() {
   };
   const remove = async () => {
     try {
-      if (usesRealBackend) {
-        await store.archiveRemote(meal.id);
-      } else {
-        store.deleteMeal(meal.id);
-      }
-      feedback.show({ message: usesRealBackend ? "餐次已移至回收站" : "餐次已从本地记录移除", tone: "success" });
+      store.deleteMeal(meal.id);
+      feedback.show({ message: "餐次已从本地记录移除", tone: "success" });
       Taro.switchTab({ url: "/pages/meal-records/index" });
     } catch {
       feedback.show({ message: "删除失败，请稍后重试", tone: "error" });
@@ -101,11 +93,7 @@ export default function MealDetailPage() {
   };
   const toggleFavorite = async () => {
     try {
-      if (usesRealBackend) {
-        await store.updateRemote(meal.id, toMealMutationInput(meal, { favorite: !meal.favorite }));
-      } else {
-        store.toggleFavorite(meal.id);
-      }
+      store.toggleFavorite(meal.id);
       feedback.show({ message: meal.favorite ? "已取消收藏" : "已加入收藏", tone: "success" });
     } catch {
       feedback.show({ message: "收藏状态更新失败，请稍后重试", tone: "error" });
