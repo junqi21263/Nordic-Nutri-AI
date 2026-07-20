@@ -22,4 +22,9 @@ describe("CloudBase custom-ticket result handling", () => {
     expect(taroConfig).toContain("@cloudbase/js-sdk$");
     expect(taroConfig).toContain("miniprogram_dist/index.js");
   });
+
+  it("initializes CloudBase with the publishable key required by RDB requests", () => {
+    const cloudbaseClient = readFileSync(resolve(import.meta.dirname, "../src/lib/cloudbase.ts"), "utf8");
+    expect(cloudbaseClient).toContain("accessKey: cloudbaseEnvironment.publishableKey");
+  });
 });
