@@ -30,7 +30,10 @@ export function BottomSheet({ open, className = "", onDismiss, children }: Botto
   }, [isRendered, open]);
 
   return isRendered ? (
-    <View className={`bottom-sheet-backdrop ${isClosing ? "bottom-sheet-backdrop--closing" : ""}`} onClick={onDismiss}>
+    <View
+      className={`bottom-sheet-backdrop ${isClosing ? "bottom-sheet-backdrop--closing" : ""}`}
+      onClick={onDismiss}
+    >
       <View
         className={`bottom-sheet ${className} ${isClosing ? "bottom-sheet--closing" : ""}`}
         onClick={(event) => event.stopPropagation()}

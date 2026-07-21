@@ -1,5 +1,7 @@
 import { Input, Text, View } from "@tarojs/components";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getProductCoachMessages, sendProductCoachMessage } from "../../api/coach-api";
+import { createProductMeal } from "../../api/meal-data-api";
 import { NordicIcon } from "../../components/nordic-icon";
 import { createCoachAdvice } from "../../features/coach/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
@@ -20,16 +22,6 @@ const nowTime = () => {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 };
 
-const replyFor = (prompt: string, proteinLeft: number) => {
-  if (prompt.includes("进度")) {
-    return `截至现在，你距离今日蛋白质目标还差 ${proteinLeft}g。晚餐补一份优质蛋白，就能把今天的节奏稳住。`;
-  }
-  if (prompt.includes("蛋白质") || prompt.includes("蛋白")) {
-    return `可以优先选择希腊酸奶、鸡胸肉或豆腐。加一份约 20–30g 蛋白质的小餐，会比临睡前吃得太多更轻松。`;
-  }
-  return "晚餐建议以一掌心大小的蛋白质、半盘蔬菜和一拳头主食为主。想要我按你家里的食材再细化吗？";
-};
-
 export default function CoachPage() {
   const meals = useMealStore();
   const coach = useCoachStore();
@@ -39,6 +31,7 @@ export default function CoachPage() {
   const advice = coach.advice.length ? coach.advice : createCoachAdvice(meals.meals, date);
   const proteinLeft = Math.max(0, summary.protein - summary.consumed.protein);
   const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: "proactive-message",
@@ -49,18 +42,55 @@ export default function CoachPage() {
     },
   ]);
 
-  const sendMessage = (value = draft) => {
+  useEffect(() => {
+    void getProductCoachMessages()
+      .then((history) => {
+        if (!history.length) return;
+        setMessages(
+          history.map((message) => ({
+            id: message.id,
+            role: message.role === "assistant" ? "coach" : "user",
+            content: message.content,
+          })),
+        );
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const sendMessage = async (value = draft) => {
     const content = value.trim();
-    if (!content) return;
-    setMessages((current) => [
-      ...current,
-      { id: `user-${Date.now()}`, role: "user", content },
-      { id: `coach-${Date.now()}`, role: "coach", content: replyFor(content, proteinLeft) },
-    ]);
+    if (!content || sending) return;
+    const optimisticId = `pending-${Date.now()}`;
+    setMessages((current) => [...current, { id: optimisticId, role: "user", content }]);
     setDraft("");
+    setSending(true);
+    try {
+      const result = await sendProductCoachMessage(content, date);
+      setMessages((current) => {
+        const known = new Set(
+          current.filter((message) => message.id !== optimisticId).map((message) => message.id),
+        );
+        const next = current.filter((message) => message.id !== optimisticId);
+        for (const message of result.messages) {
+          if (!known.has(message.id)) {
+            next.push({
+              id: message.id,
+              role: message.role === "assistant" ? "coach" : "user",
+              content: message.content,
+            });
+          }
+        }
+        return next;
+      });
+    } catch {
+      setMessages((current) => current.filter((message) => message.id !== optimisticId));
+      feedback.show({ message: "营养教练暂时无法回答，请稍后重试", tone: "error" });
+    } finally {
+      setSending(false);
+    }
   };
 
-  const addSuggestedSnack = () => {
+  const addSuggestedSnack = async () => {
     const alreadyAdded = meals
       .getMealsByDate(date)
       .some((meal) => meal.title === "希腊酸奶" && meal.mealType === "snack");
@@ -68,28 +98,29 @@ export default function CoachPage() {
       feedback.show({ message: "今晚加餐里已经有希腊酸奶", tone: "success" });
       return;
     }
-    meals.addMeal({
-      date,
-      time: nowTime(),
-      title: "希腊酸奶",
-      mealType: "snack",
-      favorite: false,
-      imageKey: null,
-      insight: "教练建议的高蛋白加餐。",
-      items: [
-        {
-          id: `coach-yogurt-${Date.now()}`,
-          name: "希腊酸奶",
-          amount: "1 杯",
-          calories: 130,
-          protein: 20,
-          carbs: 8,
-          fat: 3,
-        },
-      ],
-    });
-    feedback.show({ message: "已加入今晚加餐", tone: "success" });
-    sendMessage("已将希腊酸奶加入今晚加餐");
+    const time = nowTime();
+    try {
+      const saved = await createProductMeal({
+        mealType: "snack",
+        name: "希腊酸奶",
+        recordedAt: `${date}T${time}:00+08:00`,
+        items: [
+          {
+            name: "希腊酸奶",
+            quantityG: 200,
+            caloriesPer100g: 65,
+            proteinPer100g: 10,
+            carbsPer100g: 4,
+            fatPer100g: 1.5,
+          },
+        ],
+      });
+      meals.addMeal(saved);
+      feedback.show({ message: "已加入今晚加餐", tone: "success" });
+      await sendMessage("已将希腊酸奶加入今晚加餐");
+    } catch {
+      feedback.show({ message: "加餐保存失败，请稍后重试", tone: "error" });
+    }
   };
 
   return (
@@ -151,7 +182,7 @@ export default function CoachPage() {
             <View
               key={prompt}
               className="coach-chat__quick-chip"
-              onClick={() => sendMessage(prompt)}
+              onClick={() => void sendMessage(prompt)}
             >
               <Text>{prompt}</Text>
             </View>
@@ -174,9 +205,9 @@ export default function CoachPage() {
           placeholder="问问你的营养教练，比如：晚餐吃什么？"
           confirmType="send"
           onInput={(event) => setDraft(event.detail.value)}
-          onConfirm={() => sendMessage()}
+          onConfirm={() => void sendMessage()}
         />
-        <View className="coach-chat__send" ariaLabel="发送消息" onClick={() => sendMessage()}>
+        <View className="coach-chat__send" ariaLabel="发送消息" onClick={() => void sendMessage()}>
           <NordicIcon name="arrow-up" size={22} ariaLabel="发送" />
         </View>
       </View>

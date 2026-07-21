@@ -21,7 +21,9 @@ export default function DietPreferencesPage() {
     const selected = draft.foodAvoidances.includes(value);
     setField(
       "foodAvoidances",
-      selected ? draft.foodAvoidances.filter((item) => item !== value) : [...draft.foodAvoidances, value],
+      selected
+        ? draft.foodAvoidances.filter((item) => item !== value)
+        : [...draft.foodAvoidances, value],
     );
   };
 
@@ -57,7 +59,9 @@ export default function DietPreferencesPage() {
               </View>
               <View>
                 <Text className="diet-preferences-page__section-title">饮食偏好</Text>
-                <Text className="diet-preferences-page__section-copy">选择最接近日常习惯的一项</Text>
+                <Text className="diet-preferences-page__section-copy">
+                  选择最接近日常习惯的一项
+                </Text>
               </View>
             </View>
             <View className="diet-preferences-page__choice-grid">
@@ -74,7 +78,9 @@ export default function DietPreferencesPage() {
                     <Text className="diet-preferences-page__choice-title">{option.label}</Text>
                     <Text className="diet-preferences-page__choice-copy">{option.description}</Text>
                     <View className="diet-preferences-page__choice-indicator">
-                      {selected ? <NordicIcon name="check-inverse" size={14} ariaLabel="已选择" /> : null}
+                      {selected ? (
+                        <NordicIcon name="check-inverse" size={14} ariaLabel="已选择" />
+                      ) : null}
                     </View>
                   </View>
                 );
@@ -118,7 +124,9 @@ export default function DietPreferencesPage() {
                 <View
                   key={option.value}
                   className={`diet-preferences-page__meal-option ${
-                    draft.mealsPerDay === option.value ? "diet-preferences-page__meal-option--active" : ""
+                    draft.mealsPerDay === option.value
+                      ? "diet-preferences-page__meal-option--active"
+                      : ""
                   }`}
                   onClick={() => setField("mealsPerDay", option.value)}
                 >
@@ -131,7 +139,10 @@ export default function DietPreferencesPage() {
         </View>
 
         <BottomActionLayout>
-          <AppButton size="large" onClick={() => Taro.navigateTo({ url: "/pages/nutrition-plan/index" })}>
+          <AppButton
+            size="large"
+            onClick={() => Taro.navigateTo({ url: "/pages/nutrition-plan/index" })}
+          >
             生成我的计划
           </AppButton>
         </BottomActionLayout>

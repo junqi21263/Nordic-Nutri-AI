@@ -2,6 +2,7 @@ import { Input, Text, View } from "@tarojs/components";
 import { useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
+import { createProductMeal, getProductMeals } from "../../api/meal-data-api";
 import { type MealType } from "../../features/meals/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
@@ -68,9 +69,24 @@ export default function ManualMealPage() {
     };
     setIsSaving(true);
     try {
-      const id = meals.addMeal(localMeal);
-      feedback.show({ message: "已添加到今日饮食记录", tone: "success" });
-      navigateBackOrHome(`/pages/meal-detail/index?id=${id}`);
+      const saved = await createProductMeal({
+        mealType: localMeal.mealType,
+        name: localMeal.title,
+        recordedAt: new Date(`${date}T${time}:00+08:00`).toISOString(),
+        items: [
+          {
+            name: localMeal.title,
+            quantityG: 100,
+            caloriesPer100g: nutrition[0]!,
+            proteinPer100g: nutrition[1]!,
+            carbsPer100g: nutrition[2]!,
+            fatPer100g: nutrition[3]!,
+          },
+        ],
+      });
+      meals.replaceRemoteMeals(await getProductMeals(date), date);
+      feedback.show({ message: "已保存并同步到饮食记录", tone: "success" });
+      navigateBackOrHome(`/pages/meal-detail/index?id=${saved.id}`);
     } catch {
       feedback.show({ message: "保存失败，请检查网络后重试", tone: "error" });
     } finally {

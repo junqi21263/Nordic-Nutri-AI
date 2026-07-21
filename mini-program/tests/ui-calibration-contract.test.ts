@@ -23,10 +23,21 @@ describe("global UI calibration contract", () => {
     const icon = read(iconPath);
     expect(icon).toContain('import { Image } from "@tarojs/components"');
     expect(icon).toContain("iconSources");
-    expect(icon).toContain('height: `${size}px`');
-    expect(icon).toContain('width: `${size}px`');
+    expect(icon).toContain("height: `${size}px`");
+    expect(icon).toContain("width: `${size}px`");
 
-    for (const name of ["back", "check", "goal-muscle", "activity-low", "nova", "flame", "protein", "carbs", "fat", "milestone"]) {
+    for (const name of [
+      "back",
+      "check",
+      "goal-muscle",
+      "activity-low",
+      "nova",
+      "flame",
+      "protein",
+      "carbs",
+      "fat",
+      "milestone",
+    ]) {
       expect(icon).toContain(name);
       const assetPath = `src/assets/icons/${name}.svg`;
       expect(existsSync(source(assetPath))).toBe(true);

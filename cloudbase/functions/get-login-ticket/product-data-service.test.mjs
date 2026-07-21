@@ -85,8 +85,10 @@ test("completes onboarding through authenticated server-side tables only", async
   assert.equal(result.userId, "user-1");
   assert.equal(result.nickname, "Lewis");
   assert.deepEqual(calls.map((call) => call.table), [
-    "user_goals", "user_goals", "body_profiles", "body_profiles", "user_settings", "nutrition_plans", "profiles",
+    "user_goals", "user_goals", "body_profiles", "body_profiles", "user_settings",
+    "nutrition_plans", "nutrition_plans", "profiles",
   ]);
+  assert.equal(calls[5].operation, "retire-active");
 });
 
 test("reads only the authenticated user's current account records", async () => {
@@ -95,6 +97,8 @@ test("reads only the authenticated user's current account records", async () => 
     profiles: { nickname: "Lewis" },
     body_profiles: { age: 28, sex: "male", height_cm: 175, weight_kg: 76, activity_level: "moderate", training_days_per_week: 4 },
     user_goals: { goal_type: "muscle_gain", target_weight_kg: 72, target_calories_kcal: 2400 },
+    user_settings: { dietary_pattern: "none", food_avoidances: ["peanut"], meals_per_day: 4, theme: "system", locale: "zh-CN", notification_enabled: true, unit_system: "metric" },
+    nutrition_plans: { id: "plan-1", daily_calories_kcal: 2400, protein_g: 160, carbs_g: 260, fat_g: 70, status: "active" },
   };
   const db = { from: (table) => ({ select: () => ({ eq: (column, value) => ({ eq: () => ({ maybeSingle: async () => ({ data: rows[table], error: null }) }), maybeSingle: async () => { filters.push([table, column, value]); return { data: rows[table], error: null }; } }) }) }) };
   const result = await createProductDataService({ db }).getAccount("user-1");
@@ -104,5 +108,55 @@ test("reads only the authenticated user's current account records", async () => 
     age: result.age, sex: result.sex, heightCm: result.heightCm,
     activityLevel: result.activityLevel, trainingDays: result.trainingDays,
   }, { age: 28, sex: "male", heightCm: 175, activityLevel: "moderate", trainingDays: 4 });
-  assert.deepEqual(filters, [["profiles", "id", "user-1"]]);
+  assert.deepEqual(result.settings, {
+    dietaryPattern: "none", foodAvoidances: ["peanut"], mealsPerDay: 4,
+    theme: "system", language: "zh-CN", notification: true, unit: "metric",
+  });
+  assert.deepEqual(result.nutritionPlan, {
+    id: "plan-1", calories: 2400, proteinG: 160, carbsG: 260, fatG: 70, status: "active",
+  });
+  assert.deepEqual(filters, [["profiles", "id", "user-1"], ["user_settings", "id", "user-1"]]);
+});
+
+test("upserts settings for the authenticated user", async () => {
+  const writes = [];
+  const db = {
+    from: () => ({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "user-1" }, error: null }) }) }),
+      update: (payload) => ({ eq: () => ({ select: () => ({ single: async () => { writes.push(payload); return { data: { id: "user-1", ...payload }, error: null }; } }) }) }),
+    }),
+  };
+  const result = await createProductDataService({ db }).saveSettings("user-1", {
+    dietaryPattern: "none", foodAvoidances: ["peanut"], mealsPerDay: 4,
+    theme: "dark", language: "zh-CN", notification: false, unit: "metric",
+  });
+  assert.equal(result.dietaryPattern, "none");
+  assert.deepEqual(writes[0], {
+    dietary_pattern: "none", food_avoidances: ["peanut"], meals_per_day: 4,
+    theme: "dark", locale: "zh-CN", notification_enabled: false, unit_system: "metric",
+  });
+});
+
+test("versions the active nutrition plan for the authenticated user", async () => {
+  const writes = [];
+  const db = {
+    from: (table) => ({
+      select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({
+        data: table === "nutrition_plans" ? { id: "plan-old", goal_id: "goal-old", body_profile_id: "body-old" }
+          : table === "user_goals" ? { id: "goal-current" }
+            : { id: "body-current" },
+        error: null,
+      }) }) }) }),
+      update: (payload) => ({ eq: () => ({ eq: () => ({ then: (resolve) => { writes.push({ operation: "retire", payload }); return resolve({ error: null }); } }) }) }),
+      insert: (payload) => ({ select: () => ({ single: async () => { writes.push({ operation: "insert", payload }); return { data: { id: "plan-new", ...payload }, error: null }; } }) }),
+    }),
+  };
+  const result = await createProductDataService({ db }).saveNutritionPlan("user-1", {
+    calories: 2300, proteinG: 170, carbsG: 240, fatG: 65,
+  });
+  assert.equal(result.id, "plan-new");
+  assert.equal(writes[1].payload.user_id, "user-1");
+  assert.equal(writes[1].payload.goal_id, "goal-current");
+  assert.equal(writes[1].payload.body_profile_id, "body-current");
+  assert.equal(writes[1].payload.status, "active");
 });

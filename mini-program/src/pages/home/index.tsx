@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useEffect, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { DailyNutritionSummary } from "../../components/daily-nutrition-summary";
 import { EmptyState } from "../../components/empty-state";
@@ -13,6 +14,9 @@ import { clampProgress, type MealType } from "../../features/meals/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
+import { getProductMeals } from "../../api/meal-data-api";
+import { getProductDailySummary, type ProductDailySummary } from "../../api/insight-api";
+import { useProfileStore } from "../../stores/profile-store";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -37,9 +41,30 @@ function createInsight(
 
 export default function HomePage() {
   const store = useMealStore();
+  const profile = useProfileStore();
   const today = getLocalDateString();
-  const summary = store.getDailySummary(today);
+  const [remoteSummary, setRemoteSummary] = useState<ProductDailySummary | null>(null);
+  const localSummary = store.getDailySummary(today);
+  const summary = remoteSummary
+    ? {
+        ...remoteSummary.targets,
+        consumed: remoteSummary.consumed,
+        completion: remoteSummary.completion,
+      }
+    : localSummary;
   const meals = store.getMealsByDate(today);
+  useEffect(() => {
+    store.setLoadingState("loading");
+    void Promise.all([getProductMeals(today), getProductDailySummary(today)])
+      .then(([remoteMeals, dailySummary]) => {
+        store.replaceRemoteMeals(remoteMeals, today);
+        setRemoteSummary(dailySummary);
+      })
+      .catch(() => {
+        store.replaceRemoteMeals([], today);
+        store.setErrorState("云端饮食记录暂时无法读取，请稍后重试");
+      });
+  }, [store.replaceRemoteMeals, today]);
   const openDetail = (id: string) => Taro.navigateTo({ url: `/pages/meal-detail/index?id=${id}` });
   // Both destinations are native tabBar pages. navigateTo cannot open them.
   const openScanner = () => Taro.switchTab({ url: "/pages/food-scanner/index" });
@@ -49,7 +74,7 @@ export default function HomePage() {
     return (
       <PageLayout
         title="今天的营养"
-        subtitle="正在整理你的本地记录。"
+        subtitle="正在整理你的云端记录。"
         eyebrow="Nordic Nutri"
         activeTab="home"
       >
@@ -60,12 +85,12 @@ export default function HomePage() {
     return (
       <PageLayout
         title="今天的营养"
-        subtitle="本地记录暂时无法显示。"
+        subtitle="云端记录暂时无法显示。"
         eyebrow="Nordic Nutri"
         activeTab="home"
       >
         <ErrorState
-          title="无法读取本地餐次"
+          title="无法读取云端餐次"
           description={store.errorState ?? "请稍后再试。"}
           onRetry={() => store.setErrorState(null)}
         />
@@ -76,10 +101,10 @@ export default function HomePage() {
     <PageLayout activeTab="home" hideNavigation title="首页" className="page-layout--home">
       <View className="home-page">
         <View className="home-page__header">
-          <Avatar label="L" />
+          <Avatar label={profile.profile.nickname.slice(0, 1).toUpperCase()} />
           <View className="home-page__greeting-copy">
-            <Text className="home-page__greeting">早上好，Lewis</Text>
-            <Text className="home-page__goal">目标：精益增肌</Text>
+            <Text className="home-page__greeting">早上好，{profile.profile.nickname}</Text>
+            <Text className="home-page__goal">目标：{profile.profile.goalLabel}</Text>
           </View>
         </View>
         <View className="home-page__target">

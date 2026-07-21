@@ -3,7 +3,10 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const authApi = readFileSync(resolve(import.meta.dirname, "../src/api/auth-api.ts"), "utf8");
-const sessionManager = readFileSync(resolve(import.meta.dirname, "../src/auth/session-manager.ts"), "utf8");
+const sessionManager = readFileSync(
+  resolve(import.meta.dirname, "../src/auth/session-manager.ts"),
+  "utf8",
+);
 
 describe("HTTPS WeChat login boundary", () => {
   it("bootstraps identity through wx.login and a HTTPS CloudBase function", () => {

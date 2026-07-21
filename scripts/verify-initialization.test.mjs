@@ -22,10 +22,8 @@ const requiredPaths = [
   "mini-program/src/types",
   "mini-program/src/assets",
   "mini-program/src/config",
-  "supabase/migrations",
-  "supabase/functions",
-  "supabase/seed",
-  "supabase/tests",
+  "cloudbase/functions/get-login-ticket",
+  "cloudbase/pg/migrations",
 ];
 
 test("monorepo initialization provides required root files and directories", () => {
@@ -40,19 +38,19 @@ test("workspace configuration pins the approved tooling without secrets", () => 
 
   assert.equal(packageJson.packageManager.startsWith("pnpm@10."), true);
   assert.equal(packageJson.engines.node, ">=24.18.0 <25");
-  assert.ok(packageJson.devDependencies.supabase);
+  assert.equal(packageJson.devDependencies.supabase, undefined);
   assert.ok(packageJson.devDependencies.typescript);
   assert.ok(gitignore.includes(".env*"));
-  assert.ok(gitignore.includes(".supabase/"));
 });
 
-test("supabase baseline has local config, environment contract, and health check", () => {
-  const config = readFileSync(path.join(root, "supabase/config.toml"), "utf8");
+test("CloudBase runtime contract contains no client-side backend secrets", () => {
   const envExample = readFileSync(path.join(root, ".env.example"), "utf8");
+  const packageJson = readFileSync(path.join(root, "package.json"), "utf8");
 
-  assert.ok(config.includes('project_id = "nordic-nutri-ai"'));
-  assert.ok(config.includes("[functions.wechat-login]"));
-  assert.ok(envExample.includes("SUPABASE_PROJECT_REF="));
-  assert.ok(existsSync(path.join(root, "scripts/check-supabase.sh")));
-  assert.ok(existsSync(path.join(root, "docs/runbooks/supabase-environments.md")));
+  assert.ok(envExample.includes("CLOUDBASE_APIKEY="));
+  assert.ok(envExample.includes("APP_SESSION_SECRET="));
+  assert.ok(envExample.includes("DEEPSEEK_API_KEY="));
+  assert.ok(envExample.includes("VITA_API_KEY="));
+  assert.doesNotMatch(envExample, /SUPABASE_/);
+  assert.doesNotMatch(packageJson, /\"supabase\"\s*:/);
 });

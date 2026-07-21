@@ -24,10 +24,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   status: "unknown",
   session: null,
   user: null,
-  setSession: (session) => set({
-    status: session ? "authenticated" : "anonymous",
-    session,
-    user: session?.user ?? null,
-  }),
+  setSession: (session) =>
+    set({
+      status: session ? "authenticated" : "anonymous",
+      session,
+      user: session?.user ?? null,
+    }),
   clear: () => set({ status: "anonymous", session: null, user: null }),
 }));

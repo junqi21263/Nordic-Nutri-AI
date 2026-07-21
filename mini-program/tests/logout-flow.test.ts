@@ -5,8 +5,12 @@ describe("logout flow", () => {
   it("clears the local session before returning the user to the manual login entry", async () => {
     const steps: string[] = [];
     const logout = createLogoutFlow({
-      signOut: async () => { steps.push("sign-out"); },
-      openLogin: async () => { steps.push("open-login"); },
+      signOut: async () => {
+        steps.push("sign-out");
+      },
+      openLogin: async () => {
+        steps.push("open-login");
+      },
     });
 
     await logout.run();
@@ -16,7 +20,12 @@ describe("logout flow", () => {
 
   it("does not run two logout operations at once", async () => {
     let resolveSignOut: (() => void) | undefined;
-    const signOut = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolveSignOut = resolve; }));
+    const signOut = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSignOut = resolve;
+        }),
+    );
     const openLogin = vi.fn();
     const logout = createLogoutFlow({ signOut, openLogin });
 

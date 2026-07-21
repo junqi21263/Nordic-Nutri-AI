@@ -37,13 +37,18 @@ export type WechatLoginObserver = (update: {
   errorFunction?: string | null;
 }) => void;
 
-function logFunctionEvent(event: "started" | "completed" | "failed", diagnostics?: {
-  httpStatus?: number | null;
-  requestId?: string | null;
-}): void {
+function logFunctionEvent(
+  event: "started" | "completed" | "failed",
+  diagnostics?: {
+    httpStatus?: number | null;
+    requestId?: string | null;
+  },
+): void {
   if (getPublicRuntimeConfig().environment !== "development") return;
   console.info("[dev-auth] function-invoke-" + event, {
-    targetProjectRef: truncateProjectRef("https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com"),
+    targetProjectRef: truncateProjectRef(
+      "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com",
+    ),
     httpStatus: diagnostics?.httpStatus ?? null,
     requestId: diagnostics?.requestId ?? null,
   });
@@ -78,13 +83,11 @@ export async function loginWithWechat(observer?: WechatLoginObserver) {
         logFunctionEvent("failed", diagnostics);
         throw error;
       }
-    })().finally(() => { loginInFlight = null; });
+    })().finally(() => {
+      loginInFlight = null;
+    });
   }
   return loginInFlight;
-}
-
-export async function getCurrentProfile() {
-  throw new Error("CloudBase profile bootstrap is not deployed");
 }
 
 export { restoreSession };

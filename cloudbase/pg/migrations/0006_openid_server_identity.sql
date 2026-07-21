@@ -3,8 +3,8 @@
 -- Mini Program callers or direct database clients.
 
 alter table public.app_users
-  add column openid_hash char(64) unique;
+  add column if not exists openid_hash char(64) unique;
 
-create index app_users_openid_hash_idx
+create index if not exists app_users_openid_hash_idx
   on public.app_users (openid_hash)
   where openid_hash is not null;

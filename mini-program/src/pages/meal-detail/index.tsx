@@ -1,6 +1,6 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { ErrorState } from "../../components/error-state";
@@ -9,6 +9,12 @@ import { NordicIcon } from "../../components/nordic-icon";
 import { ConfirmDialog } from "../../components/confirm-dialog";
 import { Modal } from "../../components/modal";
 import { getMealNutrition, getMealScore } from "../../features/meals/domain";
+import {
+  deleteProductMeal,
+  getProductMeal,
+  getProductMeals,
+  updateProductMeal,
+} from "../../api/meal-data-api";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
 import { usePortionDraftStore } from "../../stores/portion-draft-store";
@@ -51,19 +57,30 @@ export default function MealDetailPage() {
   const feedback = useFeedbackStore();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [detailModal, setDetailModal] = useState<"score" | "insight" | null>(null);
-  const meal = store.getMealById(router.params.id);
+  const [remoteMeal, setRemoteMeal] = useState<ReturnType<typeof store.getMealById>>(undefined);
+  const storedMeal = store.getMealById(router.params.id);
+  const meal = storedMeal ?? remoteMeal;
+  useEffect(() => {
+    if (!router.params.id || storedMeal) return;
+    void getProductMeal(router.params.id)
+      .then((result) => setRemoteMeal(result ?? undefined))
+      .catch(() => undefined);
+  }, [router.params.id, storedMeal]);
   if (!meal)
     return (
       <PageLayout
         title="餐次详情"
-        subtitle="找不到这条本地记录。"
+        subtitle="找不到这条云端记录。"
         eyebrow="饮食记录"
         showTabs={false}
         leading="‹"
         onLeadingClick={() => navigateBackOrHome("/pages/meal-records/index")}
       >
         <ErrorState title="餐次不存在" description="它可能已被删除，或链接已经失效。" />
-        <AppButton size="large" onClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}>
+        <AppButton
+          size="large"
+          onClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
+        >
           返回饮食记录
         </AppButton>
       </PageLayout>
@@ -72,8 +89,20 @@ export default function MealDetailPage() {
   const score = getMealScore(meal);
   const scoreDetail = scoreCopy[score];
   const macros = [
-    { icon: "protein" as const, label: "蛋白质", target: 60, tone: undefined, value: nutrition.protein },
-    { icon: "carbs" as const, label: "碳水", target: 90, tone: "carbs" as const, value: nutrition.carbs },
+    {
+      icon: "protein" as const,
+      label: "蛋白质",
+      target: 60,
+      tone: undefined,
+      value: nutrition.protein,
+    },
+    {
+      icon: "carbs" as const,
+      label: "碳水",
+      target: 90,
+      tone: "carbs" as const,
+      value: nutrition.carbs,
+    },
     { icon: "fat" as const, label: "脂肪", target: 25, tone: "fat" as const, value: nutrition.fat },
   ];
   const heroImage = meal.imageKey ? mealImages[meal.imageKey] : mealBowlImage;
@@ -84,8 +113,10 @@ export default function MealDetailPage() {
   };
   const remove = async () => {
     try {
-      store.deleteMeal(meal.id);
-      feedback.show({ message: "餐次已从本地记录移除", tone: "success" });
+      const result = await deleteProductMeal(meal.id);
+      if (!result.deleted) throw new Error("Meal not found");
+      store.replaceRemoteMeals(await getProductMeals(meal.date), meal.date);
+      feedback.show({ message: "餐次已删除并同步", tone: "success" });
       Taro.switchTab({ url: "/pages/meal-records/index" });
     } catch {
       feedback.show({ message: "删除失败，请稍后重试", tone: "error" });
@@ -93,7 +124,9 @@ export default function MealDetailPage() {
   };
   const toggleFavorite = async () => {
     try {
-      store.toggleFavorite(meal.id);
+      const saved = await updateProductMeal(meal.id, { isFavorite: !meal.favorite });
+      if (!saved) throw new Error("Meal not found");
+      store.replaceRemoteMeals(await getProductMeals(meal.date), meal.date);
       feedback.show({ message: meal.favorite ? "已取消收藏" : "已加入收藏", tone: "success" });
     } catch {
       feedback.show({ message: "收藏状态更新失败，请稍后重试", tone: "error" });
@@ -122,7 +155,9 @@ export default function MealDetailPage() {
         </View>
         <View className="meal-detail-page__heading">
           <Text className="meal-detail-page__meal-title">{meal.title}</Text>
-          <Text className="meal-detail-page__meta">{meal.date} · {meal.time}</Text>
+          <Text className="meal-detail-page__meta">
+            {meal.date} · {meal.time}
+          </Text>
         </View>
         <AppCard tone="beige" className="meal-detail-page__hero">
           <View
@@ -158,20 +193,30 @@ export default function MealDetailPage() {
               </View>
             </View>
             <Text className="meal-detail-page__calories">
-              {nutrition.calories}<Text> kcal</Text>
+              {nutrition.calories}
+              <Text> kcal</Text>
             </Text>
             <View className="meal-detail-page__hero-macros">
               <View className="meal-detail-page__hero-macro">
-                <View className="meal-detail-page__hero-macro-icon"><NordicIcon name="protein" size={18} ariaLabel="蛋白质" /></View>
-                <Text>蛋白质</Text><Text>{nutrition.protein}g</Text>
+                <View className="meal-detail-page__hero-macro-icon">
+                  <NordicIcon name="protein" size={18} ariaLabel="蛋白质" />
+                </View>
+                <Text>蛋白质</Text>
+                <Text>{nutrition.protein}g</Text>
               </View>
               <View className="meal-detail-page__hero-macro">
-                <View className="meal-detail-page__hero-macro-icon"><NordicIcon name="carbs" size={18} ariaLabel="碳水" /></View>
-                <Text>碳水</Text><Text>{nutrition.carbs}g</Text>
+                <View className="meal-detail-page__hero-macro-icon">
+                  <NordicIcon name="carbs" size={18} ariaLabel="碳水" />
+                </View>
+                <Text>碳水</Text>
+                <Text>{nutrition.carbs}g</Text>
               </View>
               <View className="meal-detail-page__hero-macro">
-                <View className="meal-detail-page__hero-macro-icon"><NordicIcon name="fat" size={18} ariaLabel="脂肪" /></View>
-                <Text>脂肪</Text><Text>{nutrition.fat}g</Text>
+                <View className="meal-detail-page__hero-macro-icon">
+                  <NordicIcon name="fat" size={18} ariaLabel="脂肪" />
+                </View>
+                <Text>脂肪</Text>
+                <Text>{nutrition.fat}g</Text>
               </View>
             </View>
           </View>
@@ -239,11 +284,19 @@ export default function MealDetailPage() {
           <NordicIcon name="pencil" size={22} ariaLabel="编辑" />
           <Text>编辑</Text>
         </View>
-        <View className="meal-detail-page__action" ariaLabel={meal.favorite ? "取消收藏本餐" : "收藏本餐"} onClick={() => void toggleFavorite()}>
+        <View
+          className="meal-detail-page__action"
+          ariaLabel={meal.favorite ? "取消收藏本餐" : "收藏本餐"}
+          onClick={() => void toggleFavorite()}
+        >
           <NordicIcon name="heart" size={22} ariaLabel={meal.favorite ? "取消收藏" : "收藏"} />
           <Text>{meal.favorite ? "已收藏" : "收藏"}</Text>
         </View>
-        <View className="meal-detail-page__action meal-detail-page__action--delete" ariaLabel="删除本餐" onClick={() => setDeleteDialogOpen(true)}>
+        <View
+          className="meal-detail-page__action meal-detail-page__action--delete"
+          ariaLabel="删除本餐"
+          onClick={() => setDeleteDialogOpen(true)}
+        >
           <NordicIcon name="trash-2" size={22} ariaLabel="删除" />
           <Text>删除</Text>
         </View>

@@ -1,4 +1,5 @@
 import Taro from "@tarojs/taro";
+import { productApiEndpoint } from "./product-api-config";
 
 export interface WechatHttpsLoginResult {
   user: { id: string };
@@ -6,11 +7,9 @@ export interface WechatHttpsLoginResult {
   onboardingRequired: boolean;
 }
 
-const endpoint = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
-
 export async function requestWechatHttpsLogin(code: string): Promise<WechatHttpsLoginResult> {
   const response = await Taro.request<unknown>({
-    url: endpoint,
+    url: productApiEndpoint,
     method: "POST",
     header: { "content-type": "application/json" },
     data: { code },
@@ -22,7 +21,11 @@ export async function requestWechatHttpsLogin(code: string): Promise<WechatHttps
     code?: unknown;
   };
 
-  if (response.statusCode !== 200 || typeof data.user?.id !== "string" || typeof data.session?.accessToken !== "string") {
+  if (
+    response.statusCode !== 200 ||
+    typeof data.user?.id !== "string" ||
+    typeof data.session?.accessToken !== "string"
+  ) {
     const error = new Error("微信登录服务请求失败");
     error.name = typeof data.code === "string" ? data.code : "WechatHttpsLoginRequestError";
     throw error;

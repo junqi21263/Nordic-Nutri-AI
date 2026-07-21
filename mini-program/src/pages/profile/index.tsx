@@ -9,6 +9,12 @@ import { BottomSheet, bottomSheetExitDuration } from "../../components/bottom-sh
 import { ListItem } from "../../components/list-item";
 import { NordicIcon } from "../../components/nordic-icon";
 import { StatisticCard } from "../../components/statistic-card";
+import { submitProductFeedback } from "../../api/feedback-api";
+import {
+  getProductAchievements,
+  getProductWeeklyReview,
+  type ProductWeeklyReview,
+} from "../../api/insight-api";
 import { createAchievements } from "../../features/coach/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { createLogoutFlow } from "../../auth/logout-flow";
@@ -36,6 +42,7 @@ export default function ProfilePage() {
   const unlockedAchievements = list.filter((achievement) => achievement.unlocked).length;
   const [activeModal, setActiveModal] = useState<"privacy" | "feedback" | "about" | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState("");
+  const [weeklyReview, setWeeklyReview] = useState<ProductWeeklyReview | null>(null);
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
   const logoutFlow = createLogoutFlow({
@@ -54,6 +61,15 @@ export default function ProfilePage() {
 
   useEffect(() => () => setTabBarVisible(true), [setTabBarVisible]);
 
+  useEffect(() => {
+    void Promise.all([getProductAchievements(date), getProductWeeklyReview(date)])
+      .then(([remoteAchievements, review]) => {
+        achievements.setAchievements(remoteAchievements);
+        setWeeklyReview(review);
+      })
+      .catch(() => undefined);
+  }, [achievements.setAchievements, date]);
+
   const showNotice = (message: string) => feedback.show({ message, tone: "success" });
   const openPage = (url: string) => void Taro.navigateTo({ url });
   const openCoach = () => {
@@ -64,17 +80,24 @@ export default function ProfilePage() {
     setActiveKey("meal-records");
     void Taro.switchTab({ url: "/pages/meal-records/index" });
   };
-  const submitFeedback = () => {
+  const submitFeedback = async () => {
     if (!feedbackDraft.trim()) {
       feedback.show({ message: "请先写下你的问题或建议", tone: "error" });
       return;
     }
-    setFeedbackDraft("");
-    setActiveModal(null);
-    showNotice("感谢你的反馈");
+    try {
+      await submitProductFeedback(feedbackDraft.trim());
+      setFeedbackDraft("");
+      setActiveModal(null);
+      showNotice("感谢你的反馈");
+    } catch {
+      feedback.show({ message: "反馈提交失败，请稍后重试", tone: "error" });
+    }
   };
   const logout = () => {
-    void logoutFlow.run().catch(() => feedback.show({ message: "退出登录失败，请稍后重试", tone: "error" }));
+    void logoutFlow
+      .run()
+      .catch(() => feedback.show({ message: "退出登录失败，请稍后重试", tone: "error" }));
   };
 
   return (
@@ -84,7 +107,9 @@ export default function ProfilePage() {
       hideNavigation
       className="page-layout--profile"
     >
-      <View className="profile-page-title"><Text>个人中心</Text></View>
+      <View className="profile-page-title">
+        <Text>个人中心</Text>
+      </View>
       <View className="profile-rhythm">
         <View ariaLabel="编辑个人资料" onClick={() => openPage("/pages/profile-edit/index")}>
           <AppCard tone="dark" className="profile-hero profile-rhythm__identity">
@@ -102,17 +127,33 @@ export default function ProfilePage() {
         <View className="card-grid profile-rhythm__stats">
           <StatisticCard label="目标热量" value={`${profile.profile.targetCalories}`} hint="kcal" />
           <View onClick={openCoach}>
-            <StatisticCard label="蛋白完成度" value={`${proteinCompletion}%`} hint="今日" tone="sage" />
+            <StatisticCard
+              label="蛋白完成度"
+              value={`${proteinCompletion}%`}
+              hint="今日"
+              tone="sage"
+            />
           </View>
           <View onClick={openMealRecords}>
-            <StatisticCard label="已记录餐次" value={`${meals.meals.length}`} hint="本地记录" tone="beige" />
+            <StatisticCard
+              label="已记录餐次"
+              value={`${weeklyReview?.recordedMeals ?? meals.meals.length}`}
+              hint="本周"
+              tone="beige"
+            />
           </View>
-          <StatisticCard label="本周坚持" value="4 天" hint="保持节奏" />
+          <StatisticCard
+            label="本周坚持"
+            value={`${weeklyReview?.recordedDays ?? 0} 天`}
+            hint="保持节奏"
+          />
         </View>
 
         <View className="profile-rhythm__section-head">
           <Text>成就</Text>
-          <Text onClick={() => openPage("/pages/achievements/index")}>{unlockedAchievements}/{list.length} ›</Text>
+          <Text onClick={() => openPage("/pages/achievements/index")}>
+            {unlockedAchievements}/{list.length} ›
+          </Text>
         </View>
         <View className="profile-rhythm__achievement-row">
           {list.slice(0, 3).map((achievement) => (
@@ -137,51 +178,85 @@ export default function ProfilePage() {
           </View>
           <View className="profile-rhythm__weekly-score">
             <Text>营养节奏</Text>
-            <Text>{proteinCompletion}</Text>
+            <Text>{weeklyReview?.score ?? proteinCompletion}</Text>
             <Text>分 ›</Text>
           </View>
         </View>
 
         <View className="profile-rhythm__settings-group">
           <View onClick={() => setActiveModal("privacy")}>
-            <ListItem icon={<NordicIcon name="check" size={20} ariaLabel="隐私与数据" />} title="隐私与数据" description="本地体验说明" />
+            <ListItem
+              icon={<NordicIcon name="check" size={20} ariaLabel="隐私与数据" />}
+              title="隐私与数据"
+              description="本地体验说明"
+            />
           </View>
           <View onClick={() => setActiveModal("feedback")}>
-            <ListItem icon={<NordicIcon name="heart" size={20} ariaLabel="反馈与帮助" />} title="反馈与帮助" description="告诉我们你的想法" />
+            <ListItem
+              icon={<NordicIcon name="heart" size={20} ariaLabel="反馈与帮助" />}
+              title="反馈与帮助"
+              description="告诉我们你的想法"
+            />
           </View>
           <View onClick={() => setActiveModal("about")}>
-            <ListItem icon={<NordicIcon name="user-round" size={20} ariaLabel="关于我们" />} title="关于我们" description="Nordic Nutri AI 本地体验版" />
+            <ListItem
+              icon={<NordicIcon name="user-round" size={20} ariaLabel="关于我们" />}
+              title="关于我们"
+              description="Nordic Nutri AI 本地体验版"
+            />
           </View>
           <View onClick={logout}>
-            <ListItem icon={<NordicIcon name="x" size={20} ariaLabel="退出登录" />} title="退出登录" description="仅退出当前设备" />
+            <ListItem
+              icon={<NordicIcon name="x" size={20} ariaLabel="退出登录" />}
+              title="退出登录"
+              description="仅退出当前设备"
+            />
           </View>
         </View>
       </View>
 
-      <BottomSheet open={activeModal === "privacy"} className="profile-sheet" onDismiss={() => setActiveModal(null)}>
+      <BottomSheet
+        open={activeModal === "privacy"}
+        className="profile-sheet"
+        onDismiss={() => setActiveModal(null)}
+      >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">
             <Text className="profile-modal__title">隐私与数据</Text>
-            <View className="profile-sheet__close" ariaLabel="关闭隐私与数据" onClick={() => setActiveModal(null)}>
+            <View
+              className="profile-sheet__close"
+              ariaLabel="关闭隐私与数据"
+              onClick={() => setActiveModal(null)}
+            >
               <NordicIcon name="x" size={20} ariaLabel="关闭" />
             </View>
           </View>
           <Text className="profile-modal__lead">你的记录，应该由你清楚掌握。</Text>
           <View className="profile-modal__notice">
-            <Text>数据仅保留在当前设备，不会在当前体验版中上传、同步或共享。</Text>
-            <Text>如需移除已有记录，可通过微信小程序设置清理本地缓存。</Text>
+            <Text>账号资料、目标和饮食记录会通过加密连接同步到 CloudBase 数据库。</Text>
+            <Text>业务接口只接受当前登录会话，不允许小程序直接读写数据库。</Text>
           </View>
           <View className="profile-sheet__action">
-            <AppButton size="medium" onClick={() => setActiveModal(null)}>知道了</AppButton>
+            <AppButton size="medium" onClick={() => setActiveModal(null)}>
+              知道了
+            </AppButton>
           </View>
         </View>
       </BottomSheet>
 
-      <BottomSheet open={activeModal === "feedback"} className="profile-sheet" onDismiss={() => setActiveModal(null)}>
+      <BottomSheet
+        open={activeModal === "feedback"}
+        className="profile-sheet"
+        onDismiss={() => setActiveModal(null)}
+      >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">
             <Text className="profile-modal__title">反馈与帮助</Text>
-            <View className="profile-sheet__close" ariaLabel="关闭反馈与帮助" onClick={() => setActiveModal(null)}>
+            <View
+              className="profile-sheet__close"
+              ariaLabel="关闭反馈与帮助"
+              onClick={() => setActiveModal(null)}
+            >
               <NordicIcon name="x" size={20} ariaLabel="关闭" />
             </View>
           </View>
@@ -194,28 +269,44 @@ export default function ProfilePage() {
             autoHeight
             onInput={(event) => setFeedbackDraft(event.detail.value)}
           />
-          <Text className="profile-modal__hint">反馈仅保存在本次本地体验中，不会上传。</Text>
+          <Text className="profile-modal__hint">提交后将安全保存，用于定位问题和改进体验。</Text>
           <View className="profile-sheet__action">
-            <AppButton size="medium" onClick={submitFeedback}>提交反馈</AppButton>
+            <AppButton size="medium" onClick={() => void submitFeedback()}>
+              提交反馈
+            </AppButton>
           </View>
         </View>
       </BottomSheet>
 
-      <BottomSheet open={activeModal === "about"} className="profile-sheet" onDismiss={() => setActiveModal(null)}>
+      <BottomSheet
+        open={activeModal === "about"}
+        className="profile-sheet"
+        onDismiss={() => setActiveModal(null)}
+      >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">
             <Text className="profile-modal__title">关于我们</Text>
-            <View className="profile-sheet__close" ariaLabel="关闭关于我们" onClick={() => setActiveModal(null)}>
+            <View
+              className="profile-sheet__close"
+              ariaLabel="关闭关于我们"
+              onClick={() => setActiveModal(null)}
+            >
               <NordicIcon name="x" size={20} ariaLabel="关闭" />
             </View>
           </View>
-          <Text className="profile-modal__lead">Nordic Nutri AI 是一款本地体验中的营养记录工具。</Text>
+          <Text className="profile-modal__lead">
+            Nordic Nutri AI 是一款支持云端同步的营养记录工具。
+          </Text>
           <View className="profile-modal__notice">
             <Text>我们希望把饮食记录、目标进度和每日建议放在一个轻松、可持续的节奏里。</Text>
-            <Text>当前版本聚焦本地记录与界面体验，不提供账号、云端同步或医疗建议。</Text>
+            <Text>
+              当前版本支持账号、饮食记录和目标同步；营养建议仅供日常参考，不替代医疗意见。
+            </Text>
           </View>
           <View className="profile-sheet__action">
-            <AppButton size="medium" onClick={() => setActiveModal(null)}>知道了</AppButton>
+            <AppButton size="medium" onClick={() => setActiveModal(null)}>
+              知道了
+            </AppButton>
           </View>
         </View>
       </BottomSheet>

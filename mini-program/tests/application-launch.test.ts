@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApplicationLaunch, createRuntimeApplicationLaunch } from "../src/auth/application-launch";
+import {
+  createApplicationLaunch,
+  createRuntimeApplicationLaunch,
+} from "../src/auth/application-launch";
 
 describe("application launch", () => {
   it("waits for authentication and opens the home tab for an authenticated returning user", async () => {
@@ -20,7 +23,10 @@ describe("application launch", () => {
     const openHome = vi.fn();
     const openLogin = vi.fn();
     const launch = createApplicationLaunch(
-      { start: vi.fn().mockResolvedValue(undefined), getStatus: vi.fn().mockReturnValue("unauthenticated") },
+      {
+        start: vi.fn().mockResolvedValue(undefined),
+        getStatus: vi.fn().mockReturnValue("unauthenticated"),
+      },
       openHome,
       openLogin,
     );
@@ -33,7 +39,12 @@ describe("application launch", () => {
 
   it("shares one app launch operation", async () => {
     let resolveStart: (() => void) | undefined;
-    const start = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolveStart = resolve; }));
+    const start = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveStart = resolve;
+        }),
+    );
     const openHome = vi.fn();
     const launch = createApplicationLaunch(
       { start, getStatus: vi.fn().mockReturnValue("authenticated") },
@@ -55,7 +66,10 @@ describe("application launch", () => {
     const openOnboarding = vi.fn();
     const openLogin = vi.fn();
     const launch = createRuntimeApplicationLaunch(
-      { start: vi.fn().mockResolvedValue(undefined), getStatus: vi.fn().mockReturnValue("authenticated") },
+      {
+        start: vi.fn().mockResolvedValue(undefined),
+        getStatus: vi.fn().mockReturnValue("authenticated"),
+      },
       {
         isOnboardingCompleted: () => false,
         openHome,

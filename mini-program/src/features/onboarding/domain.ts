@@ -2,24 +2,9 @@ export type GoalType = "muscle_gain" | "fat_loss" | "maintenance" | "performance
 export type Gender = "male" | "female";
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "high";
 export type DietaryPattern =
-  | "none"
-  | "vegetarian"
-  | "vegan"
-  | "pescatarian"
-  | "low_carb"
-  | "keto"
-  | "mediterranean"
-  | "halal";
+  "none" | "vegetarian" | "vegan" | "pescatarian" | "low_carb" | "keto" | "mediterranean" | "halal";
 export type FoodAvoidance =
-  | "dairy"
-  | "nuts"
-  | "seafood"
-  | "beef"
-  | "eggs"
-  | "gluten"
-  | "pork"
-  | "soy"
-  | "spicy";
+  "dairy" | "nuts" | "seafood" | "beef" | "eggs" | "gluten" | "pork" | "soy" | "spicy";
 
 export interface OnboardingDraft {
   nickname: string;

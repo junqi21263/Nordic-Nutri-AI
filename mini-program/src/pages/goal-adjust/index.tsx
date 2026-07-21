@@ -1,6 +1,10 @@
 import { Input, Text, View } from "@tarojs/components";
 import { useState } from "react";
-import { saveProductGoal } from "../../api/product-data-api";
+import {
+  getProductNutritionPlan,
+  saveProductGoal,
+  saveProductNutritionPlan,
+} from "../../api/product-data-api";
 import { AppButton } from "../../components/app-button";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
@@ -8,9 +12,9 @@ import { useProfileStore } from "../../stores/profile-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 const goalTypeByLabel: Record<string, "muscle_gain" | "fat_loss" | "maintain"> = {
-  "精益增肌": "muscle_gain",
-  "轻盈减脂": "fat_loss",
-  "保持状态": "maintain",
+  精益增肌: "muscle_gain",
+  轻盈减脂: "fat_loss",
+  保持状态: "maintain",
 };
 
 export default function GoalAdjustPage() {
@@ -33,11 +37,19 @@ export default function GoalAdjustPage() {
     }
     setIsSaving(true);
     try {
+      const currentPlan = await getProductNutritionPlan();
+      if (!currentPlan) throw new Error("当前营养计划不存在");
       await saveProductGoal({
         goalType: goalTypeByLabel[profile.profile.goalLabel] ?? "muscle_gain",
         targetWeightKg: nextTargetWeight,
         targetCaloriesKcal: nextCalories,
         targetDate: null,
+      });
+      await saveProductNutritionPlan({
+        calories: nextCalories,
+        proteinG: currentPlan.proteinG,
+        carbsG: currentPlan.carbsG,
+        fatG: currentPlan.fatG,
       });
       profile.setProfile({ targetWeight: nextTargetWeight, targetCalories: nextCalories });
       feedback.show({ message: "目标已更新，继续保持节奏", tone: "success" });

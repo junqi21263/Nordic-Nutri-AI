@@ -75,7 +75,35 @@ test("nutrition plans receive owner identity from the authenticated CloudBase se
 test("native Mini Program identity is stored only as a server-derived OpenID hash", async () => {
   const sql = await readFile(new URL("../../cloudbase/pg/migrations/0006_openid_server_identity.sql", import.meta.url), "utf8");
 
-  assert.match(sql, /add column openid_hash char\(64\) unique/i);
+  assert.match(sql, /add column(?: if not exists)? openid_hash char\(64\) unique/i);
   assert.match(sql, /raw OpenID must never be persisted/i);
   assert.doesNotMatch(sql, /openid text|openid varchar/i);
+});
+
+test("meal storage migration supports text-based AI analysis and server-only meal writes", async () => {
+  const sql = await readFile(new URL("../../cloudbase/pg/migrations/0008_meal_data.sql", import.meta.url), "utf8");
+
+  for (const table of ["ai_analysis", "meal_records", "meal_items"]) {
+    assert.match(sql, new RegExp(`create table(?: if not exists)? public\\.${table}\\b`, "i"), table);
+  }
+  assert.match(sql, /image_path text check/i);
+  assert.match(sql, /image_sha256 char\(64\) check/i);
+  assert.match(sql, /create trigger meal_items_recalculate_meal_totals/i);
+  assert.match(sql, /revoke all on public\.ai_analysis from public, anon, authenticated/i);
+  assert.match(sql, /alter column image_path drop not null/i);
+  assert.match(sql, /ai analysis: server only/i);
+});
+
+test("incremental CloudBase migrations tolerate objects already created by the core schema", async () => {
+  const planSql = await readFile(new URL("../../cloudbase/pg/migrations/0005_onboarding_plan_permissions.sql", import.meta.url), "utf8");
+  const identitySql = await readFile(new URL("../../cloudbase/pg/migrations/0006_openid_server_identity.sql", import.meta.url), "utf8");
+  const mealSql = await readFile(new URL("../../cloudbase/pg/migrations/0008_meal_data.sql", import.meta.url), "utf8");
+
+  assert.match(planSql, /create table if not exists public\.nutrition_plans/i);
+  assert.match(planSql, /create unique index if not exists nutrition_plans_one_active_per_user_idx/i);
+  assert.match(identitySql, /add column if not exists openid_hash/i);
+  for (const table of ["ai_analysis", "meal_records", "meal_items"]) {
+    assert.match(mealSql, new RegExp(`create table if not exists public\\.${table}`, "i"));
+  }
+  assert.match(mealSql, /drop trigger if exists meal_items_recalculate_meal_totals/i);
 });

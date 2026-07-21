@@ -20,23 +20,24 @@ describe("餐食详情交互", () => {
     const styles = read("styles/page.scss");
     const actionRule = styles.slice(
       styles.indexOf(".meal-detail-page__action {"),
-      styles.indexOf(".meal-detail-page__action--delete")
+      styles.indexOf(".meal-detail-page__action--delete"),
     );
 
     expect(actionRule).toContain("flex-direction: row");
     expect(actionRule).toContain("min-height: 64px");
   });
 
-  it("让手动保存、列表编辑和删除都维持本地记录流程", () => {
+  it("让手动保存、列表编辑和删除都通过服务端餐食接口确认", () => {
     const manual = read("pages/manual-meal/index.tsx");
     const records = read("pages/meal-records/index.tsx");
     const detail = read("pages/meal-detail/index.tsx");
     const portion = read("pages/portion-adjustment/index.tsx");
 
-    expect(manual).toContain("meals.addMeal(localMeal)");
+    expect(manual).toContain("createProductMeal");
+    expect(manual).toContain("getProductMeals");
     expect(manual).toContain("loading={isSaving}");
-    expect(records).not.toContain("loadRemote");
-    expect(detail).toContain("store.deleteMeal(meal.id)");
-    expect(portion).toContain("meals.updateMeal(editingId");
+    expect(records).toContain("getProductMeals(store.selectedDate)");
+    expect(detail).toContain("deleteProductMeal(meal.id)");
+    expect(portion).toContain("updateProductMeal(editingId");
   });
 });

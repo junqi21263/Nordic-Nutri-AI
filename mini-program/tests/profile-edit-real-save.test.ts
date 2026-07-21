@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 
 describe("profile edit real save", () => {
   it("writes nickname, weight, and goal direction through authenticated HTTPS data clients", () => {
-    const page = readFileSync(resolve(import.meta.dirname, "../src/pages/profile-edit/index.tsx"), "utf8");
+    const page = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/profile-edit/index.tsx"),
+      "utf8",
+    );
 
     expect(page).toContain("saveProductProfile");
     expect(page).toContain("saveProductBodyProfile");

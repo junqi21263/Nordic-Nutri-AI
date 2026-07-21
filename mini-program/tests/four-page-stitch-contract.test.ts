@@ -172,7 +172,7 @@ describe("four-page Stitch visual contract", () => {
   it("keeps Home Dashboard labels Chinese and uses the Stitch action hierarchy", () => {
     const source = read("pages/home/index.tsx");
 
-    expect(source).toContain("早上好，Lewis");
+    expect(source).toContain("早上好，{profile.profile.nickname}");
     expect(source).toContain("今日目标");
     expect(source).toContain("拍照识别");
     expect(source).toContain("记录饮食");
@@ -199,7 +199,9 @@ describe("four-page Stitch visual contract", () => {
     expect(styles).toContain("min-height: 96px;");
     const layoutStyles = read("styles/layout.scss");
     expect(layoutStyles).toContain(".page-layout--home .page-layout__content");
-    expect(layoutStyles).toContain("padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);");
+    expect(layoutStyles).toContain(
+      "padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);",
+    );
   });
 
   it("uses local Lucide icons instead of Unicode glyphs in the Home action and tab bars", () => {
@@ -271,10 +273,12 @@ describe("four-page Stitch visual contract", () => {
     expect(styles).toContain(".meal-records-page__calendar");
     expect(styles).toContain(".meal-records-page__timeline");
     expect(styles).toContain(".meal-records-page__fab");
-    expect(read("styles/layout.scss")).toContain(".page-layout--meal-records .page-layout__content--enter");
+    expect(read("styles/layout.scss")).toContain(
+      ".page-layout--meal-records .page-layout__content--enter",
+    );
   });
 
-  it("renders the food scanner as a local-icon camera flow with a visible scan transition", () => {
+  it("renders the food scanner as a real visual-analysis camera flow with a visible scan transition", () => {
     const source = read("pages/food-scanner/index.tsx");
     const styles = read("styles/page.scss");
 
@@ -288,7 +292,8 @@ describe("four-page Stitch visual contract", () => {
     expect(source).not.toContain("food-scanner-page__header-action");
     expect(source).toContain('className="scanner-ai-status"');
     expect(source).toContain('name="sparkles"');
-    expect(source).toContain("}, 1600);");
+    expect(source).toContain("analyzeProductImage");
+    expect(source).not.toContain("captureRandom");
     expect(styles).toContain(".scanner-frame__scan-line");
     expect(styles).toContain("@keyframes scanner-sweep");
     expect(styles).toContain("@keyframes scanner-glow");
@@ -341,7 +346,7 @@ describe("four-page Stitch visual contract", () => {
     expect(source).toContain('name="back"');
     expect(source).toContain('name="sparkles"');
     expect(source).toContain('className="analysis-result-page__summary-image"');
-    expect(source).toContain('hideNavigation');
+    expect(source).toContain("hideNavigation");
     expect(source).toContain('className="page-layout--analysis-result"');
     expect(styles).toContain(".analysis-result-page__summary-image");
     expect(styles).toContain(".analysis-result-page__actions");

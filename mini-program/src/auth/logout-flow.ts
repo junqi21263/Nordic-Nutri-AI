@@ -8,10 +8,13 @@ export function createLogoutFlow(dependencies: LogoutDependencies) {
 
   const run = () => {
     if (!inFlight) {
-      inFlight = dependencies.signOut()
+      inFlight = dependencies
+        .signOut()
         .then(() => dependencies.openLogin())
         .then(() => undefined)
-        .finally(() => { inFlight = null; });
+        .finally(() => {
+          inFlight = null;
+        });
     }
     return inFlight;
   };

@@ -42,9 +42,13 @@ export function DailyNutritionSummary({
                 <View className="daily-summary__dashboard-macro" key={key}>
                   <View className="daily-summary__dashboard-macro-head">
                     <Text>{label}</Text>
-                    <Text>{summary.consumed[key]}/{summary[key]}g</Text>
+                    <Text>
+                      {summary.consumed[key]}/{summary[key]}g
+                    </Text>
                   </View>
-                  <View className={`daily-summary__dashboard-track daily-summary__dashboard-track--${tone}`}>
+                  <View
+                    className={`daily-summary__dashboard-track daily-summary__dashboard-track--${tone}`}
+                  >
                     <View style={{ width: `${progress.percent}%` }} />
                   </View>
                 </View>
@@ -53,8 +57,14 @@ export function DailyNutritionSummary({
           </View>
         </View>
         <View className="daily-summary__dashboard-foot">
-          <Text>今日已摄入 {summary.consumed.calories} / {summary.calories} kcal</Text>
-          <Text>{calorieProgress.exceeded ? `超出 ${Math.abs(calorieProgress.remaining)} kcal` : `还可摄入 ${remainingCalories} kcal`}</Text>
+          <Text>
+            今日已摄入 {summary.consumed.calories} / {summary.calories} kcal
+          </Text>
+          <Text>
+            {calorieProgress.exceeded
+              ? `超出 ${Math.abs(calorieProgress.remaining)} kcal`
+              : `还可摄入 ${remainingCalories} kcal`}
+          </Text>
         </View>
       </AppCard>
     );

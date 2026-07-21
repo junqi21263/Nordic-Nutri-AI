@@ -30,7 +30,7 @@ describe("P0 / P1 本地体验补全", () => {
     expect(profileWrite).toHaveBeenCalledWith(expect.objectContaining({ nickname: "Mia" }));
   });
 
-  it("为首次完成、手动记录和原生图片选择提供可到达的本地路径", () => {
+  it("为首次完成、手动记录和原生图片识别提供可到达的真实路径", () => {
     const config = read("app.config.ts");
     const app = read("app.tsx");
     const plan = read("pages/nutrition-plan/index.tsx");
@@ -44,10 +44,12 @@ describe("P0 / P1 本地体验补全", () => {
     expect(scanner).toContain("sourceType: [source]");
     expect(scanner).toContain('chooseImage("camera")');
     expect(scanner).toContain('chooseImage("album")');
-    expect(scanner).toContain("使用示例餐盘继续");
+    expect(scanner).toContain("analyzeProductImage");
+    expect(scanner).toContain("图片识别服务尚未配置，可先手动记录");
     expect(scanner).toContain("手动记录");
     expect(manualMeal).toContain("手动记录");
-    expect(manualMeal).toContain("meals.addMeal");
+    expect(manualMeal).toContain("createProductMeal");
+    expect(manualMeal).toContain("getProductMeals");
   });
 
   it("让记录页支持搜索、底部筛选与清除筛选", () => {

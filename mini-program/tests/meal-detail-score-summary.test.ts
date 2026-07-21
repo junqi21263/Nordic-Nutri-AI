@@ -14,7 +14,7 @@ describe("餐食详情评分与营养小结", () => {
     expect(detail).toContain("本餐评分");
     expect(detail).toContain("查看评分依据");
     expect(detail).toContain('useState<"score" | "insight" | null>(null)');
-    expect(detail).toContain('<Modal open={detailModal !== null}>');
+    expect(detail).toContain("<Modal open={detailModal !== null}>");
     expect(detail).toContain('setDetailModal("score")');
     expect(detail).toContain("为什么是这个评分？");
     expect(detail).toContain("meal-detail-page__detail-modal");
