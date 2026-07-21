@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const source = (path: string) => readFileSync(resolve(import.meta.dirname, `../src/pages/${path}/index.tsx`), "utf8");
+const source = (path: string) =>
+  readFileSync(resolve(import.meta.dirname, `../src/pages/${path}/index.tsx`), "utf8");
 
 describe("body and goal real save pages", () => {
   it("persists a validated body profile version through the authenticated HTTPS data client", () => {

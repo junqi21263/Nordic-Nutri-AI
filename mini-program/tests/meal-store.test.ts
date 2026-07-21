@@ -71,4 +71,14 @@ describe("local meal store", () => {
     store.getState().resetFixtures();
     expect(store.getState().meals).toHaveLength(createMealFixtures(today).length);
   });
+
+  it("hydrates only server-confirmed meals as the remote source", () => {
+    const store = createMealStore([], today);
+    const remoteMeal = createMealFixtures(today)[0]!;
+
+    store.getState().replaceRemoteMeals([remoteMeal]);
+
+    expect(store.getState().dataSource).toBe("remote");
+    expect(store.getState().getMealsByDate(today)).toEqual([remoteMeal]);
+  });
 });

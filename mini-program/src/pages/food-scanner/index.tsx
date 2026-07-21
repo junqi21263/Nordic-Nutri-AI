@@ -1,6 +1,7 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { analyzeProductImage } from "../../api/vision-api";
 import { AppButton } from "../../components/app-button";
 import { BottomSheet, bottomSheetExitDuration } from "../../components/bottom-sheet";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -22,15 +23,7 @@ export default function FoodScannerPage() {
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const [isScanning, setIsScanning] = useState(false);
   const [fallbackOpen, setFallbackOpen] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preview = scanner.capturedMeal ?? scanner.candidates[0] ?? null;
-
-  useEffect(
-    () => () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    },
-    [],
-  );
 
   useEffect(() => {
     if (fallbackOpen) {
@@ -43,15 +36,26 @@ export default function FoodScannerPage() {
 
   useEffect(() => () => setTabBarVisible(true), [setTabBarVisible]);
 
-  const analyzeCurrentPreview = () => {
+  const analyzeCurrentPreview = async (previewPath: string) => {
     if (isScanning) return;
-    const meal = scanner.captureRandom();
-    analysis.setAnalysis(meal);
     setIsScanning(true);
-    timeoutRef.current = setTimeout(() => {
-      timeoutRef.current = null;
-      Taro.navigateTo({ url: "/pages/analysis-result/index" });
-    }, 1600);
+    try {
+      const meal = await analyzeProductImage(previewPath);
+      scanner.setCapturedMeal(meal);
+      analysis.setAnalysis(meal);
+      await Taro.navigateTo({ url: "/pages/analysis-result/index" });
+    } catch (error) {
+      const configured = error instanceof Error && error.name !== "VISION_SERVICE_NOT_CONFIGURED";
+      feedback.show({
+        message: configured
+          ? "图片识别失败，请重新拍摄或手动记录"
+          : "图片识别服务尚未配置，可先手动记录",
+        tone: "error",
+      });
+      setFallbackOpen(true);
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const chooseImage = async (source: "camera" | "album") => {
@@ -66,7 +70,7 @@ export default function FoodScannerPage() {
       if (!previewPath) throw new Error("没有获取到图片");
       scanner.setPreviewPath(previewPath);
       scanner.setGalleryMode(source === "album");
-      analyzeCurrentPreview();
+      await analyzeCurrentPreview(previewPath);
     } catch (error) {
       const message = String(error);
       if (message.includes("cancel")) {
@@ -77,11 +81,9 @@ export default function FoodScannerPage() {
     }
   };
 
-  const useExampleMeal = () => {
+  const retryChooseImage = () => {
     setFallbackOpen(false);
-    scanner.setPreviewPath(null);
-    scanner.setGalleryMode(false);
-    analyzeCurrentPreview();
+    void chooseImage("album");
   };
 
   const openManualMeal = () => {
@@ -165,7 +167,7 @@ export default function FoodScannerPage() {
               {scanner.previewPath ? "本地图片已就绪" : "自然光更清晰"}
             </Text>
             <Text>
-              {scanner.previewPath ? "已选择图片，正在准备本地分析" : "将食物完整放入取景框"}
+              {scanner.previewPath ? "已选择图片，正在准备云端分析" : "将食物完整放入取景框"}
             </Text>
           </View>
         </View>
@@ -216,10 +218,10 @@ export default function FoodScannerPage() {
             </View>
           </View>
           <Text className="scanner-fallback-sheet__copy">
-            可检查相机或相册权限，也可以先使用示例餐盘继续体验。
+            可检查相机、相册和网络权限；如果视觉服务尚未配置，可以先手动记录。
           </Text>
-          <AppButton size="medium" onClick={useExampleMeal}>
-            使用示例餐盘继续
+          <AppButton size="medium" onClick={retryChooseImage}>
+            重新选择图片
           </AppButton>
           <AppButton variant="outline" size="medium" onClick={openManualMeal}>
             手动记录

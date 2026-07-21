@@ -8,6 +8,8 @@ import { MacroProgress } from "../../components/macro-progress";
 import { NordicIcon } from "../../components/nordic-icon";
 import { PageLayout } from "../../layouts/page-layout";
 import { createMealFromAnalysis } from "../../features/scanner/domain";
+import { createProductMeal, getProductMeals, updateProductMeal } from "../../api/meal-data-api";
+import { toProductMealInput } from "../../features/meals/product-meal-input";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { useMealStore } from "../../stores/meal-store";
 import { usePortionDraftStore } from "../../stores/portion-draft-store";
@@ -56,14 +58,25 @@ export default function PortionAdjustmentPage() {
     try {
       let id = editingId;
       if (editingId) {
-        meals.updateMeal(editingId, { items: adjusted.items, insight: portion.meal!.insight });
-        feedback.show({ message: "份量已更新，本地汇总已同步", tone: "success" });
+        const current = meals.getMealById(editingId);
+        if (!current) throw new Error("Meal not found");
+        const saved = await updateProductMeal(editingId, {
+          items: toProductMealInput({ ...current, items: adjusted.items }).items,
+        });
+        if (!saved) throw new Error("Meal not found");
+        id = saved.id;
+        feedback.show({ message: "份量已更新并同步", tone: "success" });
       } else {
-        id = meals.addMeal(
-          createMealFromAnalysis(portion.meal!, portion.multiplier, getLocalDateString(), nowTime()),
+        const localMeal = createMealFromAnalysis(
+          portion.meal!,
+          portion.multiplier,
+          getLocalDateString(),
+          nowTime(),
         );
-        feedback.show({ message: "已保存到本地饮食记录", tone: "success" });
+        id = (await createProductMeal(toProductMealInput(localMeal))).id;
+        feedback.show({ message: "已保存并同步到饮食记录", tone: "success" });
       }
+      meals.replaceRemoteMeals(await getProductMeals(getLocalDateString()), getLocalDateString());
       portion.reset();
       Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });
     } catch {

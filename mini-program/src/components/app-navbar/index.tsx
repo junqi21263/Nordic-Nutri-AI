@@ -78,7 +78,9 @@ export function AppNavbar({
               <Text className="app-navbar__title">{title}</Text>
             </View>
           )}
-          {step ? <Text className={isOnboarding ? "onboarding-step" : "app-navbar__step"}>{step}</Text> : null}
+          {step ? (
+            <Text className={isOnboarding ? "onboarding-step" : "app-navbar__step"}>{step}</Text>
+          ) : null}
         </View>
       </View>
       {progress === undefined ? null : (

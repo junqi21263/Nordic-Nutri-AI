@@ -21,7 +21,8 @@ export function createApplicationLaunch(
 
   const start = () => {
     if (!inFlight) {
-      inFlight = auth.start()
+      inFlight = auth
+        .start()
         .then(async () => {
           if (auth.getStatus() === "authenticated") {
             await openHome();
@@ -29,7 +30,9 @@ export function createApplicationLaunch(
           }
           await openLogin();
         })
-        .finally(() => { inFlight = null; });
+        .finally(() => {
+          inFlight = null;
+        });
     }
     return inFlight;
   };
@@ -43,7 +46,10 @@ export function createRuntimeApplicationLaunch(
 ) {
   return createApplicationLaunch(
     auth,
-    () => destinations.isOnboardingCompleted() ? destinations.openHome() : destinations.openOnboarding(),
+    () =>
+      destinations.isOnboardingCompleted()
+        ? destinations.openHome()
+        : destinations.openOnboarding(),
     destinations.openLogin,
   );
 }

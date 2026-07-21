@@ -58,23 +58,23 @@ export default function NutritionPlanPage() {
     setIsSaving(true);
     try {
       await completeProductOnboarding({
-          nickname: profile.nickname,
-          goalType: profile.goalType === "maintenance" ? "maintain" : profile.goalType,
-          targetWeightKg: profile.targetWeightKg,
-          targetDate: profile.targetDate,
-          age: profile.age,
-          sex: profile.gender,
-          heightCm: profile.heightCm,
-          weightKg: profile.weightKg,
-          activityLevel: profile.activityLevel,
-          trainingDays: profile.trainingDays,
-          dietaryPattern: draft.dietaryPattern,
-          foodAvoidances: draft.foodAvoidances,
-          mealsPerDay: Number(draft.mealsPerDay),
-          calories: plan.calories,
-          proteinG: plan.proteinG,
-          carbsG: plan.carbsG,
-          fatG: plan.fatG,
+        nickname: profile.nickname,
+        goalType: profile.goalType === "maintenance" ? "maintain" : profile.goalType,
+        targetWeightKg: profile.targetWeightKg,
+        targetDate: profile.targetDate,
+        age: profile.age,
+        sex: profile.gender,
+        heightCm: profile.heightCm,
+        weightKg: profile.weightKg,
+        activityLevel: profile.activityLevel,
+        trainingDays: profile.trainingDays,
+        dietaryPattern: draft.dietaryPattern,
+        foodAvoidances: draft.foodAvoidances,
+        mealsPerDay: Number(draft.mealsPerDay),
+        calories: plan.calories,
+        proteinG: plan.proteinG,
+        carbsG: plan.carbsG,
+        fatG: plan.fatG,
       });
       markOnboardingCompleted();
       await Taro.switchTab({ url: "/pages/home/index" });
@@ -217,11 +217,7 @@ export default function NutritionPlanPage() {
         </View>
 
         <BottomActionLayout>
-          <AppButton
-            size="large"
-            loading={isSaving}
-            onClick={() => void completeOnboarding()}
-          >
+          <AppButton size="large" loading={isSaving} onClick={() => void completeOnboarding()}>
             开始我的计划
           </AppButton>
           <AppButton

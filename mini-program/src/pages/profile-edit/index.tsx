@@ -1,7 +1,13 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useState } from "react";
-import { getProductAccount, saveProductBodyProfile, saveProductGoal, saveProductProfile } from "../../api/product-data-api";
+import {
+  getProductAccount,
+  saveProductBodyProfile,
+  saveProductGoal,
+  saveProductNutritionPlan,
+  saveProductProfile,
+} from "../../api/product-data-api";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -12,9 +18,9 @@ import { navigateBackOrHome } from "../../utils/navigation";
 
 const goalOptions = ["精益增肌", "轻盈减脂", "保持状态"];
 const goalTypeByLabel: Record<string, "muscle_gain" | "fat_loss" | "maintain"> = {
-  "精益增肌": "muscle_gain",
-  "轻盈减脂": "fat_loss",
-  "保持状态": "maintain",
+  精益增肌: "muscle_gain",
+  轻盈减脂: "fat_loss",
+  保持状态: "maintain",
 };
 
 export default function ProfileEditPage() {
@@ -35,7 +41,13 @@ export default function ProfileEditPage() {
     setIsSaving(true);
     try {
       const account = await getProductAccount();
-      if (account.age === null || account.sex === null || account.heightCm === null || account.activityLevel === null || account.trainingDays === null) {
+      if (
+        account.age === null ||
+        account.sex === null ||
+        account.heightCm === null ||
+        account.activityLevel === null ||
+        account.trainingDays === null
+      ) {
         throw new Error("请先补全身体资料");
       }
       const saved = await saveProductProfile({ nickname: nextNickname });
@@ -54,6 +66,14 @@ export default function ProfileEditPage() {
         targetCaloriesKcal: account.targetCaloriesKcal,
         targetDate: null,
       });
+      if (account.nutritionPlan) {
+        await saveProductNutritionPlan({
+          calories: account.nutritionPlan.calories,
+          proteinG: account.nutritionPlan.proteinG,
+          carbsG: account.nutritionPlan.carbsG,
+          fatG: account.nutritionPlan.fatG,
+        });
+      }
       const savedNickname = saved.nickname || nextNickname;
       profile.setProfile({ nickname: savedNickname, weight: nextWeight, goalLabel });
       feedback.show({ message: "个人资料已保存", tone: "success" });

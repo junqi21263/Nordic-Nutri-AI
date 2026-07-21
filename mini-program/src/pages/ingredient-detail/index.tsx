@@ -42,9 +42,17 @@ export default function IngredientDetailPage() {
 
   if (!meal || !item) {
     return (
-      <PageLayout title="食材详情" showTabs={false} hideNavigation className="page-layout--ingredient-detail">
+      <PageLayout
+        title="食材详情"
+        showTabs={false}
+        hideNavigation
+        className="page-layout--ingredient-detail"
+      >
         <ErrorState title="食材不存在" description="这条食材记录可能已被删除，或链接已经失效。" />
-        <AppButton size="large" onClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}>
+        <AppButton
+          size="large"
+          onClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
+        >
           返回饮食记录
         </AppButton>
       </PageLayout>
@@ -59,10 +67,19 @@ export default function IngredientDetailPage() {
   const insight = `${item.name}在这餐中提供 ${item.protein}g 蛋白质、${item.carbs}g 碳水和 ${item.fat}g 脂肪，可结合全天目标灵活搭配。`;
 
   return (
-    <PageLayout title="食材详情" showTabs={false} hideNavigation className="page-layout--ingredient-detail">
+    <PageLayout
+      title="食材详情"
+      showTabs={false}
+      hideNavigation
+      className="page-layout--ingredient-detail"
+    >
       <View className="ingredient-detail-page">
         <View className="ingredient-detail-page__page-title">
-          <View className="ingredient-detail-page__back" ariaLabel="返回餐食详情" onClick={returnToMeal}>
+          <View
+            className="ingredient-detail-page__back"
+            ariaLabel="返回餐食详情"
+            onClick={returnToMeal}
+          >
             <NordicIcon name="back" size={24} ariaLabel="返回餐食详情" />
           </View>
           <Text>食材详情</Text>
@@ -70,13 +87,22 @@ export default function IngredientDetailPage() {
         <View className="ingredient-detail-page__heading">
           <Text className="ingredient-detail-page__eyebrow">本餐食材</Text>
           <Text className="ingredient-detail-page__title">{item.name}</Text>
-          <Text>来自「{meal.title}」· {meal.time}</Text>
+          <Text>
+            来自「{meal.title}」· {meal.time}
+          </Text>
         </View>
         <AppCard tone="beige" className="ingredient-detail-page__hero">
-          <Image className="ingredient-detail-page__image" mode="aspectFill" src={imagesByIngredientId[item.id] ?? mealBowlImage} />
+          <Image
+            className="ingredient-detail-page__image"
+            mode="aspectFill"
+            src={imagesByIngredientId[item.id] ?? mealBowlImage}
+          />
           <View className="ingredient-detail-page__hero-copy">
             <Text className="ingredient-detail-page__amount">食用份量 · {item.amount}</Text>
-            <Text className="ingredient-detail-page__calories">{item.calories}<Text> kcal</Text></Text>
+            <Text className="ingredient-detail-page__calories">
+              {item.calories}
+              <Text> kcal</Text>
+            </Text>
             <Text className="ingredient-detail-page__amount">已计入本餐营养</Text>
           </View>
         </AppCard>
@@ -95,7 +121,9 @@ export default function IngredientDetailPage() {
           </View>
         </AppCard>
         <AIInsightCard label="食材建议" content={insight} />
-        <AppButton size="large" onClick={returnToMeal}>返回餐食详情</AppButton>
+        <AppButton size="large" onClick={returnToMeal}>
+          返回餐食详情
+        </AppButton>
       </View>
     </PageLayout>
   );

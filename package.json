@@ -10,13 +10,9 @@
   "scripts": {
     "check": "pnpm run test:initialization",
     "test:initialization": "node --test scripts/verify-initialization.test.mjs",
-    "typecheck:mini-program": "tsc --project mini-program/tsconfig.json --noEmit",
-    "test:auth:static": "python3 -m unittest discover -s supabase/tests -p 'test_*.py' -v",
-    "test:auth:local": "bash supabase/tests/auth_rls_integration.sh",
-    "test:auth:mock-e2e": "bash supabase/tests/auth_mock_e2e.sh"
+    "typecheck:mini-program": "tsc --project mini-program/tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "supabase": "^2.81.3",
     "typescript": "~5.9.0"
   }
 }

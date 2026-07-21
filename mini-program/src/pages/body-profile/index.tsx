@@ -74,9 +74,13 @@ export default function BodyProfilePage() {
     setIsSaving(true);
     try {
       await saveProductBodyProfile({
-        age: validation.profile.age, birthDate: null, sex: validation.profile.gender,
-        heightCm: validation.profile.heightCm, weightKg: validation.profile.weightKg,
-        activityLevel: validation.profile.activityLevel, trainingDays: validation.profile.trainingDays,
+        age: validation.profile.age,
+        birthDate: null,
+        sex: validation.profile.gender,
+        heightCm: validation.profile.heightCm,
+        weightKg: validation.profile.weightKg,
+        activityLevel: validation.profile.activityLevel,
+        trainingDays: validation.profile.trainingDays,
       });
       await Taro.navigateTo({ url: "/pages/diet-preferences/index" });
     } catch {
@@ -95,18 +99,18 @@ export default function BodyProfilePage() {
     >
       <View className="body-profile-page">
         <OnboardingHeader
-        brand="Nordic Nutri AI"
-        step="第 2 步，共 4 步"
-        progress={0.5}
-        progressAriaLabel="当前为第 2 步，共 4 步"
-        backAriaLabel="返回目标选择"
-        onBack={() => navigateBackOrHome("/pages/onboarding/index")}
+          brand="Nordic Nutri AI"
+          step="第 2 步，共 4 步"
+          progress={0.5}
+          progressAriaLabel="当前为第 2 步，共 4 步"
+          backAriaLabel="返回目标选择"
+          onBack={() => navigateBackOrHome("/pages/onboarding/index")}
         />
         <View className="onboarding-heading body-profile__heading">
-        <Text className="onboarding-heading__title">告诉我们你的身体情况</Text>
-        <Text className="onboarding-heading__copy">
-          这些信息将帮助 AI 为你制定更合适的营养计划。
-        </Text>
+          <Text className="onboarding-heading__title">告诉我们你的身体情况</Text>
+          <Text className="onboarding-heading__copy">
+            这些信息将帮助 AI 为你制定更合适的营养计划。
+          </Text>
         </View>
 
         <View className="body-profile__content">
@@ -164,7 +168,9 @@ export default function BodyProfilePage() {
                     value={draft.heightCm}
                     placeholder="175"
                     adjustPosition
-                    onInput={(event) => setField("heightCm", normalizeOneDecimalInput(event.detail.value))}
+                    onInput={(event) =>
+                      setField("heightCm", normalizeOneDecimalInput(event.detail.value))
+                    }
                     onBlur={validate}
                   />
                 </View>
@@ -183,7 +189,9 @@ export default function BodyProfilePage() {
                     value={draft.weightKg}
                     placeholder="72"
                     adjustPosition
-                    onInput={(event) => setField("weightKg", normalizeOneDecimalInput(event.detail.value))}
+                    onInput={(event) =>
+                      setField("weightKg", normalizeOneDecimalInput(event.detail.value))
+                    }
                     onBlur={validate}
                   />
                 </View>
@@ -217,7 +225,6 @@ export default function BodyProfilePage() {
               </View>
               <FormError message={errors.gender} />
             </View>
-
           </AppCard>
 
           <View className="body-profile__section">
@@ -251,7 +258,12 @@ export default function BodyProfilePage() {
         </View>
 
         <BottomActionLayout>
-          <AppButton size="large" disabled={!validation.valid} loading={isSaving} onClick={() => void continueToDietPreferences()}>
+          <AppButton
+            size="large"
+            disabled={!validation.valid}
+            loading={isSaving}
+            onClick={() => void continueToDietPreferences()}
+          >
             继续
           </AppButton>
         </BottomActionLayout>

@@ -8,6 +8,7 @@ import {
 
 export interface ScannerMealFixture {
   id: string;
+  analysisId?: string;
   title: string;
   mealType: MealType;
   imageKey: "bowl" | "salmon" | "oats";

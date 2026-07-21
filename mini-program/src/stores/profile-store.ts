@@ -22,7 +22,11 @@ export interface ProfileStore {
   profile: ProfilePreview;
   settings: ProfileSettings;
   beginUser: (userId: string) => void;
-  hydrate: (userId: string, profile: Partial<ProfilePreview>, settings: Partial<ProfileSettings>) => void;
+  hydrate: (
+    userId: string,
+    profile: Partial<ProfilePreview>,
+    settings: Partial<ProfileSettings>,
+  ) => void;
   resetUserData: () => void;
   setProfile: (profile: Partial<ProfilePreview>) => void;
   setSetting: <K extends keyof ProfileSettings>(key: K, value: ProfileSettings[K]) => void;
@@ -90,24 +94,27 @@ export const createProfileStore = (storage?: ProfileStorage) => {
     dataStatus: "idle",
     profile,
     settings: initialSettings,
-    beginUser: (userId) => set({
-      userId,
-      dataStatus: "loading",
-      profile: { ...initialProfile },
-      settings: { ...initialSettings },
-    }),
-    hydrate: (userId, profileChanges, settingsChanges) => set({
-      userId,
-      dataStatus: "ready",
-      profile: { ...initialProfile, ...profileChanges },
-      settings: { ...initialSettings, ...settingsChanges },
-    }),
-    resetUserData: () => set({
-      userId: null,
-      dataStatus: "idle",
-      profile: { ...initialProfile },
-      settings: { ...initialSettings },
-    }),
+    beginUser: (userId) =>
+      set({
+        userId,
+        dataStatus: "loading",
+        profile: { ...initialProfile },
+        settings: { ...initialSettings },
+      }),
+    hydrate: (userId, profileChanges, settingsChanges) =>
+      set({
+        userId,
+        dataStatus: "ready",
+        profile: { ...initialProfile, ...profileChanges },
+        settings: { ...initialSettings, ...settingsChanges },
+      }),
+    resetUserData: () =>
+      set({
+        userId: null,
+        dataStatus: "idle",
+        profile: { ...initialProfile },
+        settings: { ...initialSettings },
+      }),
     setProfile: (changes) => {
       const nextProfile = { ...get().profile, ...changes };
       storage?.write(nextProfile);

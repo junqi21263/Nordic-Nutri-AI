@@ -16,7 +16,7 @@ const createLocalId = () => `local-meal-${Date.now()}-${++idCounter}`;
 export interface MealStore {
   meals: Meal[];
   fixtureMeals: Meal[];
-  dataSource: "fixture";
+  dataSource: "fixture" | "remote";
   initialDate: string;
   selectedDate: string;
   searchKeyword: string;
@@ -39,6 +39,7 @@ export interface MealStore {
   filterMeals: () => Meal[];
   getDailySummary: (date?: string) => DailySummary;
   resetFixtures: () => void;
+  replaceRemoteMeals: (meals: Meal[], selectedDate?: string) => void;
   setSelectedDate: (date: string) => void;
   setSearchKeyword: (keyword: string) => void;
   setMealTypeFilter: (filter: MealTypeFilter) => void;
@@ -197,6 +198,17 @@ export function createMealStore(
         requestGeneration: state.requestGeneration + 1,
       }));
     },
+    replaceRemoteMeals: (meals, selectedDate = get().selectedDate) => {
+      const nextMeals = cloneMeals(meals);
+      persistMeals(nextMeals);
+      set({
+        meals: nextMeals,
+        dataSource: "remote",
+        selectedDate,
+        loadingState: nextMeals.length ? "normal" : "empty",
+        errorState: null,
+      });
+    },
     setSelectedDate: (selectedDate) =>
       set((state) => ({
         selectedDate,
@@ -207,20 +219,22 @@ export function createMealStore(
         hasMore: false,
         requestGeneration: state.requestGeneration + 1,
       })),
-    setSearchKeyword: (searchKeyword) => set((state) => ({
-      searchKeyword,
-      visibleLimit: 12,
-      nextOffset: 0,
-      hasMore: false,
-      requestGeneration: state.requestGeneration + 1,
-    })),
-    setMealTypeFilter: (mealTypeFilter) => set((state) => ({
-      mealTypeFilter,
-      visibleLimit: 12,
-      nextOffset: 0,
-      hasMore: false,
-      requestGeneration: state.requestGeneration + 1,
-    })),
+    setSearchKeyword: (searchKeyword) =>
+      set((state) => ({
+        searchKeyword,
+        visibleLimit: 12,
+        nextOffset: 0,
+        hasMore: false,
+        requestGeneration: state.requestGeneration + 1,
+      })),
+    setMealTypeFilter: (mealTypeFilter) =>
+      set((state) => ({
+        mealTypeFilter,
+        visibleLimit: 12,
+        nextOffset: 0,
+        hasMore: false,
+        requestGeneration: state.requestGeneration + 1,
+      })),
     loadMore: () => set((state) => ({ visibleLimit: state.visibleLimit + 12 })),
     setLoadingState: (loadingState) => set({ loadingState }),
     setErrorState: (errorState) =>

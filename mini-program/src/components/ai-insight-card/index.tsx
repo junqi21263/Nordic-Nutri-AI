@@ -19,7 +19,9 @@ export function AIInsightCard({
   return (
     <View className="ai-insight">
       <View className="ai-insight__top">
-        <View className="ai-insight__orb"><NordicIcon name="sparkles" size={18} ariaLabel="NOVA AI" /></View>
+        <View className="ai-insight__orb">
+          <NordicIcon name="sparkles" size={18} ariaLabel="NOVA AI" />
+        </View>
         <Text className="ai-insight__label">{label}</Text>
       </View>
       <Text className="ai-insight__content">{loading ? "正在整理今日建议…" : content}</Text>

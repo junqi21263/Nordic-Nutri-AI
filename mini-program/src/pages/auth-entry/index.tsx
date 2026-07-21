@@ -29,13 +29,22 @@ export default function AuthEntryPage() {
   };
 
   return (
-    <PageLayout title="Nordic Nutri AI" showTabs={false} hideNavigation className="page-layout--auth-entry">
+    <PageLayout
+      title="Nordic Nutri AI"
+      showTabs={false}
+      hideNavigation
+      className="page-layout--auth-entry"
+    >
       <BottomSheet open className="auth-entry-sheet">
         <AppCard className="auth-entry-page__card">
           <Text className="auth-entry-page__eyebrow">NORDIC NUTRI AI</Text>
           <Text className="auth-entry-page__card-title">继续你的营养节奏</Text>
-          <Text className="auth-entry-page__card-copy">登录后即可安全保存餐次、身体数据和目标设置。</Text>
-          <AppButton size="large" loading={isLoggingIn} onClick={login}>登录并开始使用</AppButton>
+          <Text className="auth-entry-page__card-copy">
+            登录后即可安全保存餐次、身体数据和目标设置。
+          </Text>
+          <AppButton size="large" loading={isLoggingIn} onClick={login}>
+            登录并开始使用
+          </AppButton>
         </AppCard>
       </BottomSheet>
     </PageLayout>

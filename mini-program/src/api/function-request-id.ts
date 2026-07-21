@@ -43,22 +43,27 @@ const safeErrorKinds = new Set([
   "WechatFetchError",
   "WechatRequestStartError",
   "WechatFetchUnavailableError",
-  "SupabaseClientInitializationError",
+  "BackendClientInitializationError",
   "FunctionInvokeRuntimeError",
   "AbortError",
 ]);
 
-const safeInitializationStages = new Set(["config-validation", "url-validation", "fetch-adapter", "client-create"]);
+const safeInitializationStages = new Set([
+  "config-validation",
+  "url-validation",
+  "fetch-adapter",
+  "client-create",
+]);
 const safeInitializationCauseNames = new Set([
   "ConfigurationError",
-  "InvalidSupabaseUrlError",
+  "InvalidBackendUrlError",
   "ReferenceError",
   "TypeError",
   "WechatFetchUnavailableError",
 ]);
 const safeInitializationMessages = new Set([
-  "Supabase public configuration is missing",
-  "Supabase URL is invalid",
+  "Backend public configuration is missing",
+  "Backend URL is invalid",
   "URL is not defined",
   "URL is not a constructor",
   "Headers is not defined",
@@ -69,7 +74,14 @@ const safeInitializationMessages = new Set([
   "微信网络能力不可用",
   "初始化依赖抛出了本地异常",
 ]);
-const safeMissingCapabilities = new Set(["URL", "Headers", "Request", "Response", "AbortController", "wx.request"]);
+const safeMissingCapabilities = new Set([
+  "URL",
+  "Headers",
+  "Request",
+  "Response",
+  "AbortController",
+  "wx.request",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -99,8 +111,13 @@ function readSafeString(value: unknown, key: string, allowed: Set<string>): stri
 }
 
 function readInitializationDiagnostics(error: unknown) {
-  if (readSafeErrorName(error) !== "SupabaseClientInitializationError") {
-    return { initializationStage: null, causeName: null, causeMessage: null, missingCapability: null };
+  if (readSafeErrorName(error) !== "BackendClientInitializationError") {
+    return {
+      initializationStage: null,
+      causeName: null,
+      causeMessage: null,
+      missingCapability: null,
+    };
   }
   return {
     initializationStage: readSafeString(error, "initializationStage", safeInitializationStages),
@@ -127,7 +144,9 @@ function readSafeLocalDiagnostics(error: unknown) {
     rawErrorMessage: typeof error.rawErrorMessage === "string" ? error.rawErrorMessage : null,
     rawCauseName: typeof error.rawCauseName === "string" ? error.rawCauseName : null,
     rawCauseMessage: typeof error.rawCauseMessage === "string" ? error.rawCauseMessage : null,
-    stackFrames: Array.isArray(error.stackFrames) ? error.stackFrames.filter((frame): frame is string => typeof frame === "string").slice(0, 3) : [],
+    stackFrames: Array.isArray(error.stackFrames)
+      ? error.stackFrames.filter((frame): frame is string => typeof frame === "string").slice(0, 3)
+      : [],
     errorFile: typeof error.errorFile === "string" ? error.errorFile : null,
     errorFunction: typeof error.errorFunction === "string" ? error.errorFunction : null,
   };
@@ -136,9 +155,13 @@ function readSafeLocalDiagnostics(error: unknown) {
 function safeMessageForErrorKind(errorKind: string | null): string | null {
   if (errorKind === "AbortError") return "请求已取消";
   if (errorKind === "WechatRequestStartError") return "微信网络请求未能启动";
-  if (errorKind === "SupabaseClientInitializationError") return "Supabase 客户端初始化失败";
+  if (errorKind === "BackendClientInitializationError") return "后端客户端初始化失败";
   if (errorKind === "FunctionInvokeRuntimeError") return "函数调用未到达 HTTP 响应层";
-  if (errorKind === "FunctionsFetchError" || errorKind === "WechatFetchError" || errorKind === "WechatFetchUnavailableError") {
+  if (
+    errorKind === "FunctionsFetchError" ||
+    errorKind === "WechatFetchError" ||
+    errorKind === "WechatFetchUnavailableError"
+  ) {
     return "网络请求未获得 HTTP 响应";
   }
   if (errorKind === "LocalError") return "本地请求失败";
@@ -150,9 +173,9 @@ export function truncateUserId(userId: string | null | undefined): string | null
   return userId.length > 12 ? `${userId.slice(0, 8)}…${userId.slice(-4)}` : userId;
 }
 
-export function truncateProjectRef(supabaseUrl: string): string | null {
+export function truncateProjectRef(serviceUrl: string): string | null {
   try {
-    const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+    const projectRef = new URL(serviceUrl).hostname.split(".")[0];
     return projectRef.length > 8 ? `${projectRef.slice(0, 4)}…${projectRef.slice(-4)}` : projectRef;
   } catch {
     return null;
@@ -165,7 +188,9 @@ export async function extractFunctionDiagnostics(error: unknown): Promise<Functi
   const fallback: FunctionDiagnostics = {
     httpStatus: fallbackStatus,
     errorCode: fallbackCode,
-    message: fallbackCode ? safeMessages[fallbackCode] : safeMessageForErrorKind(readSafeErrorName(error)),
+    message: fallbackCode
+      ? safeMessages[fallbackCode]
+      : safeMessageForErrorKind(readSafeErrorName(error)),
     requestId: null,
     errorName: readSafeErrorName(error),
     errorKind: readSafeErrorName(error),
@@ -176,7 +201,8 @@ export async function extractFunctionDiagnostics(error: unknown): Promise<Functi
 
   try {
     const body = await error.context.clone().json();
-    const errorCode = isRecord(body) && isRecord(body.error) ? readErrorCode(body.error) : fallback.errorCode;
+    const errorCode =
+      isRecord(body) && isRecord(body.error) ? readErrorCode(body.error) : fallback.errorCode;
     return {
       httpStatus: readStatus(error.context.status) ?? fallback.httpStatus,
       errorCode,

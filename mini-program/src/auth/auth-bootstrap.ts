@@ -16,7 +16,9 @@ export interface AuthBootstrapDependencies<Session = unknown, User = unknown> {
 function isUnauthorized(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { status?: number; statusCode?: number; code?: string };
-  return candidate.status === 401 || candidate.statusCode === 401 || candidate.code === "UNAUTHORIZED";
+  return (
+    candidate.status === 401 || candidate.statusCode === 401 || candidate.code === "UNAUTHORIZED"
+  );
 }
 
 export function createAuthBootstrap<Session = unknown, User = unknown>(
@@ -75,7 +77,10 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
   };
 
   const start = ({ allowSilentLogin = true }: { allowSilentLogin?: boolean } = {}) => {
-    if (!inFlight) inFlight = run(allowSilentLogin).finally(() => { inFlight = null; });
+    if (!inFlight)
+      inFlight = run(allowSilentLogin).finally(() => {
+        inFlight = null;
+      });
     return inFlight;
   };
 

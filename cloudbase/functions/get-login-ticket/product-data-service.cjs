@@ -49,6 +49,64 @@ function assertOnboarding(input) {
   assertNumber(input.fatG, 0, 500, "脂肪目标");
 }
 
+function normalizeSettings(input) {
+  const dietaryPatterns = ["none", "vegetarian", "vegan", "pescatarian", "low_carb", "keto", "mediterranean", "halal"];
+  if (!dietaryPatterns.includes(input?.dietaryPattern)) throw fail("饮食偏好无效");
+  if (!Array.isArray(input.foodAvoidances) || input.foodAvoidances.length > 20 || input.foodAvoidances.some((value) => typeof value !== "string" || !value.trim() || value.length > 80)) throw fail("饮食限制无效");
+  assertNumber(input.mealsPerDay, 2, 5, "每日餐数");
+  if (!["light", "dark", "system"].includes(input.theme)) throw fail("主题无效");
+  if (!["zh-CN", "en"].includes(input.language)) throw fail("语言无效");
+  if (!["metric", "imperial"].includes(input.unit)) throw fail("单位无效");
+  if (typeof input.notification !== "boolean") throw fail("通知设置无效");
+  return {
+    dietary_pattern: input.dietaryPattern,
+    food_avoidances: input.foodAvoidances.map((value) => value.trim()),
+    meals_per_day: input.mealsPerDay,
+    theme: input.theme,
+    locale: input.language,
+    notification_enabled: input.notification,
+    unit_system: input.unit,
+  };
+}
+
+function normalizePlan(input) {
+  assertNumber(input?.calories, 800, 10000, "热量目标");
+  assertNumber(input?.proteinG, 1, 1000, "蛋白质目标");
+  assertNumber(input?.carbsG, 0, 1500, "碳水目标");
+  assertNumber(input?.fatG, 1, 500, "脂肪目标");
+  return {
+    daily_calories_kcal: input.calories,
+    protein_g: input.proteinG,
+    carbs_g: input.carbsG,
+    fat_g: input.fatG,
+  };
+}
+
+function mapSettings(row) {
+  if (!row) return null;
+  return {
+    dietaryPattern: row.dietary_pattern,
+    foodAvoidances: Array.isArray(row.food_avoidances) ? row.food_avoidances : [],
+    mealsPerDay: Number(row.meals_per_day),
+    theme: row.theme,
+    language: row.locale,
+    notification: Boolean(row.notification_enabled),
+    unit: row.unit_system,
+  };
+}
+
+function mapPlan(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    calories: Number(row.daily_calories_kcal),
+    proteinG: Number(row.protein_g),
+    carbsG: Number(row.carbs_g),
+    fatG: Number(row.fat_g),
+    status: row.status,
+  };
+}
+
 function createProductDataService({ db, record = () => {} }) {
   return {
     async saveProfile(userId, input) {
@@ -129,6 +187,12 @@ function createProductDataService({ db, record = () => {} }) {
       if (settings.error || !settings.data) throw new Error("Settings save failed");
 
       const planTable = db.from("nutrition_plans");
+      record({ table: "nutrition_plans", operation: "retire-active", userId });
+      const retiredPlan = await planTable.update({
+        status: "superseded",
+        effective_to: new Date().toISOString(),
+      }).eq("user_id", userId).eq("status", "active");
+      if (retiredPlan?.error) throw new Error("Nutrition plan retirement failed");
       record({ table: "nutrition_plans", operation: "insert", userId });
       const plan = await planTable.insert({
         user_id: userId, goal_id: goal.id, body_profile_id: bodyProfile.id,
@@ -149,13 +213,61 @@ function createProductDataService({ db, record = () => {} }) {
       return { userId, nickname: profile.data.nickname, goalId: goal.id, bodyProfileId: bodyProfile.id, nutritionPlanId: plan.data.id };
     },
 
+    async saveSettings(userId, input) {
+      const payload = normalizeSettings(input);
+      const table = db.from("user_settings");
+      const existing = await table.select("id").eq("id", userId).maybeSingle();
+      if (existing.error) throw new Error("Settings lookup failed");
+      record({ table: "user_settings", operation: existing.data?.id ? "update" : "insert", userId });
+      const saved = existing.data?.id
+        ? await table.update(payload).eq("id", userId).select().single()
+        : await table.insert({ id: userId, ...payload }).select().single();
+      if (saved.error || !saved.data) throw new Error("Settings save failed");
+      return mapSettings(saved.data);
+    },
+
+    async getNutritionPlan(userId) {
+      const result = await db.from("nutrition_plans").select("*").eq("user_id", userId).eq("status", "active").maybeSingle();
+      if (result.error) throw new Error("Nutrition plan read failed");
+      return mapPlan(result.data);
+    },
+
+    async saveNutritionPlan(userId, input) {
+      const values = normalizePlan(input);
+      const table = db.from("nutrition_plans");
+      const [current, goal, bodyProfile] = await Promise.all([
+        table.select("*").eq("user_id", userId).eq("status", "active").maybeSingle(),
+        db.from("user_goals").select("id").eq("user_id", userId).eq("is_current", true).maybeSingle(),
+        db.from("body_profiles").select("id").eq("user_id", userId).eq("is_current", true).maybeSingle(),
+      ]);
+      if (current.error || goal.error || bodyProfile.error || !current.data?.id || !goal.data?.id || !bodyProfile.data?.id) throw fail("当前计划不存在");
+      const now = new Date().toISOString();
+      const retired = await table.update({ status: "superseded", effective_to: now }).eq("id", current.data.id).eq("user_id", userId);
+      if (retired?.error) throw new Error("Nutrition plan retirement failed");
+      const saved = await table.insert({
+        user_id: userId,
+        goal_id: goal.data.id,
+        body_profile_id: bodyProfile.data.id,
+        ...values,
+        calculation_source: "manual",
+        status: "active",
+        version: Number(current.data.version ?? 1) + 1,
+        effective_from: now,
+        activated_at: now,
+      }).select().single();
+      if (saved.error || !saved.data) throw new Error("Nutrition plan save failed");
+      return mapPlan(saved.data);
+    },
+
     async getAccount(userId) {
-      const [profile, bodyProfile, goal] = await Promise.all([
+      const [profile, bodyProfile, goal, settings, plan] = await Promise.all([
         db.from("profiles").select("nickname").eq("id", userId).maybeSingle(),
         db.from("body_profiles").select("age,sex,height_cm,weight_kg,activity_level,training_days_per_week").eq("user_id", userId).eq("is_current", true).maybeSingle(),
         db.from("user_goals").select("goal_type,target_weight_kg,target_calories_kcal").eq("user_id", userId).eq("is_current", true).maybeSingle(),
+        db.from("user_settings").select("dietary_pattern,food_avoidances,meals_per_day,theme,locale,notification_enabled,unit_system").eq("id", userId).maybeSingle(),
+        db.from("nutrition_plans").select("id,daily_calories_kcal,protein_g,carbs_g,fat_g,status").eq("user_id", userId).eq("status", "active").maybeSingle(),
       ]);
-      if (profile.error || bodyProfile.error || goal.error) throw new Error("Account read failed");
+      if (profile.error || bodyProfile.error || goal.error || settings.error || plan.error) throw new Error("Account read failed");
       return {
         nickname: profile.data?.nickname ?? null,
         age: bodyProfile.data?.age ?? null,
@@ -167,6 +279,8 @@ function createProductDataService({ db, record = () => {} }) {
         goalType: goal.data?.goal_type ?? null,
         targetWeightKg: goal.data?.target_weight_kg ?? null,
         targetCaloriesKcal: goal.data?.target_calories_kcal ?? null,
+        settings: mapSettings(settings.data),
+        nutritionPlan: mapPlan(plan.data),
       };
     },
   };

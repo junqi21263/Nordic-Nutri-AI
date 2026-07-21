@@ -12,7 +12,9 @@ export async function restoreSession(): Promise<AppAuthSession | null> {
 
 export async function refreshSession(): Promise<AppAuthSession | null> {
   if (!refreshInFlight) {
-    refreshInFlight = restoreSession().finally(() => { refreshInFlight = null; });
+    refreshInFlight = restoreSession().finally(() => {
+      refreshInFlight = null;
+    });
   }
   return refreshInFlight;
 }
@@ -21,7 +23,9 @@ export async function clearInvalidSession() {
   useAuthStore.getState().clear();
 }
 
-export async function signOut() { await clearInvalidSession(); }
+export async function signOut() {
+  await clearInvalidSession();
+}
 
 export function setNativeSession(user: AppAuthUser, accessToken?: string): AppAuthSession {
   const session: AppAuthSession = { user, accessToken };

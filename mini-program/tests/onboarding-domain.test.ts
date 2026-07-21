@@ -26,7 +26,9 @@ const validDraft = {
 describe("first-use onboarding domain", () => {
   it("requires a nickname while keeping the target weight optional", () => {
     expect(createInitialOnboardingDraft()).toMatchObject({ nickname: "", targetWeightKg: "" });
-    expect(validateBodyProfile({ ...validDraft, nickname: "   " }, "2026-07-13").errors.nickname).toBe("请输入昵称");
+    expect(
+      validateBodyProfile({ ...validDraft, nickname: "   " }, "2026-07-13").errors.nickname,
+    ).toBe("请输入昵称");
     expect(validateBodyProfile(validDraft, "2026-07-13").valid).toBe(true);
   });
 

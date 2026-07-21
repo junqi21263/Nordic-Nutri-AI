@@ -7,7 +7,8 @@ import { createCoachStore } from "../src/stores/coach-store";
 import { createMealFixtures } from "../src/features/meals/domain";
 import { createProfileStore } from "../src/stores/profile-store";
 
-const coachPageSource = () => readFileSync(resolve(import.meta.dirname, "../src/pages/coach/index.tsx"), "utf8");
+const coachPageSource = () =>
+  readFileSync(resolve(import.meta.dirname, "../src/pages/coach/index.tsx"), "utf8");
 
 describe("local coach and profile", () => {
   it("generates coach advice from local meals", () => {
@@ -58,7 +59,10 @@ describe("local coach and profile", () => {
   });
 
   it("uses a coach-aligned personal-center header and synchronizes tab selection from profile metrics", () => {
-    const source = readFileSync(resolve(import.meta.dirname, "../src/pages/profile/index.tsx"), "utf8");
+    const source = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/profile/index.tsx"),
+      "utf8",
+    );
 
     expect(source).toContain('title="个人中心"');
     expect(source).toContain('className="page-layout--profile"');
@@ -78,7 +82,10 @@ describe("local coach and profile", () => {
 
   it("routes the profile hub to complete local profile pages without legacy settings", () => {
     const appConfig = readFileSync(resolve(import.meta.dirname, "../src/app.config.ts"), "utf8");
-    const source = readFileSync(resolve(import.meta.dirname, "../src/pages/profile/index.tsx"), "utf8");
+    const source = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/profile/index.tsx"),
+      "utf8",
+    );
 
     ["profile-edit", "goal-adjust", "achievements", "weekly-review"].forEach((page) => {
       expect(appConfig).toContain(`pages/${page}/index`);
@@ -96,15 +103,18 @@ describe("local coach and profile", () => {
     expect(source).not.toContain("导出本地数据");
   });
 
-  it("keeps privacy, feedback and about as complete local modals", () => {
-    const source = readFileSync(resolve(import.meta.dirname, "../src/pages/profile/index.tsx"), "utf8");
+  it("keeps privacy, feedback and about as complete cloud-aware modals", () => {
+    const source = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/profile/index.tsx"),
+      "utf8",
+    );
 
     expect(source).toContain('activeModal === "privacy"');
-    expect(source).toContain("数据仅保留在当前设备");
+    expect(source).toContain("同步到 CloudBase 数据库");
     expect(source).toContain('activeModal === "feedback"');
     expect(source).toContain("提交反馈");
     expect(source).toContain('activeModal === "about"');
-    expect(source).toContain("Nordic Nutri AI 是一款本地体验中的营养记录工具");
+    expect(source).toContain("Nordic Nutri AI 是一款支持云端同步的营养记录工具");
   });
 
   it("provides local profile and goal forms backed by the profile store", () => {
@@ -152,6 +162,6 @@ describe("local coach and profile", () => {
     expect(weeklyReview).toContain('className="weekly-review__rhythm"');
     expect(weeklyReview).toContain("本周节奏");
     expect(weeklyReview).toContain("下周小目标");
-    expect(weeklyReview).toContain("基于当前设备中的记录");
+    expect(weeklyReview).toContain("基于已同步到云端的饮食记录");
   });
 });

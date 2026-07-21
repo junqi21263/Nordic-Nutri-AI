@@ -5,6 +5,7 @@ import { AppButton } from "../../components/app-button";
 import { BottomSheet, bottomSheetExitDuration } from "../../components/bottom-sheet";
 import { NordicIcon } from "../../components/nordic-icon";
 import { EmptyState } from "../../components/empty-state";
+import { ErrorState } from "../../components/error-state";
 import { SearchBar } from "../../components/search-bar";
 import {
   clampProgress,
@@ -15,6 +16,8 @@ import {
 } from "../../features/meals/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
+import { getProductMeals } from "../../api/meal-data-api";
+import { getProductDailySummary, type ProductDailySummary } from "../../api/insight-api";
 import { type MealTypeFilter, useMealStore } from "../../stores/meal-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 import bowlImage from "../../assets/meal-bowl.svg";
@@ -90,8 +93,16 @@ export default function MealRecordsPage() {
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [remoteSummary, setRemoteSummary] = useState<ProductDailySummary | null>(null);
   const today = getLocalDateString();
-  const summary = store.getDailySummary();
+  const localSummary = store.getDailySummary();
+  const summary = remoteSummary
+    ? {
+        ...remoteSummary.targets,
+        consumed: remoteSummary.consumed,
+        completion: remoteSummary.completion,
+      }
+    : localSummary;
   const meals = store.filterMeals();
   const weekDays = useMemo(() => getWeekDays(store.selectedDate), [store.selectedDate]);
   const selectedDateParts = getDateParts(store.selectedDate);
@@ -126,6 +137,22 @@ export default function MealRecordsPage() {
   }, [filterOpen, setTabBarVisible]);
 
   useEffect(() => () => setTabBarVisible(true), [setTabBarVisible]);
+
+  useEffect(() => {
+    void Promise.all([
+      getProductMeals(store.selectedDate),
+      getProductDailySummary(store.selectedDate),
+    ])
+      .then(([remoteMeals, dailySummary]) => {
+        store.replaceRemoteMeals(remoteMeals, store.selectedDate);
+        setRemoteSummary(dailySummary);
+      })
+      .catch(() => {
+        setRemoteSummary(null);
+        store.replaceRemoteMeals([], store.selectedDate);
+        store.setErrorState("饮食记录同步失败，请稍后重试");
+      });
+  }, [store.replaceRemoteMeals, store.selectedDate]);
 
   return (
     <PageLayout
@@ -224,7 +251,13 @@ export default function MealRecordsPage() {
         </View>
 
         <Text className="meal-records-page__section-title">今日餐次</Text>
-        {meals.length === 0 ? (
+        {store.loadingState === "error" ? (
+          <ErrorState
+            title="无法读取云端餐次"
+            description={store.errorState ?? "请稍后再试。"}
+            onRetry={() => store.setSelectedDate(store.selectedDate)}
+          />
+        ) : meals.length === 0 ? (
           <EmptyState
             title={
               hasFilters

@@ -1,40 +1,49 @@
 # Nordic Nutri AI
 
-Nordic Nutri AI is a Taro + React WeChat Mini Program with Supabase as its backend platform.
+Nordic Nutri AI is a Taro + React WeChat Mini Program backed by a CloudBase HTTPS function and CloudBase PostgreSQL.
 
 ## Repository layout
 
-- `mini-program/`: Taro + React + TypeScript client, defaulting to WeChat Mini Program builds and retaining H5 build support.
-- `supabase/`: migrations, Edge Functions, seeds, and Supabase tests.
-- `docs/`: PRD, technical design, and execution plans.
-- `scripts/`: repeatable local validation commands.
+- `mini-program/`: Taro + React + TypeScript Mini Program.
+- `cloudbase/functions/get-login-ticket/`: WeChat login, product session, product APIs, AI and image-analysis adapters.
+- `cloudbase/pg/migrations/`: CloudBase PostgreSQL schema migrations.
+- `docs/`: product specs, technical designs, plans and runbooks.
+- `supabase/`: legacy migration archive only; it is not installed, built or called by the application.
 
-## Current scope
+## Runtime flow
 
-The repository currently contains the engineering foundation and fixture-only page shells. It does not include real product workflows, WeChat login implementation, database reads/writes, AI provider logic, or a deployed frontend.
+1. The Mini Program calls `wx.login()`.
+2. The HTTPS function exchanges the one-time code with WeChat and derives the business user on the server.
+3. The function returns a signed Nordic Nutri product session.
+4. All account, plan, meal, insight, coach, feedback and vision traffic goes through the same authenticated HTTPS boundary.
+5. Only the function uses the CloudBase PostgreSQL API key. The Mini Program never receives a database credential or AI provider key.
 
 ## Prerequisites
 
-- Node.js 24.18.0 (see `.nvmrc`)
+- Node.js 24.18.x (see `.nvmrc`)
 - pnpm 10.x
-- Docker Desktop for future local Supabase work
+- WeChat Developer Tools
 
-## Verify the repository foundation
+## Validate and build
 
 ```bash
 pnpm install
 pnpm run check
-pnpm --filter @nordic-nutri-ai/mini-program run typecheck
-pnpm --filter @nordic-nutri-ai/mini-program run lint
-pnpm --filter @nordic-nutri-ai/mini-program run build:weapp
+pnpm --dir mini-program typecheck
+pnpm --dir mini-program lint
+pnpm --dir mini-program test:unit
+node --test cloudbase/functions/get-login-ticket/*.test.mjs
+pnpm --dir mini-program build:weapp
+pnpm --dir mini-program verify:weapp
 ```
 
 ## WeChat Developer Tools
 
-1. Build the WeChat target with `pnpm --filter @nordic-nutri-ai/mini-program run build:weapp`.
-2. In WeChat Developer Tools, import the `mini-program/` directory.
-3. The committed `project.config.json` points the tool to `mini-program/dist/weapp/`.
-4. Create `mini-program/project.private.config.json` from its example only for local IDE preferences; never commit it.
+1. Build with `pnpm --dir mini-program build:weapp`.
+2. Import the `mini-program/` directory.
+3. The committed `mini-program/project.config.json` points to `dist/weapp/`.
+4. Configure only local IDE preferences in `mini-program/project.private.config.json`; never commit that file.
 
-Do not commit `.env` files, Supabase secret/service keys, WeChat AppSecret,
-database passwords, or AI provider keys.
+## Secrets
+
+Use CloudBase function environment variables for `WX_SECRET`, `CLOUDBASE_APIKEY`, session and hashing secrets, and AI provider keys. Never commit `.env` files, database credentials, access tokens, OpenID values or real user images.

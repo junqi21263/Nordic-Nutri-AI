@@ -14,11 +14,14 @@ import oatsImage from "../../assets/meal-oats.svg";
 import salmonImage from "../../assets/meal-salmon.svg";
 import { PageLayout } from "../../layouts/page-layout";
 import { getAdjustedAnalysis } from "../../features/scanner/domain";
+import { analyzeProductMeal, createProductMeal, getProductMeals } from "../../api/meal-data-api";
+import { toProductMealInput } from "../../features/meals/product-meal-input";
 import { useAnalysisStore } from "../../stores/analysis-store";
 import { useMealStore } from "../../stores/meal-store";
 import { usePortionDraftStore } from "../../stores/portion-draft-store";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { useFeedbackStore } from "../../stores/feedback-store";
+import { useScannerStore } from "../../stores/scanner-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 const nowTime = () => {
@@ -33,6 +36,7 @@ export default function AnalysisResultPage() {
   const portion = usePortionDraftStore();
   const meals = useMealStore();
   const feedback = useFeedbackStore();
+  const scanner = useScannerStore();
   const meal = analysisStore.analysis;
   if (!meal)
     return (
@@ -51,8 +55,8 @@ export default function AnalysisResultPage() {
       </PageLayout>
     );
   const adjusted = getAdjustedAnalysis(meal, 1);
-  const save = () => {
-    const id = meals.addMeal({
+  const save = async () => {
+    const localMeal = {
       date: getLocalDateString(),
       time: nowTime(),
       title: meal.title,
@@ -61,9 +65,25 @@ export default function AnalysisResultPage() {
       imageKey: meal.imageKey,
       items: adjusted.items,
       insight: meal.insight,
-    });
-    feedback.show({ message: "已保存到本地饮食记录", tone: "success" });
-    Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });
+    };
+    try {
+      const textAnalysis = meal.analysisId
+        ? null
+        : await analyzeProductMeal(
+            adjusted.items.map((item) => ({ name: item.name, quantityG: 100 })),
+          );
+      const request = toProductMealInput(localMeal, meal.analysisId ?? textAnalysis?.id);
+      const saved = await createProductMeal(
+        textAnalysis
+          ? { ...request, name: textAnalysis.mealName, items: textAnalysis.items }
+          : request,
+      );
+      meals.replaceRemoteMeals(await getProductMeals(localMeal.date), localMeal.date);
+      feedback.show({ message: "AI 分析已保存到饮食记录", tone: "success" });
+      Taro.redirectTo({ url: `/pages/meal-detail/index?id=${saved.id}` });
+    } catch {
+      feedback.show({ message: "分析或保存失败，请检查网络后重试", tone: "error" });
+    }
   };
   return (
     <PageLayout
@@ -86,7 +106,9 @@ export default function AnalysisResultPage() {
         <View className="analysis-result-page__header">
           <View className="analysis-result-page__heading">
             <Text className="analysis-result-page__title">这餐吃得不错</Text>
-            <Text className="analysis-result-page__subtitle">本地分析已完成，保存前可微调份量。</Text>
+            <Text className="analysis-result-page__subtitle">
+              本地分析已完成，保存前可微调份量。
+            </Text>
           </View>
           <View className="analysis-result-page__ai-status">
             <NordicIcon name="sparkles" size={22} ariaLabel="AI 分析完成" />
@@ -97,7 +119,7 @@ export default function AnalysisResultPage() {
         <AppCard tone="beige" className="analysis-result-page__summary">
           <Image
             className="analysis-result-page__summary-image"
-            src={imageByKey[meal.imageKey]}
+            src={scanner.previewPath ?? imageByKey[meal.imageKey]}
             mode="aspectFill"
           />
           <View className="analysis-result-page__summary-body">
@@ -105,7 +127,9 @@ export default function AnalysisResultPage() {
               <Badge tone="success">识别可信度 {meal.confidence}%</Badge>
             </View>
             <Text className="analysis-result-page__summary-title">{meal.title}</Text>
-            <Text className="analysis-result-page__summary-meta">{meal.mealType} · 本地候选</Text>
+            <Text className="analysis-result-page__summary-meta">
+              {meal.mealType} · 云端视觉识别
+            </Text>
           </View>
         </AppCard>
 
@@ -161,7 +185,7 @@ export default function AnalysisResultPage() {
           >
             调整份量
           </AppButton>
-          <AppButton size="large" onClick={save}>
+          <AppButton size="large" onClick={() => void save()}>
             保存本餐
           </AppButton>
         </View>

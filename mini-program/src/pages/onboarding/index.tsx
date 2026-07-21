@@ -65,7 +65,9 @@ export default function OnboardingPage() {
                   <Text className="onboarding-goal-card__copy">{goalCopy.description}</Text>
                 </View>
                 <View className="onboarding-goal-card__indicator">
-                  {selected ? <NordicIcon name="check-inverse" size={15} ariaLabel="已选择" /> : null}
+                  {selected ? (
+                    <NordicIcon name="check-inverse" size={15} ariaLabel="已选择" />
+                  ) : null}
                 </View>
               </View>
             );

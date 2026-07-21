@@ -9,7 +9,7 @@ describe("profile information bottom sheets", () => {
     const source = readSource("../src/components/bottom-sheet/index.tsx");
 
     expect(source).toContain("onDismiss?: () => void");
-    expect(source).toContain('onClick={onDismiss}');
+    expect(source).toContain("onClick={onDismiss}");
     expect(source).toContain("event.stopPropagation()");
   });
 
@@ -18,7 +18,7 @@ describe("profile information bottom sheets", () => {
     const styles = readSource("../src/styles/page.scss");
 
     expect(source).toContain('from "../../components/bottom-sheet"');
-    expect(source).toContain('onDismiss={() => setActiveModal(null)}');
+    expect(source).toContain("onDismiss={() => setActiveModal(null)}");
     expect(source).toContain('className="profile-sheet__close"');
     expect(source).toContain('name="x"');
     expect(styles).toContain(".profile-sheet {");
@@ -58,7 +58,7 @@ describe("profile information bottom sheets", () => {
 
     expect(profile).toContain("Textarea");
     expect(profile).toContain("autoHeight");
-    expect(profile).not.toContain("<Input\n            className=\"profile-modal__input\"");
+    expect(profile).not.toContain('<Input\n            className="profile-modal__input"');
     expect(styles).toContain("min-height: 416px");
     expect(styles).toContain("font-size: $font-body");
     expect(styles).toContain("white-space: pre-wrap");

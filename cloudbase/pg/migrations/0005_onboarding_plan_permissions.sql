@@ -1,6 +1,6 @@
 -- Nutrition-plan persistence for the final onboarding step.
 
-create table public.nutrition_plans (
+create table if not exists public.nutrition_plans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.app_users(id) on delete cascade,
   goal_id uuid not null references public.user_goals(id) on delete cascade,
@@ -32,19 +32,32 @@ alter table public.body_profiles
 alter table public.nutrition_plans
   alter column user_id set default private.current_app_user_id();
 
-create unique index nutrition_plans_one_active_per_user_idx
+create unique index if not exists nutrition_plans_one_active_per_user_idx
 on public.nutrition_plans (user_id) where status = 'active';
 
-create index nutrition_plans_user_status_effective_from_idx
+create index if not exists nutrition_plans_user_status_effective_from_idx
 on public.nutrition_plans (user_id, status, effective_from desc);
 
 grant select, insert on public.nutrition_plans to authenticated;
 alter table public.nutrition_plans enable row level security;
 
-create policy "plans: read own rows"
-on public.nutrition_plans for select to authenticated
-using (user_id = private.current_app_user_id());
-
-create policy "plans: insert own rows"
-on public.nutrition_plans for insert to authenticated
-with check (user_id = private.current_app_user_id());
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'nutrition_plans' and policyname = 'plans: read own rows'
+  ) then
+    create policy "plans: read own rows"
+      on public.nutrition_plans for select to authenticated
+      using (user_id = private.current_app_user_id());
+  end if;
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'nutrition_plans' and policyname = 'plans: insert own rows'
+  ) then
+    create policy "plans: insert own rows"
+      on public.nutrition_plans for insert to authenticated
+      with check (user_id = private.current_app_user_id());
+  end if;
+end
+$$;
