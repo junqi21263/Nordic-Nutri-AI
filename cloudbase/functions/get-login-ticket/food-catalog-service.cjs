@@ -5,6 +5,47 @@ const PAGE_SIZE = 20;
 const MAX_PAGE = 50;
 const HAN_PATTERN = /[\u3400-\u9fff]/;
 
+// A small, server-owned fallback keeps the core nutrition-recording journey
+// available while the public USDA endpoint is rate-limited or unreachable.
+// It is not a replacement for USDA; successful USDA results are still cached
+// and preferred for search and discovery.
+const CURATED_FALLBACK_FOODS = [
+  ["salmon", "Salmon, Atlantic, cooked", 206, 22.1, 0, 12.4],
+  ["chicken-breast", "Chicken breast, cooked", 165, 31, 0, 3.6],
+  ["beef", "Beef, lean, cooked", 217, 26.1, 0, 11.8],
+  ["shrimp", "Shrimp, cooked", 99, 24, 0.2, 0.3],
+  ["egg", "Egg, whole, cooked", 155, 12.6, 1.1, 10.6],
+  ["tofu", "Tofu, firm", 144, 17.3, 2.8, 8.7],
+  ["greek-yogurt", "Greek yogurt, plain", 97, 9, 3.9, 5],
+  ["milk", "Milk, low fat", 50, 3.4, 5, 1.9],
+  ["oatmeal", "Oatmeal, cooked", 71, 2.5, 12, 1.5],
+  ["rice", "Rice, white, cooked", 130, 2.4, 28.2, 0.3],
+  ["potato", "Potato, baked", 93, 2.5, 21.2, 0.1],
+  ["banana", "Banana, raw", 89, 1.1, 22.8, 0.3],
+  ["apple", "Apple, with skin", 52, 0.3, 13.8, 0.2],
+  ["broccoli", "Broccoli, cooked", 35, 2.4, 7.2, 0.4],
+  ["avocado", "Avocado, raw", 160, 2, 8.5, 14.7],
+  ["chickpeas", "Chickpeas, cooked", 164, 8.9, 27.4, 2.6],
+  ["almonds", "Almonds, raw", 579, 21.2, 21.6, 49.9],
+  ["whole-wheat-bread", "Whole wheat bread", 247, 13, 41, 4.2],
+].map(([slug, description, calories, protein, carbs, fat]) => ({
+  id: `curated:${slug}`,
+  source: "curated_fallback",
+  sourceFoodId: slug,
+  description,
+  brandName: "Nordic Nutri curated fallback",
+  dataType: "Curated",
+  category: "Generic Foods",
+  servingSize: 100,
+  servingUnit: "g",
+  caloriesKcalPer100g: calories,
+  proteinGPer100g: protein,
+  carbsGPer100g: carbs,
+  fatGPer100g: fat,
+  imageUrl: null,
+  sourceUrl: null,
+}));
+
 class PublicFoodCatalogError extends Error {
   constructor(code) {
     super(code);
@@ -148,6 +189,14 @@ function createDatabaseCache(db) {
       if (result.error) throw new Error("Food cache lookup failed");
       return result.data ?? null;
     },
+    async listRecent(limit = 80) {
+      const result = await db.from("food_catalog")
+        .select("*")
+        .order("synced_at", { ascending: false })
+        .limit(limit);
+      if (result.error) throw new Error("Food cache discovery failed");
+      return result.data ?? [];
+    },
     async upsert(rows) {
       if (!rows.length) return [];
       const result = await db.from("food_catalog")
@@ -203,7 +252,7 @@ function requestOpenFoodFactsSearch(query) {
   const requestUrl = `https://world.openfoodfacts.org/cgi/search.pl?${params}`;
   return new Promise((resolve, reject) => {
     const request = https.get(requestUrl, {
-      timeout: 6000,
+      timeout: 3000,
       headers: { "User-Agent": "NordicNutriAI/1.0 (food-catalog; support@nordicnutri.app)" },
     }, (response) => {
       let raw = "";
@@ -232,7 +281,25 @@ function isFresh(row, now) {
   return Number.isFinite(syncedAt) && now - syncedAt < CACHE_TTL_MS;
 }
 
-function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : null, apiKey, searchUsda, searchImages = requestOpenFoodFactsSearch, translateQuery, now = Date.now }) {
+function shuffled(items, random) {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const selected = Math.floor(random() * (index + 1));
+    [copy[index], copy[selected]] = [copy[selected], copy[index]];
+  }
+  return copy;
+}
+
+function fallbackItems(query) {
+  const keyword = String(query ?? "").trim().toLowerCase();
+  const matched = CURATED_FALLBACK_FOODS.filter((food) => (
+    food.description.toLowerCase().includes(keyword)
+    || food.sourceFoodId.includes(keyword)
+  ));
+  return matched.length ? matched : CURATED_FALLBACK_FOODS;
+}
+
+function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : null, apiKey, searchUsda, searchImages = requestOpenFoodFactsSearch, translateQuery, now = Date.now, random = Math.random }) {
   if (!cache || typeof cache.search !== "function" || typeof cache.upsert !== "function") {
     throw new Error("Food catalog cache is unavailable");
   }
@@ -241,12 +308,22 @@ function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : n
     async search(_userId, query, page) {
       const normalizedQuery = normalizeQuery(query);
       const normalizedPage = normalizePage(page);
-      const resolvedQuery = HAN_PATTERN.test(normalizedQuery) && typeof translateQuery === "function"
-        ? await translateQuery(normalizedQuery)
-        : normalizedQuery;
-      if (typeof resolvedQuery !== "string" || resolvedQuery.trim().length < 2) throw new PublicFoodCatalogError("FOOD_QUERY_TRANSLATION_UNAVAILABLE");
+      let resolvedQuery = normalizedQuery;
+      if (HAN_PATTERN.test(normalizedQuery) && typeof translateQuery === "function") {
+        try {
+          const translated = await translateQuery(normalizedQuery);
+          if (typeof translated === "string" && translated.trim().length >= 2) resolvedQuery = translated;
+        } catch {
+          // The generic fallback below still supports a usable Chinese search.
+        }
+      }
       const searchableQuery = resolvedQuery.trim();
-      const cached = await cache.search(searchableQuery);
+      let cached = [];
+      try {
+        cached = await cache.search(searchableQuery);
+      } catch {
+        // A temporary database cache fault must not make food search unavailable.
+      }
       const currentTime = now();
       if (cached.length && cached.every((row) => isFresh(row, currentTime))) {
         const cachedItems = cached.map(mapCatalogRow).filter(Boolean);
@@ -273,7 +350,7 @@ function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : n
         foods = await search(searchableQuery, normalizedPage);
       } catch (error) {
         if (cached.length) return { items: cached.map(mapCatalogRow).filter(Boolean), source: "cache-stale", page: normalizedPage, resolvedQuery: searchableQuery };
-        throw error;
+        return { items: fallbackItems(searchableQuery).slice(0, PAGE_SIZE), source: "fallback", page: normalizedPage, resolvedQuery: searchableQuery };
       }
       const mappedFoods = foods.map(mapUsdaFood).filter(Boolean).filter(hasUsableNutrition).slice(0, PAGE_SIZE);
       let foodsWithImages = mappedFoods;
@@ -283,12 +360,33 @@ function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : n
         // Food images are optional enrichment and must not block nutrient lookup.
       }
       const rows = foodsWithImages.map(toDatabaseRow);
-      const persisted = await cache.upsert(rows);
+      let persisted;
+      try {
+        persisted = await cache.upsert(rows);
+      } catch {
+        // USDA nutrients remain usable even when the optional local cache is unavailable.
+        persisted = foodsWithImages.map(toDatabaseRow).map((row) => ({ ...row, id: row.source_food_id }));
+      }
       return {
         items: persisted.map(mapCatalogRow).filter(Boolean),
         source: "usda_fdc",
         page: normalizedPage,
         resolvedQuery: searchableQuery,
+      };
+    },
+    async discover(_userId) {
+      let cachedItems = [];
+      if (typeof cache.listRecent === "function") {
+        try {
+          cachedItems = (await cache.listRecent(80)).map(mapCatalogRow).filter(hasUsableNutrition);
+        } catch {
+          // The fallback list remains available if the cache cannot be read.
+        }
+      }
+      const combined = [...cachedItems, ...CURATED_FALLBACK_FOODS.filter((fallback) => !cachedItems.some((item) => item.sourceFoodId === fallback.sourceFoodId))];
+      return {
+        items: shuffled(combined, random).slice(0, 10),
+        source: cachedItems.length ? "cache" : "fallback",
       };
     },
     async getById(_userId, id) {
@@ -304,6 +402,7 @@ function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : n
 
 module.exports = {
   CACHE_TTL_MS,
+  CURATED_FALLBACK_FOODS,
   PAGE_SIZE,
   PublicFoodCatalogError,
   createFoodCatalogService,

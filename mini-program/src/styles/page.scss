@@ -4043,6 +4043,44 @@
   gap: $space-20;
   padding: $space-24;
 }
+.manual-meal__selected-food {
+  align-items: center;
+  background: rgba($color-sage, 0.22);
+  border: 1px solid rgba($color-forest-green, 0.14);
+  border-radius: $radius-16;
+  display: flex;
+  gap: $space-12;
+  padding: $space-12;
+}
+.manual-meal__selected-food image,
+.manual-meal__selected-food-placeholder {
+  background: $color-soft-beige;
+  border-radius: $radius-12;
+  height: 60px;
+  width: 60px;
+}
+.manual-meal__selected-food-placeholder {
+  align-items: center;
+  color: $color-forest-green;
+  display: flex;
+  justify-content: center;
+}
+.manual-meal__selected-food > view:last-child {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: $space-4;
+  min-width: 0;
+}
+.manual-meal__selected-food text:first-child {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+}
+.manual-meal__selected-food text:last-child {
+  color: $color-text-primary;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+}
 .manual-meal__field {
   border-bottom: 1px solid $color-divider;
   display: flex;
@@ -4249,6 +4287,12 @@
   color: $color-text-secondary;
   font-size: $font-caption;
   line-height: $line-body;
+}
+.food-catalog-page__discovery-title {
+  color: $color-text-primary;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+  margin-top: $space-4;
 }
 .food-catalog-results {
   display: flex;

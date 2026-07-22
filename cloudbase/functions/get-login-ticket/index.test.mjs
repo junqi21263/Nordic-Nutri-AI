@@ -213,6 +213,33 @@ test("serves food catalog searches only through the authenticated product sessio
   });
 });
 
+test("serves randomized food catalog discovery only through the authenticated product session", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      foodCatalog: {
+        discover: async (userId) => {
+          calls.push(userId);
+          return { items: [{ id: "curated:salmon", description: "Salmon" }], source: "fallback" };
+        },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const unauthorized = await fetch(`${baseUrl}/get-login-ticket/foods/discover`);
+    assert.equal(unauthorized.status, 401);
+
+    const response = await fetch(`${baseUrl}/get-login-ticket/foods/discover`, {
+      headers: { authorization: "Bearer valid-session" },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { items: [{ id: "curated:salmon", description: "Salmon" }], source: "fallback" });
+    assert.deepEqual(calls, ["user-1"]);
+  });
+});
+
 test("updates settings and nutrition plans only for the signed-in user", async () => {
   const calls = [];
   const server = createHttpServer({

@@ -127,3 +127,32 @@ test("does not return USDA products without any usable nutrition values", async 
 
   assert.deepEqual(result.items, []);
 });
+
+test("returns a curated nutrition fallback when the upstream catalog is temporarily unavailable", async () => {
+  const service = createFoodCatalogService({
+    cache: { search: async () => [], upsert: async () => [] },
+    translateQuery: async () => "salmon",
+    searchUsda: async () => { throw new Error("USDA search timed out"); },
+  });
+
+  const result = await service.search("user-1", "三文鱼", 1);
+
+  assert.equal(result.source, "fallback");
+  assert.ok(result.items.length > 0);
+  assert.match(result.items[0].description, /Salmon/i);
+  assert.ok(result.items[0].proteinGPer100g > 0);
+});
+
+test("returns ten distinct discovery foods in a randomized order", async () => {
+  const service = createFoodCatalogService({
+    cache: { search: async () => [], upsert: async () => [] },
+    searchUsda: async () => [],
+    random: () => 0.5,
+  });
+
+  const result = await service.discover("user-1");
+
+  assert.equal(result.items.length, 10);
+  assert.equal(new Set(result.items.map((item) => item.id)).size, 10);
+  assert.equal(result.source, "fallback");
+});

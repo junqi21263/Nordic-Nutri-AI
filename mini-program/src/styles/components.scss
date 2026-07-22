@@ -767,7 +767,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  font-size: $font-overline;
+  font-size: 18px;
   font-weight: $font-weight-semibold;
   gap: 2px;
   justify-content: center;
@@ -780,9 +780,9 @@
   border-radius: $radius-full;
   display: flex;
   font-size: $font-h3;
-  height: 48px;
+  height: 44px;
   justify-content: center;
-  width: 72px;
+  width: 52px;
 }
 .bottom-tab-bar__icon .nordic-icon {
   filter: grayscale(1) opacity(0.64);

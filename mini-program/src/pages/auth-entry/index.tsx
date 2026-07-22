@@ -1,12 +1,46 @@
 import { Text } from "@tarojs/components";
+import Taro from "@tarojs/taro";
 import { useState } from "react";
 import { loginWithWechat } from "../../api/auth-api";
+import { saveProductProfile } from "../../api/product-data-api";
+import { uploadProfileAvatar } from "../../api/profile-avatar-api";
 import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomSheet } from "../../components/bottom-sheet";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
+
+type WechatProfile = {
+  nickname: string;
+  avatarUrl: string | null;
+};
+
+async function requestWechatProfile(): Promise<WechatProfile | null> {
+  try {
+    const result = await Taro.getUserProfile({ desc: "用于同步你的微信昵称和头像到个人资料" });
+    const nickname = result.userInfo?.nickName?.trim();
+    if (!nickname) return null;
+    return { nickname, avatarUrl: result.userInfo.avatarUrl || null };
+  } catch {
+    // Declining profile authorization never blocks the actual WeChat login.
+    return null;
+  }
+}
+
+async function syncWechatProfile(profile: WechatProfile | null): Promise<void> {
+  if (!profile) return;
+  await saveProductProfile({ nickname: profile.nickname });
+  if (!profile.avatarUrl) return;
+  try {
+    const downloaded = await Taro.downloadFile({ url: profile.avatarUrl });
+    if (downloaded.statusCode === 200 && downloaded.tempFilePath) {
+      await uploadProfileAvatar(downloaded.tempFilePath);
+    }
+  } catch {
+    // A nickname update is still valuable if the remote avatar is unavailable.
+  }
+}
 
 export default function AuthEntryPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -15,8 +49,10 @@ export default function AuthEntryPage() {
   const login = async () => {
     setIsLoggingIn(true);
     try {
+      const wechatProfile = await requestWechatProfile();
       const user = await loginWithWechat();
       if (!user) throw new Error("微信登录未返回用户信息");
+      await syncWechatProfile(wechatProfile);
       await startApplicationAuth();
     } catch (error) {
       feedback.show({

@@ -1,7 +1,7 @@
 import { Image, Input, Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useDidShow } from "@tarojs/taro";
 import { useState } from "react";
-import { searchProductFoodCatalog, type ProductFoodCatalogItem } from "../../api/food-catalog-api";
+import { discoverProductFoodCatalog, searchProductFoodCatalog, type ProductFoodCatalogItem } from "../../api/food-catalog-api";
 import { NordicIcon } from "../../components/nordic-icon";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
@@ -17,6 +17,21 @@ export default function FoodCatalogPage() {
   const [items, setItems] = useState<ProductFoodCatalogItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  const discover = async () => {
+    setIsSearching(true);
+    try {
+      const result = await discoverProductFoodCatalog();
+      setItems(result.items);
+      setHasSearched(false);
+    } catch {
+      feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  useDidShow(() => { void discover(); });
 
   const search = async () => {
     const keyword = query.trim();
@@ -38,18 +53,24 @@ export default function FoodCatalogPage() {
 
   const select = (food: ProductFoodCatalogItem) => {
     selectFood(food);
-    feedback.show({ message: "已带回手动记录", tone: "success" });
-    Taro.navigateBack();
+    const pages = Taro.getCurrentPages();
+    if (pages.length > 1 && pages[pages.length - 2]?.route === "pages/manual-meal/index") {
+      feedback.show({ message: "已带回手动记录", tone: "success" });
+      void Taro.navigateBack();
+      return;
+    }
+    feedback.show({ message: "已选择食物，请补充餐次", tone: "success" });
+    void Taro.navigateTo({ url: "/pages/manual-meal/index" });
   };
 
   return (
-    <PageLayout title="标准食物库" showTabs={false} hideNavigation className="page-layout--food-catalog">
+    <PageLayout title="标准食物库" activeTab="food-catalog" hideNavigation className="page-layout--food-catalog">
       <View className="food-catalog-page">
         <View className="food-catalog-page__title-row">
-          <View className="food-catalog-page__back" ariaLabel="返回" onClick={() => navigateBackOrHome("/pages/manual-meal/index")}>
+          <View className="food-catalog-page__back" ariaLabel="返回" onClick={() => navigateBackOrHome("/pages/home/index")}>
             <NordicIcon name="back" size={22} ariaLabel="返回" />
           </View>
-          <Text>标准食物库</Text>
+          <Text>食物库</Text>
         </View>
         <Text className="food-catalog-page__description">查询 USDA 标准营养数据，选择后自动回填到本餐。</Text>
         <View className="food-catalog-search">
@@ -70,6 +91,8 @@ export default function FoodCatalogPage() {
           <Text>支持中文或英文搜索 · 营养数据来自 USDA · 默认按每 100g 展示</Text>
         </View>
         {items.length ? (
+          <>
+            {!hasSearched ? <Text className="food-catalog-page__discovery-title">今日随机推荐 10 种食物</Text> : null}
           <View className="food-catalog-results">
             {items.map((food) => (
               <View className="food-catalog-item" key={food.id} onClick={() => select(food)}>
@@ -91,6 +114,7 @@ export default function FoodCatalogPage() {
               </View>
             ))}
           </View>
+          </>
         ) : hasSearched && !isSearching ? (
           <View className="food-catalog-empty">
             <NordicIcon name="utensils" size={30} ariaLabel="未找到结果" />
@@ -100,8 +124,8 @@ export default function FoodCatalogPage() {
         ) : (
           <View className="food-catalog-empty">
             <NordicIcon name="sparkles" size={30} ariaLabel="食物库提示" />
-            <Text className="food-catalog-empty__title">搜索食物，自动带回营养数据</Text>
-            <Text className="food-catalog-empty__copy">例如：牛肉、鸡胸肉、salmon、greek yogurt。</Text>
+            <Text className="food-catalog-empty__title">正在为你准备食物库</Text>
+            <Text className="food-catalog-empty__copy">也可搜索：牛肉、鸡胸肉、salmon、greek yogurt。</Text>
           </View>
         )}
       </View>

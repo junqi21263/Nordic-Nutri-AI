@@ -20,9 +20,14 @@ export interface ProductFoodCatalogItem {
 
 export interface ProductFoodCatalogSearch {
   items: ProductFoodCatalogItem[];
-  source: "cache" | "cache-stale" | "usda_fdc";
+  source: "cache" | "cache-stale" | "usda_fdc" | "fallback";
   page: number;
   resolvedQuery?: string;
+}
+
+export interface ProductFoodCatalogDiscovery {
+  items: ProductFoodCatalogItem[];
+  source: "cache" | "fallback";
 }
 
 export function searchProductFoodCatalog(query: string, page = 1) {
@@ -30,4 +35,11 @@ export function searchProductFoodCatalog(query: string, page = 1) {
     `/foods?query=${encodeURIComponent(query)}&page=${page}`,
     { method: "GET", fallbackMessage: "食物库暂时不可用，请稍后重试" },
   );
+}
+
+export function discoverProductFoodCatalog() {
+  return requestProductApi<ProductFoodCatalogDiscovery>("/foods/discover", {
+    method: "GET",
+    fallbackMessage: "食物库暂时不可用，请稍后重试",
+  });
 }

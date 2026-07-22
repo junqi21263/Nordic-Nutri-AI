@@ -282,6 +282,7 @@ function getCoachRoute(pathname) {
 
 function getFoodRoute(pathname) {
   const path = pathname.replace(/^\/get-login-ticket/, "");
+  if (path === "/foods/discover") return { operation: "discover" };
   if (path === "/foods") return { operation: "search" };
   const match = path.match(/^\/foods\/([0-9a-f-]{36})$/i);
   return match ? { operation: "detail", foodId: match[1] } : null;
@@ -345,6 +346,9 @@ function createHttpServer({ service }) {
       if (!session?.sub || !service.foodCatalog) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       try {
+        if (foodRoute.operation === "discover") {
+          return sendJson(res, 200, await service.foodCatalog.discover(session.sub));
+        }
         if (foodRoute.operation === "search") {
           const query = url.searchParams.get("query");
           const page = Number(url.searchParams.get("page") ?? "1");

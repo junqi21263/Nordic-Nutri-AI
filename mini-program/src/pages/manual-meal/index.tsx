@@ -1,4 +1,4 @@
-import { Input, Text, View } from "@tarojs/components";
+import { Image, Input, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
 import { useState } from "react";
 import { AppButton } from "../../components/app-button";
@@ -170,6 +170,19 @@ export default function ManualMealPage() {
           <NordicIcon name="chevron-right" size={20} ariaLabel="打开食物库" />
         </View>
         <View className="manual-meal__form">
+          {selectedFood ? (
+            <View className="manual-meal__selected-food">
+              {selectedFood.imageUrl ? (
+                <Image src={selectedFood.imageUrl} mode="aspectFill" />
+              ) : (
+                <View className="manual-meal__selected-food-placeholder"><NordicIcon name="utensils" size={22} ariaLabel="食物" /></View>
+              )}
+              <View>
+                <Text>已从食物库选中</Text>
+                <Text>{selectedFood.description}</Text>
+              </View>
+            </View>
+          ) : null}
           <View className="manual-meal__field">
             <Text>餐次名称</Text>
             <Input
