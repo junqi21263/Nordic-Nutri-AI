@@ -315,7 +315,11 @@ export default function CoachPage() {
 
         <View className="coach-chat__suggestion">
           <View
-            className="coach-chat__section-toggle"
+            className={`coach-chat__section-toggle ${
+              expandedSections.suggestion
+                ? "coach-chat__section-toggle--expanded"
+                : "coach-chat__section-toggle--collapsed"
+            }`}
             ariaLabel={expandedSections.suggestion ? "收起 AI 建议" : "展开 AI 建议"}
             onClick={() =>
               setExpandedSections((current) => ({ ...current, suggestion: !current.suggestion }))
@@ -356,7 +360,11 @@ export default function CoachPage() {
         <View className="coach-chat__bottom-tools">
           <View className="coach-chat__progress-card">
             <View
-              className="coach-chat__progress-heading coach-chat__section-toggle"
+              className={`coach-chat__progress-heading coach-chat__section-toggle ${
+                expandedSections.progress
+                  ? "coach-chat__section-toggle--expanded"
+                  : "coach-chat__section-toggle--collapsed"
+              }`}
               ariaLabel={expandedSections.progress ? "收起今日进度" : "展开今日进度"}
               onClick={() =>
                 setExpandedSections((current) => ({ ...current, progress: !current.progress }))
@@ -411,7 +419,11 @@ export default function CoachPage() {
 
           <View className="coach-chat__quick-section">
             <View
-              className="coach-chat__section-toggle"
+              className={`coach-chat__section-toggle ${
+                expandedSections.quickReplies
+                  ? "coach-chat__section-toggle--expanded"
+                  : "coach-chat__section-toggle--collapsed"
+              }`}
               ariaLabel={expandedSections.quickReplies ? "收起快捷提问" : "展开快捷提问"}
               onClick={() =>
                 setExpandedSections((current) => ({

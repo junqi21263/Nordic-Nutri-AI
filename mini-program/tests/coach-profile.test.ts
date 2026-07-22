@@ -74,16 +74,19 @@ describe("local coach and profile", () => {
     expect(source).not.toContain('className="coach-chat__score"');
     expect(source).not.toContain("今日营养评分");
     expect(source).not.toContain('variant="hero"');
-    expect(source).toContain('className="coach-chat__section-toggle"');
+    expect(source).toContain("coach-chat__section-toggle");
     expect(source).toContain('className="coach-chat__image-picker"');
     expect(source).toContain('name="chevron-right"');
+    expect(source).toContain("coach-chat__section-toggle--expanded");
+    expect(source).toContain("coach-chat__section-toggle--collapsed");
     expect(source.indexOf('className="coach-chat__image-picker"')).toBeLessThan(
       source.indexOf('className="coach-chat__send"'),
     );
     expect(pageStyles).toContain(".coach-chat__bottom-tools");
     expect(pageStyles).toContain(".coach-chat__section-toggle");
     expect(pageStyles).toContain(".coach-chat__image-picker");
-    expect(pageStyles).toContain('.coach-chat__section-toggle[aria-label*="展开"] .nordic-icon');
+    expect(pageStyles).toContain(".coach-chat__section-toggle--expanded .nordic-icon");
+    expect(pageStyles).not.toContain('[aria-label*="展开"]');
     expect(pageStyles).not.toContain(".coach-chat__score {");
     expect(layoutStyles).toContain(
       "padding-bottom: calc($tabbar-height + $safe-area-bottom + 112px);",

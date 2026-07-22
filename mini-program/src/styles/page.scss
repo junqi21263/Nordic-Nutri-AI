@@ -1067,11 +1067,11 @@
 .coach-chat__section-toggle .nordic-icon {
   flex: 0 0 auto;
   opacity: 0.72;
-  transform: rotate(90deg);
+  transform: rotate(0deg);
   transition: transform 180ms ease;
 }
-.coach-chat__section-toggle[aria-label*="展开"] .nordic-icon {
-  transform: rotate(0deg);
+.coach-chat__section-toggle--expanded .nordic-icon {
+  transform: rotate(90deg);
 }
 .coach-chat__suggestion-title {
   color: $color-forest-green;
