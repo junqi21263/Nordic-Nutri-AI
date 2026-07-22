@@ -88,7 +88,7 @@ export default function HomePage() {
     <PageLayout activeTab="home" hideNavigation title="首页" className="page-layout--home">
       <View className="home-page">
         <View className="home-page__header">
-          <Avatar label={profile.profile.nickname.slice(0, 1).toUpperCase()} />
+          <Avatar label={profile.profile.nickname.slice(0, 1).toUpperCase()} src={profile.profile.avatarUrl} />
           <View className="home-page__greeting-copy">
             <Text className="home-page__greeting">早上好，{profile.profile.nickname}</Text>
             <Text className="home-page__goal">目标：{profile.profile.goalLabel}</Text>

@@ -1596,6 +1596,39 @@
   gap: $space-20;
   padding-bottom: $space-24;
 }
+.profile-edit__avatar {
+  align-items: center;
+  align-self: center;
+  background: $color-forest-green;
+  border: 4px solid $color-warm-white;
+  border-radius: $radius-full;
+  box-shadow: 0 10px 24px rgba($color-forest-green, 0.16);
+  color: $color-warm-white;
+  display: flex;
+  font-size: $font-h2;
+  font-weight: $font-weight-semibold;
+  height: 144px;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  width: 144px;
+}
+.profile-edit__avatar image {
+  height: 100%;
+  width: 100%;
+}
+.profile-edit__avatar-action {
+  align-items: center;
+  background: rgba($color-forest-green, 0.82);
+  bottom: 0;
+  display: flex;
+  font-size: $font-overline;
+  height: 40px;
+  justify-content: center;
+  left: 0;
+  position: absolute;
+  right: 0;
+}
 .profile-form__summary,
 .profile-goal-hero {
   align-items: center;
@@ -4074,6 +4107,35 @@
   gap: $space-12;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+.manual-meal__portion {
+  align-items: center;
+  background: $color-soft-beige;
+  border-radius: $radius-12;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: $space-12;
+  padding: $space-12 $space-16;
+}
+.manual-meal__portion > text {
+  color: $color-text-primary;
+  font-size: $font-caption;
+  font-weight: $font-weight-semibold;
+}
+.manual-meal__portion > view {
+  align-items: center;
+  display: flex;
+  gap: $space-8;
+}
+.manual-meal__portion input {
+  color: $color-text-primary;
+  font-size: $font-body;
+  text-align: right;
+  width: 96px;
+}
+.manual-meal__portion > view text {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+}
 .manual-meal__nutrition-field {
   background: $color-soft-beige;
   border-radius: $radius-16;
@@ -4209,6 +4271,13 @@
   display: flex;
   height: 56px;
   justify-content: center;
+  width: 56px;
+}
+.food-catalog-item__image {
+  background: $color-soft-beige;
+  border-radius: $radius-12;
+  height: 56px;
+  overflow: hidden;
   width: 56px;
 }
 .food-catalog-item__copy {

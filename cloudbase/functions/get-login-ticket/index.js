@@ -12,6 +12,8 @@ const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-d
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
 const { createVisionDataService, PublicVisionDataError } = require("./vision-data-service.cjs");
 const { createFoodCatalogService, PublicFoodCatalogError } = require("./food-catalog-service.cjs");
+const { createFoodQueryTranslator } = require("./food-query-translator.cjs");
+const { createProfileAvatarService, PublicProfileAvatarError } = require("./profile-avatar-service.cjs");
 
 const MAX_BODY_BYTES = 4096;
 const MAX_VISION_BODY_BYTES = 4_300_000;
@@ -155,7 +157,22 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       return { userId, onboardingRequired: !profile.data?.onboarding_completed_at };
     },
   });
-  const data = createProductDataService({ db });
+  const cloudbaseNode = dependencies.cloudbaseNodeSdk ?? require("@cloudbase/node-sdk");
+  const admin = cloudbaseNode.init({ env: config.cloudbaseEnvId });
+  const getTemporaryUrl = async (fileId) => {
+    const result = await admin.getTempFileURL({ fileList: [fileId] });
+    return result?.fileList?.[0]?.tempFileURL ?? null;
+  };
+  const data = createProductDataService({ db, resolveAvatarUrl: getTemporaryUrl });
+  const avatar = createProfileAvatarService({
+    data,
+    uploadImage: async ({ cloudPath, content }) => {
+      const uploaded = await admin.uploadFile({ cloudPath, fileContent: content });
+      if (!uploaded?.fileID) throw new Error("Avatar upload failed");
+      return { fileId: uploaded.fileID };
+    },
+    createTemporaryUrl: getTemporaryUrl,
+  });
   const meals = createMealDataService({
     db,
     model: deepseekModel,
@@ -168,12 +185,14 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     getNutritionPlan: data.getNutritionPlan,
   });
   const foodCatalog = typeof env.USDA_FDC_API_KEY === "string" && env.USDA_FDC_API_KEY.trim()
-    ? createFoodCatalogService({ db, apiKey: env.USDA_FDC_API_KEY })
+    ? createFoodCatalogService({
+      db,
+      apiKey: env.USDA_FDC_API_KEY,
+      translateQuery: createFoodQueryTranslator({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel }),
+    })
     : null;
   let vision = null;
   if (typeof env.VITA_API_KEY === "string" && env.VITA_API_KEY) {
-    const cloudbaseNode = dependencies.cloudbaseNodeSdk ?? require("@cloudbase/node-sdk");
-    const admin = cloudbaseNode.init({ env: config.cloudbaseEnvId });
     vision = createVisionDataService({
       db,
       model: env.VITA_MODEL,
@@ -210,6 +229,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     }),
     feedback: createFeedbackDataService({ db }),
     foodCatalog,
+    avatar,
     vision,
   };
 }
@@ -275,6 +295,10 @@ function isVisionRoute(pathname) {
   return pathname.replace(/^\/get-login-ticket/, "") === "/vision-analysis";
 }
 
+function isAvatarRoute(pathname) {
+  return pathname.replace(/^\/get-login-ticket/, "") === "/profile/avatar";
+}
+
 function sendMealError(res, error) {
   if (error instanceof PublicMealDataError || error instanceof PublicMealAnalysisError) {
     const statusCode = error.code === "MEAL_DATA_INVALID" ? 400 : 503;
@@ -300,9 +324,21 @@ function createHttpServer({ service }) {
     const foodRoute = getFoodRoute(url.pathname);
     const feedbackRoute = isFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !foodRoute && !feedbackRoute && !visionRoute) {
+    const avatarRoute = isAvatarRoute(url.pathname);
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !foodRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
+    }
+    if (avatarRoute) {
+      const session = service?.verifySession?.(readBearerToken(req));
+      if (!session?.sub || !service.avatar?.upload) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      try {
+        return sendJson(res, 200, await service.avatar.upload(session.sub, await readJsonBody(req, MAX_VISION_BODY_BYTES)));
+      } catch (error) {
+        if (error instanceof PublicProfileAvatarError) return sendJson(res, 400, { code: error.code });
+        return sendJson(res, 503, { code: "AVATAR_UPLOAD_FAILED" });
+      }
     }
     if (foodRoute) {
       const session = service?.verifySession?.(readBearerToken(req));

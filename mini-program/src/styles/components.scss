@@ -645,6 +645,11 @@
   height: 128px;
   width: 128px;
 }
+.avatar--image {
+  display: inline-block;
+  object-fit: cover;
+  overflow: hidden;
+}
 .statistic-card {
   display: flex;
   flex-direction: column;

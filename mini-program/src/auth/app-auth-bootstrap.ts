@@ -24,6 +24,7 @@ async function loadIdentity(user: { id: string }) {
     user.id,
     {
       ...(account.nickname ? { nickname: account.nickname } : {}),
+      ...(account.avatarUrl ? { avatarUrl: account.avatarUrl } : {}),
       ...(account.weightKg != null ? { weight: account.weightKg } : {}),
       ...(account.goalType ? { goalLabel: labels[account.goalType] ?? "精益增肌" } : {}),
       ...(account.targetWeightKg != null ? { targetWeight: account.targetWeightKg } : {}),

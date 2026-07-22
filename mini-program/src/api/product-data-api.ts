@@ -21,6 +21,7 @@ export interface ProductNutritionPlan {
 
 export interface ProductAccount {
   nickname: string | null;
+  avatarUrl: string | null;
   age: number | null;
   sex: "female" | "male" | "undisclosed" | null;
   heightCm: number | null;
@@ -46,6 +47,14 @@ export function saveProductProfile(input: { nickname: string }) {
     method: "POST",
     data: { ...input },
     fallbackMessage: "资料保存失败，请稍后重试",
+  });
+}
+
+export function uploadProductAvatar(input: { mimeType: "image/jpeg" | "image/png" | "image/webp"; base64: string }) {
+  return requestProductApi<{ avatarUrl: string }>("/profile/avatar", {
+    method: "POST",
+    data: input,
+    fallbackMessage: "头像上传失败，请稍后重试",
   });
 }
 

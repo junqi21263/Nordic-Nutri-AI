@@ -107,7 +107,7 @@ function mapPlan(row) {
   };
 }
 
-function createProductDataService({ db, record = () => {} }) {
+function createProductDataService({ db, record = () => {}, resolveAvatarUrl = async () => null }) {
   return {
     async saveProfile(userId, input) {
       const nickname = typeof input?.nickname === "string" ? input.nickname.trim().slice(0, 40) : "";
@@ -124,6 +124,17 @@ function createProductDataService({ db, record = () => {} }) {
         result = await table.insert({ id: userId, nickname }).select().single();
       }
       if (result.error || !result.data) throw new Error("Profile save failed");
+      return result.data;
+    },
+
+    async saveAvatarPath(userId, avatarPath) {
+      if (typeof avatarPath !== "string" || !avatarPath.trim()) throw fail("头像无效");
+      const table = db.from("profiles");
+      const existing = await table.select("id").eq("id", userId).maybeSingle();
+      if (existing.error || !existing.data?.id) throw new Error("Profile lookup failed");
+      record({ table: "profiles", operation: "update-avatar", userId });
+      const result = await table.update({ avatar_path: avatarPath }).eq("id", userId).select().single();
+      if (result.error || !result.data) throw new Error("Avatar save failed");
       return result.data;
     },
 
@@ -261,15 +272,20 @@ function createProductDataService({ db, record = () => {} }) {
 
     async getAccount(userId) {
       const [profile, bodyProfile, goal, settings, plan] = await Promise.all([
-        db.from("profiles").select("nickname").eq("id", userId).maybeSingle(),
+        db.from("profiles").select("nickname,avatar_path").eq("id", userId).maybeSingle(),
         db.from("body_profiles").select("age,sex,height_cm,weight_kg,activity_level,training_days_per_week").eq("user_id", userId).eq("is_current", true).maybeSingle(),
         db.from("user_goals").select("goal_type,target_weight_kg,target_calories_kcal").eq("user_id", userId).eq("is_current", true).maybeSingle(),
         db.from("user_settings").select("dietary_pattern,food_avoidances,meals_per_day,theme,locale,notification_enabled,unit_system").eq("id", userId).maybeSingle(),
         db.from("nutrition_plans").select("id,daily_calories_kcal,protein_g,carbs_g,fat_g,status").eq("user_id", userId).eq("status", "active").maybeSingle(),
       ]);
       if (profile.error || bodyProfile.error || goal.error || settings.error || plan.error) throw new Error("Account read failed");
+      let avatarUrl = null;
+      if (profile.data?.avatar_path) {
+        try { avatarUrl = await resolveAvatarUrl(profile.data.avatar_path); } catch { avatarUrl = null; }
+      }
       return {
         nickname: profile.data?.nickname ?? null,
+        avatarUrl,
         age: bodyProfile.data?.age ?? null,
         sex: bodyProfile.data?.sex ?? null,
         heightCm: bodyProfile.data?.height_cm ?? null,

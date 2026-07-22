@@ -118,6 +118,24 @@ test("reads only the authenticated user's current account records", async () => 
   assert.deepEqual(filters, [["profiles", "id", "user-1"], ["user_settings", "id", "user-1"]]);
 });
 
+test("resolves a signed-in user's stored avatar path into a temporary avatar URL", async () => {
+  const rows = {
+    profiles: { nickname: "Lewis", avatar_path: "cloud://env.avatars/user-1/profile.jpg" },
+    body_profiles: null,
+    user_goals: null,
+    user_settings: null,
+    nutrition_plans: null,
+  };
+  const db = { from: (table) => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: rows[table], error: null }) }), maybeSingle: async () => ({ data: rows[table], error: null }) }) }) }) };
+
+  const result = await createProductDataService({
+    db,
+    resolveAvatarUrl: async (path) => path === rows.profiles.avatar_path ? "https://temp.example/avatar.jpg" : null,
+  }).getAccount("user-1");
+
+  assert.equal(result.avatarUrl, "https://temp.example/avatar.jpg");
+});
+
 test("upserts settings for the authenticated user", async () => {
   const writes = [];
   const db = {

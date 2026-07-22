@@ -22,6 +22,7 @@ export interface ProductFoodCatalogSearch {
   items: ProductFoodCatalogItem[];
   source: "cache" | "cache-stale" | "usda_fdc";
   page: number;
+  resolvedQuery?: string;
 }
 
 export function searchProductFoodCatalog(query: string, page = 1) {

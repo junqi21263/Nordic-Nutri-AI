@@ -1,4 +1,4 @@
-import { Input, Text, View } from "@tarojs/components";
+import { Image, Input, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useState } from "react";
 import { searchProductFoodCatalog, type ProductFoodCatalogItem } from "../../api/food-catalog-api";
@@ -58,7 +58,7 @@ export default function FoodCatalogPage() {
             value={query}
             maxlength={80}
             confirmType="search"
-            placeholder="例如：chicken breast、oatmeal"
+            placeholder="例如：牛肉、鸡胸肉、oatmeal"
             onConfirm={() => void search()}
             onInput={(event) => setQuery(event.detail.value)}
           />
@@ -67,13 +67,17 @@ export default function FoodCatalogPage() {
           </View>
         </View>
         <View className="food-catalog-page__source-note">
-          <Text>营养数据来源：USDA FoodData Central · 默认按每 100g 展示</Text>
+          <Text>支持中文或英文搜索 · 营养数据来自 USDA · 默认按每 100g 展示</Text>
         </View>
         {items.length ? (
           <View className="food-catalog-results">
             {items.map((food) => (
               <View className="food-catalog-item" key={food.id} onClick={() => select(food)}>
-                <View className="food-catalog-item__icon"><NordicIcon name="utensils" size={23} ariaLabel="食物" /></View>
+                {food.imageUrl ? (
+                  <Image className="food-catalog-item__image" src={food.imageUrl} mode="aspectFill" />
+                ) : (
+                  <View className="food-catalog-item__icon"><NordicIcon name="utensils" size={23} ariaLabel="食物" /></View>
+                )}
                 <View className="food-catalog-item__copy">
                   <Text className="food-catalog-item__name">{food.description}</Text>
                   <Text className="food-catalog-item__meta">{food.brandName || food.category || "USDA 标准食物"}</Text>
@@ -91,13 +95,13 @@ export default function FoodCatalogPage() {
           <View className="food-catalog-empty">
             <NordicIcon name="utensils" size={30} ariaLabel="未找到结果" />
             <Text className="food-catalog-empty__title">暂未找到匹配食物</Text>
-            <Text className="food-catalog-empty__copy">可尝试英文食物名、品牌名或更短关键词。</Text>
+            <Text className="food-catalog-empty__copy">可尝试中文或英文食物名、品牌名或更短关键词。</Text>
           </View>
         ) : (
           <View className="food-catalog-empty">
             <NordicIcon name="sparkles" size={30} ariaLabel="食物库提示" />
             <Text className="food-catalog-empty__title">搜索食物，自动带回营养数据</Text>
-            <Text className="food-catalog-empty__copy">例如：salmon、banana、greek yogurt。</Text>
+            <Text className="food-catalog-empty__copy">例如：牛肉、鸡胸肉、salmon、greek yogurt。</Text>
           </View>
         )}
       </View>

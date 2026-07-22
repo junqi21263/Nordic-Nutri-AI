@@ -113,7 +113,7 @@ export default function ProfilePage() {
       <View className="profile-rhythm">
         <View ariaLabel="编辑个人资料" onClick={() => openPage("/pages/profile-edit/index")}>
           <AppCard tone="dark" className="profile-hero profile-rhythm__identity">
-            <Avatar label={profile.profile.nickname.slice(0, 1).toUpperCase()} size="large" />
+            <Avatar label={profile.profile.nickname.slice(0, 1).toUpperCase()} src={profile.profile.avatarUrl} size="large" />
             <View>
               <Text className="profile-hero__name">{profile.profile.nickname}</Text>
               <Text className="profile-hero__goal">

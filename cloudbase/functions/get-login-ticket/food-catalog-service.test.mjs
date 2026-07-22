@@ -51,10 +51,12 @@ test("validates the search query and page before consulting the cache", async ()
 
 test("returns fresh cache results without calling USDA", async () => {
   let upstreamCalls = 0;
+  const imageWrites = [];
   const cached = [{ id: "food-1", ...mapUsdaFood(usdaFood), synced_at: new Date().toISOString() }];
   const service = createFoodCatalogService({
-    cache: { search: async () => cached, upsert: async () => [] },
+    cache: { search: async () => cached, upsert: async (rows) => { imageWrites.push(rows); return rows.map((row) => ({ id: "food-1", ...row })); } },
     searchUsda: async () => { upstreamCalls += 1; return []; },
+    searchImages: async () => [{ productName: "Chicken", imageUrl: "https://images.openfoodfacts.org/chicken.jpg" }],
     now: () => new Date("2026-07-22T00:00:00Z").getTime(),
   });
 
@@ -62,6 +64,8 @@ test("returns fresh cache results without calling USDA", async () => {
   assert.equal(upstreamCalls, 0);
   assert.equal(result.items[0].id, "food-1");
   assert.equal(result.items[0].proteinGPer100g, 31.02);
+  assert.equal(result.items[0].imageUrl, "https://images.openfoodfacts.org/chicken.jpg");
+  assert.equal(imageWrites.length, 1);
   assert.equal(result.source, "cache");
 });
 
@@ -77,6 +81,7 @@ test("fetches USDA and persists a cacheable normalized result on a cache miss", 
       assert.equal(pageNumber, 1);
       return [usdaFood];
     },
+    searchImages: async () => [],
   });
 
   const result = await service.search("user-1", "chicken breast", 1);
@@ -84,4 +89,41 @@ test("fetches USDA and persists a cacheable normalized result on a cache miss", 
   assert.equal(upserts[0][0].source_food_id, "12345");
   assert.equal(result.source, "usda_fdc");
   assert.equal(result.items[0].description, usdaFood.description);
+});
+
+test("translates a Chinese food query before searching USDA and attaches an optional food image", async () => {
+  const queries = [];
+  const service = createFoodCatalogService({
+    cache: { search: async () => [], upsert: async (rows) => rows.map((row) => ({ id: "food-1", ...row })) },
+    translateQuery: async (query) => {
+      assert.equal(query, "牛肉");
+      return "beef";
+    },
+    searchUsda: async (query) => {
+      queries.push(query);
+      return [usdaFood];
+    },
+    searchImages: async (query) => {
+      assert.equal(query, "beef");
+      return [{ productName: "Beef", imageUrl: "https://images.openfoodfacts.org/beef.jpg" }];
+    },
+  });
+
+  const result = await service.search("user-1", "牛肉", 1);
+
+  assert.deepEqual(queries, ["beef"]);
+  assert.equal(result.resolvedQuery, "beef");
+  assert.equal(result.items[0].imageUrl, "https://images.openfoodfacts.org/beef.jpg");
+});
+
+test("does not return USDA products without any usable nutrition values", async () => {
+  const service = createFoodCatalogService({
+    cache: { search: async () => [], upsert: async (rows) => rows.map((row) => ({ id: "food-unknown", ...row })) },
+    searchUsda: async () => [{ fdcId: 9, description: "Unknown packaged food", foodNutrients: [] }],
+    searchImages: async () => [],
+  });
+
+  const result = await service.search("user-1", "unknown", 1);
+
+  assert.deepEqual(result.items, []);
 });

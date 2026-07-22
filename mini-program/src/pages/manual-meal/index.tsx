@@ -10,6 +10,7 @@ import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
+import type { ProductFoodCatalogItem } from "../../api/food-catalog-api";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 const mealTypes: Array<{ value: MealType; label: string }> = [
@@ -25,6 +26,20 @@ const nowTime = () => {
 };
 
 const readNumber = (value: string) => Number(value || 0);
+const displayNumber = (value: unknown) => {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) && number >= 0 ? String(Math.round(number * 10) / 10) : "";
+};
+
+function scaleNutrition(food: ProductFoodCatalogItem, grams: number) {
+  const scale = grams / 100;
+  return {
+    calories: displayNumber(Number(food.caloriesKcalPer100g) * scale),
+    protein: displayNumber(Number(food.proteinGPer100g) * scale),
+    carbs: displayNumber(Number(food.carbsGPer100g) * scale),
+    fat: displayNumber(Number(food.fatGPer100g) * scale),
+  };
+}
 
 export default function ManualMealPage() {
   const meals = useMealStore();
@@ -36,17 +51,33 @@ export default function ManualMealPage() {
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
+  const [portionG, setPortionG] = useState("100");
+  const [selectedFood, setSelectedFood] = useState<ProductFoodCatalogItem | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useDidShow(() => {
     const food = consumeSelectedFood();
     if (!food) return;
     setTitle(food.description);
-    setCalories(food.caloriesKcalPer100g === null ? "" : String(food.caloriesKcalPer100g));
-    setProtein(food.proteinGPer100g === null ? "" : String(food.proteinGPer100g));
-    setCarbs(food.carbsGPer100g === null ? "" : String(food.carbsGPer100g));
-    setFat(food.fatGPer100g === null ? "" : String(food.fatGPer100g));
+    setSelectedFood(food);
+    setPortionG("100");
+    const nutrition = scaleNutrition(food, 100);
+    setCalories(nutrition.calories);
+    setProtein(nutrition.protein);
+    setCarbs(nutrition.carbs);
+    setFat(nutrition.fat);
   });
+
+  const updatePortion = (value: string) => {
+    setPortionG(value);
+    const grams = Number(value);
+    if (!selectedFood || !Number.isFinite(grams) || grams <= 0) return;
+    const nutrition = scaleNutrition(selectedFood, grams);
+    setCalories(nutrition.calories);
+    setProtein(nutrition.protein);
+    setCarbs(nutrition.carbs);
+    setFat(nutrition.fat);
+  };
 
   const save = async () => {
     const nutrition = [calories, protein, carbs, fat].map(readNumber);
@@ -82,6 +113,8 @@ export default function ManualMealPage() {
     };
     setIsSaving(true);
     try {
+      const quantityG = Number(portionG);
+      const normalization = Number.isFinite(quantityG) && quantityG > 0 ? 100 / quantityG : 1;
       const saved = await createProductMeal({
         mealType: localMeal.mealType,
         name: localMeal.title,
@@ -89,11 +122,11 @@ export default function ManualMealPage() {
         items: [
           {
             name: localMeal.title,
-            quantityG: 100,
-            caloriesPer100g: nutrition[0]!,
-            proteinPer100g: nutrition[1]!,
-            carbsPer100g: nutrition[2]!,
-            fatPer100g: nutrition[3]!,
+            quantityG: Number.isFinite(quantityG) && quantityG > 0 ? quantityG : 100,
+            caloriesPer100g: nutrition[0]! * normalization,
+            proteinPer100g: nutrition[1]! * normalization,
+            carbsPer100g: nutrition[2]! * normalization,
+            fatPer100g: nutrition[3]! * normalization,
           },
         ],
       });
@@ -166,8 +199,17 @@ export default function ManualMealPage() {
           </View>
           <View className="manual-meal__nutrition-title">
             <Text>营养估算</Text>
-            <Text>可按包装或常见份量填写</Text>
+            <Text>{selectedFood ? "已按当前份量自动计算" : "可按包装或常见份量填写"}</Text>
           </View>
+          {selectedFood ? (
+            <View className="manual-meal__portion">
+              <Text>食用份量</Text>
+              <View>
+                <Input type="digit" value={portionG} placeholder="100" onInput={(event) => updatePortion(event.detail.value)} />
+                <Text>g</Text>
+              </View>
+            </View>
+          ) : null}
           <View className="manual-meal__nutrition-grid">
             {[
               ["热量", "kcal", calories, setCalories],

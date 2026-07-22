@@ -3,6 +3,7 @@ const https = require("node:https");
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 20;
 const MAX_PAGE = 50;
+const HAN_PATTERN = /[\u3400-\u9fff]/;
 
 class PublicFoodCatalogError extends Error {
   constructor(code) {
@@ -56,6 +57,38 @@ function mapUsdaFood(food) {
     imageUrl: null,
     sourceUrl: `https://fdc.nal.usda.gov/food-details/${sourceFoodId}/nutrients`,
   };
+}
+
+function normalizeImageUrl(value) {
+  const url = typeof value === "string" ? value.trim() : "";
+  return /^https:\/\/images\.openfoodfacts\.org\//i.test(url) ? url : null;
+}
+
+function attachFoodImages(foods, products, query) {
+  const normalizedQuery = query.toLowerCase();
+  const validProducts = Array.isArray(products) ? products
+    .map((product) => ({
+      productName: typeof product?.productName === "string" ? product.productName.trim() : "",
+      imageUrl: normalizeImageUrl(product?.imageUrl),
+    }))
+    .filter((product) => product.productName && product.imageUrl) : [];
+  return foods.map((food) => {
+    const description = food.description.toLowerCase();
+    const image = validProducts.find((product) =>
+      description.includes(product.productName.toLowerCase())
+      || product.productName.toLowerCase().includes(normalizedQuery),
+    );
+    return image ? { ...food, imageUrl: image.imageUrl } : food;
+  });
+}
+
+function hasUsableNutrition(food) {
+  return [
+    food.caloriesKcalPer100g,
+    food.proteinGPer100g,
+    food.carbsGPer100g,
+    food.fatGPer100g,
+  ].some((value) => typeof value === "number" && Number.isFinite(value) && value > 0);
 }
 
 function toDatabaseRow(food) {
@@ -158,12 +191,48 @@ function requestUsdaSearch({ apiKey, query, page }) {
   });
 }
 
+function requestOpenFoodFactsSearch(query) {
+  const params = new URLSearchParams({
+    search_terms: query,
+    search_simple: "1",
+    action: "process",
+    json: "1",
+    page_size: String(PAGE_SIZE),
+    fields: "product_name,image_front_small_url,image_small_url",
+  });
+  const requestUrl = `https://world.openfoodfacts.org/cgi/search.pl?${params}`;
+  return new Promise((resolve, reject) => {
+    const request = https.get(requestUrl, {
+      timeout: 6000,
+      headers: { "User-Agent": "NordicNutriAI/1.0 (food-catalog; support@nordicnutri.app)" },
+    }, (response) => {
+      let raw = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => { raw += chunk; });
+      response.on("end", () => {
+        if (response.statusCode !== 200) return reject(new Error(`Open Food Facts search failed (${response.statusCode ?? 0})`));
+        try {
+          const data = JSON.parse(raw);
+          resolve((Array.isArray(data?.products) ? data.products : []).map((product) => ({
+            productName: product?.product_name,
+            imageUrl: product?.image_front_small_url ?? product?.image_small_url,
+          })));
+        } catch {
+          reject(new Error("Open Food Facts search response was invalid"));
+        }
+      });
+    });
+    request.on("timeout", () => request.destroy(new Error("Open Food Facts search timed out")));
+    request.on("error", reject);
+  });
+}
+
 function isFresh(row, now) {
   const syncedAt = new Date(row?.synced_at ?? row?.syncedAt ?? 0).getTime();
   return Number.isFinite(syncedAt) && now - syncedAt < CACHE_TTL_MS;
 }
 
-function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : null, apiKey, searchUsda, now = Date.now }) {
+function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : null, apiKey, searchUsda, searchImages = requestOpenFoodFactsSearch, translateQuery, now = Date.now }) {
   if (!cache || typeof cache.search !== "function" || typeof cache.upsert !== "function") {
     throw new Error("Food catalog cache is unavailable");
   }
@@ -172,25 +241,54 @@ function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : n
     async search(_userId, query, page) {
       const normalizedQuery = normalizeQuery(query);
       const normalizedPage = normalizePage(page);
-      const cached = await cache.search(normalizedQuery);
+      const resolvedQuery = HAN_PATTERN.test(normalizedQuery) && typeof translateQuery === "function"
+        ? await translateQuery(normalizedQuery)
+        : normalizedQuery;
+      if (typeof resolvedQuery !== "string" || resolvedQuery.trim().length < 2) throw new PublicFoodCatalogError("FOOD_QUERY_TRANSLATION_UNAVAILABLE");
+      const searchableQuery = resolvedQuery.trim();
+      const cached = await cache.search(searchableQuery);
       const currentTime = now();
       if (cached.length && cached.every((row) => isFresh(row, currentTime))) {
-        return { items: cached.map(mapCatalogRow).filter(Boolean), source: "cache", page: normalizedPage };
+        const cachedItems = cached.map(mapCatalogRow).filter(Boolean);
+        if (cachedItems.some((item) => !item.imageUrl)) {
+          try {
+            const enriched = attachFoodImages(cachedItems, await searchImages(searchableQuery), searchableQuery);
+            const updated = await cache.upsert(enriched.filter((item) => item.imageUrl).map(toDatabaseRow));
+            const byId = new Map(updated.map(mapCatalogRow).filter(Boolean).map((item) => [item.id, item]));
+            return {
+              items: cachedItems.map((item) => byId.get(item.id) ?? enriched.find((candidate) => candidate.sourceFoodId === item.sourceFoodId) ?? item),
+              source: "cache",
+              page: normalizedPage,
+              resolvedQuery: searchableQuery,
+            };
+          } catch {
+            // Existing nutrient data remains usable when optional image enrichment fails.
+          }
+        }
+        return { items: cachedItems, source: "cache", page: normalizedPage, resolvedQuery: searchableQuery };
       }
 
       let foods;
       try {
-        foods = await search(normalizedQuery, normalizedPage);
+        foods = await search(searchableQuery, normalizedPage);
       } catch (error) {
-        if (cached.length) return { items: cached.map(mapCatalogRow).filter(Boolean), source: "cache-stale", page: normalizedPage };
+        if (cached.length) return { items: cached.map(mapCatalogRow).filter(Boolean), source: "cache-stale", page: normalizedPage, resolvedQuery: searchableQuery };
         throw error;
       }
-      const rows = foods.map(mapUsdaFood).filter(Boolean).slice(0, PAGE_SIZE).map(toDatabaseRow);
+      const mappedFoods = foods.map(mapUsdaFood).filter(Boolean).filter(hasUsableNutrition).slice(0, PAGE_SIZE);
+      let foodsWithImages = mappedFoods;
+      try {
+        foodsWithImages = attachFoodImages(mappedFoods, await searchImages(searchableQuery), searchableQuery);
+      } catch {
+        // Food images are optional enrichment and must not block nutrient lookup.
+      }
+      const rows = foodsWithImages.map(toDatabaseRow);
       const persisted = await cache.upsert(rows);
       return {
         items: persisted.map(mapCatalogRow).filter(Boolean),
         source: "usda_fdc",
         page: normalizedPage,
+        resolvedQuery: searchableQuery,
       };
     },
     async getById(_userId, id) {
@@ -211,5 +309,6 @@ module.exports = {
   createFoodCatalogService,
   mapCatalogRow,
   mapUsdaFood,
+  requestOpenFoodFactsSearch,
   requestUsdaSearch,
 };

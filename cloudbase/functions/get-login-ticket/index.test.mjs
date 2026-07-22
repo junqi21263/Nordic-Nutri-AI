@@ -133,6 +133,31 @@ test("writes product data only with a valid product session", async () => {
   });
 });
 
+test("uploads a profile avatar only through the authenticated product session", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      avatar: { upload: async (userId, body) => { calls.push({ userId, body }); return { avatarUrl: "https://temp.example/avatar.png" }; } },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const unauthorized = await fetch(`${baseUrl}/get-login-ticket/profile/avatar`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mimeType: "image/png", base64: "abc" }),
+    });
+    assert.equal(unauthorized.status, 401);
+
+    const response = await fetch(`${baseUrl}/get-login-ticket/profile/avatar`, {
+      method: "POST", headers: { "content-type": "application/json", authorization: "Bearer valid-session" },
+      body: JSON.stringify({ mimeType: "image/png", base64: "abc" }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { avatarUrl: "https://temp.example/avatar.png" });
+    assert.deepEqual(calls, [{ userId: "user-1", body: { mimeType: "image/png", base64: "abc" } }]);
+  });
+});
+
 test("reads the signed-in account without accepting a client user id", async () => {
   const server = createHttpServer({
     service: {

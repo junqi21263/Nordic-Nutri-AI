@@ -11,6 +11,7 @@ export interface ProfileSettings {
 }
 export interface ProfilePreview {
   nickname: string;
+  avatarUrl: string | null;
   goalLabel: string;
   weight: number;
   targetWeight: number;
@@ -39,6 +40,7 @@ export interface ProfileStorage {
 }
 const initialProfile = {
   nickname: "Lewis",
+  avatarUrl: null,
   goalLabel: "精益增肌",
   weight: 70,
   targetWeight: 74,
