@@ -4285,6 +4285,23 @@
   font-size: 22px;
   font-weight: $font-weight-semibold;
 }
+.home-page__sync-note {
+  align-items: center;
+  background: rgba($stitch-brand-green, 0.08);
+  border-radius: $radius-medium;
+  color: $stitch-text-secondary;
+  display: flex;
+  font-size: 18px;
+  gap: $space-8;
+  justify-content: space-between;
+  line-height: 1.45;
+  padding: $space-8 $space-12;
+}
+.home-page__sync-note Text:last-child {
+  color: $stitch-brand-green;
+  flex: 0 0 auto;
+  font-weight: $font-weight-semibold;
+}
 .home-page__more {
   align-items: center;
   display: flex;

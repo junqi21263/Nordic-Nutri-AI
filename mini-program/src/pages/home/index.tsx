@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { DailyNutritionSummary } from "../../components/daily-nutrition-summary";
 import { EmptyState } from "../../components/empty-state";
-import { ErrorState } from "../../components/error-state";
 import { Loading } from "../../components/loading";
 import { MealGroup } from "../../components/meal-group";
 import { SectionTitle } from "../../components/section-title";
@@ -44,6 +43,8 @@ export default function HomePage() {
   const profile = useProfileStore();
   const today = getLocalDateString();
   const [remoteSummary, setRemoteSummary] = useState<ProductDailySummary | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const localSummary = store.getDailySummary(today);
   const summary = remoteSummary
     ? {
@@ -55,16 +56,18 @@ export default function HomePage() {
   const meals = store.getMealsByDate(today);
   useEffect(() => {
     store.setLoadingState("loading");
+    setSyncError(null);
     void Promise.all([getProductMeals(today), getProductDailySummary(today)])
       .then(([remoteMeals, dailySummary]) => {
         store.replaceRemoteMeals(remoteMeals, today);
         setRemoteSummary(dailySummary);
       })
       .catch(() => {
-        store.replaceRemoteMeals([], today);
-        store.setErrorState("云端饮食记录暂时无法读取，请稍后重试");
+        setRemoteSummary(null);
+        setSyncError("云端同步暂时不可用，已保留本地记录。");
+        store.setLoadingState(store.getMealsByDate(today).length ? "normal" : "empty");
       });
-  }, [store.replaceRemoteMeals, today]);
+  }, [refreshVersion, store.replaceRemoteMeals, today]);
   const openDetail = (id: string) => Taro.navigateTo({ url: `/pages/meal-detail/index?id=${id}` });
   // Both destinations are native tabBar pages. navigateTo cannot open them.
   const openScanner = () => Taro.switchTab({ url: "/pages/food-scanner/index" });
@@ -81,22 +84,6 @@ export default function HomePage() {
         <Loading label="正在加载今日餐次" />
       </PageLayout>
     );
-  if (store.loadingState === "error")
-    return (
-      <PageLayout
-        title="今天的营养"
-        subtitle="云端记录暂时无法显示。"
-        eyebrow="Nordic Nutri"
-        activeTab="home"
-      >
-        <ErrorState
-          title="无法读取云端餐次"
-          description={store.errorState ?? "请稍后再试。"}
-          onRetry={() => store.setErrorState(null)}
-        />
-      </PageLayout>
-    );
-
   return (
     <PageLayout activeTab="home" hideNavigation title="首页" className="page-layout--home">
       <View className="home-page">
@@ -107,6 +94,12 @@ export default function HomePage() {
             <Text className="home-page__goal">目标：{profile.profile.goalLabel}</Text>
           </View>
         </View>
+        {syncError ? (
+          <View className="home-page__sync-note">
+            <Text>{syncError}</Text>
+            <Text onClick={() => setRefreshVersion((version) => version + 1)}>重试</Text>
+          </View>
+        ) : null}
         <View className="home-page__target">
           <View className="home-page__section-head">
             <Text>今日目标</Text>
