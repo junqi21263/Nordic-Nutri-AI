@@ -325,9 +325,11 @@ export default function CoachPage() {
               <NordicIcon name="sparkles" size={18} ariaLabel="AI 建议" />
               <Text>AI 建议</Text>
             </View>
-            <Text className="coach-chat__section-toggle-copy">
-              {expandedSections.suggestion ? "收起⌃" : "展开⌄"}
-            </Text>
+            <NordicIcon
+              name="chevron-right"
+              size={16}
+              ariaLabel={expandedSections.suggestion ? "收起" : "展开"}
+            />
           </View>
           {expandedSections.suggestion ? (
             <>
@@ -367,9 +369,11 @@ export default function CoachPage() {
               <View>
                 <Text className="coach-chat__progress-score">{summary.completion}</Text>
                 <Text className="coach-chat__progress-unit">/100</Text>
-                <Text className="coach-chat__section-toggle-copy">
-                  {expandedSections.progress ? "收起⌃" : "展开⌄"}
-                </Text>
+                <NordicIcon
+                  name="chevron-right"
+                  size={16}
+                  ariaLabel={expandedSections.progress ? "收起" : "展开"}
+                />
               </View>
             </View>
             {expandedSections.progress
@@ -417,9 +421,11 @@ export default function CoachPage() {
               }
             >
               <Text className="coach-chat__quick-title">快捷提问</Text>
-              <Text className="coach-chat__section-toggle-copy">
-                {expandedSections.quickReplies ? "收起⌃" : "展开⌄"}
-              </Text>
+              <NordicIcon
+                name="chevron-right"
+                size={16}
+                ariaLabel={expandedSections.quickReplies ? "收起" : "展开"}
+              />
             </View>
             {expandedSections.quickReplies ? (
               <View className="coach-chat__quick-actions">
@@ -443,13 +449,6 @@ export default function CoachPage() {
       </View>
 
       <View className="coach-chat__composer">
-        <View
-          className="coach-chat__image-picker"
-          ariaLabel="选择饮食图片"
-          onClick={() => void chooseCoachImage()}
-        >
-          <NordicIcon name="images" size={20} ariaLabel="选择图片" />
-        </View>
         <Input
           className="coach-chat__input"
           value={draft}
@@ -469,9 +468,15 @@ export default function CoachPage() {
               src={selectedImagePath}
               mode="aspectFill"
             />
-            <Text>×</Text>
           </View>
         ) : null}
+        <View
+          className="coach-chat__image-picker"
+          ariaLabel="选择饮食图片"
+          onClick={() => void chooseCoachImage()}
+        >
+          <NordicIcon name="images" size={20} ariaLabel="选择图片" />
+        </View>
         <View className="coach-chat__send" ariaLabel="发送消息" onClick={() => void sendMessage()}>
           <NordicIcon name="arrow-up" size={22} ariaLabel="发送" />
         </View>
