@@ -76,6 +76,7 @@ describe("local coach and profile", () => {
     expect(source).not.toContain('variant="hero"');
     expect(source).toContain("coach-chat__section-toggle");
     expect(source).toContain('className="coach-chat__image-picker"');
+    expect(source).toContain('name="camera"');
     expect(source).toContain('name="chevron-right"');
     expect(source).toContain("coach-chat__section-toggle--expanded");
     expect(source).toContain("coach-chat__section-toggle--collapsed");

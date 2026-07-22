@@ -487,7 +487,7 @@ export default function CoachPage() {
           ariaLabel="选择饮食图片"
           onClick={() => void chooseCoachImage()}
         >
-          <NordicIcon name="images" size={20} ariaLabel="选择图片" />
+          <NordicIcon name="camera" size={20} ariaLabel="选择图片" />
         </View>
         <View className="coach-chat__send" ariaLabel="发送消息" onClick={() => void sendMessage()}>
           <NordicIcon name="arrow-up" size={22} ariaLabel="发送" />
