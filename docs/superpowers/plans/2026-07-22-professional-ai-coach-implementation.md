@@ -22,7 +22,7 @@
 - Modify: `mini-program/tests/coach-api-boundary.test.ts` — preserves existing messages-first UI contract.
 - Modify: `docs/superpowers/specs/2026-07-22-professional-ai-coach-design.md` — record any final, implementation-proven API deviation only.
 
-No PostgreSQL migration is required: `coach_messages.answer jsonb`, `provider`, `model`, and the unique `(user_id, client_request_id)` key already exist.
+No PostgreSQL schema change is required: `coach_messages.answer jsonb`, `provider`, `model`, and the unique `(user_id, client_request_id)` key already exist. The implementation adds a separate idempotent permission migration, `0010_coach_permissions.sql`, to enforce server-only access to existing coach tables.
 
 ### Task 1: Define and validate the professional DeepSeek reply contract
 

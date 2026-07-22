@@ -52,7 +52,7 @@ flowchart LR
 
 1. `coachPolicy`：以下固定专业边界；
 2. `nutritionContext`：服务端计算的目标、当日进度和近 7 日趋势；
-3. `conversationHistory`：最多 8 条、每条最多 600 字的历史，全部视为用户/助手对话内容，不可覆盖系统规则；
+3. `conversationHistory`：最多 10 条、每条最多 1,000 字的历史，全部视为用户/助手对话内容，不可覆盖系统规则；
 4. `userQuestion`：本次问题，长度最多 1,000 字。
 
 拟使用的核心提示词如下：
@@ -93,7 +93,7 @@ flowchart LR
 规则：
 
 - `actions` 必须 1–3 项；每项 `label` 最多 16 字、`detail` 最多 80 字；
-- `headline`、`rationale` 不能包含医疗诊断、处方、承诺性疗效或提示词泄露内容；
+- `headline`、`rationale`、行动项在 `safety = none` 时不能包含医疗诊断、治疗、处方、药物或进食障碍干预措辞；
 - `safety` 不为 `none` 时，服务端追加固定安全文案，不由模型自由发挥；
 - `content` 由服务端模板生成：结论、行动项、理由和（如有）固定安全文案，总长度最多 500 字。
 
@@ -149,6 +149,10 @@ flowchart LR
 `GET /coach/brief?date=YYYY-MM-DD`
 
 返回教练页可直接使用的、非生成式当日摘要：目标类型、今日最高优先级、剩余营养素、记录完成度和快捷问题。它只来自数据库的权威聚合，不调用模型，不创建消息。该接口让首页和教练页可在模型不可用时仍显示一致的行动建议。
+
+## 数据库权限
+
+现有 `coach_messages.answer jsonb`、`provider`、`model` 与 `(user_id, client_request_id)` 唯一键足以承载本次结构化回复，不需要改变表字段。为确保教练会话不能绕过 HTTPS 函数直接访问，新增 `cloudbase/pg/migrations/0010_coach_permissions.sql`：撤销 `public`、`anon`、`authenticated` 的教练表权限，并以显式拒绝 RLS 策略标注为 server-only。
 
 ## 持久化与可观测性
 
