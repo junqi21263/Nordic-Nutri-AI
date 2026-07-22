@@ -302,6 +302,40 @@ test("reads, writes, and summarizes coach data only for the signed-in user", asy
   assert.deepEqual(calls.map((call) => call.slice(0, 2)), [["read", "user-1"], ["write", "user-1"], ["brief", "user-1"]]);
 });
 
+test("streams coach events only for the authenticated product user", async () => {
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      coach: {
+        streamMessage: async function* (userId, body) {
+          assert.equal(userId, "user-1");
+          assert.equal(body.userId, "attacker");
+          yield { type: "delta", text: "晚餐先补蛋白。" };
+          yield { type: "complete", messages: [], reply: { source: "deepseek" } };
+        },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const unauthorized = await fetch(`${baseUrl}/get-login-ticket/coach-answer/stream`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt: "晚餐怎么补蛋白？" }),
+    });
+    assert.equal(unauthorized.status, 401);
+
+    const response = await fetch(`${baseUrl}/get-login-ticket/coach-answer/stream`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({ userId: "attacker", prompt: "晚餐怎么补蛋白？" }),
+    });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /application\/x-ndjson/);
+    assert.deepEqual((await response.text()).trim().split("\n").map(JSON.parse).map((event) => event.type), ["delta", "complete"]);
+  });
+});
+
 test("persists feedback only for the signed-in user", async () => {
   const calls = [];
   const server = createHttpServer({

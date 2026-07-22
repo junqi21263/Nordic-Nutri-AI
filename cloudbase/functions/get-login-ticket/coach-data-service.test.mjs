@@ -137,6 +137,51 @@ test("keeps unrelated questions inside the nutrition-coach boundary without call
   assert.match(result.messages[1].content, /营养、饮食、食谱或训练恢复/);
 });
 
+test("streams a bounded nutrition reply and persists only after completion", async () => {
+  const { db, inserts } = createDb();
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    streamAnswer: async function* () {
+      yield "晚餐优先";
+      yield "安排鸡胸肉和蔬菜。";
+    },
+  });
+
+  const events = [];
+  for await (const event of service.streamMessage("user-1", {
+    ...validRequest,
+    clientRequestId: "44444444-4444-4444-8444-444444444444",
+  })) events.push(event);
+
+  assert.deepEqual(events.map((event) => event.type), ["delta", "complete"]);
+  assert.equal(events[0].text, "晚餐优先安排鸡胸肉和蔬菜。");
+  assert.equal(events[1].reply.source, "deepseek");
+  assert.equal(inserts.filter((entry) => entry.payload.role === "assistant").length, 1);
+  assert.match(inserts.at(-1).payload.content, /鸡胸肉和蔬菜/);
+});
+
+test("does not invoke the stream model for unrelated questions", async () => {
+  const { db } = createDb();
+  let calls = 0;
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    streamAnswer: async function* () { calls += 1; yield "不应出现"; },
+  });
+
+  const events = [];
+  for await (const event of service.streamMessage("user-1", {
+    ...validRequest,
+    clientRequestId: "55555555-5555-4555-8555-555555555555",
+    prompt: "帮我写一首诗",
+  })) events.push(event);
+
+  assert.equal(calls, 0);
+  assert.deepEqual(events.map((event) => event.type), ["complete"]);
+  assert.equal(events[0].reply.source, "rule_v2");
+});
+
 test("returns a non-generative coach brief from authoritative context", async () => {
   const { db } = createDb();
   const service = createCoachDataService({ db, ...dependencies(), answer: null });

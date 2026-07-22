@@ -6,7 +6,7 @@ const { createProductDataService } = require("./product-data-service.cjs");
 const { createDeepseekMealService, PublicMealAnalysisError } = require("./deepseek-meal-service.cjs");
 const { createMealDataService, PublicMealDataError } = require("./meal-data-service.cjs");
 const { createInsightDataService } = require("./insight-data-service.cjs");
-const { createDeepseekCoachService } = require("./deepseek-coach-service.cjs");
+const { createDeepseekCoachService, createDeepseekCoachStreamService } = require("./deepseek-coach-service.cjs");
 const { createCoachDataService, PublicCoachDataError } = require("./coach-data-service.cjs");
 const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-data-service.cjs");
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
@@ -200,6 +200,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       answer: typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
         ? createDeepseekCoachService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
         : null,
+      streamAnswer: typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
+        ? createDeepseekCoachStreamService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
+        : null,
     }),
     feedback: createFeedbackDataService({ db }),
     vision,
@@ -248,6 +251,7 @@ function getCoachRoute(pathname) {
   if (path === "/coach/messages") return "getMessages";
   if (path === "/coach/brief") return "getBrief";
   if (path === "/coach-answer") return "sendMessage";
+  if (path === "/coach-answer/stream") return "streamMessage";
   return null;
 }
 
@@ -345,6 +349,23 @@ function createHttpServer({ service }) {
         }
         if (coachOperation === "sendMessage" && req.method === "POST") {
           return sendJson(res, 200, await service.coach.sendMessage(session.sub, await readJsonBody(req)));
+        }
+        if (coachOperation === "streamMessage" && req.method === "POST") {
+          const body = await readJsonBody(req);
+          res.writeHead(200, {
+            "Content-Type": "application/x-ndjson; charset=utf-8",
+            "Cache-Control": "no-cache",
+            ...CORS_HEADERS,
+          });
+          try {
+            for await (const event of service.coach.streamMessage(session.sub, body)) {
+              res.write(`${JSON.stringify(event)}\n`);
+            }
+          } catch {
+            res.write(`${JSON.stringify({ type: "error", code: "COACH_SERVICE_UNAVAILABLE" })}\n`);
+          }
+          res.end();
+          return;
         }
         return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       } catch (error) {

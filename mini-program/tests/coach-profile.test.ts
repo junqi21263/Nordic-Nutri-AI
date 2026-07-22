@@ -55,7 +55,9 @@ describe("local coach and profile", () => {
     expect(source).toContain("问问你的营养教练");
     expect(source).toContain('className="coach-chat__status"');
     expect(source).toContain('className="coach-chat__suggestion-product"');
-    expect(source).toContain('const quickPrompts = ["晚餐怎么补蛋白？", "查看今日进度"]');
+    expect(source).toContain(
+      'const quickPrompts = ["晚餐怎么补蛋白？", "如何补充蛋白质？", "加餐推荐", "外食怎么选？"]',
+    );
   });
 
   it("keeps the fixed score, composer, and tab bar in separate vertical lanes", () => {
@@ -72,6 +74,20 @@ describe("local coach and profile", () => {
     expect(layoutStyles).toContain(
       "padding-bottom: calc($tabbar-height + $safe-area-bottom + 188px);",
     );
+  });
+
+  it("uses NOVA in the Nordic coach hero and reserves a streaming message state", () => {
+    const source = coachPageSource();
+    const styles = readFileSync(resolve(import.meta.dirname, "../src/styles/page.scss"), "utf8");
+
+    expect(source).toContain("CoachAvatar");
+    expect(source).toContain('className="coach-chat__hero"');
+    expect(source).toContain('className="coach-chat__progress-card"');
+    expect(source).toContain('"coach-chat__streaming-copy"');
+    expect(source).toContain('status={message.streaming ? "thinking" : "idle"}');
+    expect(source).not.toContain('name="bot"');
+    expect(styles).toContain(".coach-chat__hero");
+    expect(styles).toContain(".coach-chat__progress-card");
   });
 
   it("uses a coach-aligned personal-center header and synchronizes tab selection from profile metrics", () => {

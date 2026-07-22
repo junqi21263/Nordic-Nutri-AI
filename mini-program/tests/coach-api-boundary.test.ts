@@ -14,11 +14,17 @@ describe("persisted coach boundary", () => {
     expect(api).toContain("getProductCoachBrief");
     expect(api).toContain("ProductCoachReply");
     expect(api).toContain("ProductCoachBrief");
+    expect(api).toContain("streamProductCoachMessage");
+    expect(api).toContain("ProductCoachStreamEvent");
     expect(api).toContain("/coach/messages");
     expect(api).toContain("/coach-answer");
+    expect(api).toContain("/coach-answer/stream");
     expect(api).toContain("/coach/brief");
     expect(page).toContain("getProductCoachMessages");
     expect(page).toContain("sendProductCoachMessage");
+    expect(page).toContain("streamProductCoachMessage");
+    expect(page).toContain('event.type === "delta"');
+    expect(page).toContain('event.type === "complete"');
     expect(page).not.toContain("replyFor");
   });
 });

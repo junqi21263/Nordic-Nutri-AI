@@ -1,11 +1,18 @@
 import { Input, Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
-import { getProductCoachMessages, sendProductCoachMessage } from "../../api/coach-api";
+import {
+  getProductCoachMessages,
+  sendProductCoachMessage,
+  streamProductCoachMessage,
+  type ProductCoachMessage,
+} from "../../api/coach-api";
 import { createProductMeal } from "../../api/meal-data-api";
+import { CoachAvatar } from "../../components/coach-avatar";
 import { NordicIcon } from "../../components/nordic-icon";
 import { createCoachAdvice } from "../../features/coach/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
+import { createClientRequestId } from "../../repositories/client-request-id";
 import { useCoachStore } from "../../stores/coach-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
@@ -14,9 +21,10 @@ type ChatMessage = {
   id: string;
   role: "coach" | "user";
   content: string;
+  streaming?: boolean;
 };
 
-const quickPrompts = ["晚餐怎么补蛋白？", "查看今日进度"];
+const quickPrompts = ["晚餐怎么补蛋白？", "如何补充蛋白质？", "加餐推荐", "外食怎么选？"];
 const nowTime = () => {
   const date = new Date();
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
@@ -42,6 +50,26 @@ export default function CoachPage() {
     },
   ]);
 
+  const mergeServerMessages = (
+    result: { messages: ProductCoachMessage[] },
+    temporaryIds: string[],
+  ) => {
+    setMessages((current) => {
+      const retained = current.filter((message) => !temporaryIds.includes(message.id));
+      const known = new Set(retained.map((message) => message.id));
+      return [
+        ...retained,
+        ...result.messages
+          .filter((message) => !known.has(message.id))
+          .map((message) => ({
+            id: message.id,
+            role: message.role === "assistant" ? ("coach" as const) : ("user" as const),
+            content: message.content,
+          })),
+      ];
+    });
+  };
+
   useEffect(() => {
     void getProductCoachMessages()
       .then((history) => {
@@ -60,31 +88,50 @@ export default function CoachPage() {
   const sendMessage = async (value = draft) => {
     const content = value.trim();
     if (!content || sending) return;
-    const optimisticId = `pending-${Date.now()}`;
+    const requestId = createClientRequestId();
+    const optimisticId = "pending-" + requestId;
+    const streamingId = "stream-" + requestId;
     setMessages((current) => [...current, { id: optimisticId, role: "user", content }]);
     setDraft("");
     setSending(true);
     try {
-      const result = await sendProductCoachMessage(content, date);
-      setMessages((current) => {
-        const known = new Set(
-          current.filter((message) => message.id !== optimisticId).map((message) => message.id),
-        );
-        const next = current.filter((message) => message.id !== optimisticId);
-        for (const message of result.messages) {
-          if (!known.has(message.id)) {
-            next.push({
-              id: message.id,
-              role: message.role === "assistant" ? "coach" : "user",
-              content: message.content,
-            });
+      setMessages((current) => [
+        ...current,
+        { id: streamingId, role: "coach", content: "", streaming: true },
+      ]);
+      let completed = false;
+      await streamProductCoachMessage(
+        content,
+        date,
+        (event) => {
+          if (event.type === "delta") {
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === streamingId
+                  ? { ...message, content: message.content + event.text }
+                  : message,
+              ),
+            );
+            return;
           }
-        }
-        return next;
-      });
+          if (event.type === "complete") {
+            completed = true;
+            mergeServerMessages(event, [optimisticId, streamingId]);
+          }
+        },
+        requestId,
+      );
+      if (!completed) throw new Error("流式回复未完成");
     } catch {
-      setMessages((current) => current.filter((message) => message.id !== optimisticId));
-      feedback.show({ message: "营养教练暂时无法回答，请稍后重试", tone: "error" });
+      try {
+        const result = await sendProductCoachMessage(content, date, requestId);
+        mergeServerMessages(result, [optimisticId, streamingId]);
+      } catch {
+        setMessages((current) =>
+          current.filter((message) => message.id !== optimisticId && message.id !== streamingId),
+        );
+        feedback.show({ message: "营养教练暂时无法回答，请稍后重试", tone: "error" });
+      }
     } finally {
       setSending(false);
     }
@@ -140,6 +187,30 @@ export default function CoachPage() {
           <Text>增肌目标 · 今日还差 {proteinLeft}g 蛋白质</Text>
         </View>
 
+        <View className="coach-chat__hero">
+          <View className="coach-chat__hero-copy">
+            <Text className="coach-chat__hero-kicker">NOVA · 今日营养陪伴</Text>
+            <Text className="coach-chat__hero-title">晚上好，{"\n"}我来帮你补齐今天的蛋白质</Text>
+            <View className="coach-chat__hero-actions">
+              <View
+                className="coach-chat__hero-action"
+                onClick={() => void sendMessage("晚餐怎么补蛋白？")}
+              >
+                <NordicIcon name="protein" size={18} ariaLabel="晚餐补蛋白" />
+                <Text>晚餐怎么补蛋白？</Text>
+              </View>
+              <View
+                className="coach-chat__hero-action"
+                onClick={() => void sendMessage("查看今日进度")}
+              >
+                <NordicIcon name="list-checks" size={18} ariaLabel="查看今日进度" />
+                <Text>查看今日进度</Text>
+              </View>
+            </View>
+          </View>
+          <CoachAvatar variant="hero" />
+        </View>
+
         <View className="coach-chat__conversation">
           {messages.map((message) => (
             <View
@@ -147,9 +218,15 @@ export default function CoachPage() {
               className={`coach-chat__message coach-chat__message--${message.role}`}
             >
               {message.role === "coach" ? (
-                <NordicIcon name="bot" size={20} ariaLabel="你的营养教练" />
+                <CoachAvatar status={message.streaming ? "thinking" : "idle"} />
               ) : null}
-              <Text>{message.content}</Text>
+              <Text
+                className={
+                  message.streaming ? "coach-chat__streaming-copy" : "coach-chat__message-copy"
+                }
+              >
+                {message.content || "NOVA 正在整理建议…"}
+              </Text>
             </View>
           ))}
         </View>
@@ -175,6 +252,48 @@ export default function CoachPage() {
             </View>
             <NordicIcon name="circle-plus" size={24} ariaLabel="加入今晚加餐" />
           </View>
+        </View>
+
+        <View className="coach-chat__progress-card">
+          <View className="coach-chat__progress-heading">
+            <View>
+              <Text className="coach-chat__progress-kicker">今日进度</Text>
+              <Text className="coach-chat__progress-title">营养节奏</Text>
+            </View>
+            <View>
+              <Text className="coach-chat__progress-score">{summary.completion}</Text>
+              <Text className="coach-chat__progress-unit">/100</Text>
+            </View>
+          </View>
+          {[
+            ["蛋白质", summary.consumed.protein, summary.protein],
+            ["碳水", summary.consumed.carbs, summary.carbs],
+            ["热量", summary.consumed.calories, summary.calories],
+          ].map(([label, consumed, target]) => {
+            const numericConsumed = Number(consumed);
+            const numericTarget = Number(target);
+            const progress = Math.min(
+              100,
+              Math.round((numericConsumed / Math.max(1, numericTarget)) * 100),
+            );
+            return (
+              <View className="coach-chat__progress-row" key={String(label)}>
+                <View className="coach-chat__progress-row-copy">
+                  <Text>{label}</Text>
+                  <Text>
+                    {numericConsumed}/{numericTarget}
+                    {label === "热量" ? " kcal" : "g"}
+                  </Text>
+                </View>
+                <View className="coach-chat__progress-track">
+                  <View
+                    className="coach-chat__progress-fill"
+                    style={{ width: String(progress) + "%" }}
+                  />
+                </View>
+              </View>
+            );
+          })}
         </View>
 
         <View className="coach-chat__quick-actions">

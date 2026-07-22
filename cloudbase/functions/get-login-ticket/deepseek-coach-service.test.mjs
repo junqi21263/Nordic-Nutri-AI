@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createDeepseekCoachService } from "./deepseek-coach-service.cjs";
+import { createDeepseekCoachService, createDeepseekCoachStreamService } from "./deepseek-coach-service.cjs";
 
 const validReply = {
   priority: "protein",
@@ -72,4 +72,33 @@ test("uses JSON mode and an injection-safe professional policy prompt", async ()
   assert.match(body.messages[0].content, /仅回答日常营养、饮食、食谱或训练恢复相关问题/);
   assert.equal(body.messages[1].role, "user");
   assert.equal(body.messages[2].role, "assistant");
+});
+
+test("requests DeepSeek SSE and emits parsed nutrition text deltas", async () => {
+  let body;
+  const answer = createDeepseekCoachStreamService({
+    apiKey: "test-key",
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return {
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"晚餐先吃"}}]}\n\n'));
+            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"鸡胸肉。"}}]}\n\n'));
+            controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        }),
+      };
+    },
+  });
+
+  const parts = [];
+  for await (const part of answer({ prompt: "晚餐怎么补蛋白？", context: {}, history: [] })) parts.push(part);
+
+  assert.deepEqual(parts, ["晚餐先吃", "鸡胸肉。"]);
+  assert.equal(body.stream, true);
+  assert.equal(body.response_format, undefined);
+  assert.match(body.messages[0].content, /只回答日常营养/);
 });

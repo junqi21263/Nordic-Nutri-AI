@@ -18,8 +18,20 @@
 | 上传/分析 | Storage upload；POST `/analyze-food` | 是 | 是 | `{objectPath,sha256}` → analysis | 骨架；NOT_IMPLEMENTED |
 | 当前/历史计划 | GET `/rest/v1/nutrition_plans` | 是 | 否 | status/effective_from 分页 | 只读可用 |
 | 生成/激活计划 | POST `/generate-plan` | 是 | 是 | `{bodyProfileId,healthGoalId}` → plan | 骨架；NOT_IMPLEMENTED |
-| 教练会话/消息 | GET conversations/messages；POST `/coach-answer` | 是 | 是 | `{message,conversationId?}` → reply | 读取模型已建；回复骨架 |
+| 教练会话/消息 | GET `/coach/messages`；POST `/coach-answer` | 是 | 是 | `{message,date,clientRequestId}` → `{conversationId,messages,reply}` | CloudBase HTTPS 产品会话；结构化 JSON 回退 |
+| 教练流式回复 | POST `/coach-answer/stream` | 是 | 是 | `{message,date,clientRequestId}` → NDJSON `delta` / `complete` / `error` | 优先路径；仅饮食、营养、食谱与训练恢复范围；失败回退 `/coach-answer` |
 | 首页汇总 | POST `/meal-summary` | 是 | 是 | `{date}` → totals/plan/progress | 骨架；NOT_IMPLEMENTED |
 | 健康检查 | GET `/health` | 否（apikey） | 是 | service/status | 可用 |
 
 错误码：`UNAUTHORIZED`、`FORBIDDEN`、`VALIDATION_ERROR`、`NOT_FOUND`、`CONFLICT`、`RATE_LIMITED`、`AI_SERVICE_ERROR`、`STORAGE_ERROR`、`DATABASE_ERROR`、`NOT_IMPLEMENTED`、`INTERNAL_ERROR`。客户端对网络/5xx/429 可重试；带 client_request_id 的写入可安全重试。
+
+## 教练流式事件
+
+`POST /coach-answer/stream` 使用 CloudBase HTTPS 函数与产品 session，不直接暴露数据库或 DeepSeek 凭证。响应为 `application/x-ndjson; charset=utf-8`：
+
+```json
+{"type":"delta","text":"晚餐可以优先安排鸡胸肉和蔬菜。"}
+{"type":"complete","conversationId":"...","messages":[],"reply":{"content":"..."}}
+```
+
+若响应头已发送后出现可恢复异常，服务只输出 `{"type":"error","code":"COACH_SERVICE_UNAVAILABLE"}`，不会返回上游错误、提示词或凭证。用户输入和最终通过安全校验的助理回答才会持久化；医疗风险及非营养问题不调用模型，直接返回边界说明。
