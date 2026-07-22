@@ -1,8 +1,45 @@
+const priorities = new Set(["protein", "calories", "carbs", "fat", "fiber", "regularity", "logging"]);
+const safetyLevels = new Set(["none", "professional_consultation", "urgent_care"]);
+
+const COACH_SYSTEM_PROMPT = `你是 Nordic Nutri 的专业日常营养教练。系统提供的 nutritionContext 是唯一权威营养事实；不得猜测、补造或改写未提供的体重、疾病、训练量、食材热量、餐食记录或目标。依据用户目标、当天记录和一周趋势，用简洁中文给出可执行的日常饮食建议；区分增肌、减脂、维持目标，但不要把每周训练天数误认为今天正在训练。
+
+不得诊断、治疗、开具处方或替代医生；遇到疾病、药物、孕产、未成年人、进食障碍或严重不适，只给出谨慎的就医或专业咨询建议。不要鼓励极端节食、暴食、代偿、危险补剂或不安全运动。不要要求或输出用户的身份信息。
+
+只输出一个 JSON 对象，不要 Markdown、代码块或额外解释。对象必须为：{"priority":"protein|calories|carbs|fat|fiber|regularity|logging","headline":"不超过32个字符","actions":[{"label":"不超过16个字符","detail":"不超过80个字符"}],"rationale":"不超过120个字符","safety":"none|professional_consultation|urgent_care"}。actions 必须有 1 至 3 项。`;
+
 class PublicCoachError extends Error {
   constructor(code, message = "营养教练暂不可用") {
     super(message);
     this.code = code;
   }
+}
+
+function boundedText(value, maxLength) {
+  return typeof value === "string" && value.trim() && value.trim().length <= maxLength ? value.trim() : null;
+}
+
+function validateReply(payload) {
+  let result = payload;
+  try {
+    if (typeof result === "string") result = JSON.parse(result);
+  } catch {
+    throw new PublicCoachError("COACH_RETRYABLE");
+  }
+  if (!result || typeof result !== "object" || Array.isArray(result) || !priorities.has(result.priority) || !safetyLevels.has(result.safety)) {
+    throw new PublicCoachError("COACH_RETRYABLE");
+  }
+  const headline = boundedText(result.headline, 32);
+  const rationale = boundedText(result.rationale, 120);
+  if (!headline || !rationale || !Array.isArray(result.actions) || result.actions.length < 1 || result.actions.length > 3) {
+    throw new PublicCoachError("COACH_RETRYABLE");
+  }
+  const actions = result.actions.map((action) => {
+    const label = boundedText(action?.label, 16);
+    const detail = boundedText(action?.detail, 80);
+    if (!label || !detail) throw new PublicCoachError("COACH_RETRYABLE");
+    return { label, detail };
+  });
+  return { priority: result.priority, headline, actions, rationale, safety: result.safety };
 }
 
 function validateInput(input) {
@@ -29,13 +66,11 @@ function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis
         body: JSON.stringify({
           model: selectedModel,
           thinking: { type: "disabled" },
-          temperature: 0.3,
+          response_format: { type: "json_object" },
+          temperature: 0.2,
           max_tokens: 500,
           messages: [
-            {
-              role: "system",
-              content: "你是 Nordic Nutri 的日常营养教练。依据提供的目标和饮食记录，用简洁中文给出可执行建议。不得诊断、治疗或替代医生；遇到疾病、药物、孕产或进食障碍问题，建议咨询专业人员。回答不超过 500 个汉字。",
-            },
+            { role: "system", content: COACH_SYSTEM_PROMPT },
             ...history.map((message) => ({
               role: message.role === "assistant" ? "assistant" : "user",
               content: String(message.content ?? "").slice(0, 1000),
@@ -59,13 +94,7 @@ function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis
 
 function createDeepseekCoachService({ apiKey, model, requestCompletion, fetchImpl } = {}) {
   const complete = requestCompletion ?? createDeepseekRequestCompletion({ apiKey, model, fetchImpl });
-  return async (input) => {
-    const request = validateInput(input);
-    const response = await complete(request);
-    const content = typeof response === "string" ? response.trim() : "";
-    if (!content || content.length > 1200) throw new PublicCoachError("COACH_RETRYABLE");
-    return content;
-  };
+  return async (input) => validateReply(await complete(validateInput(input)));
 }
 
-module.exports = { createDeepseekCoachService, PublicCoachError };
+module.exports = { COACH_SYSTEM_PROMPT, PublicCoachError, createDeepseekCoachService, validateReply };
