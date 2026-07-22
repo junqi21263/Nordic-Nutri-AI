@@ -152,7 +152,7 @@ flowchart LR
 
 ## 数据库权限
 
-现有 `coach_messages.answer jsonb`、`provider`、`model` 与 `(user_id, client_request_id)` 唯一键足以承载本次结构化回复，不需要改变表字段。为确保教练会话不能绕过 HTTPS 函数直接访问，新增 `cloudbase/pg/migrations/0010_coach_permissions.sql`：撤销 `public`、`anon`、`authenticated` 的教练表权限，并以显式拒绝 RLS 策略标注为 server-only。
+`coach_messages.answer jsonb`、`provider`、`model` 与 `(user_id, client_request_id)` 唯一键足以承载本次结构化回复。为兼容尚未执行早期核心迁移的环境，`cloudbase/pg/migrations/0010_coach_permissions.sql` 会先用 `create table if not exists` 补齐两张教练表和索引；随后撤销 `public`、`anon`、`authenticated` 的表权限，并以显式拒绝 RLS 策略标注为 server-only。
 
 ## 持久化与可观测性
 
