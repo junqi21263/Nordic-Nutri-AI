@@ -273,7 +273,7 @@ test("writes meal analysis and meal data without accepting a caller-controlled u
   });
 });
 
-test("reads and writes persisted coach messages only for the signed-in user", async () => {
+test("reads, writes, and summarizes coach data only for the signed-in user", async () => {
   const calls = [];
   const server = createHttpServer({
     service: {
@@ -281,6 +281,7 @@ test("reads and writes persisted coach messages only for the signed-in user", as
       coach: {
         getMessages: async (userId) => { calls.push(["read", userId]); return []; },
         sendMessage: async (userId, body) => { calls.push(["write", userId, body]); return { messages: [] }; },
+        getBrief: async (userId, date) => { calls.push(["brief", userId, date]); return { date, priority: "protein" }; },
       },
     },
   });
@@ -293,9 +294,12 @@ test("reads and writes persisted coach messages only for the signed-in user", as
       headers: { ...headers, "content-type": "application/json" },
       body: JSON.stringify({ userId: "attacker", prompt: "晚餐吃什么？" }),
     })).status, 200);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/brief?date=2026-07-20`, { headers })).status, 200);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/brief?date=2026-07-20`, { method: "POST", headers })).status, 405);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/brief?date=2026-07-20`)).status, 401);
   });
 
-  assert.deepEqual(calls.map((call) => call.slice(0, 2)), [["read", "user-1"], ["write", "user-1"]]);
+  assert.deepEqual(calls.map((call) => call.slice(0, 2)), [["read", "user-1"], ["write", "user-1"], ["brief", "user-1"]]);
 });
 
 test("persists feedback only for the signed-in user", async () => {

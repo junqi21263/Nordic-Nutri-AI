@@ -194,6 +194,8 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     coach: createCoachDataService({
       db,
       getDailySummary: insights.getDailySummary,
+      getWeeklyReview: insights.getWeeklyReview,
+      getAccount: data.getAccount,
       model: deepseekModel,
       answer: typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
         ? createDeepseekCoachService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
@@ -244,6 +246,7 @@ function getInsightRoute(pathname) {
 function getCoachRoute(pathname) {
   const path = pathname.replace(/^\/get-login-ticket/, "");
   if (path === "/coach/messages") return "getMessages";
+  if (path === "/coach/brief") return "getBrief";
   if (path === "/coach-answer") return "sendMessage";
   return null;
 }
@@ -334,6 +337,11 @@ function createHttpServer({ service }) {
       try {
         if (coachOperation === "getMessages" && req.method === "GET") {
           return sendJson(res, 200, await service.coach.getMessages(session.sub));
+        }
+        if (coachOperation === "getBrief" && req.method === "GET") {
+          const date = url.searchParams.get("date");
+          if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
+          return sendJson(res, 200, await service.coach.getBrief(session.sub, date));
         }
         if (coachOperation === "sendMessage" && req.method === "POST") {
           return sendJson(res, 200, await service.coach.sendMessage(session.sub, await readJsonBody(req)));
