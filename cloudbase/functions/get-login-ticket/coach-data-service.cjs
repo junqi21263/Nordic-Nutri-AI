@@ -1,5 +1,7 @@
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const medicalRiskPattern = /疾病|诊断|治疗|药物|吃药|处方|孕产|怀孕|哺乳|未成年|进食障碍|厌食|暴食/i;
+const urgentRiskPattern = /自杀|昏厥|胸痛|呼吸困难|严重过敏|急诊|急救/i;
 
 class PublicCoachDataError extends Error {
   constructor(code, message = "教练消息无效") {
@@ -16,6 +18,11 @@ function normalizeInput(input) {
   return { prompt, clientRequestId: input.clientRequestId, date: input.date };
 }
 
+function normalizeDate(date) {
+  if (typeof date !== "string" || !datePattern.test(date)) throw new PublicCoachDataError("COACH_INPUT_INVALID");
+  return date;
+}
+
 function mapMessage(row) {
   return {
     id: row.id,
@@ -27,16 +34,108 @@ function mapMessage(row) {
   };
 }
 
-function ruleReply(prompt, summary) {
-  const protein = Math.max(0, Math.round(Number(summary?.remaining?.protein ?? 0)));
-  const calories = Math.max(0, Math.round(Number(summary?.remaining?.calories ?? 0)));
-  if (prompt.includes("进度")) return `今天还可摄入约 ${calories} kcal，距离目标还差 ${protein}g 蛋白质。下一餐优先安排瘦肉、鸡蛋、豆腐或高蛋白酸奶。`;
-  if (prompt.includes("蛋白")) return `今天还差约 ${protein}g 蛋白质。可以分到接下来的一至两餐补充，优先选择鸡胸肉、鱼、鸡蛋、豆腐或无糖高蛋白酸奶。`;
-  return `结合今天的记录，下一餐建议包含一掌心优质蛋白、半盘蔬菜和适量主食；目前还差约 ${protein}g 蛋白质。`;
+function safeNumber(value) {
+  return Math.max(0, Math.round(Number(value) || 0));
 }
 
-function createCoachDataService({ db, getDailySummary, answer, model = "deepseek-v4-flash" }) {
-  if (!db || typeof db.from !== "function" || typeof getDailySummary !== "function") throw new Error("Coach dependencies are unavailable");
+function createContext(daily, weekly, account) {
+  return {
+    goalType: account?.goalType ?? null,
+    daily: {
+      targets: daily?.targets ?? {},
+      consumed: daily?.consumed ?? {},
+      remaining: daily?.remaining ?? {},
+      completion: safeNumber(daily?.completion),
+      mealCount: Array.isArray(daily?.meals) ? daily.meals.length : 0,
+    },
+    weekly: {
+      recordedDays: safeNumber(weekly?.recordedDays),
+      proteinCompletion: safeNumber(weekly?.proteinCompletion),
+      score: safeNumber(weekly?.score),
+    },
+    preferences: {
+      dietaryPattern: account?.settings?.dietaryPattern ?? null,
+      foodAvoidances: Array.isArray(account?.settings?.foodAvoidances) ? account.settings.foodAvoidances.slice(0, 20) : [],
+    },
+  };
+}
+
+function safetyForPrompt(prompt) {
+  if (urgentRiskPattern.test(prompt)) return "urgent_care";
+  if (medicalRiskPattern.test(prompt)) return "professional_consultation";
+  return "none";
+}
+
+function priorityForContext(context) {
+  const remaining = context.daily.remaining;
+  if (!context.daily.mealCount) return "logging";
+  if (safeNumber(remaining.protein) >= 20) return "protein";
+  if (safeNumber(remaining.calories) >= 300) return "calories";
+  if (safeNumber(remaining.carbs) >= 40) return "carbs";
+  if (safeNumber(remaining.fat) >= 15) return "fat";
+  return "regularity";
+}
+
+function createRuleReply(prompt, context) {
+  const safety = safetyForPrompt(prompt);
+  if (safety !== "none") {
+    const urgent = safety === "urgent_care";
+    return {
+      priority: "regularity",
+      headline: urgent ? "请优先获得及时医疗帮助" : "请先咨询合适的专业人员",
+      actions: [{ label: "安全优先", detail: urgent ? "如有紧急或严重不适，请尽快联系急救服务或就近医疗机构。" : "涉及疾病、药物或特殊生理阶段时，请向医生或注册营养专业人士确认。" }],
+      rationale: "为了避免给出不适合个人情况的饮食建议，需要专业人员结合你的具体健康信息判断。",
+      safety,
+    };
+  }
+
+  const protein = safeNumber(context.daily.remaining.protein);
+  const calories = safeNumber(context.daily.remaining.calories);
+  const priority = priorityForContext(context);
+  if (priority === "logging") {
+    return {
+      priority,
+      headline: "先记录一餐，再做更准调整",
+      actions: [{ label: "记录", detail: "先补记今天已吃的一餐或加餐，包含份量和主要食材。" }],
+      rationale: "记录不足时不适合推测热量或营养缺口，先有真实记录再调整更稳妥。",
+      safety: "none",
+    };
+  }
+  if (priority === "protein") {
+    return {
+      priority,
+      headline: "下一餐优先补充优质蛋白",
+      actions: [
+        { label: "主菜", detail: `安排一掌心鸡胸肉、鱼、鸡蛋或豆腐，约补足 ${protein}g 蛋白质缺口的一部分。` },
+        { label: "搭配", detail: "同时配半盘蔬菜和适量主食，避免只靠零食补蛋白。" },
+      ],
+      rationale: `今天还差约 ${protein}g 蛋白质；分到接下来一至两餐补充更容易执行。`,
+      safety: "none",
+    };
+  }
+  return {
+    priority,
+    headline: "下一餐保持均衡、按饥饿感进食",
+    actions: [{ label: "组合", detail: "选择一份优质蛋白、半盘蔬菜和适量主食，餐后观察饱腹感。" }],
+    rationale: `今天仍有约 ${calories} kcal 的可安排空间，规律进餐比临时大幅调整更重要。`,
+    safety: "none",
+  };
+}
+
+function formatContent(reply) {
+  const actions = reply.actions.map((action, index) => `${index + 1}. ${action.label}：${action.detail}`).join("\n");
+  const safety = reply.safety === "none" ? "" : "\n如有不适或特殊健康情况，请咨询合适的专业人员。";
+  return `${reply.headline}\n${actions}\n原因：${reply.rationale}${safety}`.slice(0, 500);
+}
+
+function addReplyMetadata(reply, source, model) {
+  return { ...reply, source, model: source === "deepseek" ? model : null };
+}
+
+function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccount, answer, model = "deepseek-v4-flash" }) {
+  if (!db || typeof db.from !== "function" || typeof getDailySummary !== "function" || typeof getWeeklyReview !== "function" || typeof getAccount !== "function") {
+    throw new Error("Coach dependencies are unavailable");
+  }
 
   async function getConversation(userId) {
     const current = await db.from("coach_conversations").select("id").eq("user_id", userId).is("archived_at", null)
@@ -56,13 +155,31 @@ function createCoachDataService({ db, getDailySummary, answer, model = "deepseek
     return (result.data ?? []).map(mapMessage);
   }
 
+  async function buildContext(userId, date) {
+    const [daily, weekly, account] = await Promise.all([
+      getDailySummary(userId, date),
+      getWeeklyReview(userId, date),
+      getAccount(userId),
+    ]);
+    return createContext(daily, weekly, account);
+  }
+
+  async function getPriorReply(userId, clientRequestId) {
+    const prior = await db.from("coach_messages").select("*").eq("user_id", userId).eq("client_request_id", clientRequestId).maybeSingle();
+    if (prior.error) throw new Error("Coach request lookup failed");
+    if (!prior.data?.id) return null;
+    const assistant = await db.from("coach_messages").select("*").eq("user_id", userId).eq("conversation_id", prior.data.conversation_id)
+      .eq("role", "assistant").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (assistant.error || !assistant.data?.answer || typeof assistant.data.answer !== "object") throw new Error("Coach prior reply unavailable");
+    return { conversationId: prior.data.conversation_id, reply: assistant.data.answer };
+  }
+
   async function sendMessage(userId, input) {
     const request = normalizeInput(input);
-    const conversationId = await getConversation(userId);
-    const prior = await db.from("coach_messages").select("id").eq("user_id", userId).eq("client_request_id", request.clientRequestId).maybeSingle();
-    if (prior.error) throw new Error("Coach request lookup failed");
-    if (prior.data?.id) return { conversationId, messages: await getMessages(userId) };
+    const prior = await getPriorReply(userId, request.clientRequestId);
+    if (prior) return { conversationId: prior.conversationId, messages: await getMessages(userId), reply: prior.reply };
 
+    const conversationId = await getConversation(userId);
     const userMessage = await db.from("coach_messages").insert({
       user_id: userId,
       conversation_id: conversationId,
@@ -73,33 +190,47 @@ function createCoachDataService({ db, getDailySummary, answer, model = "deepseek
     }).select("*").single();
     if (userMessage.error || !userMessage.data) throw new Error("Coach message save failed");
 
-    const [summary, history] = await Promise.all([getDailySummary(userId, request.date), getMessages(userId, 10)]);
-    let provider = "rule_v1";
-    let content = ruleReply(request.prompt, summary);
-    if (typeof answer === "function") {
+    const [context, history] = await Promise.all([buildContext(userId, request.date), getMessages(userId, 10)]);
+    let source = "rule_v2";
+    let reply = createRuleReply(request.prompt, context);
+    if (reply.safety === "none" && typeof answer === "function") {
       try {
-        content = await answer({ prompt: request.prompt, context: summary, history });
-        provider = "deepseek";
+        reply = await answer({ prompt: request.prompt, context, history });
+        source = "deepseek";
       } catch {
-        // Keep a safe, deterministic answer when the optional model is unavailable.
+        // The deterministic reply remains available if the optional provider is unavailable.
       }
     }
+    const persistedReply = addReplyMetadata(reply, source, model);
     const assistantMessage = await db.from("coach_messages").insert({
       user_id: userId,
       conversation_id: conversationId,
       role: "assistant",
-      content,
+      content: formatContent(reply),
       context_date: request.date,
-      context_snapshot: summary,
-      answer: { content },
-      provider,
-      model: provider === "deepseek" ? model : "rule_v1",
+      context_snapshot: context,
+      answer: persistedReply,
+      provider: source,
+      model: source === "deepseek" ? model : "rule_v2",
     }).select("*").single();
     if (assistantMessage.error || !assistantMessage.data) throw new Error("Coach answer save failed");
-    return { conversationId, messages: [mapMessage(userMessage.data), mapMessage(assistantMessage.data)] };
+    return { conversationId, messages: [mapMessage(userMessage.data), mapMessage(assistantMessage.data)], reply: persistedReply };
   }
 
-  return { getMessages, sendMessage };
+  async function getBrief(userId, date) {
+    const safeDate = normalizeDate(date);
+    const context = await buildContext(userId, safeDate);
+    const priority = priorityForContext(context);
+    return {
+      date: safeDate,
+      priority,
+      remaining: context.daily.remaining,
+      completion: context.daily.completion,
+      quickPrompts: priority === "protein" ? ["晚餐怎么补蛋白？", "查看今日进度"] : ["查看今日进度", "下一餐怎么搭配？"],
+    };
+  }
+
+  return { getMessages, sendMessage, getBrief };
 }
 
-module.exports = { createCoachDataService, PublicCoachDataError };
+module.exports = { PublicCoachDataError, createCoachDataService };
