@@ -79,6 +79,7 @@ describe("local coach and profile", () => {
     expect(source).toContain('name="chevron-right"');
     expect(source).toContain("coach-chat__section-toggle--expanded");
     expect(source).toContain("coach-chat__section-toggle--collapsed");
+    expect(source).toContain('className="coach-chat__progress-score-group"');
     expect(source.indexOf('className="coach-chat__image-picker"')).toBeLessThan(
       source.indexOf('className="coach-chat__send"'),
     );
@@ -86,7 +87,9 @@ describe("local coach and profile", () => {
     expect(pageStyles).toContain(".coach-chat__section-toggle");
     expect(pageStyles).toContain(".coach-chat__image-picker");
     expect(pageStyles).toContain(".coach-chat__section-toggle--expanded .nordic-icon");
+    expect(pageStyles).toContain(".coach-chat__progress-score-group");
     expect(pageStyles).not.toContain('[aria-label*="展开"]');
+    expect(pageStyles).not.toContain(".coach-chat__progress-heading > :last-child");
     expect(pageStyles).not.toContain(".coach-chat__score {");
     expect(layoutStyles).toContain(
       "padding-bottom: calc($tabbar-height + $safe-area-bottom + 112px);",

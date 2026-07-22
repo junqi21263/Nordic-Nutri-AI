@@ -374,7 +374,7 @@ export default function CoachPage() {
                 <Text className="coach-chat__progress-kicker">今日进度</Text>
                 <Text className="coach-chat__progress-title">营养节奏</Text>
               </View>
-              <View>
+              <View className="coach-chat__progress-score-group">
                 <Text className="coach-chat__progress-score">{summary.completion}</Text>
                 <Text className="coach-chat__progress-unit">/100</Text>
                 <NordicIcon
