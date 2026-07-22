@@ -4288,6 +4288,52 @@
   font-size: $font-caption;
   line-height: $line-body;
 }
+.food-catalog-filters {
+  display: flex;
+  flex-direction: column;
+  gap: $space-12;
+}
+.food-catalog-filters__group {
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
+}
+.food-catalog-filters__label {
+  color: $color-text-primary;
+  font-size: $font-caption;
+  font-weight: $font-weight-semibold;
+}
+.food-catalog-filters__chips,
+.food-catalog-item__labels,
+.food-detail-page__labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-8;
+}
+.food-catalog-filter,
+.food-catalog-item__category,
+.food-catalog-item__tag,
+.food-detail-page__category,
+.food-detail-page__tag {
+  border: 1px solid $color-divider;
+  border-radius: $radius-full;
+  color: $color-text-secondary;
+  font-size: 22px;
+  line-height: 1;
+  padding: 9px 12px;
+}
+.food-catalog-filter--active,
+.food-catalog-item__category,
+.food-detail-page__category {
+  background: rgba($color-sage, 0.24);
+  border-color: rgba($color-forest-green, 0.32);
+  color: $color-forest-green;
+  font-weight: $font-weight-semibold;
+}
+.food-catalog-item__tag,
+.food-detail-page__tag {
+  background: $color-soft-beige;
+}
 .food-catalog-page__discovery-title {
   color: $color-text-primary;
   font-size: $font-body;
@@ -4350,6 +4396,137 @@
   color: $color-forest-green;
   font-size: $font-caption;
 }
+.food-catalog-empty--filtered {
+  margin-top: $space-12;
+  padding: $space-24;
+}
+
+// Food detail: a browse-only nutrition reference; selection is deliberately opt-in from manual meals.
+.food-detail-page {
+  display: flex;
+  flex-direction: column;
+  gap: $space-20;
+}
+.food-detail-page__title-row {
+  align-items: center;
+  color: $color-text-primary;
+  display: flex;
+  font-size: $font-h2;
+  font-weight: $font-weight-semibold;
+  justify-content: center;
+  min-height: 48px;
+  position: relative;
+}
+.food-detail-page__back {
+  align-items: center;
+  border: 1px solid $color-divider;
+  border-radius: $radius-full;
+  display: flex;
+  height: 48px;
+  justify-content: center;
+  left: 0;
+  position: absolute;
+  width: 48px;
+}
+.food-detail-page__hero {
+  background: $color-soft-beige;
+  border-radius: $radius-24;
+  overflow: hidden;
+}
+.food-detail-page__image,
+.food-detail-page__image-placeholder {
+  display: block;
+  height: 280px;
+  width: 100%;
+}
+.food-detail-page__image-placeholder {
+  align-items: center;
+  background: rgba($color-sage, 0.24);
+  display: flex;
+  justify-content: center;
+}
+.food-detail-page__identity {
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
+}
+.food-detail-page__name {
+  color: $color-text-primary;
+  font-size: $font-h2;
+  font-weight: $font-weight-semibold;
+  line-height: 1.35;
+}
+.food-detail-page__source {
+  color: $color-text-secondary;
+  font-size: $font-body;
+}
+.food-detail-page__section-heading {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+}
+.food-detail-page__section-heading text:first-child {
+  color: $color-text-primary;
+  font-size: $font-h3;
+  font-weight: $font-weight-semibold;
+}
+.food-detail-page__section-heading text:last-child {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+}
+.food-detail-page__nutrition-grid {
+  display: grid;
+  gap: $space-12;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.food-detail-page__nutrition-item {
+  background: $color-soft-beige;
+  border-radius: $radius-16;
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
+  padding: $space-16;
+}
+.food-detail-page__nutrition-item text:first-child {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+}
+.food-detail-page__nutrition-item text:last-child {
+  color: $color-forest-green;
+  font-size: $font-h3;
+  font-weight: $font-weight-semibold;
+}
+.food-detail-page__note {
+  align-items: flex-start;
+  color: $color-text-secondary;
+  display: flex;
+  font-size: $font-caption;
+  gap: $space-8;
+  line-height: $line-body;
+}
+.food-detail-page__action {
+  background: rgba($color-warm-white, 0.96);
+  bottom: 0;
+  box-shadow: 0 -12px 28px rgba($color-dark-forest, 0.06);
+  left: 0;
+  padding: $space-16 $page-horizontal calc($safe-area-bottom + $space-16);
+  position: fixed;
+  right: 0;
+  z-index: 5;
+}
+.food-detail-page__action .app-button { width: 100%; }
+.food-detail-page--empty {
+  align-items: center;
+  color: $color-text-secondary;
+  padding-top: $space-48;
+  text-align: center;
+}
+.food-detail-page__empty-title {
+  color: $color-text-primary;
+  font-size: $font-h3;
+  font-weight: $font-weight-semibold;
+}
+.food-detail-page__empty-copy { font-size: $font-body; }
 .food-catalog-empty {
   align-items: center;
   background: $color-surface;

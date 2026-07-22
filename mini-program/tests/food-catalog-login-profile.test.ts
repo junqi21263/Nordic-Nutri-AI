@@ -17,10 +17,22 @@ describe("food catalog discovery and login profile sync", () => {
   it("loads a fresh discovery list on food catalog entry and preserves selected food images", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/food-catalog/index.tsx"), "utf8");
     const manualMeal = readFileSync(resolve(sourceRoot, "pages/manual-meal/index.tsx"), "utf8");
+    const detail = readFileSync(resolve(sourceRoot, "pages/food-detail/index.tsx"), "utf8");
+    const labels = readFileSync(resolve(sourceRoot, "features/food-catalog/food-labels.ts"), "utf8");
+    const appConfig = readFileSync(resolve(sourceRoot, "app.config.ts"), "utf8");
 
     expect(page).toContain("discoverProductFoodCatalog");
     expect(page).toContain("useDidShow(() => { void discover(); })");
     expect(manualMeal).toContain("selectedFood.imageUrl");
+    expect(page).toContain("pages/food-detail/index");
+    expect(page).toContain("getFoodCategory");
+    expect(page).toContain("getFoodTags");
+    expect(page).toContain("categoryFilter");
+    expect(page).toContain("tagFilter");
+    expect(detail).toContain("知道了");
+    expect(detail).toContain("添加到本餐");
+    expect(labels).toContain("高蛋白");
+    expect(appConfig).toContain('"pages/food-detail/index"');
   });
 
   it("requests the WeChat profile from the login tap and syncs nickname plus avatar after login", () => {
@@ -30,5 +42,7 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("saveProductProfile");
     expect(page).toContain("uploadProfileAvatar");
     expect(page).toContain("Taro.downloadFile");
+    expect(page).toContain("useProfileStore.getState().setProfile");
+    expect(page).toContain("syncWechatProfile(wechatProfile).catch");
   });
 });

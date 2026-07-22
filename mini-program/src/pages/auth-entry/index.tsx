@@ -10,6 +10,7 @@ import { AppCard } from "../../components/app-card";
 import { BottomSheet } from "../../components/bottom-sheet";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
+import { useProfileStore } from "../../stores/profile-store";
 
 type WechatProfile = {
   nickname: string;
@@ -28,18 +29,22 @@ async function requestWechatProfile(): Promise<WechatProfile | null> {
   }
 }
 
-async function syncWechatProfile(profile: WechatProfile | null): Promise<void> {
-  if (!profile) return;
-  await saveProductProfile({ nickname: profile.nickname });
-  if (!profile.avatarUrl) return;
+async function syncWechatProfile(profile: WechatProfile | null): Promise<WechatProfile | null> {
+  if (!profile) return null;
+  const saved = await saveProductProfile({ nickname: profile.nickname });
+  // Keep the just-authorized avatar in the local session even if the optional
+  // CloudBase copy fails; a successful upload replaces it with a signed URL.
+  let avatarUrl: string | null = profile.avatarUrl;
+  if (!profile.avatarUrl) return { nickname: saved.nickname, avatarUrl };
   try {
     const downloaded = await Taro.downloadFile({ url: profile.avatarUrl });
     if (downloaded.statusCode === 200 && downloaded.tempFilePath) {
-      await uploadProfileAvatar(downloaded.tempFilePath);
+      avatarUrl = (await uploadProfileAvatar(downloaded.tempFilePath)).avatarUrl;
     }
   } catch {
     // A nickname update is still valuable if the remote avatar is unavailable.
   }
+  return { nickname: saved.nickname, avatarUrl };
 }
 
 export default function AuthEntryPage() {
@@ -52,8 +57,14 @@ export default function AuthEntryPage() {
       const wechatProfile = await requestWechatProfile();
       const user = await loginWithWechat();
       if (!user) throw new Error("微信登录未返回用户信息");
-      await syncWechatProfile(wechatProfile);
+      const syncedProfile = await syncWechatProfile(wechatProfile).catch(() => null);
       await startApplicationAuth();
+      if (syncedProfile) {
+        useProfileStore.getState().setProfile({
+          nickname: syncedProfile.nickname,
+          avatarUrl: syncedProfile.avatarUrl,
+        });
+      }
     } catch (error) {
       feedback.show({
         message: error instanceof Error ? error.message : "登录未完成，请稍后重试",

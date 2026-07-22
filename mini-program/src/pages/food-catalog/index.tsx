@@ -1,8 +1,9 @@
 import { Image, Input, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { discoverProductFoodCatalog, searchProductFoodCatalog, type ProductFoodCatalogItem } from "../../api/food-catalog-api";
 import { NordicIcon } from "../../components/nordic-icon";
+import { FOOD_CATEGORIES, FOOD_TAGS, getFoodCategory, getFoodTags, matchesFoodFilters, type FoodCategory, type FoodTag } from "../../features/food-catalog/food-labels";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
@@ -12,11 +13,17 @@ const numberText = (value: number | null, suffix: string) => value === null ? "�
 
 export default function FoodCatalogPage() {
   const feedback = useFeedbackStore();
-  const selectFood = useFoodSelectionStore((state) => state.selectFood);
+  const inspectFood = useFoodSelectionStore((state) => state.inspectFood);
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<ProductFoodCatalogItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<FoodCategory>("全部");
+  const [tagFilter, setTagFilter] = useState<FoodTag>("全部");
+  const visibleItems = useMemo(
+    () => items.filter((food) => matchesFoodFilters(food, categoryFilter, tagFilter)),
+    [categoryFilter, items, tagFilter],
+  );
 
   const discover = async () => {
     setIsSearching(true);
@@ -51,16 +58,11 @@ export default function FoodCatalogPage() {
     }
   };
 
-  const select = (food: ProductFoodCatalogItem) => {
-    selectFood(food);
+  const inspect = (food: ProductFoodCatalogItem) => {
+    inspectFood(food);
     const pages = Taro.getCurrentPages();
-    if (pages.length > 1 && pages[pages.length - 2]?.route === "pages/manual-meal/index") {
-      feedback.show({ message: "已带回手动记录", tone: "success" });
-      void Taro.navigateBack();
-      return;
-    }
-    feedback.show({ message: "已选择食物，请补充餐次", tone: "success" });
-    void Taro.navigateTo({ url: "/pages/manual-meal/index" });
+    const fromManualMeal = pages.length > 1 && pages[pages.length - 2]?.route === "pages/manual-meal/index";
+    void Taro.navigateTo({ url: `/pages/food-detail/index${fromManualMeal ? "?mode=select" : ""}` });
   };
 
   return (
@@ -72,7 +74,7 @@ export default function FoodCatalogPage() {
           </View>
           <Text>食物库</Text>
         </View>
-        <Text className="food-catalog-page__description">查询 USDA 标准营养数据，选择后自动回填到本餐。</Text>
+        <Text className="food-catalog-page__description">查询 USDA 标准营养数据，查看食物详情与每 100g 营养估算。</Text>
         <View className="food-catalog-search">
           <NordicIcon name="utensils" size={20} ariaLabel="搜索食物" />
           <Input
@@ -90,12 +92,42 @@ export default function FoodCatalogPage() {
         <View className="food-catalog-page__source-note">
           <Text>支持中文或英文搜索 · 营养数据来自 USDA · 默认按每 100g 展示</Text>
         </View>
+        <View className="food-catalog-filters">
+          <View className="food-catalog-filters__group">
+            <Text className="food-catalog-filters__label">分类</Text>
+            <View className="food-catalog-filters__chips">
+              {FOOD_CATEGORIES.map((category) => (
+                <View
+                  className={`food-catalog-filter ${categoryFilter === category ? "food-catalog-filter--active" : ""}`}
+                  key={category}
+                  onClick={() => setCategoryFilter(category)}
+                >
+                  <Text>{category}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+          <View className="food-catalog-filters__group">
+            <Text className="food-catalog-filters__label">标签</Text>
+            <View className="food-catalog-filters__chips">
+              {FOOD_TAGS.map((tag) => (
+                <View
+                  className={`food-catalog-filter ${tagFilter === tag ? "food-catalog-filter--active" : ""}`}
+                  key={tag}
+                  onClick={() => setTagFilter(tag)}
+                >
+                  <Text>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
         {items.length ? (
           <>
             {!hasSearched ? <Text className="food-catalog-page__discovery-title">今日随机推荐 10 种食物</Text> : null}
           <View className="food-catalog-results">
-            {items.map((food) => (
-              <View className="food-catalog-item" key={food.id} onClick={() => select(food)}>
+            {visibleItems.map((food) => (
+              <View className="food-catalog-item" key={food.id} onClick={() => inspect(food)}>
                 {food.imageUrl ? (
                   <Image className="food-catalog-item__image" src={food.imageUrl} mode="aspectFill" />
                 ) : (
@@ -104,6 +136,10 @@ export default function FoodCatalogPage() {
                 <View className="food-catalog-item__copy">
                   <Text className="food-catalog-item__name">{food.description}</Text>
                   <Text className="food-catalog-item__meta">{food.brandName || food.category || "USDA 标准食物"}</Text>
+                  <View className="food-catalog-item__labels">
+                    <Text className="food-catalog-item__category">{getFoodCategory(food)}</Text>
+                    {getFoodTags(food).slice(0, 2).map((tag) => <Text className="food-catalog-item__tag" key={tag}>{tag}</Text>)}
+                  </View>
                   <View className="food-catalog-item__nutrition">
                     <Text>{numberText(food.caloriesKcalPer100g, " kcal")}</Text>
                     <Text>{numberText(food.proteinGPer100g, "g 蛋白")}</Text>
@@ -114,6 +150,12 @@ export default function FoodCatalogPage() {
               </View>
             ))}
           </View>
+          {!visibleItems.length ? (
+            <View className="food-catalog-empty food-catalog-empty--filtered">
+              <Text className="food-catalog-empty__title">暂无符合筛选的食物</Text>
+              <Text className="food-catalog-empty__copy">可以调整分类或标签，再试一次。</Text>
+            </View>
+          ) : null}
           </>
         ) : hasSearched && !isSearching ? (
           <View className="food-catalog-empty">

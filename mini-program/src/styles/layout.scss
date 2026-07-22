@@ -81,6 +81,10 @@
   padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
   padding-bottom: calc($tabbar-height + $safe-area-bottom + $space-32);
 }
+.page-layout--food-detail .page-layout__content {
+  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+  padding-bottom: calc($safe-area-bottom + 132px);
+}
 .page-layout--profile .page-layout__content,
 .page-layout--achievements .page-layout__content,
 .page-layout--weekly-review .page-layout__content {

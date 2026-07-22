@@ -3,13 +3,17 @@ import type { ProductFoodCatalogItem } from "../api/food-catalog-api";
 
 interface FoodSelectionStore {
   selectedFood: ProductFoodCatalogItem | null;
+  detailFood: ProductFoodCatalogItem | null;
   selectFood: (food: ProductFoodCatalogItem) => void;
+  inspectFood: (food: ProductFoodCatalogItem) => void;
   consumeSelectedFood: () => ProductFoodCatalogItem | null;
 }
 
 export const useFoodSelectionStore = create<FoodSelectionStore>((set, get) => ({
   selectedFood: null,
+  detailFood: null,
   selectFood: (selectedFood) => set({ selectedFood }),
+  inspectFood: (detailFood) => set({ detailFood }),
   consumeSelectedFood: () => {
     const selectedFood = get().selectedFood;
     set({ selectedFood: null });
