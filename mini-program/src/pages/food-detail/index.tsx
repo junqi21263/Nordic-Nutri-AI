@@ -1,13 +1,15 @@
-import { Image, Text, View } from "@tarojs/components";
+import { Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
 import { AppButton } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
+import { FoodThumbnail } from "../../components/food-thumbnail";
 import { getFoodCategory, getFoodTags } from "../../features/food-catalog/food-labels";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
-const nutritionValue = (value: number | null, suffix: string) => value === null ? "—" : `${Math.round(value * 10) / 10}${suffix}`;
+const nutritionValue = (value: number | null, suffix: string) =>
+  value === null ? "—" : `${Math.round(value * 10) / 10}${suffix}`;
 
 export default function FoodDetailPage() {
   const router = useRouter();
@@ -18,12 +20,19 @@ export default function FoodDetailPage() {
 
   if (!food) {
     return (
-      <PageLayout title="食物详情" showTabs={false} hideNavigation className="page-layout--food-detail">
+      <PageLayout
+        title="食物详情"
+        showTabs={false}
+        hideNavigation
+        className="page-layout--food-detail"
+      >
         <View className="food-detail-page food-detail-page--empty">
           <NordicIcon name="utensils" size={32} ariaLabel="食物详情" />
           <Text className="food-detail-page__empty-title">没有可展示的食物</Text>
           <Text className="food-detail-page__empty-copy">请返回食物库重新选择。</Text>
-          <AppButton size="large" onClick={returnToCatalog}>知道了</AppButton>
+          <AppButton size="large" onClick={returnToCatalog}>
+            知道了
+          </AppButton>
         </View>
       </PageLayout>
     );
@@ -42,7 +51,12 @@ export default function FoodDetailPage() {
   };
 
   return (
-    <PageLayout title="食物详情" showTabs={false} hideNavigation className="page-layout--food-detail">
+    <PageLayout
+      title="食物详情"
+      showTabs={false}
+      hideNavigation
+      className="page-layout--food-detail"
+    >
       <View className="food-detail-page">
         <View className="food-detail-page__title-row">
           <View className="food-detail-page__back" ariaLabel="返回食物库" onClick={returnToCatalog}>
@@ -51,18 +65,20 @@ export default function FoodDetailPage() {
           <Text>食物详情</Text>
         </View>
         <View className="food-detail-page__hero">
-          {food.imageUrl ? (
-            <Image className="food-detail-page__image" src={food.imageUrl} mode="aspectFill" />
-          ) : (
-            <View className="food-detail-page__image-placeholder"><NordicIcon name="utensils" size={42} ariaLabel="食物" /></View>
-          )}
+          <FoodThumbnail className="food-detail-page__image" food={food} />
         </View>
         <View className="food-detail-page__identity">
           <Text className="food-detail-page__name">{food.description}</Text>
-          <Text className="food-detail-page__source">{food.brandName || food.category || "USDA 标准食物"}</Text>
+          <Text className="food-detail-page__source">
+            {food.brandName || food.category || "USDA 标准食物"}
+          </Text>
           <View className="food-detail-page__labels">
             <Text className="food-detail-page__category">{getFoodCategory(food)}</Text>
-            {tags.map((tag) => <Text className="food-detail-page__tag" key={tag}>{tag}</Text>)}
+            {tags.map((tag) => (
+              <Text className="food-detail-page__tag" key={tag}>
+                {tag}
+              </Text>
+            ))}
           </View>
         </View>
         <View className="food-detail-page__section-heading">

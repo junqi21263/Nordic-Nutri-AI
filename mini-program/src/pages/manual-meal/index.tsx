@@ -1,7 +1,8 @@
-import { Image, Input, Text, View } from "@tarojs/components";
+import { Input, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
 import { useState } from "react";
 import { AppButton } from "../../components/app-button";
+import { FoodThumbnail } from "../../components/food-thumbnail";
 import { NordicIcon } from "../../components/nordic-icon";
 import { createProductMeal, getProductMeals } from "../../api/meal-data-api";
 import { type MealType } from "../../features/meals/domain";
@@ -159,7 +160,10 @@ export default function ManualMealPage() {
           <Text>补充这一餐</Text>
         </View>
         <Text className="manual-meal__description">不方便拍照时，也能快速把饮食节奏记下来。</Text>
-        <View className="manual-meal__catalog-link" onClick={() => void Taro.navigateTo({ url: "/pages/food-catalog/index" })}>
+        <View
+          className="manual-meal__catalog-link"
+          onClick={() => void Taro.navigateTo({ url: "/pages/food-catalog/index" })}
+        >
           <View className="manual-meal__catalog-link-copy">
             <NordicIcon name="utensils" size={22} ariaLabel="标准食物库" />
             <View>
@@ -172,11 +176,7 @@ export default function ManualMealPage() {
         <View className="manual-meal__form">
           {selectedFood ? (
             <View className="manual-meal__selected-food">
-              {selectedFood.imageUrl ? (
-                <Image src={selectedFood.imageUrl} mode="aspectFill" />
-              ) : (
-                <View className="manual-meal__selected-food-placeholder"><NordicIcon name="utensils" size={22} ariaLabel="食物" /></View>
-              )}
+              <FoodThumbnail className="manual-meal__selected-food-image" food={selectedFood} />
               <View>
                 <Text>已从食物库选中</Text>
                 <Text>{selectedFood.description}</Text>
@@ -218,7 +218,12 @@ export default function ManualMealPage() {
             <View className="manual-meal__portion">
               <Text>食用份量</Text>
               <View>
-                <Input type="digit" value={portionG} placeholder="100" onInput={(event) => updatePortion(event.detail.value)} />
+                <Input
+                  type="digit"
+                  value={portionG}
+                  placeholder="100"
+                  onInput={(event) => updatePortion(event.detail.value)}
+                />
                 <Text>g</Text>
               </View>
             </View>

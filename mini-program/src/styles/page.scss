@@ -4289,14 +4289,50 @@
   line-height: $line-body;
 }
 .food-catalog-filters {
+  background: rgba($color-sage, 0.13);
+  border: 1px solid rgba($color-forest-green, 0.16);
+  border-radius: $radius-16;
   display: flex;
   flex-direction: column;
   gap: $space-12;
+  padding: $space-16;
+}
+.food-catalog-filter-summary {
+  align-items: center;
+  background: $color-surface;
+  border: 1px solid $color-divider;
+  border-radius: $radius-16;
+  display: flex;
+  justify-content: space-between;
+  padding: $space-12 $space-16;
+}
+.food-catalog-filter-summary__eyebrow,
+.food-catalog-filters__heading > text:last-child {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+}
+.food-catalog-filter-summary__value {
+  color: $color-text-primary;
+  display: block;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+  margin-top: 4px;
+}
+.food-catalog-filter-summary__action {
+  color: $color-forest-green;
+  font-size: $font-caption;
+  font-weight: $font-weight-semibold;
 }
 .food-catalog-filters__group {
   display: flex;
   flex-direction: column;
   gap: $space-8;
+}
+.food-catalog-filters__heading {
+  align-items: baseline;
+  display: flex;
+  gap: $space-8;
+  justify-content: space-between;
 }
 .food-catalog-filters__label {
   color: $color-text-primary;
@@ -4309,6 +4345,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: $space-8;
+}
+.food-catalog-filters__scroll {
+  white-space: nowrap;
+}
+.food-catalog-filters__scroll .food-catalog-filters__chips {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  padding-right: $space-8;
 }
 .food-catalog-filter,
 .food-catalog-item__category,
@@ -4395,6 +4439,11 @@
 .food-catalog-item__nutrition text {
   color: $color-forest-green;
   font-size: $font-caption;
+}
+.manual-meal__selected-food-image {
+  border-radius: $radius-12;
+  height: 56px;
+  width: 56px;
 }
 .food-catalog-empty--filtered {
   margin-top: $space-12;
@@ -4514,7 +4563,9 @@
   right: 0;
   z-index: 5;
 }
-.food-detail-page__action .app-button { width: 100%; }
+.food-detail-page__action .app-button {
+  width: 100%;
+}
 .food-detail-page--empty {
   align-items: center;
   color: $color-text-secondary;
@@ -4526,7 +4577,9 @@
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
 }
-.food-detail-page__empty-copy { font-size: $font-body; }
+.food-detail-page__empty-copy {
+  font-size: $font-body;
+}
 .food-catalog-empty {
   align-items: center;
   background: $color-surface;
