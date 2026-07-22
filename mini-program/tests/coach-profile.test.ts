@@ -60,7 +60,8 @@ describe("local coach and profile", () => {
     );
   });
 
-  it("keeps the fixed score, composer, and tab bar in separate vertical lanes", () => {
+  it("keeps progress, quick replies, composer, and tab bar in separate vertical lanes", () => {
+    const source = coachPageSource();
     const pageStyles = readFileSync(
       resolve(import.meta.dirname, "../src/styles/page.scss"),
       "utf8",
@@ -70,13 +71,18 @@ describe("local coach and profile", () => {
       "utf8",
     );
 
-    expect(pageStyles).toContain("bottom: calc($tabbar-height + $safe-area-bottom + 96px);");
+    expect(source).toContain('className="coach-chat__bottom-tools"');
+    expect(source).not.toContain('className="coach-chat__score"');
+    expect(source).not.toContain("今日营养评分");
+    expect(source).not.toContain('variant="hero"');
+    expect(pageStyles).toContain(".coach-chat__bottom-tools");
+    expect(pageStyles).not.toContain(".coach-chat__score {");
     expect(layoutStyles).toContain(
-      "padding-bottom: calc($tabbar-height + $safe-area-bottom + 188px);",
+      "padding-bottom: calc($tabbar-height + $safe-area-bottom + 112px);",
     );
   });
 
-  it("uses NOVA in the Nordic coach hero and reserves a streaming message state", () => {
+  it("uses NOVA only in coach messages and reserves a streaming message state", () => {
     const source = coachPageSource();
     const styles = readFileSync(resolve(import.meta.dirname, "../src/styles/page.scss"), "utf8");
 
@@ -85,6 +91,7 @@ describe("local coach and profile", () => {
     expect(source).toContain('className="coach-chat__progress-card"');
     expect(source).toContain('"coach-chat__streaming-copy"');
     expect(source).toContain('status={message.streaming ? "thinking" : "idle"}');
+    expect(source).not.toContain('<CoachAvatar variant="hero"');
     expect(source).not.toContain('name="bot"');
     expect(styles).toContain(".coach-chat__hero");
     expect(styles).toContain(".coach-chat__progress-card");

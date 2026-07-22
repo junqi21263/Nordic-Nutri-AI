@@ -851,7 +851,7 @@
   border: 1px solid rgba($color-forest-green, 0.08);
   border-radius: $radius-24;
   display: flex;
-  min-height: 246px;
+  min-height: 214px;
   overflow: hidden;
   padding: $space-20 $space-16 $space-16;
   position: relative;
@@ -920,21 +920,6 @@
   height: 100%;
   overflow: hidden;
   width: 100%;
-}
-.coach-avatar--hero {
-  align-self: flex-end;
-  background: transparent;
-  border: 0;
-  bottom: 0;
-  flex-basis: 230px;
-  height: 228px;
-  position: absolute;
-  right: -20px;
-  width: 230px;
-  z-index: 1;
-}
-.coach-avatar--hero .coach-avatar__image {
-  border-radius: 0;
 }
 .coach-avatar__dots {
   align-items: center;
@@ -1103,14 +1088,19 @@
   font-weight: $font-weight-semibold;
   margin-top: 2px;
 }
+.coach-chat__bottom-tools {
+  display: flex;
+  flex-direction: column;
+  gap: $space-12;
+}
 .coach-chat__progress-card {
   background: linear-gradient(180deg, rgba($color-sage-light, 0.6), $color-surface 52%);
   border: 1px solid rgba($color-forest-green, 0.12);
   border-radius: $radius-16;
   display: flex;
   flex-direction: column;
-  gap: $space-12;
-  padding: $space-16;
+  gap: $space-8;
+  padding: $space-12;
 }
 .coach-chat__progress-heading,
 .coach-chat__progress-row-copy {
@@ -1157,37 +1147,17 @@
 .coach-chat__quick-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: $space-8;
+  gap: $space-8 $space-12;
 }
 .coach-chat__quick-chip {
-  border: 1px solid $color-forest-green;
+  background: $color-surface;
+  border: 1px solid rgba($color-forest-green, 0.78);
   border-radius: $radius-full;
   color: $color-forest-green;
   font-size: $font-caption;
-  padding: $space-8 $space-12;
-}
-.coach-chat__score {
-  align-items: center;
-  background: rgba($color-sage-green, 0.3);
-  border-radius: $radius-full;
-  color: $color-text-secondary;
-  display: flex;
-  font-size: $font-caption;
-  gap: $space-4;
-  left: $page-horizontal;
-  padding: $space-12 $space-16;
-  position: fixed;
-  right: $page-horizontal;
-  // Composer bottom offset (12) + its 76px height + an 8px visual gap.
-  // This keeps the score above, instead of underneath, the fixed composer.
-  bottom: calc($tabbar-height + $safe-area-bottom + 96px);
-  z-index: 20;
-}
-.coach-chat__score-value {
-  color: $color-forest-green;
-  font-size: $font-h2;
   font-weight: $font-weight-semibold;
-  margin-left: auto;
+  line-height: 1;
+  padding: $space-8 $space-16;
 }
 .coach-chat__composer {
   align-items: center;

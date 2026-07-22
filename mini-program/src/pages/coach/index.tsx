@@ -208,7 +208,6 @@ export default function CoachPage() {
               </View>
             </View>
           </View>
-          <CoachAvatar variant="hero" />
         </View>
 
         <View className="coach-chat__conversation">
@@ -254,67 +253,65 @@ export default function CoachPage() {
           </View>
         </View>
 
-        <View className="coach-chat__progress-card">
-          <View className="coach-chat__progress-heading">
-            <View>
-              <Text className="coach-chat__progress-kicker">今日进度</Text>
-              <Text className="coach-chat__progress-title">营养节奏</Text>
-            </View>
-            <View>
-              <Text className="coach-chat__progress-score">{summary.completion}</Text>
-              <Text className="coach-chat__progress-unit">/100</Text>
-            </View>
-          </View>
-          {[
-            ["蛋白质", summary.consumed.protein, summary.protein],
-            ["碳水", summary.consumed.carbs, summary.carbs],
-            ["热量", summary.consumed.calories, summary.calories],
-          ].map(([label, consumed, target]) => {
-            const numericConsumed = Number(consumed);
-            const numericTarget = Number(target);
-            const progress = Math.min(
-              100,
-              Math.round((numericConsumed / Math.max(1, numericTarget)) * 100),
-            );
-            return (
-              <View className="coach-chat__progress-row" key={String(label)}>
-                <View className="coach-chat__progress-row-copy">
-                  <Text>{label}</Text>
-                  <Text>
-                    {numericConsumed}/{numericTarget}
-                    {label === "热量" ? " kcal" : "g"}
-                  </Text>
-                </View>
-                <View className="coach-chat__progress-track">
-                  <View
-                    className="coach-chat__progress-fill"
-                    style={{ width: String(progress) + "%" }}
-                  />
-                </View>
+        <View className="coach-chat__bottom-tools">
+          <View className="coach-chat__progress-card">
+            <View className="coach-chat__progress-heading">
+              <View>
+                <Text className="coach-chat__progress-kicker">今日进度</Text>
+                <Text className="coach-chat__progress-title">营养节奏</Text>
               </View>
-            );
-          })}
-        </View>
-
-        <View className="coach-chat__quick-actions">
-          {quickPrompts.map((prompt) => (
-            <View
-              key={prompt}
-              className="coach-chat__quick-chip"
-              onClick={() => void sendMessage(prompt)}
-            >
-              <Text>{prompt}</Text>
+              <View>
+                <Text className="coach-chat__progress-score">{summary.completion}</Text>
+                <Text className="coach-chat__progress-unit">/100</Text>
+              </View>
             </View>
-          ))}
-        </View>
+            {[
+              ["蛋白质", summary.consumed.protein, summary.protein],
+              ["碳水", summary.consumed.carbs, summary.carbs],
+              ["热量", summary.consumed.calories, summary.calories],
+            ].map(([label, consumed, target]) => {
+              const numericConsumed = Number(consumed);
+              const numericTarget = Number(target);
+              const progress = Math.min(
+                100,
+                Math.round((numericConsumed / Math.max(1, numericTarget)) * 100),
+              );
+              return (
+                <View className="coach-chat__progress-row" key={String(label)}>
+                  <View className="coach-chat__progress-row-copy">
+                    <Text>{label}</Text>
+                    <Text>
+                      {numericConsumed}/{numericTarget}
+                      {label === "热量" ? " kcal" : "g"}
+                    </Text>
+                  </View>
+                  <View className="coach-chat__progress-track">
+                    <View
+                      className="coach-chat__progress-fill"
+                      style={{ width: String(progress) + "%" }}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
 
-        <View className="coach-chat__score">
-          <NordicIcon name="sparkles" size={19} ariaLabel="今日营养评分" />
-          <Text>今日营养评分</Text>
-          <Text className="coach-chat__score-value">87</Text>
-          <Text>/100</Text>
+          <View className="coach-chat__quick-actions">
+            {quickPrompts.map((prompt) => (
+              <View
+                key={prompt}
+                className="coach-chat__quick-chip"
+                onClick={() => void sendMessage(prompt)}
+              >
+                <Text>{prompt}</Text>
+              </View>
+            ))}
+          </View>
+
+          <Text className="coach-chat__safety-note">
+            营养建议仅供日常饮食参考，不替代医疗意见。
+          </Text>
         </View>
-        <Text className="coach-chat__safety-note">营养建议仅供日常饮食参考，不替代医疗意见。</Text>
       </View>
 
       <View className="coach-chat__composer">
