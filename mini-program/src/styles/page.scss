@@ -3971,6 +3971,35 @@
   font-size: $font-body;
   margin-top: $space-4;
 }
+.manual-meal__catalog-link {
+  align-items: center;
+  background: rgba($color-sage, 0.24);
+  border: 1px solid rgba($color-forest-green, 0.14);
+  border-radius: $radius-16;
+  color: $color-forest-green;
+  display: flex;
+  justify-content: space-between;
+  padding: $space-16;
+}
+.manual-meal__catalog-link-copy {
+  align-items: center;
+  display: flex;
+  gap: $space-12;
+}
+.manual-meal__catalog-link-copy view {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+.manual-meal__catalog-link-copy text:first-child {
+  color: $color-text-primary;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+}
+.manual-meal__catalog-link-copy text:last-child {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+}
 .manual-meal__form {
   background: $color-surface;
   border: 1px solid $color-divider;
@@ -4094,6 +4123,140 @@
 }
 .manual-meal__action .app-button {
   width: 100%;
+}
+
+// Food catalog: a compact search-first catalogue that keeps data provenance visible.
+.food-catalog-page {
+  display: flex;
+  flex-direction: column;
+  gap: $space-20;
+}
+.food-catalog-page__title-row {
+  align-items: center;
+  color: $color-text-primary;
+  display: flex;
+  font-size: $font-h2;
+  font-weight: $font-weight-semibold;
+  justify-content: center;
+  min-height: 48px;
+  position: relative;
+}
+.food-catalog-page__back {
+  align-items: center;
+  border: 1px solid $color-divider;
+  border-radius: $radius-full;
+  display: flex;
+  height: 48px;
+  justify-content: center;
+  left: 0;
+  position: absolute;
+  width: 48px;
+}
+.food-catalog-page__description {
+  color: $color-text-secondary;
+  font-size: $font-body;
+}
+.food-catalog-search {
+  align-items: center;
+  background: $color-surface;
+  border: 1px solid $color-divider;
+  border-radius: $radius-16;
+  display: flex;
+  gap: $space-12;
+  padding: $space-8 $space-8 $space-8 $space-16;
+}
+.food-catalog-search input {
+  color: $color-text-primary;
+  flex: 1;
+  font-size: $font-body;
+  min-width: 0;
+}
+.food-catalog-search__action {
+  align-items: center;
+  background: $color-forest-green;
+  border-radius: $radius-12;
+  color: $color-warm-white;
+  display: flex;
+  font-size: $font-caption;
+  font-weight: $font-weight-semibold;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0 $space-16;
+}
+.food-catalog-page__source-note {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+  line-height: $line-body;
+}
+.food-catalog-results {
+  display: flex;
+  flex-direction: column;
+  gap: $space-12;
+}
+.food-catalog-item {
+  align-items: center;
+  background: $color-surface;
+  border: 1px solid $color-divider;
+  border-radius: $radius-16;
+  display: flex;
+  gap: $space-12;
+  padding: $space-16;
+}
+.food-catalog-item__icon {
+  align-items: center;
+  background: $color-soft-beige;
+  border-radius: $radius-12;
+  display: flex;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+.food-catalog-item__copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: $space-4;
+  min-width: 0;
+}
+.food-catalog-item__name {
+  color: $color-text-primary;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+  line-height: $line-body;
+}
+.food-catalog-item__meta {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+}
+.food-catalog-item__nutrition {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-8;
+}
+.food-catalog-item__nutrition text {
+  color: $color-forest-green;
+  font-size: $font-caption;
+}
+.food-catalog-empty {
+  align-items: center;
+  background: $color-surface;
+  border: 1px dashed $color-divider;
+  border-radius: $radius-24;
+  color: $color-text-secondary;
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
+  padding: $space-48 $space-24;
+  text-align: center;
+}
+.food-catalog-empty__title {
+  color: $color-text-primary;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+}
+.food-catalog-empty__copy {
+  font-size: $font-caption;
+  line-height: $line-body;
 }
 
 // Records filter: a compact sheet avoids crowding the calendar itself.

@@ -1,4 +1,5 @@
 import { Input, Text, View } from "@tarojs/components";
+import Taro, { useDidShow } from "@tarojs/taro";
 import { useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -8,6 +9,7 @@ import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
+import { useFoodSelectionStore } from "../../stores/food-selection-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 const mealTypes: Array<{ value: MealType; label: string }> = [
@@ -27,6 +29,7 @@ const readNumber = (value: string) => Number(value || 0);
 export default function ManualMealPage() {
   const meals = useMealStore();
   const feedback = useFeedbackStore();
+  const consumeSelectedFood = useFoodSelectionStore((state) => state.consumeSelectedFood);
   const [title, setTitle] = useState("");
   const [mealType, setMealType] = useState<MealType>("snack");
   const [calories, setCalories] = useState("");
@@ -34,6 +37,16 @@ export default function ManualMealPage() {
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  useDidShow(() => {
+    const food = consumeSelectedFood();
+    if (!food) return;
+    setTitle(food.description);
+    setCalories(food.caloriesKcalPer100g === null ? "" : String(food.caloriesKcalPer100g));
+    setProtein(food.proteinGPer100g === null ? "" : String(food.proteinGPer100g));
+    setCarbs(food.carbsGPer100g === null ? "" : String(food.carbsGPer100g));
+    setFat(food.fatGPer100g === null ? "" : String(food.fatGPer100g));
+  });
 
   const save = async () => {
     const nutrition = [calories, protein, carbs, fat].map(readNumber);
@@ -113,6 +126,16 @@ export default function ManualMealPage() {
           <Text>补充这一餐</Text>
         </View>
         <Text className="manual-meal__description">不方便拍照时，也能快速把饮食节奏记下来。</Text>
+        <View className="manual-meal__catalog-link" onClick={() => void Taro.navigateTo({ url: "/pages/food-catalog/index" })}>
+          <View className="manual-meal__catalog-link-copy">
+            <NordicIcon name="utensils" size={22} ariaLabel="标准食物库" />
+            <View>
+              <Text>从标准食物库添加</Text>
+              <Text>USDA 标准营养数据会自动回填</Text>
+            </View>
+          </View>
+          <NordicIcon name="chevron-right" size={20} ariaLabel="打开食物库" />
+        </View>
         <View className="manual-meal__form">
           <View className="manual-meal__field">
             <Text>餐次名称</Text>

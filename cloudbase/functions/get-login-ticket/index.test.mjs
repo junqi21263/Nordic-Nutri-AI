@@ -153,6 +153,41 @@ test("reads the signed-in account without accepting a client user id", async () 
   });
 });
 
+test("serves food catalog searches only through the authenticated product session", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      foodCatalog: {
+        search: async (userId, query, page) => {
+          calls.push({ userId, query, page });
+          return { items: [{ id: "food-1", description: "Chicken breast" }], page, source: "cache" };
+        },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const unauthorized = await fetch(`${baseUrl}/get-login-ticket/foods?query=chicken&page=1`);
+    assert.equal(unauthorized.status, 401);
+
+    const wrongMethod = await fetch(`${baseUrl}/get-login-ticket/foods?query=chicken&page=1`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session" },
+    });
+    assert.equal(wrongMethod.status, 405);
+
+    const response = await fetch(`${baseUrl}/get-login-ticket/foods?query=chicken&page=2`, {
+      headers: { authorization: "Bearer valid-session" },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      items: [{ id: "food-1", description: "Chicken breast" }], page: 2, source: "cache",
+    });
+    assert.deepEqual(calls, [{ userId: "user-1", query: "chicken", page: 2 }]);
+  });
+});
+
 test("updates settings and nutrition plans only for the signed-in user", async () => {
   const calls = [];
   const server = createHttpServer({

@@ -7,6 +7,7 @@ const pages = [
   "pages/home/index",
   "pages/food-scanner/index",
   "pages/manual-meal/index",
+  "pages/food-catalog/index",
   "pages/analysis-result/index",
   "pages/portion-adjustment/index",
   "pages/meal-detail/index",

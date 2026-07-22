@@ -11,6 +11,7 @@ const { createCoachDataService, PublicCoachDataError } = require("./coach-data-s
 const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-data-service.cjs");
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
 const { createVisionDataService, PublicVisionDataError } = require("./vision-data-service.cjs");
+const { createFoodCatalogService, PublicFoodCatalogError } = require("./food-catalog-service.cjs");
 
 const MAX_BODY_BYTES = 4096;
 const MAX_VISION_BODY_BYTES = 4_300_000;
@@ -166,6 +167,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     listMealsRange: meals.listMealsRange,
     getNutritionPlan: data.getNutritionPlan,
   });
+  const foodCatalog = typeof env.USDA_FDC_API_KEY === "string" && env.USDA_FDC_API_KEY.trim()
+    ? createFoodCatalogService({ db, apiKey: env.USDA_FDC_API_KEY })
+    : null;
   let vision = null;
   if (typeof env.VITA_API_KEY === "string" && env.VITA_API_KEY) {
     const cloudbaseNode = dependencies.cloudbaseNodeSdk ?? require("@cloudbase/node-sdk");
@@ -205,6 +209,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
         : null,
     }),
     feedback: createFeedbackDataService({ db }),
+    foodCatalog,
     vision,
   };
 }
@@ -255,6 +260,13 @@ function getCoachRoute(pathname) {
   return null;
 }
 
+function getFoodRoute(pathname) {
+  const path = pathname.replace(/^\/get-login-ticket/, "");
+  if (path === "/foods") return { operation: "search" };
+  const match = path.match(/^\/foods\/([0-9a-f-]{36})$/i);
+  return match ? { operation: "detail", foodId: match[1] } : null;
+}
+
 function isFeedbackRoute(pathname) {
   return pathname.replace(/^\/get-login-ticket/, "") === "/feedback";
 }
@@ -285,11 +297,28 @@ function createHttpServer({ service }) {
     const mealRoute = getMealRoute(url.pathname);
     const insightOperation = getInsightRoute(url.pathname);
     const coachOperation = getCoachRoute(url.pathname);
+    const foodRoute = getFoodRoute(url.pathname);
     const feedbackRoute = isFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !feedbackRoute && !visionRoute) {
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !foodRoute && !feedbackRoute && !visionRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
+    }
+    if (foodRoute) {
+      const session = service?.verifySession?.(readBearerToken(req));
+      if (!session?.sub || !service.foodCatalog) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      try {
+        if (foodRoute.operation === "search") {
+          const query = url.searchParams.get("query");
+          const page = Number(url.searchParams.get("page") ?? "1");
+          return sendJson(res, 200, await service.foodCatalog.search(session.sub, query, page));
+        }
+        return sendJson(res, 200, await service.foodCatalog.getById(session.sub, foodRoute.foodId));
+      } catch (error) {
+        if (error instanceof PublicFoodCatalogError) return sendJson(res, 400, { code: error.code });
+        return sendJson(res, 503, { code: "FOOD_CATALOG_UNAVAILABLE" });
+      }
     }
     if (mealRoute) {
       const session = service?.verifySession?.(readBearerToken(req));
