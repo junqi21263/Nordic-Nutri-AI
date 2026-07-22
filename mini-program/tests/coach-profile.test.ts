@@ -55,9 +55,8 @@ describe("local coach and profile", () => {
     expect(source).toContain("问问你的营养教练");
     expect(source).toContain('className="coach-chat__status"');
     expect(source).toContain('className="coach-chat__suggestion-product"');
-    expect(source).toContain(
-      'const quickPrompts = ["晚餐怎么补蛋白？", "如何补充蛋白质？", "加餐推荐", "外食怎么选？"]',
-    );
+    expect(source).toContain("const defaultQuickPrompts");
+    expect(source).toContain("quickPrompts.map");
   });
 
   it("keeps progress, quick replies, composer, and tab bar in separate vertical lanes", () => {
@@ -75,7 +74,11 @@ describe("local coach and profile", () => {
     expect(source).not.toContain('className="coach-chat__score"');
     expect(source).not.toContain("今日营养评分");
     expect(source).not.toContain('variant="hero"');
+    expect(source).toContain('className="coach-chat__section-toggle"');
+    expect(source).toContain('className="coach-chat__image-picker"');
     expect(pageStyles).toContain(".coach-chat__bottom-tools");
+    expect(pageStyles).toContain(".coach-chat__section-toggle");
+    expect(pageStyles).toContain(".coach-chat__image-picker");
     expect(pageStyles).not.toContain(".coach-chat__score {");
     expect(layoutStyles).toContain(
       "padding-bottom: calc($tabbar-height + $safe-area-bottom + 112px);",

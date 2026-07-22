@@ -5,7 +5,7 @@ const read = (relativePath: string) =>
   readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
 describe("persisted coach boundary", () => {
-  it("uses authenticated coach history, answer, and non-generative brief endpoints", () => {
+  it("uses authenticated coach history, answer, and record-aware brief endpoints", () => {
     const api = read("src/api/coach-api.ts");
     const page = read("src/pages/coach/index.tsx");
 
@@ -23,6 +23,10 @@ describe("persisted coach boundary", () => {
     expect(page).toContain("getProductCoachMessages");
     expect(page).toContain("sendProductCoachMessage");
     expect(page).toContain("streamProductCoachMessage");
+    expect(page).toContain("getProductCoachBrief");
+    expect(page).toContain("refreshCoachBrief");
+    expect(page).toContain("analyzeProductImage");
+    expect(page).toContain("Taro.chooseMedia");
     expect(page).toContain('event.type === "delta"');
     expect(page).toContain('event.type === "complete"');
     expect(page).not.toContain("replyFor");

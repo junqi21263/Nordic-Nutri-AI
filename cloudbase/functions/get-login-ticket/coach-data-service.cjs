@@ -82,6 +82,32 @@ function priorityForContext(context) {
   return "regularity";
 }
 
+function quickPromptsForContext(context) {
+  const priority = priorityForContext(context);
+  const protein = safeNumber(context.daily.remaining.protein);
+  const calories = safeNumber(context.daily.remaining.calories);
+  if (priority === "logging") {
+    return ["我想补记今天的一餐", "这餐怎么记录更准确？", "今天还差哪些营养？", "下一餐怎么搭配？"];
+  }
+  if (priority === "protein") {
+    return [
+      `晚餐怎么补${protein}g 蛋白？`,
+      "适合的高蛋白加餐？",
+      "外食怎么补足蛋白？",
+      "今天其余营养怎么搭配？",
+    ];
+  }
+  if (priority === "calories") {
+    return [
+      `还剩${calories} kcal，下一餐怎么吃？`,
+      "加餐怎么安排更合适？",
+      "外食怎么选更均衡？",
+      "查看今天的营养进度",
+    ];
+  }
+  return ["下一餐怎么搭配？", "适合什么健康加餐？", "外食怎么选更均衡？", "查看今天的营养进度"];
+}
+
 function createRuleReply(prompt, context) {
   const safety = safetyForPrompt(prompt);
   if (safety !== "none") {
@@ -313,7 +339,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       priority,
       remaining: context.daily.remaining,
       completion: context.daily.completion,
-      quickPrompts: priority === "protein" ? ["晚餐怎么补蛋白？", "查看今日进度"] : ["查看今日进度", "下一餐怎么搭配？"],
+      quickPrompts: quickPromptsForContext(context),
     };
   }
 

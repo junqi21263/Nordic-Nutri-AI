@@ -879,6 +879,10 @@
   font-size: $font-overline;
   font-weight: $font-weight-semibold;
 }
+.coach-chat__progress-kicker {
+  font-size: $font-body;
+  line-height: 1.2;
+}
 .coach-chat__hero-title {
   color: $color-text-primary;
   font-size: 42px;
@@ -1009,6 +1013,22 @@
   flex: 1;
   white-space: pre-line;
 }
+.coach-chat__message-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: $space-8;
+  min-width: 0;
+}
+.coach-chat__message-image {
+  border-radius: $radius-12;
+  height: 196px;
+  width: 196px;
+}
+.coach-chat__message-image-label {
+  color: $color-text-secondary;
+  font-size: $font-overline;
+}
 .coach-chat__streaming-copy {
   color: $color-text-secondary;
 }
@@ -1038,6 +1058,17 @@
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
   gap: $space-4;
+}
+.coach-chat__section-toggle {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+.coach-chat__section-toggle-copy {
+  color: $color-text-secondary;
+  font-size: $font-overline;
+  margin-left: $space-8;
+  white-space: nowrap;
 }
 .coach-chat__suggestion-title {
   color: $color-forest-green;
@@ -1108,6 +1139,15 @@
   display: flex;
   justify-content: space-between;
 }
+.coach-chat__progress-heading {
+  align-items: flex-start;
+}
+.coach-chat__progress-heading .coach-chat__section-toggle-copy {
+  display: block;
+  margin-left: 0;
+  margin-top: 2px;
+  text-align: right;
+}
 .coach-chat__progress-title {
   color: $color-text-primary;
   display: block;
@@ -1149,6 +1189,16 @@
   flex-wrap: wrap;
   gap: $space-8 $space-12;
 }
+.coach-chat__quick-section {
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
+}
+.coach-chat__quick-title {
+  color: $color-text-primary;
+  font-size: $font-caption;
+  font-weight: $font-weight-semibold;
+}
 .coach-chat__quick-chip {
   background: $color-surface;
   border: 1px solid rgba($color-forest-green, 0.78);
@@ -1173,6 +1223,30 @@
   position: fixed;
   right: $page-horizontal;
   z-index: 20;
+}
+.coach-chat__image-picker {
+  align-items: center;
+  background: rgba($color-sage-light, 0.58);
+  border-radius: $radius-full;
+  display: flex;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+.coach-chat__selected-image {
+  align-items: center;
+  background: $color-soft-beige;
+  border-radius: $radius-full;
+  color: $color-forest-green;
+  display: flex;
+  height: 48px;
+  justify-content: center;
+  overflow: hidden;
+  width: 48px;
+}
+.coach-chat__selected-image-preview {
+  height: 100%;
+  width: 100%;
 }
 .coach-chat__input {
   color: $color-text-primary;

@@ -182,13 +182,18 @@ test("does not invoke the stream model for unrelated questions", async () => {
   assert.equal(events[0].reply.source, "rule_v2");
 });
 
-test("returns a non-generative coach brief from authoritative context", async () => {
+test("returns record-aware coach quick prompts from authoritative context", async () => {
   const { db } = createDb();
   const service = createCoachDataService({ db, ...dependencies(), answer: null });
 
   const brief = await service.getBrief("user-1", "2026-07-20");
 
   assert.equal(brief.priority, "protein");
-  assert.deepEqual(brief.quickPrompts, ["晚餐怎么补蛋白？", "查看今日进度"]);
+  assert.deepEqual(brief.quickPrompts, [
+    "晚餐怎么补40g 蛋白？",
+    "适合的高蛋白加餐？",
+    "外食怎么补足蛋白？",
+    "今天其余营养怎么搭配？",
+  ]);
   assert.equal(brief.remaining.protein, 40);
 });
