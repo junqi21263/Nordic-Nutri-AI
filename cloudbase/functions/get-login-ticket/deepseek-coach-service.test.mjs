@@ -38,6 +38,15 @@ test("rejects invalid model replies and unsafe-sized fields", async () => {
   await assert.rejects(() => answer({ prompt: "给我建议", context: {}, history: [] }), /暂不可用/);
 });
 
+test("rejects medical-prescriptive wording when the model claims normal safety", async () => {
+  const answer = createDeepseekCoachService({
+    apiKey: "test-key",
+    requestCompletion: async () => ({ ...validReply, rationale: "建议用药物治疗以加快减脂。", safety: "none" }),
+  });
+
+  await assert.rejects(() => answer({ prompt: "怎么减脂？", context: {}, history: [] }), /暂不可用/);
+});
+
 test("uses JSON mode and an injection-safe professional policy prompt", async () => {
   let body;
   const answer = createDeepseekCoachService({

@@ -1,5 +1,6 @@
 const priorities = new Set(["protein", "calories", "carbs", "fat", "fiber", "regularity", "logging"]);
 const safetyLevels = new Set(["none", "professional_consultation", "urgent_care"]);
+const unsafeMedicalWording = /诊断|治疗|处方|药物|用药|孕期|怀孕|哺乳|厌食|暴食/i;
 
 const COACH_SYSTEM_PROMPT = `你是 Nordic Nutri 的专业日常营养教练。系统提供的 nutritionContext 是唯一权威营养事实；不得猜测、补造或改写未提供的体重、疾病、训练量、食材热量、餐食记录或目标。依据用户目标、当天记录和一周趋势，用简洁中文给出可执行的日常饮食建议；区分增肌、减脂、维持目标，但不要把每周训练天数误认为今天正在训练。
 
@@ -39,6 +40,9 @@ function validateReply(payload) {
     if (!label || !detail) throw new PublicCoachError("COACH_RETRYABLE");
     return { label, detail };
   });
+  if (result.safety === "none" && unsafeMedicalWording.test([headline, rationale, ...actions.flatMap((action) => [action.label, action.detail])].join("\n"))) {
+    throw new PublicCoachError("COACH_RETRYABLE");
+  }
   return { priority: result.priority, headline, actions, rationale, safety: result.safety };
 }
 
