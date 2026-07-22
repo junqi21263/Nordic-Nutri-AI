@@ -70,7 +70,8 @@
 }
 .page-layout--coach-chat .page-layout__content {
   padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
-  padding-bottom: calc($tabbar-height + $safe-area-bottom + $space-48 + $space-40);
+  // Reserve scroll space for the fixed composer, score and tab bar.
+  padding-bottom: calc($tabbar-height + $safe-area-bottom + 188px);
 }
 .page-layout--manual-meal .page-layout__content {
   padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);

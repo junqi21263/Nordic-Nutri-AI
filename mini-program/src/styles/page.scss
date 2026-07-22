@@ -996,7 +996,9 @@
   padding: $space-12 $space-16;
   position: fixed;
   right: $page-horizontal;
-  bottom: calc($tabbar-height + $safe-area-bottom + $space-48 + $space-8);
+  // Composer bottom offset (12) + its 76px height + an 8px visual gap.
+  // This keeps the score above, instead of underneath, the fixed composer.
+  bottom: calc($tabbar-height + $safe-area-bottom + 96px);
   z-index: 20;
 }
 .coach-chat__score-value {

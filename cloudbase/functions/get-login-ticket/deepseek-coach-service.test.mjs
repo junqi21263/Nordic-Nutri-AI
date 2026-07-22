@@ -69,6 +69,7 @@ test("uses JSON mode and an injection-safe professional policy prompt", async ()
   assert.equal(body.temperature, 0.2);
   assert.match(body.messages[0].content, /nutritionContext 是唯一权威营养事实/);
   assert.match(body.messages[0].content, /不得诊断/);
+  assert.match(body.messages[0].content, /仅回答日常营养、饮食、食谱或训练恢复相关问题/);
   assert.equal(body.messages[1].role, "user");
   assert.equal(body.messages[2].role, "assistant");
 });

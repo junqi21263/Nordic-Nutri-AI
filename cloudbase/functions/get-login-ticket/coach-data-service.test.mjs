@@ -125,6 +125,18 @@ test("uses a fixed consultation response instead of calling the model for medica
   assert.equal(result.reply.source, "rule_v2");
 });
 
+test("keeps unrelated questions inside the nutrition-coach boundary without calling the model", async () => {
+  const { db } = createDb();
+  let calls = 0;
+  const service = createCoachDataService({ db, ...dependencies(), answer: async () => { calls += 1; return validReply; } });
+
+  const result = await service.sendMessage("user-1", { ...validRequest, clientRequestId: "33333333-3333-4333-8333-333333333333", prompt: "帮我写一首诗" });
+
+  assert.equal(calls, 0);
+  assert.equal(result.reply.source, "rule_v2");
+  assert.match(result.messages[1].content, /营养、饮食、食谱或训练恢复/);
+});
+
 test("returns a non-generative coach brief from authoritative context", async () => {
   const { db } = createDb();
   const service = createCoachDataService({ db, ...dependencies(), answer: null });

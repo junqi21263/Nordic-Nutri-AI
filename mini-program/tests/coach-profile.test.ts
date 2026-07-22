@@ -58,6 +58,22 @@ describe("local coach and profile", () => {
     expect(source).toContain('const quickPrompts = ["晚餐怎么补蛋白？", "查看今日进度"]');
   });
 
+  it("keeps the fixed score, composer, and tab bar in separate vertical lanes", () => {
+    const pageStyles = readFileSync(
+      resolve(import.meta.dirname, "../src/styles/page.scss"),
+      "utf8",
+    );
+    const layoutStyles = readFileSync(
+      resolve(import.meta.dirname, "../src/styles/layout.scss"),
+      "utf8",
+    );
+
+    expect(pageStyles).toContain("bottom: calc($tabbar-height + $safe-area-bottom + 96px);");
+    expect(layoutStyles).toContain(
+      "padding-bottom: calc($tabbar-height + $safe-area-bottom + 188px);",
+    );
+  });
+
   it("uses a coach-aligned personal-center header and synchronizes tab selection from profile metrics", () => {
     const source = readFileSync(
       resolve(import.meta.dirname, "../src/pages/profile/index.tsx"),

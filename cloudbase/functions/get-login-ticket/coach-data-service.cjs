@@ -2,6 +2,7 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const medicalRiskPattern = /疾病|诊断|治疗|药物|吃药|处方|孕产|怀孕|哺乳|未成年|进食障碍|厌食|暴食/i;
 const urgentRiskPattern = /自杀|昏厥|胸痛|呼吸困难|严重过敏|急诊|急救/i;
+const nutritionScopePattern = /营养|饮食|食谱|食物|吃|喝|餐|蛋白|热量|卡路里|碳水|脂肪|纤维|蔬菜|水果|主食|食材|加餐|早餐|午餐|晚餐|增肌|减脂|体重|饱腹|恢复|训练|运动|今日进度/i;
 
 class PublicCoachDataError extends Error {
   constructor(code, message = "教练消息无效") {
@@ -66,6 +67,10 @@ function safetyForPrompt(prompt) {
   return "none";
 }
 
+function isNutritionQuestion(prompt) {
+  return nutritionScopePattern.test(prompt);
+}
+
 function priorityForContext(context) {
   const remaining = context.daily.remaining;
   if (!context.daily.mealCount) return "logging";
@@ -86,6 +91,16 @@ function createRuleReply(prompt, context) {
       actions: [{ label: "安全优先", detail: urgent ? "如有紧急或严重不适，请尽快联系急救服务或就近医疗机构。" : "涉及疾病、药物或特殊生理阶段时，请向医生或注册营养专业人士确认。" }],
       rationale: "为了避免给出不适合个人情况的饮食建议，需要专业人员结合你的具体健康信息判断。",
       safety,
+    };
+  }
+
+  if (!isNutritionQuestion(prompt)) {
+    return {
+      priority: "regularity",
+      headline: "我只提供日常营养建议",
+      actions: [{ label: "可以这样问", detail: "请咨询营养、饮食、食谱或训练恢复相关问题，例如：晚餐怎么补蛋白？" }],
+      rationale: "为了让建议保持准确、安全和可执行，我不会回答与日常营养无关的话题。",
+      safety: "none",
     };
   }
 
@@ -193,7 +208,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     const [context, history] = await Promise.all([buildContext(userId, request.date), getMessages(userId, 10)]);
     let source = "rule_v2";
     let reply = createRuleReply(request.prompt, context);
-    if (reply.safety === "none" && typeof answer === "function") {
+    if (reply.safety === "none" && isNutritionQuestion(request.prompt) && typeof answer === "function") {
       try {
         reply = await answer({ prompt: request.prompt, context, history });
         source = "deepseek";
