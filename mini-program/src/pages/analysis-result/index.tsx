@@ -63,6 +63,7 @@ export default function AnalysisResultPage() {
       mealType: meal.mealType,
       favorite: false,
       imageKey: meal.imageKey,
+      imageUrl: meal.imagePath || meal.imageUrl || scanner.previewPath || null,
       items: adjusted.items,
       insight: meal.insight,
     };
@@ -85,27 +86,20 @@ export default function AnalysisResultPage() {
       feedback.show({ message: "分析或保存失败，请检查网络后重试", tone: "error" });
     }
   };
+  const evaluation = meal.evaluation || "这餐吃得不错";
   return (
     <PageLayout
-      title="这餐吃得不错"
+      title={evaluation}
       showTabs={false}
       hideNavigation
+      showBack
+      onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--analysis-result"
     >
       <View className="analysis-result-page">
-        <View className="analysis-result-page__page-title">
-          <View
-            className="analysis-result-page__back"
-            ariaLabel="重新扫描"
-            onClick={() => navigateBackOrHome("/pages/food-scanner/index")}
-          >
-            <NordicIcon name="back" size={24} ariaLabel="返回扫描" />
-          </View>
-          <Text>营养分析</Text>
-        </View>
         <View className="analysis-result-page__header">
           <View className="analysis-result-page__heading">
-            <Text className="analysis-result-page__title">这餐吃得不错</Text>
+            <Text className="analysis-result-page__title">{evaluation}</Text>
             <Text className="analysis-result-page__subtitle">
               本地分析已完成，保存前可微调份量。
             </Text>
@@ -125,6 +119,8 @@ export default function AnalysisResultPage() {
           <View className="analysis-result-page__summary-body">
             <View className="analysis-result-page__confidence">
               <Badge tone="success">识别可信度 {meal.confidence}%</Badge>
+              {meal.nutritionSource === "usda" && <Badge tone="info">营养来自 USDA</Badge>}
+              {meal.nutritionSource === "mixed" && <Badge tone="info">营养部分来自 USDA</Badge>}
             </View>
             <Text className="analysis-result-page__summary-title">{meal.title}</Text>
             <Text className="analysis-result-page__summary-meta">

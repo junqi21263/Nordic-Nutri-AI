@@ -39,8 +39,8 @@ export default defineAppConfig({
     borderStyle: "white",
     list: [
       { pagePath: "pages/home/index", text: "首页" },
-      { pagePath: "pages/food-scanner/index", text: "扫描" },
       { pagePath: "pages/meal-records/index", text: "记录" },
+      { pagePath: "pages/food-catalog/index", text: "食物库" },
       { pagePath: "pages/coach/index", text: "教练" },
       { pagePath: "pages/profile/index", text: "我的" },
     ],

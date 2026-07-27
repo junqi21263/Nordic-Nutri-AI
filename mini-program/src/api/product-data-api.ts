@@ -128,6 +128,33 @@ export function getProductNutritionPlan() {
   });
 }
 
+export interface NutritionPlanPreviewResult {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  insight?: string | null;
+  source?: "deepseek" | "formula" | string;
+}
+
+export function previewProductNutritionPlan(input: {
+  age: number;
+  sex: "female" | "male" | "undisclosed";
+  heightCm: number;
+  weightKg: number;
+  activityLevel: "sedentary" | "light" | "moderate" | "high" | "very_high";
+  trainingDays: number;
+  goalType: "muscle_gain" | "fat_loss" | "maintenance" | "maintain" | "performance";
+  dietaryPattern?: string;
+  foodAvoidances?: string[];
+}) {
+  return requestProductApi<NutritionPlanPreviewResult>("/nutrition-plan/preview", {
+    method: "POST",
+    data: input,
+    fallbackMessage: "营养计划计算失败，请稍后重试",
+  });
+}
+
 export function saveProductNutritionPlan(
   input: Pick<ProductNutritionPlan, "calories" | "proteinG" | "carbsG" | "fatG">,
 ) {

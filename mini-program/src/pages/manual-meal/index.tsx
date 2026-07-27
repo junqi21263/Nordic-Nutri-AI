@@ -146,17 +146,12 @@ export default function ManualMealPage() {
       title="手动记录"
       showTabs={false}
       hideNavigation
+      showBack
+      onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--manual-meal"
     >
       <View className="manual-meal-page">
         <View className="manual-meal__page-title">
-          <View
-            className="manual-meal__back"
-            ariaLabel="返回"
-            onClick={() => navigateBackOrHome("/pages/meal-records/index")}
-          >
-            <NordicIcon name="back" size={22} ariaLabel="返回" />
-          </View>
           <Text>补充这一餐</Text>
         </View>
         <Text className="manual-meal__description">不方便拍照时，也能快速把饮食节奏记下来。</Text>

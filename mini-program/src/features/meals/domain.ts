@@ -19,6 +19,7 @@ export interface Meal {
   mealType: MealType;
   favorite: boolean;
   imageKey: "bowl" | "salmon" | "oats" | null;
+  imageUrl?: string | null;
   items: MealItem[];
   insight: string;
 }

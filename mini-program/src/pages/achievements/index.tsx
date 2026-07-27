@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import Taro from "@tarojs/taro";
 import { useEffect } from "react";
 import { getProductAchievements } from "../../api/insight-api";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -7,8 +8,6 @@ import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { useAchievementStore } from "../../stores/achievement-store";
 import { useMealStore } from "../../stores/meal-store";
-import { navigateBackOrHome } from "../../utils/navigation";
-
 export default function AchievementsPage() {
   const achievements = useAchievementStore();
   const meals = useMealStore();
@@ -29,16 +28,11 @@ export default function AchievementsPage() {
       title="全部成就"
       showTabs={false}
       hideNavigation
+      showBack
+      onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--achievements"
     >
       <View className="profile-subpage__page-title">
-        <View
-          className="profile-subpage__back"
-          ariaLabel="返回个人中心"
-          onClick={() => navigateBackOrHome("/pages/profile/index")}
-        >
-          ‹
-        </View>
         <Text>全部成就</Text>
       </View>
       <View className="achievement-center">

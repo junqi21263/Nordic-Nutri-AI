@@ -20,10 +20,12 @@ async function loadIdentity(user: { id: string }) {
     maintain: "保持状态",
     performance: "运动表现",
   };
+  // Prefer the server/bootstrap nickname when present so home/profile stay in sync.
+  const realNickname = account.nickname && account.nickname !== "微信用户" ? account.nickname : null;
   useProfileStore.getState().hydrate(
     user.id,
     {
-      ...(account.nickname ? { nickname: account.nickname } : {}),
+      ...(realNickname ? { nickname: realNickname } : { nickname: "" }),
       ...(account.avatarUrl ? { avatarUrl: account.avatarUrl } : {}),
       ...(account.weightKg != null ? { weight: account.weightKg } : {}),
       ...(account.goalType ? { goalLabel: labels[account.goalType] ?? "精益增肌" } : {}),

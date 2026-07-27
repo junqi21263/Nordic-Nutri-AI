@@ -462,3 +462,93 @@ test("accepts authenticated visual analysis without trusting a client user id", 
   });
   assert.equal(calls[0].userId, "user-1");
 });
+
+test("serves food categories and tags to authenticated users", async () => {
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      foodRepository: {
+        listCategories: async () => [{ code: "meat", nameZh: "肉禽" }],
+        listTags: async () => [{ code: "high_protein", nameZh: "高蛋白" }],
+        suggestions: async () => [{ id: "f1", nameEn: "Chicken" }],
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const cats = await fetch(`${baseUrl}/get-login-ticket/foods/categories`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(cats.status, 200);
+    assert.equal((await cats.json()).items[0].code, "meat");
+
+    const tags = await fetch(`${baseUrl}/get-login-ticket/foods/tags`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal((await tags.json()).items[0].code, "high_protein");
+
+    const sug = await fetch(`${baseUrl}/get-login-ticket/foods/suggestions?q=chicken`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal((await sug.json()).items[0].nameEn, "Chicken");
+  });
+});
+
+test("barcode lookup returns 404 when missing", async () => {
+  const { FoodBarcodeError } = await import("./food-barcode-service.cjs");
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      foodBarcode: { lookup: async (code) => { if (code === "5449000000996") return { food: { id: "f1" }, source: "cache" }; throw new FoodBarcodeError("FOOD_BARCODE_NOT_FOUND"); } },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const ok = await fetch(`${baseUrl}/get-login-ticket/foods/barcode/5449000000996`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(ok.status, 200);
+    assert.equal((await ok.json()).source, "cache");
+
+    const missing = await fetch(`${baseUrl}/get-login-ticket/foods/barcode/0000000000000`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).code, "FOOD_BARCODE_NOT_FOUND");
+  });
+});
+
+test("admin food routes reject non-admin users with 403", async () => {
+  const { FoodAdminError } = await import("./food-admin-service.cjs");
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      foodAdmin: {
+        listMissingImages: async () => { throw new FoodAdminError("FORBIDDEN"); },
+        listSyncJobs: async () => { throw new FoodAdminError("FORBIDDEN"); },
+        reviewImage: async () => { throw new FoodAdminError("FORBIDDEN"); },
+        setPrimaryImage: async () => { throw new FoodAdminError("FORBIDDEN"); },
+        updateFood: async () => { throw new FoodAdminError("FORBIDDEN"); },
+        syncImages: async () => { throw new FoodAdminError("FORBIDDEN"); },
+        importUsda: async () => { throw new FoodAdminError("FORBIDDEN"); },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const r1 = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods/missing-images`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(r1.status, 403);
+    const r2 = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods/sync-jobs`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(r2.status, 403);
+    const r3 = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-images/11111111-2222-3333-4444-555555555555/review`, { method: "PATCH", headers: { authorization: "Bearer valid-session", "content-type": "application/json" }, body: JSON.stringify({ status: "ready" }) });
+    assert.equal(r3.status, 403);
+  });
+});
+
+test("food image upload requires authentication and a base64 payload", async () => {
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      foodImage: { acquireFromUpload: async () => ({ storagePath: "foods/k/hash", thumbUrl: null, mediumUrl: null, detailUrl: "https://cdn/x", contentHash: "h", mimeType: "image/webp", fileSize: 10, width: null, height: null }) },
+      foodRepository: { insertImage: async (record) => ({ id: "img1", ...record }) },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const noAuth = await fetch(`${baseUrl}/get-login-ticket/foods/images/upload`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ imageBase64: "AA==" }) });
+    assert.equal(noAuth.status, 401);
+
+    const empty = await fetch(`${baseUrl}/get-login-ticket/foods/images/upload`, { method: "POST", headers: { authorization: "Bearer valid-session", "content-type": "application/json" }, body: JSON.stringify({}) });
+    assert.equal(empty.status, 400);
+
+    const ok = await fetch(`${baseUrl}/get-login-ticket/foods/images/upload`, { method: "POST", headers: { authorization: "Bearer valid-session", "content-type": "application/json" }, body: JSON.stringify({ imageBase64: "AA==", contentType: "image/jpeg" }) });
+    assert.equal(ok.status, 200);
+    assert.equal((await ok.json()).image.status, "pending");
+  });
+});

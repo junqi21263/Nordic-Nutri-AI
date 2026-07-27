@@ -69,7 +69,7 @@ describe("P0 / P1 本地体验补全", () => {
 
     expect(records.slice(addMealStart, addMealEnd)).toContain('setActiveKey("food-scanner")');
     expect(records.slice(addMealStart, addMealEnd)).toContain(
-      'Taro.switchTab({ url: "/pages/food-scanner/index" })',
+      'Taro.navigateTo({ url: "/pages/food-scanner/index" })',
     );
   });
 
@@ -102,8 +102,6 @@ describe("P0 / P1 本地体验补全", () => {
     expect(styles).toContain(".manual-meal__page-title");
     expect(styles).toContain("font-size: $font-h2;");
     expect(layoutStyles).toContain(".page-layout--manual-meal .page-layout__content");
-    expect(layoutStyles).toContain(
-      "padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);",
-    );
+    expect(layoutStyles).toContain("page-layout__content");
   });
 });

@@ -1,4 +1,5 @@
 import { Input, Text, View } from "@tarojs/components";
+import Taro from "@tarojs/taro";
 import { useState } from "react";
 import {
   getProductNutritionPlan,
@@ -66,16 +67,11 @@ export default function GoalAdjustPage() {
       title="调整目标"
       showTabs={false}
       hideNavigation
+      showBack
+      onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--goal-adjust"
     >
       <View className="profile-subpage__page-title">
-        <View
-          className="profile-subpage__back"
-          ariaLabel="返回编辑资料"
-          onClick={() => navigateBackOrHome("/pages/profile-edit/index")}
-        >
-          ‹
-        </View>
         <Text>调整目标</Text>
       </View>
       <View className="profile-flow profile-goal-adjust">

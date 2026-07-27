@@ -107,3 +107,52 @@ test("incremental CloudBase migrations tolerate objects already created by the c
   }
   assert.match(mealSql, /drop trigger if exists meal_items_recalculate_meal_totals/i);
 });
+
+test("food catalog v2 migration defines the unified food data model with server-only RLS", async () => {
+  const sql = await readFile(new URL("../../cloudbase/pg/migrations/0012_food_catalog_v2.sql", import.meta.url), "utf8");
+
+  for (const table of [
+    "food_categories", "food_tags", "foods", "food_tag_relations",
+    "food_images", "food_source_payloads", "food_sync_jobs", "food_image_tasks",
+  ]) {
+    assert.match(sql, new RegExp(`create table if not exists public\\.${table}\\b`, "i"), table);
+  }
+  assert.match(sql, /add column if not exists is_admin boolean not null default false/i);
+  assert.match(sql, /create extension if not exists pg_trgm/i);
+  assert.match(sql, /foods_name_zh_trigram_idx/i);
+  assert.match(sql, /foods_search_keywords_idx/i);
+  assert.match(sql, /food_images_one_primary_per_food_idx/i);
+  assert.match(sql, /unique \(source, source_id\)/i);
+  assert.match(sql, /calories >= 0/i);
+  assert.match(sql, /protein_g >= 0/i);
+  assert.match(sql, /fat_g >= 0/i);
+  assert.match(sql, /carbs_g >= 0/i);
+  assert.match(sql, /revoke all on public\.%I from public, anon, authenticated/i);
+  assert.match(sql, /enable row level security/i);
+  assert.match(sql, /: server only/i);
+  assert.match(sql, /insert into public\.food_categories/i);
+  assert.match(sql, /insert into public\.food_tags/i);
+  assert.match(sql, /'high_protein','高蛋白'/i);
+  assert.match(sql, /insert into public\.foods[\s\S]*from public\.food_catalog/i);
+});
+
+test("food image generation migration adds jobs queue and review metadata", async () => {
+  const sql = await readFile(new URL("../../cloudbase/pg/migrations/0013_food_image_generation.sql", import.meta.url), "utf8");
+  assert.match(sql, /create table if not exists public\.food_image_jobs/i);
+  assert.match(sql, /food_image_jobs_one_active_per_food_idx/i);
+  assert.match(sql, /add column if not exists image_status/i);
+  assert.match(sql, /add column if not exists review_status/i);
+  assert.match(sql, /create table if not exists public\.food_image_usage_daily/i);
+  assert.match(sql, /'hunyuan'/i);
+  assert.match(sql, /'candidate'/i);
+});
+
+test("food seed inserts 50 high-frequency fixture foods idempotently", async () => {
+  const sql = await readFile(new URL("../../cloudbase/pg/seeds/0012_food_seed.sql", import.meta.url), "utf8");
+  assert.match(sql, /insert into public\.foods[\s\S]*on conflict \(source, source_id\) do nothing/i);
+  assert.match(sql, /'chicken-breast','鸡胸肉'/i);
+  assert.match(sql, /'quinoa','藜麦'/i);
+  const slugs = sql.match(/\('([a-z-]+)','[^']+','[^']+',/g) ?? [];
+  assert.ok(slugs.length >= 50, `expected >=50 seed foods, got ${slugs.length}`);
+});
+

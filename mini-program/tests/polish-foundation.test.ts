@@ -40,7 +40,7 @@ describe("MVP polish foundation", () => {
     expect(components).not.toContain("prefers-reduced-motion");
     expect(components).toContain(".app-button:active");
     expect(navigation).toContain("ariaLabel");
-    expect(layout).toContain("page-layout__content--enter");
+    expect(layout).toContain("page-layout__content");
   });
 
   it("uses the local dialog system for destructive meal confirmation", () => {

@@ -27,8 +27,9 @@ describe("body and goal real save pages", () => {
     const page = source("nutrition-plan");
 
     expect(page).toContain("completeProductOnboarding");
+    expect(page).toContain("previewProductNutritionPlan");
     expect(page).toContain("nickname: profile.nickname");
     expect(page).not.toContain("getSupabaseClient");
-    expect(page).toContain("loading={isSaving}");
+    expect(page).toContain("loading={isSaving || isLoadingPlan}");
   });
 });

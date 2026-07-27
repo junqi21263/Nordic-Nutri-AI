@@ -1,10 +1,8 @@
-import { BottomTabBar } from "../components/bottom-tab-bar";
-import { useTabBarStore } from "../stores/tab-bar-store";
-
+// WeChat renders this component automatically on tab pages, but we render the
+// BottomTabBar directly in PageLayout so that ALL pages (including non-tab pages
+// opened via reLaunch) show the tab bar. Returning null here avoids double rendering.
 function CustomTabBar() {
-  const activeKey = useTabBarStore((state) => state.activeKey);
-  const visible = useTabBarStore((state) => state.visible);
-  return visible ? <BottomTabBar activeKey={activeKey} /> : null;
+  return null;
 }
 
 CustomTabBar.options = {

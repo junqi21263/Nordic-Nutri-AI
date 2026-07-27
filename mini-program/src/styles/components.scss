@@ -11,9 +11,8 @@
   font-weight: $font-weight-button;
   letter-spacing: 0.2px;
   transition:
-    transform $duration-fast $ease-standard,
-    box-shadow $duration-base $ease-standard,
-    opacity $duration-fast $ease-standard;
+    transform $duration-press $ease-standard,
+    opacity $duration-press $ease-standard;
 
   &--primary {
     background: $color-forest-green;
@@ -52,7 +51,8 @@
 }
 .app-button--active,
 .app-button:active {
-  transform: scale(0.975);
+  opacity: 0.92;
+  transform: scale(0.97);
 }
 .app-button--disabled:active {
   transform: none;
@@ -372,6 +372,33 @@
   line-height: $line-body;
   margin-top: $space-4;
 }
+.brand-header {
+  align-items: center;
+  background: rgba($color-background, 0.92);
+  backdrop-filter: blur(12px);
+  display: flex;
+  left: 0;
+  padding: 0 $page-horizontal;
+  position: sticky;
+  right: 0;
+  top: 0;
+  z-index: 100;
+}
+.brand-header__content {
+  align-items: center;
+  display: flex;
+  gap: $space-8;
+  padding-bottom: $space-8;
+}
+.brand-header__content .nordic-icon {
+  filter: brightness(0) saturate(100%) hue-rotate(80deg);
+}
+.brand-header__name {
+  color: $color-forest-green;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+  letter-spacing: 0.3px;
+}
 .section-title {
   align-items: flex-end;
   display: flex;
@@ -504,6 +531,10 @@
 .nutrition-tag--fat {
   background: rgba($color-neutral-gray, 0.16);
   color: $color-text-secondary;
+}
+.badge--info {
+  background: rgba($color-sage, 0.18);
+  color: $color-forest-green;
 }
 .chip {
   background: $color-soft-beige;
@@ -645,6 +676,11 @@
   height: 128px;
   width: 128px;
 }
+.avatar--home {
+  font-size: $font-h3;
+  height: 104px;
+  width: 104px;
+}
 .avatar--image {
   display: inline-block;
   object-fit: cover;
@@ -756,7 +792,8 @@
   display: flex;
   height: calc($bottom-tab-height + $safe-area-bottom);
   left: 0;
-  padding-bottom: $safe-area-bottom;
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
   position: fixed;
   right: 0;
   z-index: 20;
@@ -767,10 +804,14 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: $font-weight-semibold;
   gap: 2px;
   justify-content: center;
+  min-height: $touch-target-min;
+  transition:
+    transform $duration-press $ease-standard,
+    opacity $duration-press $ease-standard;
 }
 .bottom-tab-bar__item--active {
   color: $color-forest-green;
@@ -780,8 +821,9 @@
   border-radius: $radius-full;
   display: flex;
   font-size: $font-h3;
-  height: 44px;
+  height: $touch-target-min;
   justify-content: center;
+  min-width: $touch-target-min;
   width: 52px;
 }
 .bottom-tab-bar__icon .nordic-icon {
@@ -970,11 +1012,13 @@
   color: $color-text-primary;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
+  text-align: center;
 }
 .confirm-dialog__description {
   color: $color-text-secondary;
   font-size: $font-caption;
   line-height: $line-body;
+  text-align: center;
 }
 .confirm-dialog__actions {
   display: grid;

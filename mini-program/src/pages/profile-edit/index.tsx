@@ -1,4 +1,4 @@
-import { Image, Input, Text, View } from "@tarojs/components";
+import { Button, Image, Input, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useState } from "react";
 import {
@@ -16,6 +16,7 @@ import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { navigateBackOrHome } from "../../utils/navigation";
+import { resolveAvatarUrl } from "../../features/profile/avatar-defaults";
 
 const goalOptions = ["精益增肌", "轻盈减脂", "保持状态"];
 const goalTypeByLabel: Record<string, "muscle_gain" | "fat_loss" | "maintain"> = {
@@ -33,18 +34,22 @@ export default function ProfileEditPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-  const chooseAvatar = async () => {
+  const onChooseAvatar = async (event: { detail?: { avatarUrl?: string } }) => {
     if (isUploadingAvatar || isSaving) return;
+    const filePath = typeof event.detail?.avatarUrl === "string" ? event.detail.avatarUrl.trim() : "";
+    if (!filePath) return;
     try {
-      const result = await Taro.chooseMedia({ count: 1, mediaType: ["image"], sourceType: ["album", "camera"] });
-      const filePath = result.tempFiles[0]?.tempFilePath;
-      if (!filePath) throw new Error("没有获取到图片");
       setIsUploadingAvatar(true);
       const uploaded = await uploadProfileAvatar(filePath);
       profile.setProfile({ avatarUrl: uploaded.avatarUrl });
       feedback.show({ message: "头像已更新", tone: "success" });
     } catch (error) {
-      if (!String(error).includes("cancel")) feedback.show({ message: error instanceof Error ? error.message : "头像上传失败，请稍后重试", tone: "error" });
+      if (!String(error).includes("cancel")) {
+        feedback.show({
+          message: error instanceof Error ? error.message : "头像上传失败，请稍后重试",
+          tone: "error",
+        });
+      }
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -109,27 +114,23 @@ export default function ProfileEditPage() {
       title="编辑资料"
       showTabs={false}
       hideNavigation
+      showBack
+      onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--profile-edit"
     >
-      <View className="profile-subpage__page-title">
-        <View
-          className="profile-subpage__back"
-          ariaLabel="返回个人中心"
-          onClick={() => navigateBackOrHome("/pages/profile/index")}
-        >
-          ‹
-        </View>
-        <Text>编辑资料</Text>
-      </View>
       <View className="profile-flow">
-        <View className="profile-edit__avatar" onClick={() => void chooseAvatar()}>
-          {profile.profile.avatarUrl ? (
-            <Image src={profile.profile.avatarUrl} mode="aspectFill" />
+        <Button
+          className="profile-edit__avatar"
+          openType="chooseAvatar"
+          onChooseAvatar={(event) => void onChooseAvatar(event)}
+        >
+          {resolveAvatarUrl(profile.profile.avatarUrl) ? (
+            <Image src={resolveAvatarUrl(profile.profile.avatarUrl)!} mode="aspectFill" />
           ) : (
             <Text>{profile.profile.nickname.slice(0, 1).toUpperCase()}</Text>
           )}
           <View className="profile-edit__avatar-action"><Text>{isUploadingAvatar ? "上传中" : "更换头像"}</Text></View>
-        </View>
+        </Button>
         <View onClick={() => void Taro.navigateTo({ url: "/pages/goal-adjust/index" })}>
           <AppCard className="profile-form__summary profile-form__summary--action">
             <View className="profile-form__summary-icon">
@@ -148,10 +149,12 @@ export default function ProfileEditPage() {
           <View className="profile-form__field">
             <Text>昵称</Text>
             <Input
+              type="nickname"
               value={nickname}
               maxlength={16}
               placeholder="输入你的昵称"
               onInput={(event) => setNickname(event.detail.value)}
+              onBlur={(event) => setNickname(event.detail.value)}
             />
           </View>
           <View className="profile-form__field">

@@ -42,6 +42,6 @@ describe("Stitch onboarding visual contract", () => {
     expect(tokenSource).toContain("$color-dark-forest: #0c1f14;");
     expect(tokenSource).toContain("$color-primary-container: #2d4b37;");
     expect(tokenSource).toContain("$color-warm-white: #faf9f6;");
-    expect(tokenSource).toMatch(/"PingFang SC",\s*-apple-system/);
+    expect(tokenSource).toMatch(/-apple-system,\s*"Helvetica Neue",\s*"PingFang SC"/);
   });
 });

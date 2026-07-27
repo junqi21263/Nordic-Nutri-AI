@@ -29,20 +29,20 @@ $color-border: $color-divider;
 $color-border-light: $color-divider;
 $color-disabled: $color-disabled-surface;
 
-$font-display: 46px;
-$font-h1: 40px;
-$font-h2: 34px;
-$font-h3: 30px;
-$font-body: 26px;
-$font-caption: 22px;
-$font-overline: 18px;
-$font-brand: 22px;
+$font-display: 48px;
+$font-h1: 42px;
+$font-h2: 36px;
+$font-h3: 32px;
+$font-body: 28px;
+$font-caption: 26px;
+$font-overline: 22px;
+$font-brand: 26px;
 $font-page-title: $font-h1;
 $font-section-title: $font-h3;
 $font-card-title: $font-caption;
 $font-body-small: $font-overline;
 $font-button: $font-body;
-$font-number-large: 48px;
+$font-number-large: 52px;
 $font-number-medium: $font-h2;
 $font-weight-regular: 400;
 $font-weight-medium: 500;
@@ -53,11 +53,10 @@ $line-heading: 1.24;
 $line-body: 1.55;
 $line-caption: 1.35;
 $font-family:
-  "PingFang SC",
   -apple-system,
-  BlinkMacSystemFont,
   "Helvetica Neue",
-  Arial,
+  "PingFang SC",
+  "Microsoft YaHei",
   sans-serif;
 
 $radius-4: 4px;
@@ -114,6 +113,12 @@ $space-32: 64px;
 $space-40: 80px;
 $space-48: 96px;
 
+// Mini Program UX (88rpx touch target @ 375 design width).
+$touch-target-min: 44px;
+$touch-target-gap: $space-8;
+$duration-press: 150ms;
+$mp-placeholder-color: $color-text-secondary;
+
 $duration-fast: 160ms;
 $duration-base: 240ms;
 $duration-normal: $duration-base;
@@ -126,6 +131,7 @@ $reduced-motion-duration: 0ms;
 
 $safe-area-top: env(safe-area-inset-top);
 $safe-area-bottom: env(safe-area-inset-bottom);
+$page-safe-top: calc(env(safe-area-inset-top) + $space-32 + $space-4);
 $page-gutter: $space-20;
 $page-horizontal: $page-gutter;
 $page-top: $space-16;

@@ -1,6 +1,7 @@
 const crypto = require("node:crypto");
 
 const MAX_AVATAR_BYTES = 1_500_000;
+const MAX_INLINE_AVATAR_BYTES = 350_000;
 const MIME_TO_EXTENSION = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -31,6 +32,14 @@ function parseAvatarInput(input) {
   return { content, mimeType, extension: MIME_TO_EXTENSION[mimeType] };
 }
 
+function isDisplayableAvatarRef(value) {
+  return typeof value === "string" && (
+    value.startsWith("data:") ||
+    value.startsWith("default:") ||
+    /^https?:\/\//i.test(value)
+  );
+}
+
 function createProfileAvatarService({ data, uploadImage, createTemporaryUrl }) {
   if (!data || typeof data.saveAvatarPath !== "function" || typeof uploadImage !== "function" || typeof createTemporaryUrl !== "function") {
     throw new Error("Profile avatar service is unavailable");
@@ -39,15 +48,43 @@ function createProfileAvatarService({ data, uploadImage, createTemporaryUrl }) {
     async upload(userId, input) {
       const image = parseAvatarInput(input);
       const cloudPath = `avatars/${userId}/${crypto.randomUUID()}.${image.extension}`;
-      const uploaded = await uploadImage({ cloudPath, contentType: image.mimeType, content: image.content });
-      const fileId = typeof uploaded?.fileId === "string" ? uploaded.fileId : "";
-      if (!fileId) throw new Error("Avatar storage upload failed");
-      await data.saveAvatarPath(userId, fileId);
-      const avatarUrl = await createTemporaryUrl(fileId);
-      if (!avatarUrl) throw new Error("Avatar temporary URL failed");
+      let storedRef = "";
+      let avatarUrl = "";
+
+      try {
+        const uploaded = await uploadImage({ cloudPath, contentType: image.mimeType, content: image.content });
+        const fileId = typeof uploaded?.fileId === "string" ? uploaded.fileId.trim() : "";
+        if (fileId) {
+          const resolved = isDisplayableAvatarRef(fileId) ? fileId : await createTemporaryUrl(fileId);
+          if (resolved) {
+            storedRef = fileId;
+            avatarUrl = resolved;
+          }
+        }
+      } catch (error) {
+        console.error("[avatar] Cloud storage upload failed, falling back to inline data URL:", error?.message || error);
+      }
+
+      // Only persist after we have something the client can actually render.
+      // This prevents overwriting default:robot-N with a broken pgstore:/cloud:// ref.
+      if (!avatarUrl) {
+        if (image.content.length > MAX_INLINE_AVATAR_BYTES) {
+          throw new PublicProfileAvatarError("AVATAR_IMAGE_INVALID");
+        }
+        storedRef = `data:${image.mimeType};base64,${image.content.toString("base64")}`;
+        avatarUrl = storedRef;
+      }
+
+      await data.saveAvatarPath(userId, storedRef);
       return { avatarUrl };
     },
   };
 }
 
-module.exports = { MAX_AVATAR_BYTES, PublicProfileAvatarError, createProfileAvatarService, parseAvatarInput };
+module.exports = {
+  MAX_AVATAR_BYTES,
+  PublicProfileAvatarError,
+  createProfileAvatarService,
+  parseAvatarInput,
+  isDisplayableAvatarRef,
+};

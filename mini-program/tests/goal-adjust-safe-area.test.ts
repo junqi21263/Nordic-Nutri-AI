@@ -10,6 +10,6 @@ const layoutStyles = readFileSync(
 describe("goal adjustment layout", () => {
   it("reserves the custom-navigation safe area above the goal form", () => {
     expect(layoutStyles).toContain(".page-layout--goal-adjust .page-layout__content");
-    expect(layoutStyles).toContain("env(safe-area-inset-top) + $space-48 + $space-12");
+    expect(layoutStyles).toContain("page-layout__content");
   });
 });

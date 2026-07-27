@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import Taro from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { getProductWeeklyReview, type ProductWeeklyReview } from "../../api/insight-api";
 import { AppCard } from "../../components/app-card";
@@ -7,8 +8,6 @@ import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
 import { useProfileStore } from "../../stores/profile-store";
-import { navigateBackOrHome } from "../../utils/navigation";
-
 const weekdayLabels = ["日", "一", "二", "三", "四", "五", "六"];
 
 const formatDate = (value: Date) => {
@@ -71,16 +70,11 @@ export default function WeeklyReviewPage() {
       title="本周回顾"
       showTabs={false}
       hideNavigation
+      showBack
+      onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--weekly-review"
     >
       <View className="profile-subpage__page-title">
-        <View
-          className="profile-subpage__back"
-          ariaLabel="返回个人中心"
-          onClick={() => navigateBackOrHome("/pages/profile/index")}
-        >
-          ‹
-        </View>
         <Text>本周回顾</Text>
       </View>
       <View className="weekly-review">

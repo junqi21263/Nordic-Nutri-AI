@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createMealDataService } from "./meal-data-service.cjs";
+import { createMealDataService, normalizeStoredImagePath } from "./meal-data-service.cjs";
+
+test("rejects oversized HTTPS temp URLs for image_path storage", () => {
+  assert.equal(normalizeStoredImagePath("cloud://env/food-images/a.jpg"), "cloud://env/food-images/a.jpg");
+  assert.equal(normalizeStoredImagePath(`https://example.com/${"x".repeat(500)}`), null);
+  assert.equal(normalizeStoredImagePath("https://cdn.example.com/meal.jpg"), "https://cdn.example.com/meal.jpg");
+});
 
 function createDb() {
   const calls = [];

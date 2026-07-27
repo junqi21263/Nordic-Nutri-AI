@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateNutritionPlan,
   createInitialOnboardingDraft,
+  macroEnergyPercents,
   normalizeAgeInput,
   normalizeOneDecimalInput,
   type OnboardingDraft,
@@ -97,6 +98,14 @@ describe("first-use onboarding domain", () => {
       const macroCalories = plan.proteinG * 4 + plan.carbsG * 4 + plan.fatG * 9;
       expect(Math.abs(macroCalories - plan.calories) / plan.calories).toBeLessThanOrEqual(0.03);
     }
+  });
+
+  it("reports energy-share percentages that sum near 100", () => {
+    const body = validateBodyProfile(validDraft, "2026-07-13").profile!;
+    const plan = calculateNutritionPlan(body);
+    const percents = macroEnergyPercents(plan);
+    expect(percents.proteinPct + percents.carbsPct + percents.fatPct).toBeGreaterThanOrEqual(98);
+    expect(percents.proteinPct + percents.carbsPct + percents.fatPct).toBeLessThanOrEqual(102);
   });
 
   it("resets the draft to its initial, non-sensitive state", () => {

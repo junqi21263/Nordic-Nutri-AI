@@ -16,6 +16,8 @@ export interface ProductMealInput {
   name: string;
   recordedAt: string;
   isFavorite?: boolean;
+  imageUrl?: string | null;
+  imagePath?: string | null;
   items: Array<Omit<ProductMealItem, "id">>;
 }
 

@@ -62,10 +62,10 @@ function TimelineMeal({ meal, onClick }: { meal: Meal; onClick: () => void }) {
         <View
           className={`meal-records-page__meal-visual meal-records-page__meal-visual--${meal.imageKey ?? "empty"}`}
         >
-          {meal.imageKey ? (
+          {meal.imageUrl || meal.imageKey ? (
             <Image
               className="meal-records-page__meal-image"
-              src={imageByKey[meal.imageKey]}
+              src={meal.imageUrl || imageByKey[meal.imageKey!]}
               mode="aspectFill"
             />
           ) : (
@@ -111,7 +111,7 @@ export default function MealRecordsPage() {
   const openDetail = (id: string) => Taro.navigateTo({ url: `/pages/meal-detail/index?id=${id}` });
   const addMeal = () => {
     setActiveKey("food-scanner");
-    void Taro.switchTab({ url: "/pages/food-scanner/index" });
+    void Taro.navigateTo({ url: "/pages/food-scanner/index" });
   };
   const openManualMeal = () => {
     setFilterOpen(false);
@@ -162,23 +162,21 @@ export default function MealRecordsPage() {
       className="page-layout--meal-records"
     >
       <View className="meal-records-page">
-        <View className="meal-records-page__header">
-          <Text className="meal-records-page__header-title">饮食记录</Text>
+        <View className="meal-records-page__toolbar">
+          <SearchBar
+            value={store.searchKeyword}
+            placeholder="搜索餐次或食材"
+            onInput={store.setSearchKeyword}
+            onClear={() => store.setSearchKeyword("")}
+          />
           <View
-            className="meal-records-page__header-more"
+            className="meal-records-page__filter-btn"
             ariaLabel="筛选记录"
             onClick={() => setFilterOpen(true)}
           >
             <NordicIcon name="ellipsis" size={22} />
           </View>
         </View>
-
-        <SearchBar
-          value={store.searchKeyword}
-          placeholder="搜索餐次或食材"
-          onInput={store.setSearchKeyword}
-          onClear={() => store.setSearchKeyword("")}
-        />
 
         <View className="meal-records-page__calendar">
           <View className="meal-records-page__calendar-head">

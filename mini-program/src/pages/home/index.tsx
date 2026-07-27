@@ -70,7 +70,7 @@ export default function HomePage() {
   }, [refreshVersion, store.replaceRemoteMeals, today]);
   const openDetail = (id: string) => Taro.navigateTo({ url: `/pages/meal-detail/index?id=${id}` });
   // Both destinations are native tabBar pages. navigateTo cannot open them.
-  const openScanner = () => Taro.switchTab({ url: "/pages/food-scanner/index" });
+  const openScanner = () => Taro.navigateTo({ url: "/pages/food-scanner/index" });
   const openRecords = () => Taro.switchTab({ url: "/pages/meal-records/index" });
 
   if (store.loadingState === "loading")
@@ -88,7 +88,11 @@ export default function HomePage() {
     <PageLayout activeTab="home" hideNavigation title="首页" className="page-layout--home">
       <View className="home-page">
         <View className="home-page__header">
-          <Avatar label={profile.profile.nickname.slice(0, 1).toUpperCase()} src={profile.profile.avatarUrl} />
+          <Avatar
+            label={profile.profile.nickname.slice(0, 1).toUpperCase()}
+            src={profile.profile.avatarUrl}
+            size="home"
+          />
           <View className="home-page__greeting-copy">
             <Text className="home-page__greeting">早上好，{profile.profile.nickname}</Text>
             <Text className="home-page__goal">目标：{profile.profile.goalLabel}</Text>

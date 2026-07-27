@@ -10,6 +10,10 @@ export interface ScannerMealFixture {
   id: string;
   analysisId?: string;
   title: string;
+  evaluation?: string;
+  imageUrl?: string | null;
+  imagePath?: string | null;
+  nutritionSource?: string;
   mealType: MealType;
   imageKey: "bowl" | "salmon" | "oats";
   confidence: number;
@@ -306,6 +310,7 @@ export function createMealFromAnalysis(
     mealType: meal.mealType,
     favorite: false,
     imageKey: meal.imageKey,
+    imageUrl: meal.imagePath || meal.imageUrl || null,
     items: adjusted.items,
     insight: meal.insight,
   };

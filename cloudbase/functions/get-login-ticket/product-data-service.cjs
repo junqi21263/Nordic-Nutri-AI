@@ -131,8 +131,16 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
       if (typeof avatarPath !== "string" || !avatarPath.trim()) throw fail("头像无效");
       const table = db.from("profiles");
       const existing = await table.select("id").eq("id", userId).maybeSingle();
-      if (existing.error || !existing.data?.id) throw new Error("Profile lookup failed");
+      if (existing.error) throw new Error("Profile lookup failed");
       record({ table: "profiles", operation: "update-avatar", userId });
+      if (!existing.data?.id) {
+        const result = await table
+          .insert({ id: userId, nickname: "微信用户", avatar_path: avatarPath })
+          .select()
+          .single();
+        if (result.error || !result.data) throw new Error("Avatar save failed");
+        return result.data;
+      }
       const result = await table.update({ avatar_path: avatarPath }).eq("id", userId).select().single();
       if (result.error || !result.data) throw new Error("Avatar save failed");
       return result.data;
@@ -280,8 +288,34 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
       ]);
       if (profile.error || bodyProfile.error || goal.error || settings.error || plan.error) throw new Error("Account read failed");
       let avatarUrl = null;
-      if (profile.data?.avatar_path) {
-        try { avatarUrl = await resolveAvatarUrl(profile.data.avatar_path); } catch { avatarUrl = null; }
+      const avatarPath = typeof profile.data?.avatar_path === "string" ? profile.data.avatar_path.trim() : null;
+      if (avatarPath) {
+        try { avatarUrl = await resolveAvatarUrl(avatarPath); } catch { avatarUrl = null; }
+        // Keep default:/data:/https refs even if storage resolution fails.
+        if (!avatarUrl && (avatarPath.startsWith("default:") || avatarPath.startsWith("data:") || /^https?:\/\//i.test(avatarPath))) {
+          avatarUrl = avatarPath;
+        }
+        // Tiny inline images are almost always WeChat's grey placeholder silhouette
+        // that previously overwrote default:robot-N during silent getUserInfo sync.
+        let tinyInlinePlaceholder = false;
+        if (avatarPath.startsWith("data:image/")) {
+          const comma = avatarPath.indexOf(",");
+          if (comma >= 0) {
+            const bytes = Math.floor(((avatarPath.length - comma - 1) * 3) / 4);
+            tinyInlinePlaceholder = bytes > 0 && bytes < 16_384;
+          }
+        }
+        const shouldRepair = tinyInlinePlaceholder || !avatarUrl;
+        if (shouldRepair) {
+          const robotIndex = 1 + Math.floor(Math.random() * 4);
+          const repaired = `default:robot-${robotIndex}`;
+          try {
+            await db.from("profiles").update({ avatar_path: repaired }).eq("id", userId);
+            avatarUrl = repaired;
+          } catch {
+            avatarUrl = repaired;
+          }
+        }
       }
       return {
         nickname: profile.data?.nickname ?? null,

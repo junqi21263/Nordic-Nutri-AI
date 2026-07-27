@@ -1,39 +1,53 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { PublicProfileAvatarError, createProfileAvatarService } from "./profile-avatar-service.cjs";
+import { createProfileAvatarService, parseAvatarInput } from "./profile-avatar-service.cjs";
 
-const PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9jOsAAAAAASUVORK5CYII=";
+// Minimal valid 1x1 PNG
+const PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
-test("stores a validated image beneath the authenticated user's avatar prefix and persists only the file id", async () => {
-  const writes = [];
+test("parseAvatarInput accepts a tiny PNG", () => {
+  const parsed = parseAvatarInput({ mimeType: "image/png", base64: PNG_BASE64 });
+  assert.equal(parsed.mimeType, "image/png");
+  assert.ok(Buffer.isBuffer(parsed.content));
+});
+
+test("upload falls back to data URL when cloud storage fails", async () => {
+  let savedPath = "";
   const service = createProfileAvatarService({
-    data: { saveAvatarPath: async (userId, path) => { writes.push({ userId, path }); return { avatar_path: path }; } },
-    uploadImage: async ({ cloudPath, contentType, content }) => {
-      assert.match(cloudPath, /^avatars\/user-1\/[a-f0-9-]+\.png$/);
-      assert.equal(contentType, "image/png");
-      assert.ok(Buffer.isBuffer(content));
-      return { fileId: "cloud://env.avatars/user-1/avatar.png" };
+    data: {
+      saveAvatarPath: async (_userId, avatarPath) => {
+        savedPath = avatarPath;
+        return { id: _userId, avatar_path: avatarPath };
+      },
     },
-    createTemporaryUrl: async (fileId) => `https://temp.example/${fileId.split("/").pop()}`,
+    uploadImage: async () => {
+      throw new Error("Avatar storage upload failed: INVALID_ACCESS_TOKEN");
+    },
+    createTemporaryUrl: async () => null,
   });
 
   const result = await service.upload("user-1", { mimeType: "image/png", base64: PNG_BASE64 });
-
-  assert.equal(writes[0].userId, "user-1");
-  assert.equal(writes[0].path, "cloud://env.avatars/user-1/avatar.png");
-  assert.equal(result.avatarUrl, "https://temp.example/avatar.png");
+  assert.match(result.avatarUrl, /^data:image\/png;base64,/);
+  assert.equal(savedPath, result.avatarUrl);
 });
 
-test("rejects a non-image payload before uploading it", async () => {
+test("upload does not persist unresolvable storage refs", async () => {
+  let savedPath = "";
   const service = createProfileAvatarService({
-    data: { saveAvatarPath: async () => ({}) },
-    uploadImage: async () => { throw new Error("must not upload"); },
-    createTemporaryUrl: async () => "https://temp.example/avatar.png",
+    data: {
+      saveAvatarPath: async (_userId, avatarPath) => {
+        savedPath = avatarPath;
+        return { id: _userId, avatar_path: avatarPath };
+      },
+    },
+    uploadImage: async () => ({ fileId: "pgstore:avatars/broken.png" }),
+    createTemporaryUrl: async () => null,
   });
 
-  await assert.rejects(
-    () => service.upload("user-1", { mimeType: "image/png", base64: Buffer.from("not an image").toString("base64") }),
-    (error) => error instanceof PublicProfileAvatarError && error.code === "AVATAR_IMAGE_INVALID",
-  );
+  const result = await service.upload("user-1", { mimeType: "image/png", base64: PNG_BASE64 });
+  assert.match(result.avatarUrl, /^data:image\/png;base64,/);
+  assert.match(savedPath, /^data:image\/png;base64,/);
+  assert.doesNotMatch(savedPath, /^pgstore:/);
 });

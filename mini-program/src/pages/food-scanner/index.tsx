@@ -1,9 +1,9 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { analyzeProductImage } from "../../api/vision-api";
 import { AppButton } from "../../components/app-button";
-import { BottomSheet, bottomSheetExitDuration } from "../../components/bottom-sheet";
+import { BottomSheet } from "../../components/bottom-sheet";
 import { NordicIcon } from "../../components/nordic-icon";
 import bowlImage from "../../assets/meal-bowl.svg";
 import oatsImage from "../../assets/meal-oats.svg";
@@ -12,29 +12,32 @@ import { PageLayout } from "../../layouts/page-layout";
 import { useAnalysisStore } from "../../stores/analysis-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useScannerStore } from "../../stores/scanner-store";
-import { useTabBarStore } from "../../stores/tab-bar-store";
 
 const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
+
+function isUserCancelMediaChoice(error: unknown): boolean {
+  const pieces = [
+    typeof error === "string" ? error : "",
+    error instanceof Error ? error.message : "",
+    error && typeof error === "object" && "errMsg" in error
+      ? String((error as { errMsg?: unknown }).errMsg ?? "")
+      : "",
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : "",
+  ];
+  const text = pieces.join(" ").toLowerCase();
+  return text.includes("cancel") || text.includes("取消");
+}
 
 export default function FoodScannerPage() {
   const scanner = useScannerStore();
   const analysis = useAnalysisStore();
   const feedback = useFeedbackStore();
-  const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const [isScanning, setIsScanning] = useState(false);
   const [fallbackOpen, setFallbackOpen] = useState(false);
+  const [fallbackMessage, setFallbackMessage] = useState("可检查相机、相册和网络权限；如果视觉服务尚未配置，可以先手动记录。");
   const preview = scanner.capturedMeal ?? scanner.candidates[0] ?? null;
-
-  useEffect(() => {
-    if (fallbackOpen) {
-      setTabBarVisible(false);
-      return undefined;
-    }
-    const timer = setTimeout(() => setTabBarVisible(true), bottomSheetExitDuration);
-    return () => clearTimeout(timer);
-  }, [fallbackOpen, setTabBarVisible]);
-
-  useEffect(() => () => setTabBarVisible(true), [setTabBarVisible]);
 
   const analyzeCurrentPreview = async (previewPath: string) => {
     if (isScanning) return;
@@ -45,11 +48,21 @@ export default function FoodScannerPage() {
       analysis.setAnalysis(meal);
       await Taro.navigateTo({ url: "/pages/analysis-result/index" });
     } catch (error) {
-      const configured = error instanceof Error && error.name !== "VISION_SERVICE_NOT_CONFIGURED";
+      const isNotConfigured = error instanceof Error && error.name === "VISION_SERVICE_NOT_CONFIGURED";
+      console.error("[vision] analyzeProductImage failed:", error);
+      setFallbackMessage(
+        isNotConfigured
+          ? "图片识别服务尚未配置，可先手动记录。"
+          : error instanceof Error
+            ? error.message
+            : "图片识别失败，请重新选择图片或手动记录。",
+      );
       feedback.show({
-        message: configured
-          ? "图片识别失败，请重新拍摄或手动记录"
-          : "图片识别服务尚未配置，可先手动记录",
+        message: isNotConfigured
+          ? "图片识别服务尚未配置，可先手动记录"
+          : error instanceof Error
+            ? error.message
+            : "图片识别失败，请重新拍摄或手动记录",
         tone: "error",
       });
       setFallbackOpen(true);
@@ -65,18 +78,18 @@ export default function FoodScannerPage() {
         count: 1,
         mediaType: ["image"],
         sourceType: [source],
+        sizeType: ["compressed", "original"],
       });
       const previewPath = result.tempFiles[0]?.tempFilePath;
       if (!previewPath) throw new Error("没有获取到图片");
       scanner.setPreviewPath(previewPath);
       scanner.setGalleryMode(source === "album");
+      setFallbackOpen(false);
       await analyzeCurrentPreview(previewPath);
     } catch (error) {
-      const message = String(error);
-      if (message.includes("cancel")) {
-        feedback.show({ message: "已取消选择图片", tone: "success" });
-        return;
-      }
+      // User closed the album/camera without picking — stay on the page quietly.
+      if (isUserCancelMediaChoice(error)) return;
+      setFallbackMessage("暂时无法打开图片，请检查相机、相册和网络权限。");
       setFallbackOpen(true);
     }
   };
@@ -99,9 +112,6 @@ export default function FoodScannerPage() {
       className="page-layout--food-scanner"
     >
       <View className="food-scanner-page">
-        <View className="food-scanner-page__page-title">
-          <Text>食物扫描</Text>
-        </View>
         <View className="food-scanner-page__header">
           <View className="food-scanner-page__heading">
             <Text className="food-scanner-page__title">记录这一餐</Text>
@@ -138,20 +148,6 @@ export default function FoodScannerPage() {
             ) : (
               <NordicIcon name="utensils" size={56} ariaLabel="餐盘取景提示" />
             )}
-          </View>
-          <View className="scanner-frame__mode-strip">
-            <View className="scanner-frame__mode-item scanner-frame__mode-item--active">
-              <NordicIcon name="camera" size={17} ariaLabel="原生相机" />
-              <Text>原生相机</Text>
-            </View>
-            <View className="scanner-frame__mode-item">
-              <NordicIcon name="images" size={17} ariaLabel="本地图库" />
-              <Text>本地图库</Text>
-            </View>
-            <View className="scanner-frame__mode-item">
-              <NordicIcon name="zap" size={17} ariaLabel="原生相机闪光控制" />
-              <Text>相机内调节</Text>
-            </View>
           </View>
           {isScanning ? (
             <View className="scanner-frame__analysis-overlay">
@@ -217,9 +213,7 @@ export default function FoodScannerPage() {
               <NordicIcon name="x" size={20} ariaLabel="关闭" />
             </View>
           </View>
-          <Text className="scanner-fallback-sheet__copy">
-            可检查相机、相册和网络权限；如果视觉服务尚未配置，可以先手动记录。
-          </Text>
+          <Text className="scanner-fallback-sheet__copy">{fallbackMessage}</Text>
           <AppButton size="medium" onClick={retryChooseImage}>
             重新选择图片
           </AppButton>

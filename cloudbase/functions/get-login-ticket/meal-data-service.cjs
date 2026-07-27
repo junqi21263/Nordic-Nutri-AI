@@ -40,11 +40,24 @@ function normalizeItems(items) {
   });
 }
 
+/** Store durable short paths only — cloud file IDs or short local/https URLs (DB max 512). */
+function normalizeStoredImagePath(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 512) return null;
+  if (/^cloud:\/\//i.test(trimmed)) return trimmed;
+  if (/^(wxfile:|http:\/\/tmp|https:\/\/tmp)/i.test(trimmed)) return trimmed;
+  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  return null;
+}
+
 function normalizeMealInput(input) {
   const name = typeof input?.name === "string" ? input.name.trim() : "";
   if (!name || name.length > 100 || !mealTypes.has(input?.mealType)) throw invalid();
   const recordedAt = typeof input.recordedAt === "string" ? new Date(input.recordedAt) : null;
   if (!recordedAt || Number.isNaN(recordedAt.getTime())) throw invalid();
+  // Prefer durable cloud file ID from imagePath; fall back to imageUrl when it fits the column.
+  const imageUrl = normalizeStoredImagePath(input.imagePath) || normalizeStoredImagePath(input.imageUrl);
   return {
     clientRequestId: assertUuid(input.clientRequestId, "请求 ID"),
     analysisId: input.analysisId == null ? null : assertUuid(input.analysisId, "分析 ID"),
@@ -52,6 +65,7 @@ function normalizeMealInput(input) {
     name,
     recordedAt: recordedAt.toISOString(),
     isFavorite: Boolean(input.isFavorite),
+    imageUrl,
     items: normalizeItems(input.items),
   };
 }
@@ -79,6 +93,7 @@ function mapMeal(row, itemRows) {
     name: row.name,
     recordedAt: row.recorded_at,
     isFavorite: Boolean(row.is_favorite),
+    imageUrl: row.image_path ?? null,
     caloriesKcal: Number(row.calories_kcal ?? 0),
     proteinG: Number(row.protein_g ?? 0),
     carbsG: Number(row.carbs_g ?? 0),
@@ -103,8 +118,20 @@ function assertDateRange(from, to) {
   if (days < 0 || days > 31) throw invalid("日期范围无效");
 }
 
-function createMealDataService({ db, analyze, model = "deepseek-v4-flash" }) {
+function createMealDataService({ db, analyze, model = "deepseek-v4-flash", resolveImageUrl }) {
   if (!db || typeof db.from !== "function") throw new Error("Meal database is unavailable");
+
+  async function withResolvedImage(meal) {
+    if (!meal?.imageUrl || typeof resolveImageUrl !== "function") return meal;
+    if (!/^cloud:\/\//i.test(meal.imageUrl)) return meal;
+    try {
+      const url = await resolveImageUrl(meal.imageUrl);
+      return url ? { ...meal, imageUrl: url } : meal;
+    } catch (err) {
+      console.error("[meals] resolveImageUrl failed:", err?.message || err);
+      return meal;
+    }
+  }
 
   async function getMeal(userId, mealId) {
     const record = await db.from("meal_records").select("*").eq("id", mealId).eq("user_id", userId).is("deleted_at", null).maybeSingle();
@@ -112,7 +139,7 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash" }) {
     if (!record.data) return null;
     const items = await db.from("meal_items").select("*").eq("meal_record_id", mealId).order("created_at", { ascending: true });
     if (items.error) throw new Error("Meal item read failed");
-    return mapMeal(record.data, items.data ?? []);
+    return withResolvedImage(mapMeal(record.data, items.data ?? []));
   }
 
   return {
@@ -166,9 +193,16 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash" }) {
         if (!prior) throw new Error("Meal request conflict");
         return prior;
       }
+      let imagePath = meal.imageUrl;
       if (meal.analysisId) {
-        const analysis = await db.from("ai_analysis").select("id").eq("id", meal.analysisId).eq("user_id", userId).maybeSingle();
+        const analysis = await db.from("ai_analysis").select("id,image_path").eq("id", meal.analysisId).eq("user_id", userId).maybeSingle();
         if (analysis.error || !analysis.data?.id) throw invalid("分析记录无效");
+        // Prefer durable cloud file ID from vision analysis when the client only has a
+        // temp HTTPS URL (too long for image_path) or a local wxfile path.
+        if (!imagePath || !/^cloud:\/\//i.test(imagePath)) {
+          const analysisPath = normalizeStoredImagePath(analysis.data.image_path);
+          if (analysisPath && /^cloud:\/\//i.test(analysisPath)) imagePath = analysisPath;
+        }
       }
       const created = await db.from("meal_records").insert({
         user_id: userId,
@@ -178,6 +212,7 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash" }) {
         name: meal.name,
         recorded_at: meal.recordedAt,
         is_favorite: meal.isFavorite,
+        image_path: imagePath,
       }).select("*").single();
       if (created.error || !created.data?.id) throw new Error("Meal save failed");
       const itemRows = meal.items.map((item) => ({
@@ -192,7 +227,7 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash" }) {
       }));
       const itemResult = await db.from("meal_items").insert(itemRows).select("*");
       if (itemResult.error) throw new Error("Meal item save failed");
-      return mapMeal(created.data, itemResult.data ?? itemRows);
+      return withResolvedImage(mapMeal({ ...created.data, image_path: imagePath }, itemResult.data ?? itemRows));
     },
 
     async updateMeal(userId, mealId, input) {
@@ -245,4 +280,4 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash" }) {
   };
 }
 
-module.exports = { createMealDataService, PublicMealDataError };
+module.exports = { createMealDataService, PublicMealDataError, normalizeStoredImagePath };

@@ -3,10 +3,16 @@ import { useAuthStore } from "../auth/auth-store";
 import type { ScannerMealFixture } from "../features/scanner/domain";
 import { createClientRequestId } from "../repositories/client-request-id";
 import { productApiEndpoint } from "./product-api-config";
-const maxImageBytes = 3 * 1024 * 1024;
+const maxImageBytes = 20 * 1024 * 1024;
+/** Network upload target — keep base64 payload small enough for mobile + cloud timeout. */
+const targetUploadBytes = 1.2 * 1024 * 1024;
 
 interface ProductVisionResult {
   analysisId: string;
+  evaluation?: string;
+  imageUrl?: string | null;
+  imagePath?: string | null;
+  nutritionSource?: string;
   mealName: string;
   mealType: ScannerMealFixture["mealType"];
   confidence: number;
@@ -18,6 +24,7 @@ interface ProductVisionResult {
     proteinPer100g: number;
     carbsPer100g: number;
     fatPer100g: number;
+    nutritionSource?: string;
   }>;
 }
 
@@ -34,10 +41,26 @@ function readBase64(filePath: string) {
   });
 }
 
-function detectImageContentType(imageBase64: string): "image/jpeg" | "image/webp" {
+function detectImageContentType(imageBase64: string, filePath?: string): string {
+  // Magic-byte detection for mainstream formats (Android + Apple)
   if (imageBase64.startsWith("/9j/")) return "image/jpeg";
+  if (imageBase64.startsWith("iVBOR")) return "image/png";
   if (imageBase64.startsWith("UklGR")) return "image/webp";
-  throw new Error("图片格式不支持，请使用相机重新拍摄");
+  if (imageBase64.startsWith("R0lGOD")) return "image/gif";
+  if (imageBase64.startsWith("Qk")) return "image/bmp";
+  // HEIC/HEIF (Apple default since iOS 11) — ftyp box at byte 4
+  if (imageBase64.startsWith("AAAA") && /AAAA[A-Za-z0-9+/]{0,4}GZ0eXB/i.test(imageBase64.slice(0, 24))) return "image/heic";
+  // Fallback: infer from file extension
+  if (filePath) {
+    const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+    const extMap: Record<string, string> = {
+      jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+      gif: "image/gif", bmp: "image/bmp", heic: "image/heic", heif: "image/heic",
+    };
+    if (extMap[ext]) return extMap[ext];
+  }
+  // Default to JPEG (WeChat usually converts HEIC to JPEG automatically)
+  return "image/jpeg";
 }
 
 function mapVisionResult(result: ProductVisionResult): ScannerMealFixture {
@@ -45,6 +68,10 @@ function mapVisionResult(result: ProductVisionResult): ScannerMealFixture {
     id: result.analysisId,
     analysisId: result.analysisId,
     title: result.mealName,
+    evaluation: result.evaluation,
+    imageUrl: result.imageUrl ?? null,
+    imagePath: result.imagePath ?? null,
+    nutritionSource: result.nutritionSource ?? "ai_estimate",
     mealType: result.mealType,
     imageKey: "bowl",
     confidence: Math.round(result.confidence * 100),
@@ -64,31 +91,106 @@ function mapVisionResult(result: ProductVisionResult): ScannerMealFixture {
   };
 }
 
+async function fileSizeOf(filePath: string) {
+  try {
+    const info = await Taro.getFileInfo({ filePath });
+    return "size" in info ? info.size : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function prepareImagePath(sourcePath: string) {
+  let path = sourcePath;
+  try {
+    const originalSize = await fileSizeOf(sourcePath);
+    // Compress aggressively for scan upload; recognition quality stays fine at ~1MB JPEG.
+    const firstQuality = originalSize > 8 * 1024 * 1024 ? 40 : originalSize > 3 * 1024 * 1024 ? 50 : 60;
+    const first = await Taro.compressImage({ src: sourcePath, quality: firstQuality });
+    path = first.tempFilePath || sourcePath;
+    if ((await fileSizeOf(path)) > targetUploadBytes) {
+      const second = await Taro.compressImage({ src: path, quality: 35 });
+      path = second.tempFilePath || path;
+    }
+  } catch {
+    return sourcePath;
+  }
+  return path;
+}
+
 export async function analyzeProductImage(sourcePath: string): Promise<ScannerMealFixture> {
   const token = useAuthStore.getState().session?.accessToken;
-  if (!token) throw new Error("登录状态已失效，请重新登录");
-  const compressed = await Taro.compressImage({ src: sourcePath, quality: 70 });
-  const info = await Taro.getFileInfo({ filePath: compressed.tempFilePath });
-  if (!("size" in info) || info.size > maxImageBytes) throw new Error("图片过大，请重新拍摄");
-  const imageBase64 = await readBase64(compressed.tempFilePath);
-  const contentType = detectImageContentType(imageBase64);
-  const response = await Taro.request<unknown>({
-    url: `${productApiEndpoint}/vision-analysis`,
-    method: "POST",
-    header: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    data: {
-      clientRequestId: createClientRequestId(),
-      contentType,
-      imageBase64,
-    },
-    timeout: 30000,
-  });
-  const data = response.data as ProductVisionResult & { code?: unknown };
+  if (!token) {
+    console.error("[vision] No auth token in session:", useAuthStore.getState().session);
+    throw new Error("登录状态已失效，请重新登录");
+  }
+  const filePath = await prepareImagePath(sourcePath);
+  let info;
+  try {
+    info = await Taro.getFileInfo({ filePath });
+  } catch (err) {
+    console.error("[vision] getFileInfo failed:", err);
+    throw new Error("无法读取图片文件，请重新选择");
+  }
+  if (!("size" in info) || info.size > maxImageBytes) throw new Error("图片过大（超过 20MB），请重新拍摄或选择更小的图片");
+  let imageBase64;
+  try {
+    imageBase64 = await readBase64(filePath);
+  } catch (err) {
+    console.error("[vision] readBase64 failed:", err);
+    throw new Error("图片读取失败，请重新选择");
+  }
+  let contentType;
+  try {
+    contentType = detectImageContentType(imageBase64, filePath);
+  } catch (err) {
+    console.error("[vision] detectImageContentType failed:", err);
+    throw err;
+  }
+  console.info(
+    "[vision] Sending request to",
+    `${productApiEndpoint}/vision-analysis`,
+    "contentType:",
+    contentType,
+    "bytes:",
+    info.size,
+    "base64Length:",
+    imageBase64.length,
+  );
+  let response;
+  try {
+    response = await Taro.request<unknown>({
+      url: `${productApiEndpoint}/vision-analysis`,
+      method: "POST",
+      header: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      data: {
+        clientRequestId: createClientRequestId(),
+        contentType,
+        imageBase64,
+      },
+      timeout: 55000,
+    });
+  } catch (err) {
+    console.error("[vision] network request failed:", err);
+    throw new Error("识别超时或网络不稳定，请压缩后重试或换一张更清晰的近景照片");
+  }
+  const data = response.data as ProductVisionResult & { code?: unknown; message?: unknown };
   if (response.statusCode !== 200) {
+    const backendMessage = typeof data.message === "string" ? data.message : "";
+    const errorCode = typeof data.code === "string" ? data.code : "VisionRequestError";
+    const timedOut =
+      response.statusCode === 443 ||
+      response.statusCode === 504 ||
+      response.statusCode === 408 ||
+      /timeout|timed out|超时/i.test(backendMessage);
     const error = new Error(
-      response.statusCode === 503 ? "图片识别服务暂不可用" : "图片识别失败，请重新拍摄",
+      timedOut
+        ? "识别超时，请换一张更清晰、更近的餐盘照片后重试"
+        : backendMessage ||
+            (response.statusCode === 503 ? "图片识别服务暂不可用" : "图片识别失败，请重新拍摄"),
     );
-    error.name = typeof data.code === "string" ? data.code : "VisionRequestError";
+    error.name = errorCode;
+    console.error("[vision] request failed:", response.statusCode, data);
     throw error;
   }
   return mapVisionResult(data);

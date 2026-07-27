@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nordic Nutri · 食物图片管理</title>
+  <style>
+    :root { font-family: "SF Pro Text", "PingFang SC", sans-serif; color: #1f2a24; background: #f6f1ea; }
+    body { margin: 0; padding: 24px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    .muted { color: #66736b; font-size: 13px; margin-bottom: 20px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .card { background: #fff; border-radius: 16px; padding: 14px 16px; min-width: 140px; box-shadow: 0 8px 24px rgba(31,42,36,.06); }
+    .card b { display: block; font-size: 22px; margin-top: 6px; }
+    label { display: block; font-size: 13px; margin: 8px 0 4px; }
+    input, textarea, select, button { font: inherit; }
+    input, textarea, select { width: min(520px, 100%); padding: 10px 12px; border: 1px solid #d7d0c6; border-radius: 10px; background: #fff; }
+    button { border: 0; border-radius: 999px; padding: 10px 16px; background: #2f5d50; color: #fff; cursor: pointer; }
+    button.secondary { background: #e8efe9; color: #2f5d50; }
+    pre { background: #1f2a24; color: #e8efe9; padding: 14px; border-radius: 12px; overflow: auto; max-height: 420px; }
+    .panel { background: #fff; border-radius: 18px; padding: 18px; margin-top: 16px; box-shadow: 0 8px 24px rgba(31,42,36,.06); }
+    .candidates { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .candidates img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 12px; background: #eee; }
+  </style>
+</head>
+<body>
+  <h1>食物图片管理</h1>
+  <p class="muted">调用 CloudBase `get-login-ticket` 管理端 API。需要管理员 Bearer Token（`app_users.is_admin = true`）。小程序前端不参与生图。</p>
+
+  <div class="panel">
+    <label>API Base（含 /get-login-ticket）</label>
+    <input id="baseUrl" placeholder="https://xxx.tcloudbaseapp.com/get-login-ticket" />
+    <label>Bearer Token</label>
+    <input id="token" placeholder="产品会话 access token" />
+    <div class="row" style="margin-top:12px">
+      <button id="loadStats">刷新统计</button>
+      <button class="secondary" id="runWorker">消费队列 Worker</button>
+      <button class="secondary" id="runDiagnose">诊断混元生图</button>
+    </div>
+  </div>
+
+  <div class="row" id="stats"></div>
+
+  <div class="panel">
+    <h3>创建生图任务</h3>
+    <label>foodId</label>
+    <input id="foodId" />
+    <label>candidateCount（默认 3，冒烟可用 1）</label>
+    <input id="candidateCount" type="number" value="1" min="1" max="6" />
+    <label>cookingMethod</label>
+    <input id="cookingMethod" value="水煮" />
+    <label>extraPrompt</label>
+    <textarea id="extraPrompt" rows="3">鸡胸肉自然白色，无煎痕烤痕酱汁，不增加米饭蔬菜</textarea>
+    <div class="row" style="margin-top:12px">
+      <button id="createJob">创建任务</button>
+      <button class="secondary" id="loadJob">查看任务</button>
+    </div>
+    <label>jobId</label>
+    <input id="jobId" />
+  </div>
+
+  <div class="panel">
+    <h3>候选图审核</h3>
+    <div class="candidates" id="candidates"></div>
+    <label>imageId</label>
+    <input id="imageId" />
+    <div class="row" style="margin-top:12px">
+      <button id="approve">设为主图 / 通过</button>
+      <button class="secondary" id="reject">拒绝</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>响应</h3>
+    <pre id="out">{}</pre>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const out = (data) => { $("out").textContent = JSON.stringify(data, null, 2); };
+
+    async function api(path, { method = "GET", body } = {}) {
+      const base = $("baseUrl").value.replace(/\/$/, "");
+      const token = $("token").value.trim();
+      if (!base || !token) throw new Error("请填写 baseUrl 和 token");
+      const res = await fetch(`${base}/api/admin${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw Object.assign(new Error(json.code || res.statusText), { json, status: res.status });
+      return json;
+    }
+
+    $("loadStats").onclick = async () => {
+      try {
+        const stats = await api("/food-image-jobs/stats");
+        out(stats);
+        $("stats").innerHTML = [
+          ["缺失图片", stats.missingImages],
+          ["待生成", stats.pendingJobs],
+          ["生成中", stats.processingJobs],
+          ["待审核", stats.pendingReviewImages],
+          ["已有主图", stats.readyFoods],
+          ["失败任务", stats.failedJobs],
+          ["今日已生成", `${stats.dailyGenerated}/${stats.dailyLimit}`],
+        ].map(([k, v]) => `<div class="card">${k}<b>${v}</b></div>`).join("");
+      } catch (e) { out(e.json || { error: e.message }); }
+    };
+
+    $("runWorker").onclick = async () => {
+      try { out(await api("/food-image-jobs/worker", { method: "POST", body: {} })); }
+      catch (e) { out(e.json || { error: e.message }); }
+    };
+
+    $("runDiagnose").onclick = async () => {
+      try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); }
+      catch (e) { out(e.json || { error: e.message }); }
+    };
+
+    $("createJob").onclick = async () => {
+      try {
+        const job = await api("/food-image-jobs", {
+          method: "POST",
+          body: {
+            foodId: $("foodId").value.trim(),
+            candidateCount: Number($("candidateCount").value || 1),
+            cookingMethod: $("cookingMethod").value.trim(),
+            extraPrompt: $("extraPrompt").value.trim(),
+            force: true,
+          },
+        });
+        $("jobId").value = job.id;
+        out(job);
+      } catch (e) { out(e.json || { error: e.message }); }
+    };
+
+    $("loadJob").onclick = async () => {
+      try {
+        const data = await api(`/food-image-jobs/${$("jobId").value.trim()}`);
+        out(data);
+        $("candidates").innerHTML = (data.candidates || []).map((c) => `
+          <div>
+            <img src="${c.listUrl || c.detailUrl || c.thumbnailUrl || ""}" alt="" />
+            <div style="font-size:12px;margin-top:6px">${c.id}<br/>${c.reviewStatus || c.status}</div>
+            <button class="secondary" data-id="${c.id}">选用</button>
+          </div>
+        `).join("");
+        $("candidates").querySelectorAll("button[data-id]").forEach((btn) => {
+          btn.onclick = () => { $("imageId").value = btn.getAttribute("data-id"); };
+        });
+      } catch (e) { out(e.json || { error: e.message }); }
+    };
+
+    $("approve").onclick = async () => {
+      try { out(await api(`/food-images/${$("imageId").value.trim()}/approve`, { method: "POST", body: {} })); }
+      catch (e) { out(e.json || { error: e.message }); }
+    };
+    $("reject").onclick = async () => {
+      const reason = prompt("拒绝原因") || "不符合要求";
+      try { out(await api(`/food-images/${$("imageId").value.trim()}/reject`, { method: "POST", body: { reason } })); }
+      catch (e) { out(e.json || { error: e.message }); }
+    };
+  </script>
+</body>
+</html>

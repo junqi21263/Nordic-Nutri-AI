@@ -1,31 +1,33 @@
 @use "./tokens" as *;
 
 .app-layout {
-  min-height: 100vh;
   background: $color-background;
+  min-height: 100vh;
 }
 .page-layout {
+  background: $color-background;
   min-height: 100vh;
 }
 .app-safe-area {
+  background: $color-background;
   box-sizing: border-box;
   min-height: 100vh;
   padding-top: $safe-area-top;
 }
-.app-safe-area.page-layout--custom-navigation {
+.app-safe-area.page-layout--custom-navigation,
+.app-safe-area.page-layout--with-brand {
   padding-top: 0;
 }
 .page-layout__scroll {
+  background: $color-background;
   box-sizing: border-box;
   min-height: 100vh;
 }
 .page-layout__content {
+  background: $color-background;
   box-sizing: border-box;
   min-height: 100vh;
-  padding: $page-top $page-horizontal calc($tabbar-height + $safe-area-bottom + $section-gap);
-}
-.page-layout__content--enter {
-  animation: page-enter $duration-page $ease-standard both;
+  padding: $space-16 $page-horizontal calc($tabbar-height + $safe-area-bottom + $section-gap);
 }
 .page-layout--without-tabs .page-layout__content {
   padding-bottom: calc($safe-area-bottom + $section-gap);
@@ -34,69 +36,37 @@
   padding: $space-8 $stitch-page-gutter
     calc($stitch-action-height + $space-12 + $safe-area-bottom + $space-16);
 }
-.page-layout--home .page-layout__content {
-  // Give the greeting a further 12px visual clearance below Dynamic Island devices.
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
-}
 .page-layout--meal-records .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
-}
-.page-layout--meal-records .page-layout__content--enter {
-  // Keep the floating add action viewport-fixed instead of trapping it in the page-enter transform.
-  animation: none;
-}
-.page-layout--food-scanner .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
+  padding-bottom: calc($tabbar-height + $safe-area-bottom + $section-gap);
 }
 .page-layout--analysis-result .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
   padding-bottom: calc($safe-area-bottom + $space-32);
 }
 .page-layout--portion-adjustment .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
   padding-bottom: calc($safe-area-bottom + $space-32);
 }
 .page-layout--meal-detail .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
   padding-bottom: calc($safe-area-bottom + 132px);
 }
 .page-layout--ingredient-detail .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
   padding-bottom: calc($safe-area-bottom + $space-32);
 }
-.page-layout--meal-detail .page-layout__content--enter,
-.page-layout--ingredient-detail .page-layout__content--enter {
-  animation: none;
-}
 .page-layout--coach-chat .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
   // Reserve scroll space for the fixed composer and tab bar.
   padding-bottom: calc($tabbar-height + $safe-area-bottom + 112px);
 }
 .page-layout--manual-meal .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
   padding-bottom: calc($safe-area-bottom + 176px);
 }
 .page-layout--food-catalog .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
   padding-bottom: calc($tabbar-height + $safe-area-bottom + $space-32);
 }
 .page-layout--food-detail .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
   padding-bottom: calc($safe-area-bottom + 132px);
-}
-.page-layout--profile .page-layout__content,
-.page-layout--achievements .page-layout__content,
-.page-layout--weekly-review .page-layout__content {
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
 }
 .page-layout--profile-edit .page-layout__content,
 .page-layout--goal-adjust .page-layout__content {
   padding-bottom: calc($safe-area-bottom + $space-48 + $space-48 + $space-24);
-  padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);
-}
-.page-layout--coach-chat .page-layout__content--enter {
-  animation: none;
 }
 .page-layout--nutrition-plan .page-layout__content {
   padding-bottom: calc(
@@ -119,14 +89,4 @@
 }
 .safe-bottom {
   height: $safe-area-bottom;
-}
-@keyframes page-enter {
-  from {
-    opacity: 0;
-    transform: translateY($space-4);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }

@@ -1,4 +1,4 @@
-import { Image, Input, Text, View } from "@tarojs/components";
+import { Image, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import {
@@ -12,6 +12,7 @@ import { createProductMeal } from "../../api/meal-data-api";
 import { analyzeProductImage } from "../../api/vision-api";
 import { CoachAvatar } from "../../components/coach-avatar";
 import { NordicIcon } from "../../components/nordic-icon";
+import { CoachComposer } from "./components/CoachComposer";
 import { createCoachAdvice } from "../../features/coach/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
@@ -196,6 +197,7 @@ export default function CoachPage() {
         count: 1,
         mediaType: ["image"],
         sourceType: ["album", "camera"],
+        sizeType: ["original", "compressed"],
       });
       const path = result.tempFiles[0]?.tempFilePath;
       if (!path) throw new Error("没有获取到图片");
@@ -249,17 +251,12 @@ export default function CoachPage() {
       className="page-layout--coach-chat"
     >
       <View className="coach-chat">
-        <View className="coach-chat__page-title">
-          <Text>你的营养教练</Text>
-        </View>
-
-        <View className="coach-chat__status">
-          <NordicIcon name="sparkles" size={17} ariaLabel="今日营养状态" />
-          <Text>增肌目标 · 今日还差 {proteinLeft}g 蛋白质</Text>
-        </View>
-
         <View className="coach-chat__hero">
           <View className="coach-chat__hero-copy">
+            <View className="coach-chat__status-badge">
+              <NordicIcon name="sparkles" size={15} ariaLabel="今日营养状态" />
+              <Text>增肌目标 · 今日还差 {proteinLeft}g 蛋白质</Text>
+            </View>
             <Text className="coach-chat__hero-kicker">NOVA · 今日营养陪伴</Text>
             <Text className="coach-chat__hero-title">晚上好，{"\n"}我来帮你补齐今天的蛋白质</Text>
             <View className="coach-chat__hero-actions">
@@ -460,39 +457,15 @@ export default function CoachPage() {
         </View>
       </View>
 
-      <View className="coach-chat__composer">
-        <Input
-          className="coach-chat__input"
-          value={draft}
-          placeholder="问问你的营养教练，比如：晚餐吃什么？"
-          confirmType="send"
-          onInput={(event) => setDraft(event.detail.value)}
-          onConfirm={() => void sendMessage()}
-        />
-        {selectedImagePath ? (
-          <View
-            className="coach-chat__selected-image"
-            ariaLabel="取消已选图片"
-            onClick={() => setSelectedImagePath(null)}
-          >
-            <Image
-              className="coach-chat__selected-image-preview"
-              src={selectedImagePath}
-              mode="aspectFill"
-            />
-          </View>
-        ) : null}
-        <View
-          className="coach-chat__image-picker"
-          ariaLabel="选择饮食图片"
-          onClick={() => void chooseCoachImage()}
-        >
-          <NordicIcon name="camera" size={20} ariaLabel="选择图片" />
-        </View>
-        <View className="coach-chat__send" ariaLabel="发送消息" onClick={() => void sendMessage()}>
-          <NordicIcon name="arrow-up" size={22} ariaLabel="发送" />
-        </View>
-      </View>
+      <CoachComposer
+        value={draft}
+        disabled={sending}
+        selectedImagePath={selectedImagePath}
+        onInput={setDraft}
+        onSend={() => void sendMessage()}
+        onPickImage={() => void chooseCoachImage()}
+        onClearImage={() => setSelectedImagePath(null)}
+      />
     </PageLayout>
   );
 }

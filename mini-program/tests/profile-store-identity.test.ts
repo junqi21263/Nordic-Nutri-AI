@@ -10,7 +10,7 @@ describe("profile store identity boundary", () => {
 
     expect(store.getState().userId).toBe("u2");
     expect(store.getState().dataStatus).toBe("loading");
-    expect(store.getState().profile.nickname).toBe("Lewis");
+    expect(store.getState().profile.nickname).toBe("");
     expect(store.getState().settings.mealsPerDay).toBe(3);
   });
 });

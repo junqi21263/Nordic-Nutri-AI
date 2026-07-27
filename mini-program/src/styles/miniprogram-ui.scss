@@ -1,0 +1,143 @@
+// WeChat Mini Program UI/UX conventions (miniprogram-ui-ux-design skill).
+// Token exposure, touch targets, press feedback, and WXSS-safe defaults.
+// Does not alter page layout grids or component composition.
+
+@use "./tokens" as *;
+
+page {
+  --mp-color-primary: #{$color-primary};
+  --mp-color-text: #{$color-text-primary};
+  --mp-color-text-secondary: #{$color-text-secondary};
+  --mp-color-surface: #{$color-surface};
+  --mp-color-background: #{$color-background};
+  --mp-color-success: #{$color-success};
+  --mp-color-warning: #{$color-warning};
+  --mp-color-error: #{$color-error};
+  --mp-color-divider: #{$color-divider};
+
+  --mp-spacing-xs: #{$space-4};
+  --mp-spacing-sm: #{$space-8};
+  --mp-spacing-md: #{$space-12};
+  --mp-spacing-lg: #{$space-16};
+  --mp-spacing-xl: #{$space-20};
+  --mp-spacing-2xl: #{$space-24};
+  --mp-spacing-3xl: #{$space-32};
+
+  --mp-radius-sm: #{$radius-8};
+  --mp-radius-md: #{$radius-12};
+  --mp-radius-lg: #{$radius-16};
+  --mp-radius-full: #{$radius-full};
+
+  --mp-shadow-1: #{$shadow-subtle};
+  --mp-shadow-2: #{$shadow-card};
+  --mp-shadow-3: #{$shadow-floating};
+
+  --mp-touch-min: #{$touch-target-min};
+  --mp-touch-gap: #{$touch-target-gap};
+  --mp-duration-press: #{$duration-press};
+
+  -webkit-tap-highlight-color: transparent;
+}
+
+// Skill: press feedback uses transform + opacity only (GPU-friendly).
+.pressable--active {
+  opacity: 0.92;
+  transform: scale(0.97);
+}
+
+// Existing interactive surfaces — same visual size, normalized press feedback.
+.bottom-tab-bar__item,
+.food-catalog-page__back,
+.food-detail-page__back,
+.profile-subpage__back,
+.scanner-control,
+.scanner-capture,
+.home-page__action,
+.food-catalog-popular-card,
+.food-catalog-recent-card,
+.food-catalog-category,
+.food-catalog-filter,
+.food-catalog-search__action,
+.coach-chat__send,
+.coach-chat__image-picker,
+.coach-chat__quick-chip,
+.list-item,
+.chip,
+.profile-choice,
+.food-detail-page__portion-chip,
+.food-catalog-popular-card__add,
+.food-catalog-recent-card__add {
+  transition:
+    transform $duration-press $ease-standard,
+    opacity $duration-press $ease-standard;
+}
+
+.bottom-tab-bar__item.pressable--active,
+.bottom-tab-bar__item:active,
+.food-catalog-page__back:active,
+.food-detail-page__back:active,
+.profile-subpage__back:active,
+.scanner-control:active,
+.scanner-capture:active,
+.home-page__action:active,
+.food-catalog-popular-card:active,
+.food-catalog-recent-card:active,
+.food-catalog-category:active,
+.food-catalog-filter:active,
+.food-catalog-search__action:active,
+.coach-chat__send:active,
+.coach-chat__image-picker:active,
+.coach-chat__quick-chip:active,
+.list-item:active,
+.chip:active,
+.profile-choice:active,
+.food-detail-page__portion-chip:active {
+  opacity: 0.92;
+  transform: scale(0.97);
+}
+
+// Skill: minimum 88rpx (44px @ 375 design) touch targets for compact controls.
+.scanner-control,
+.coach-chat__image-picker,
+.food-catalog-popular-card__add,
+.food-catalog-recent-card__add {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-height: $touch-target-min;
+  min-width: $touch-target-min;
+}
+
+.coach-chat__send {
+  min-height: $touch-target-min;
+  min-width: $touch-target-min;
+}
+
+// Skill: placeholder contrast ≥ #767676 on white backgrounds.
+input::placeholder,
+textarea::placeholder {
+  color: $color-text-secondary;
+}
+
+input,
+textarea {
+  caret-color: $color-primary;
+}
+
+// Skill: system font stack (no remote @font-face).
+page,
+view,
+text,
+button,
+input,
+textarea {
+  font-family: $font-family;
+}
+
+[data-reduced-motion="true"] .pressable--active,
+[data-reduced-motion="true"] .bottom-tab-bar__item:active,
+[data-reduced-motion="true"] .home-page__action:active,
+[data-reduced-motion="true"] .scanner-capture:active {
+  opacity: 1;
+  transform: none;
+}

@@ -43,6 +43,16 @@ import arrowUp from "../../assets/icons/arrow-up.svg";
 import heart from "../../assets/icons/heart.svg";
 import trash2 from "../../assets/icons/trash-2.svg";
 import chevronRight from "../../assets/icons/chevron-right.svg";
+import refreshCw from "../../assets/icons/refresh-cw.svg";
+import foodEgg from "../../assets/icons/food-egg.svg";
+import foodMilk from "../../assets/icons/food-milk.svg";
+import foodFish from "../../assets/icons/food-fish.svg";
+import foodBean from "../../assets/icons/food-bean.svg";
+import foodCarrot from "../../assets/icons/food-carrot.svg";
+import foodApple from "../../assets/icons/food-apple.svg";
+import foodCup from "../../assets/icons/food-cup.svg";
+import foodPot from "../../assets/icons/food-pot.svg";
+import foodSalt from "../../assets/icons/food-salt.svg";
 
 export type NordicIconName =
   | "back"
@@ -88,7 +98,17 @@ export type NordicIconName =
   | "arrow-up"
   | "heart"
   | "trash-2"
-  | "chevron-right";
+  | "chevron-right"
+  | "refresh-cw"
+  | "food-egg"
+  | "food-milk"
+  | "food-fish"
+  | "food-bean"
+  | "food-carrot"
+  | "food-apple"
+  | "food-cup"
+  | "food-pot"
+  | "food-salt";
 
 export interface NordicIconProps {
   name: NordicIconName;
@@ -141,6 +161,16 @@ const iconSources: Record<NordicIconName, string> = {
   heart,
   "trash-2": trash2,
   "chevron-right": chevronRight,
+  "refresh-cw": refreshCw,
+  "food-egg": foodEgg,
+  "food-milk": foodMilk,
+  "food-fish": foodFish,
+  "food-bean": foodBean,
+  "food-carrot": foodCarrot,
+  "food-apple": foodApple,
+  "food-cup": foodCup,
+  "food-pot": foodPot,
+  "food-salt": foodSalt,
 };
 
 /** Renderable local SVG asset for WeChat targets that do not expose Svg/Path components. */

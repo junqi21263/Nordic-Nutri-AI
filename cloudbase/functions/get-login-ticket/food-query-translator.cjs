@@ -4,6 +4,8 @@ const COMMON_FOOD_TERMS = {
   "牛肉": "beef",
   "鸡肉": "chicken",
   "鸡胸肉": "chicken breast",
+  "白切鸡": "chicken",
+  "鸡汤": "chicken broth",
   "猪肉": "pork",
   "三文鱼": "salmon",
   "虾": "shrimp",
@@ -13,13 +15,29 @@ const COMMON_FOOD_TERMS = {
   "酸奶": "yogurt",
   "希腊酸奶": "greek yogurt",
   "豆腐": "tofu",
+  "白米饭": "rice",
   "米饭": "rice",
   "燕麦": "oatmeal",
   "香蕉": "banana",
   "苹果": "apple",
   "土豆": "potato",
   "西兰花": "broccoli",
+  "辣椒酱": "chili sauce",
+  "芥末": "mustard",
 };
+
+/** Longest key first so "白米饭" wins over "米饭". */
+const COMMON_FOOD_TERM_KEYS = Object.keys(COMMON_FOOD_TERMS).sort((a, b) => b.length - a.length);
+
+function matchCommonFoodTerm(query) {
+  const text = typeof query === "string" ? query.trim() : "";
+  if (!text) return null;
+  if (COMMON_FOOD_TERMS[text]) return COMMON_FOOD_TERMS[text];
+  for (const key of COMMON_FOOD_TERM_KEYS) {
+    if (text.includes(key)) return COMMON_FOOD_TERMS[key];
+  }
+  return null;
+}
 
 function cleanTranslation(value) {
   const text = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
@@ -62,10 +80,17 @@ function requestDeepSeekTranslation({ apiKey, query, model }) {
 
 function createFoodQueryTranslator({ apiKey, model = "deepseek-v4-flash", translate = requestDeepSeekTranslation }) {
   return async (query) => {
-    if (COMMON_FOOD_TERMS[query]) return COMMON_FOOD_TERMS[query];
+    const common = matchCommonFoodTerm(query);
+    if (common) return common;
     if (typeof apiKey !== "string" || !apiKey) return null;
     return translate({ apiKey, query, model });
   };
 }
 
-module.exports = { COMMON_FOOD_TERMS, cleanTranslation, createFoodQueryTranslator, requestDeepSeekTranslation };
+module.exports = {
+  COMMON_FOOD_TERMS,
+  cleanTranslation,
+  createFoodQueryTranslator,
+  matchCommonFoodTerm,
+  requestDeepSeekTranslation,
+};

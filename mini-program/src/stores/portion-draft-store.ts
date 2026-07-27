@@ -7,6 +7,7 @@ const toScannerFixture = (meal: Meal): ScannerMealFixture => ({
   title: meal.title,
   mealType: meal.mealType,
   imageKey: meal.imageKey ?? "bowl",
+  imageUrl: meal.imageUrl ?? null,
   confidence: 100,
   items: meal.items.map((item) => ({ ...item })),
   insight: meal.insight,

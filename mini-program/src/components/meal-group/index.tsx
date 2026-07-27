@@ -12,6 +12,13 @@ const labels: Record<MealType, string> = {
   snack: "加餐",
 };
 const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
+
+function mealThumbSrc(meal: Meal) {
+  if (meal.imageUrl) return meal.imageUrl;
+  if (meal.imageKey) return imageByKey[meal.imageKey];
+  return null;
+}
+
 export interface MealGroupProps {
   mealType: MealType;
   meals: Meal[];
@@ -33,15 +40,12 @@ export function MealGroup({ mealType, meals, onSelect, onAdd }: MealGroupProps) 
       ) : (
         meals.map((meal) => {
           const nutrition = getMealNutrition(meal);
+          const thumb = mealThumbSrc(meal);
           return (
             <View className="meal-group__item" key={meal.id} onClick={() => onSelect(meal)}>
               <View className={`meal-group__image meal-group__image--${meal.imageKey ?? "empty"}`}>
-                {meal.imageKey ? (
-                  <Image
-                    className="meal-group__image-asset"
-                    src={imageByKey[meal.imageKey]}
-                    mode="aspectFill"
-                  />
+                {thumb ? (
+                  <Image className="meal-group__image-asset" src={thumb} mode="aspectFill" />
                 ) : (
                   <Text>＋</Text>
                 )}

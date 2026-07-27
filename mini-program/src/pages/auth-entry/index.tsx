@@ -3,9 +3,7 @@ import Taro from "@tarojs/taro";
 import { useState } from "react";
 import { loginWithWechat } from "../../api/auth-api";
 import { saveProductProfile } from "../../api/product-data-api";
-import { uploadProfileAvatar } from "../../api/profile-avatar-api";
 import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
-import { readWechatProfile, type WechatProfile } from "../../auth/wechat-profile";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomSheet } from "../../components/bottom-sheet";
@@ -13,38 +11,21 @@ import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useProfileStore } from "../../stores/profile-store";
 
-async function requestWechatProfile(): Promise<{
-  profile: WechatProfile | null;
-  warning: string | null;
-}> {
+/**
+ * Persist a real WeChat nickname when available.
+ * Never sync avatar from silent getUserInfo — modern WeChat often returns the grey
+ * placeholder silhouette, which would overwrite bootstrap `default:robot-N`.
+ * Users change avatars explicitly via chooseAvatar on the profile-edit page.
+ */
+async function syncWechatNickname(nickname: string | null): Promise<string | null> {
+  const trimmed = typeof nickname === "string" ? nickname.trim() : "";
+  if (!trimmed || trimmed === "微信用户") return null;
   try {
-    const result = await Taro.getUserProfile({ desc: "用于同步你的微信昵称和头像到个人资料" });
-    const profile = readWechatProfile(result);
-    return profile
-      ? { profile, warning: null }
-      : { profile: null, warning: "未获得昵称与头像授权；可在“我的 > 编辑资料”中重新设置。" };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "微信资料授权未完成";
-    return { profile: null, warning: `${message}；可在“我的 > 编辑资料”中重新设置。` };
-  }
-}
-
-async function syncWechatProfile(profile: WechatProfile | null): Promise<WechatProfile | null> {
-  if (!profile) return null;
-  const saved = await saveProductProfile({ nickname: profile.nickname });
-  // Keep the just-authorized avatar in the local session even if the optional
-  // CloudBase copy fails; a successful upload replaces it with a signed URL.
-  let avatarUrl: string | null = profile.avatarUrl;
-  if (!profile.avatarUrl) return { nickname: saved.nickname, avatarUrl };
-  try {
-    const downloaded = await Taro.downloadFile({ url: profile.avatarUrl });
-    if (downloaded.statusCode === 200 && downloaded.tempFilePath) {
-      avatarUrl = (await uploadProfileAvatar(downloaded.tempFilePath)).avatarUrl;
-    }
+    const saved = await saveProductProfile({ nickname: trimmed });
+    return saved.nickname;
   } catch {
-    // A nickname update is still valuable if the remote avatar is unavailable.
+    return trimmed;
   }
-  return { nickname: saved.nickname, avatarUrl };
 }
 
 export default function AuthEntryPage() {
@@ -54,27 +35,21 @@ export default function AuthEntryPage() {
   const login = async () => {
     setIsLoggingIn(true);
     try {
-      const profileResult = await requestWechatProfile();
       const user = await loginWithWechat();
       if (!user) throw new Error("微信登录未返回用户信息");
-      let syncedProfile: WechatProfile | null = null;
-      let profileWarning = profileResult.warning;
-      if (profileResult.profile) {
-        try {
-          syncedProfile = await syncWechatProfile(profileResult.profile);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "资料同步失败";
-          profileWarning = `${message}；可在“我的 > 编辑资料”中重新设置。`;
-        }
+      let syncedNickname: string | null = null;
+      try {
+        const result = await Taro.getUserInfo({ withCredentials: false });
+        const nickName =
+          typeof result?.userInfo?.nickName === "string" ? result.userInfo.nickName : null;
+        syncedNickname = await syncWechatNickname(nickName);
+      } catch {
+        // Non-fatal: defaults from bootstrap remain.
       }
       await startApplicationAuth();
-      if (syncedProfile) {
-        useProfileStore.getState().setProfile({
-          nickname: syncedProfile.nickname,
-          avatarUrl: syncedProfile.avatarUrl,
-        });
+      if (syncedNickname) {
+        useProfileStore.getState().setProfile({ nickname: syncedNickname });
       }
-      if (profileWarning) feedback.show({ message: profileWarning, tone: "error" });
     } catch (error) {
       feedback.show({
         message: error instanceof Error ? error.message : "登录未完成，请稍后重试",
@@ -90,6 +65,7 @@ export default function AuthEntryPage() {
       title="Nordic Nutri AI"
       showTabs={false}
       hideNavigation
+      showBrandHeader={false}
       className="page-layout--auth-entry"
     >
       <BottomSheet open className="auth-entry-sheet">
@@ -97,11 +73,14 @@ export default function AuthEntryPage() {
           <Text className="auth-entry-page__eyebrow">NORDIC NUTRI AI</Text>
           <Text className="auth-entry-page__card-title">继续你的营养节奏</Text>
           <Text className="auth-entry-page__card-copy">
-            登录后即可安全保存餐次、身体数据和目标设置。
+            一键登录即可开始记录餐次，默认头像与昵称会自动生成，可在「我的」中随时更换。
           </Text>
           <AppButton size="large" loading={isLoggingIn} onClick={login}>
-            登录并开始使用
+            微信一键登录
           </AppButton>
+          <Text className="auth-entry-page__privacy-note">
+            登录即同意微信授权，昵称和头像可在「我的」中随时修改。
+          </Text>
         </AppCard>
       </BottomSheet>
     </PageLayout>

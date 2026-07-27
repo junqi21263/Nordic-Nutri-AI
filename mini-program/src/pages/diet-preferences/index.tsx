@@ -32,6 +32,7 @@ export default function DietPreferencesPage() {
       title="饮食偏好与限制"
       showTabs={false}
       hideNavigation
+      showBrandHeader={false}
       className="page-layout--onboarding"
     >
       <View className="diet-preferences-page">

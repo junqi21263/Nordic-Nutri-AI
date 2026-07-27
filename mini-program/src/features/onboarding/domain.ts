@@ -200,3 +200,22 @@ export function calculateNutritionPlan(profile: ValidBodyProfile): NutritionPlan
     fatG,
   };
 }
+
+/** Energy-share percentages for protein / carbs / fat (sum ≈ 100). */
+export function macroEnergyPercents(plan: {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}): { proteinPct: number; carbsPct: number; fatPct: number } {
+  const calories = Math.max(plan.calories, 1);
+  const proteinKcal = plan.proteinG * 4;
+  const carbsKcal = plan.carbsG * 4;
+  const fatKcal = plan.fatG * 9;
+  const total = proteinKcal + carbsKcal + fatKcal || calories;
+  return {
+    proteinPct: Math.round((proteinKcal / total) * 100),
+    carbsPct: Math.round((carbsKcal / total) * 100),
+    fatPct: Math.round((fatKcal / total) * 100),
+  };
+}

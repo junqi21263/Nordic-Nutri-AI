@@ -1,0 +1,76 @@
+@use "../../styles/tokens" as *;
+
+.app-top-bar {
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 1000;
+  background: $color-warm-white;
+}
+.app-top-bar--transparent {
+  background: transparent;
+}
+.app-top-bar--divider {
+  border-bottom: 1px solid rgba($color-forest-green, 0.06);
+}
+.app-top-bar__status-bar {
+  width: 100%;
+}
+.app-top-bar__nav-bar {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+}
+.app-top-bar__side {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  height: 100%;
+  z-index: 2;
+}
+.app-top-bar__side--left {
+  justify-content: flex-start;
+  padding-left: $space-4;
+}
+.app-top-bar__side--right {
+  flex-shrink: 0;
+}
+.app-top-bar__btn {
+  align-items: center;
+  border-radius: $radius-12;
+  display: flex;
+  height: 64px;
+  justify-content: center;
+  width: 64px;
+}
+.app-top-bar__btn:active {
+  background: rgba($color-forest-green, 0.06);
+}
+.app-top-bar__brand {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  left: 50%;
+  min-height: 28px;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+.app-top-bar__brand .nordic-icon {
+  flex-shrink: 0;
+}
+.app-top-bar__brand-text {
+  color: $color-forest-green;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+}

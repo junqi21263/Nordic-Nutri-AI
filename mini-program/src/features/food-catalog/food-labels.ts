@@ -1,5 +1,6 @@
 import type { ProductFoodCatalogItem } from "../../api/food-catalog-api";
 
+/** Fallback chip labels when the categories API is unavailable. */
 export const FOOD_CATEGORIES = [
   "全部",
   "肉禽",
@@ -7,15 +8,71 @@ export const FOOD_CATEGORIES = [
   "蛋类",
   "乳制品",
   "豆制品",
-  "谷薯主食",
-  "蔬菜水果",
+  "谷物",
+  "蔬菜",
+  "水果",
+  "饮料",
+  "调味品",
+  "混合菜",
   "其他",
 ] as const;
 
-export const FOOD_TAGS = ["全部", "高蛋白", "低脂", "高碳水", "低热量", "植物蛋白"] as const;
+/** Fallback tag labels when the tags API is unavailable. */
+export const FOOD_TAGS = [
+  "全部",
+  "高蛋白",
+  "低脂",
+  "高碳水",
+  "低热量",
+  "植物蛋白",
+  "高膳食纤维",
+] as const;
 
-export type FoodCategory = (typeof FOOD_CATEGORIES)[number];
-export type FoodTag = (typeof FOOD_TAGS)[number];
+export type FoodCategory = (typeof FOOD_CATEGORIES)[number] | string;
+export type FoodTag = (typeof FOOD_TAGS)[number] | string;
+
+/**
+ * English USDA search keywords keyed by Chinese category label.
+ * Tapping a category must hit USDA/cache search — not filter the tiny discover list.
+ */
+export const CATEGORY_SEARCH_QUERIES: Record<string, string> = {
+  肉禽: "chicken breast beef pork turkey lamb",
+  鱼虾海鲜: "salmon shrimp tuna cod crab",
+  蛋类: "egg whole cooked",
+  乳制品: "milk greek yogurt cheese cottage",
+  豆制品: "tofu soybeans chickpeas lentils tempeh",
+  谷物: "rice oatmeal bread pasta quinoa potato",
+  蔬菜: "broccoli spinach carrot tomato cucumber",
+  水果: "apple banana blueberry strawberry orange",
+  饮料: "orange juice coffee tea almond milk",
+  调味品: "olive oil soy sauce honey mustard",
+  混合菜: "salad stew soup casserole chili",
+  其他: "almonds walnuts peanut butter",
+};
+
+/** Same keywords keyed by server food_categories.code for reliable lookup. */
+export const CATEGORY_SEARCH_BY_CODE: Record<string, string> = {
+  meat: CATEGORY_SEARCH_QUERIES["肉禽"],
+  seafood: CATEGORY_SEARCH_QUERIES["鱼虾海鲜"],
+  egg: CATEGORY_SEARCH_QUERIES["蛋类"],
+  dairy: CATEGORY_SEARCH_QUERIES["乳制品"],
+  soy: CATEGORY_SEARCH_QUERIES["豆制品"],
+  grain: CATEGORY_SEARCH_QUERIES["谷物"],
+  vegetable: CATEGORY_SEARCH_QUERIES["蔬菜"],
+  fruit: CATEGORY_SEARCH_QUERIES["水果"],
+  beverage: CATEGORY_SEARCH_QUERIES["饮料"],
+  seasoning: CATEGORY_SEARCH_QUERIES["调味品"],
+  mixed_dish: CATEGORY_SEARCH_QUERIES["混合菜"],
+  other: CATEGORY_SEARCH_QUERIES["其他"],
+};
+
+export function resolveCategorySearchQuery(category: FoodCategory, categoryCode?: string | null) {
+  if (category === "全部") return null;
+  if (categoryCode && CATEGORY_SEARCH_BY_CODE[categoryCode]) {
+    return CATEGORY_SEARCH_BY_CODE[categoryCode];
+  }
+  return CATEGORY_SEARCH_QUERIES[category] ?? (String(category).trim() || null);
+}
 
 function sourceText(food: ProductFoodCatalogItem) {
   return [food.description, food.brandName, food.category, food.dataType]
@@ -24,18 +81,52 @@ function sourceText(food: ProductFoodCatalogItem) {
     .toLowerCase();
 }
 
+/** Infer a Chinese category label for USDA/cache items without a server category. */
 export function getFoodCategory(food: ProductFoodCatalogItem): Exclude<FoodCategory, "全部"> {
   const text = sourceText(food);
-  if (/(salmon|tuna|fish|shrimp|prawn|crab|seafood|cod)/.test(text)) return "鱼虾海鲜";
-  if (/(beef|chicken|turkey|pork|lamb|meat|steak|ham|sausage)/.test(text)) return "肉禽";
-  if (/(egg|omelet)/.test(text)) return "蛋类";
-  if (/(milk|yogurt|cheese|skyr|kefir|cream)/.test(text)) return "乳制品";
-  if (/(tofu|soy|bean|lentil|chickpea|tempeh)/.test(text)) return "豆制品";
-  if (/(rice|oat|oatmeal|bread|pasta|noodle|potato|grain|cereal|tortilla)/.test(text)) return "谷薯主食";
-  if (/(apple|banana|avocado|berry|fruit|vegetable|broccoli|tomato|spinach|salad)/.test(text)) return "蔬菜水果";
+  if (
+    /(salmon|tuna|fish|shrimp|prawn|crab|seafood|cod|sardine|mackerel|trout|lobster|clam|oyster|scallop|mussel|anchovy)/.test(
+      text,
+    )
+  ) {
+    return "鱼虾海鲜";
+  }
+  if (/(beef|chicken|turkey|pork|lamb|meat|steak|ham|sausage|bacon|duck|veal)/.test(text)) return "肉禽";
+  // Word-boundary for egg so "eggplant" does not become 蛋类.
+  if (/(^|[^a-z])(eggs?|omelets?|omelettes?)([^a-z]|$)/.test(text)) return "蛋类";
+  if (/(milk|yogurt|yoghurt|cheese|skyr|kefir|cream|cottage|butter)/.test(text)) return "乳制品";
+  if (/(tofu|soy|bean|lentil|chickpea|tempeh|edamame|legume)/.test(text)) return "豆制品";
+  if (/(juice|soda|beverage|drink|cola|coffee|tea|smoothie)/.test(text)) return "饮料";
+  if (
+    /(rice|oat|oatmeal|bread|pasta|noodle|potato|grain|cereal|tortilla|quinoa|wheat|barley|couscous)/.test(
+      text,
+    )
+  ) {
+    return "谷物";
+  }
+  if (
+    /(apple|banana|avocado|berry|fruit|blueberry|orange|strawberry|grape|mango|pear|peach|kiwi|pineapple|watermelon)/.test(
+      text,
+    )
+  ) {
+    return "水果";
+  }
+  if (
+    /(vegetable|broccoli|tomato|spinach|salad|carrot|cucumber|pepper|mushroom|eggplant|lettuce|cabbage|kale|onion|garlic|zucchini|cauliflower|asparagus)/.test(
+      text,
+    )
+  ) {
+    return "蔬菜";
+  }
+  if (/(oil|honey|seasoning|sauce|mustard|vinegar|ketchup|mayonnaise|salt|pepper)/.test(text)) {
+    return "调味品";
+  }
+  if (/(stew|soup|casserole|chili|curry|pizza|burger|sandwich|mixed)/.test(text)) return "混合菜";
+  if (/(almond|walnut|cashew|peanut|pistachio|snack|chip|cracker)/.test(text)) return "其他";
   return "其他";
 }
 
+/** Infer tag labels using the same thresholds as the server auto-tag rules. */
 export function getFoodTags(food: ProductFoodCatalogItem): Exclude<FoodTag, "全部">[] {
   const tags: Exclude<FoodTag, "全部">[] = [];
   const protein = food.proteinGPer100g ?? 0;
@@ -45,10 +136,10 @@ export function getFoodTags(food: ProductFoodCatalogItem): Exclude<FoodTag, "全
   const category = getFoodCategory(food);
 
   if (protein >= 15) tags.push("高蛋白");
-  if (fat <= 5) tags.push("低脂");
-  if (carbs >= 20) tags.push("高碳水");
+  if (fat <= 3) tags.push("低脂");
+  if (carbs >= 30) tags.push("高碳水");
   if (calories <= 100) tags.push("低热量");
-  if (category === "豆制品") tags.push("植物蛋白");
+  if (category === "豆制品" || category === "谷物") tags.push("植物蛋白");
   return tags;
 }
 
@@ -57,6 +148,12 @@ export function matchesFoodFilters(
   category: FoodCategory,
   tag: FoodTag,
 ) {
-  return (category === "全部" || getFoodCategory(food) === category)
-    && (tag === "全部" || getFoodTags(food).includes(tag));
+  const foodCategory = getFoodCategory(food);
+  const categoryMatched =
+    category === "全部"
+    || foodCategory === category
+    // Legacy chip "蔬菜水果" maps to either vegetable or fruit.
+    || (category === "蔬菜水果" && (foodCategory === "蔬菜" || foodCategory === "水果"))
+    || (category === "谷薯主食" && foodCategory === "谷物");
+  return categoryMatched && (tag === "全部" || getFoodTags(food).includes(tag));
 }

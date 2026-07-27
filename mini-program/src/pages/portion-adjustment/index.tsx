@@ -54,6 +54,9 @@ export default function PortionAdjustmentPage() {
   const canIncrease = portion.multiplier < 2;
   const save = async () => {
     const editingId = portion.editingMealId;
+    const draftMeal = portion.meal;
+    const multiplier = portion.multiplier;
+    if (!draftMeal || !adjusted) return;
     setIsSaving(true);
     try {
       let id = editingId;
@@ -68,8 +71,8 @@ export default function PortionAdjustmentPage() {
         feedback.show({ message: "份量已更新并同步", tone: "success" });
       } else {
         const localMeal = createMealFromAnalysis(
-          portion.meal!,
-          portion.multiplier,
+          draftMeal,
+          multiplier,
           getLocalDateString(),
           nowTime(),
         );
@@ -77,8 +80,10 @@ export default function PortionAdjustmentPage() {
         feedback.show({ message: "已保存并同步到饮食记录", tone: "success" });
       }
       meals.replaceRemoteMeals(await getProductMeals(getLocalDateString()), getLocalDateString());
+      // Navigate before clearing the draft — resetting first re-renders this page as
+      // "份量草稿不存在", and a failed/timed-out redirect leaves the user stuck there.
+      await Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });
       portion.reset();
-      Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });
     } catch {
       feedback.show({ message: "保存调整失败，请稍后重试", tone: "error" });
     } finally {
@@ -90,17 +95,12 @@ export default function PortionAdjustmentPage() {
       title="调整份量"
       showTabs={false}
       hideNavigation
+      showBack
+      onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--portion-adjustment"
     >
       <View className="portion-adjustment-page">
         <View className="portion-adjustment-page__page-title">
-          <View
-            className="portion-adjustment-page__back"
-            ariaLabel="返回分析结果"
-            onClick={() => navigateBackOrHome("/pages/analysis-result/index")}
-          >
-            <NordicIcon name="back" size={24} ariaLabel="返回分析结果" />
-          </View>
           <Text>调整份量</Text>
         </View>
         <Text className="portion-adjustment-page__subtitle">每一步都会即时重算本地营养数据。</Text>

@@ -39,7 +39,7 @@ export interface ProfileStorage {
   clear: () => void;
 }
 const initialProfile = {
-  nickname: "Lewis",
+  nickname: "",
   avatarUrl: null,
   goalLabel: "精益增肌",
   weight: 70,

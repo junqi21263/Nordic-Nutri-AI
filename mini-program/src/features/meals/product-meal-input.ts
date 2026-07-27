@@ -14,12 +14,17 @@ export function toProductMealInput(
   meal: Omit<Meal, "id">,
   analysisId?: string | null,
 ): ProductMealInput {
+  const imageRef = meal.imageUrl ?? null;
   return {
     ...(analysisId ? { analysisId } : {}),
     mealType: meal.mealType,
     name: meal.title,
     recordedAt: recordedAtFromLocal(meal.date, meal.time),
     isFavorite: meal.favorite,
+    // Prefer durable cloud file IDs via imagePath; keep imageUrl for short https/wxfile refs.
+    ...(imageRef && /^cloud:\/\//i.test(imageRef)
+      ? { imagePath: imageRef }
+      : { imageUrl: imageRef }),
     items: meal.items.map((item) => {
       const quantityG = readQuantity(item.amount);
       const scale = quantityG / 100;

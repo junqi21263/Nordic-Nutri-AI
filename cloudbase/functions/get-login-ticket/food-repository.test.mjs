@@ -1,0 +1,173 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  FoodRepositoryError,
+  clampPage,
+  clampPageSize,
+  mapFoodRow,
+  mapCategoryRow,
+  mapTagRow,
+  sanitizeFilterTerm,
+  createFoodRepository,
+} from "./food-repository.cjs";
+
+function mockDb(tables = {}) {
+  const calls = [];
+  const state = { ...tables };
+  function chain(table) {
+    let q = {
+      _table: table, _filters: [], _or: null, _order: null, _range: null,
+      _limit: null, _count: false, _single: false, _maybe: false,
+      _conflict: null, _payload: null,
+      select(cols, opts) { if (opts?.count) this._count = true; calls.push({ t: "select", table, cols }); return this; },
+      eq(col, val) { this._filters.push(["eq", col, val]); return this; },
+      in(col, vals) { this._filters.push(["in", col, vals]); return this; },
+      ilike(col, val) { this._filters.push(["ilike", col, val]); return this; },
+      is(col, val) { this._filters.push(["is", col, val]); return this; },
+      or(expr) { this._or = expr; return this; },
+      order(col, opts) { this._order = { col, asc: opts?.ascending }; return this; },
+      range(a, b) { this._range = [a, b]; return this; },
+      limit(n) { this._limit = n; return this; },
+      maybeSingle() { this._maybe = true; return this._resolve(); },
+      single() { this._single = true; return this._resolve(); },
+      upsert(payload, opts) { this._payload = payload; this._conflict = opts?.onConflict; return this; },
+      insert(payload) { this._payload = payload; return this; },
+      update(payload) { this._payload = payload; return this; },
+      async _resolve() {
+        let rows = state[this._table] ? [...state[this._table]] : [];
+        for (const [op, col, val] of this._filters) {
+          if (op === "eq") rows = rows.filter((r) => r[col] === val);
+          if (op === "in") rows = rows.filter((r) => Array.isArray(val) && val.includes(r[col]));
+          if (op === "is") rows = rows.filter((r) => (val ? r[col] != null : r[col] == null));
+          if (op === "ilike") {
+            const pat = String(val).replace(/^\*|\*$/g, "").toLowerCase();
+            rows = rows.filter((r) => String(r[col] ?? "").toLowerCase().includes(pat));
+          }
+        }
+        if (this._or) {
+          const clauses = this._or.split(",").map((c) => {
+            const m = c.match(/^(\w+)\.ilike\.\*(\w+)\*/);
+            return m ? { col: m[1], val: m[2] } : null;
+          }).filter(Boolean);
+          rows = rows.filter((r) => clauses.some((c) => String(r[c.col] ?? "").toLowerCase().includes(c.val)));
+        }
+        if (this._order) rows.sort((a, b) => {
+          const av = a[this._order.col], bv = b[this._order.col];
+          return this._order.asc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+        });
+        if (this._limit) rows = rows.slice(0, this._limit);
+        if (this._range) rows = rows.slice(this._range[0], this._range[1] + 1);
+        if (this._payload && (this._table === "food_tag_relations" || this._table === "food_images" || this._table === "food_source_payloads" || this._table === "food_sync_jobs")) {
+          return { data: this._payload, error: null };
+        }
+        if (this._payload && (this._table === "foods" || this._table === "app_users")) {
+          return { data: { id: "f1", ...this._payload }, error: null };
+        }
+        if (this._maybe || this._single) return { data: rows[0] ?? null, error: null };
+        return { data: rows, error: null, count: rows.length };
+      },
+      then(resolve, reject) { return this._resolve().then(resolve, reject); },
+    };
+    return q;
+  }
+  return {
+    from: (table) => { calls.push({ t: "from", table }); return chain(table); },
+    _calls: calls, _state: state,
+  };
+}
+
+test("clampPage/clampPageSize enforce bounds", () => {
+  assert.equal(clampPage(0), 1);
+  assert.equal(clampPage(5), 5);
+  assert.equal(clampPageSize(100), 50);
+  assert.equal(clampPageSize(undefined), 20);
+});
+
+test("mapFoodRow maps nutrition and flags", () => {
+  const f = mapFoodRow({
+    id: "f1", source: "usda", source_id: "123", fdc_id: 123,
+    calories: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6, fiber_g: 0,
+    is_featured: true, is_verified: false, is_active: true, popularity_score: 2,
+  });
+  assert.equal(f.nutritionPer100g.protein, 31);
+  assert.equal(f.isFeatured, true);
+  assert.equal(f.fdcId, 123);
+});
+
+test("mapCategoryRow and mapTagRow", () => {
+  assert.deepEqual(mapCategoryRow({ id: "c1", code: "meat", name_zh: "肉禽", name_en: "Meat", sort_order: 1, is_active: true }).code, "meat");
+  assert.equal(mapTagRow({ id: "t1", code: "high_protein", name_zh: "高蛋白", sort_order: 1, is_active: true }).code, "high_protein");
+});
+
+test("listCategories returns active categories sorted", async () => {
+  const db = mockDb({ food_categories: [
+    { id: "c1", code: "meat", name_zh: "肉禽", name_en: "Meat", sort_order: 1, is_active: true },
+    { id: "c2", code: "other", name_zh: "其他", name_en: "Other", sort_order: 12, is_active: true },
+    { id: "c3", code: "x", name_zh: "X", sort_order: 5, is_active: false },
+  ] });
+  const repo = createFoodRepository({ db });
+  const cats = await repo.listCategories();
+  assert.equal(cats.length, 2);
+  assert.equal(cats[0].code, "meat");
+});
+
+test("listFoods applies search filter, pagination, and joins", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f1", source: "usda", source_id: "1", name_en: "Chicken breast", normalized_name: "chicken breast", calories: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6, is_active: true, popularity_score: 5, category_id: "c1" },
+      { id: "f2", source: "usda", source_id: "2", name_en: "Salmon", normalized_name: "salmon", calories: 206, protein_g: 22, carbs_g: 0, fat_g: 12, is_active: true, popularity_score: 3, category_id: "c2" },
+    ],
+    food_categories: [{ id: "c1", code: "meat", name_zh: "肉禽", name_en: "Meat", sort_order: 1, is_active: true }],
+    food_tag_relations: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+  const result = await repo.listFoods({ q: "chicken", page: 1, pageSize: 10, sort: "popular" });
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].nameEn, "Chicken breast");
+  assert.equal(result.pagination.page, 1);
+  assert.equal(result.pagination.pageSize, 10);
+});
+
+test("getFoodById returns null when missing", async () => {
+  const db = mockDb({ foods: [], food_categories: [], food_tag_relations: [], food_images: [] });
+  const repo = createFoodRepository({ db });
+  assert.equal(await repo.getFoodById("missing"), null);
+});
+
+test("suggestions returns up to limit items", async () => {
+  const db = mockDb({ foods: [
+    { id: "f1", name_zh: "鸡胸肉", name_en: "Chicken breast", normalized_name: "chicken breast", brand_name: null, calories: 165, protein_g: 31, is_active: true, popularity_score: 5 },
+  ] });
+  const repo = createFoodRepository({ db });
+  const s = await repo.suggestions("chicken", 8);
+  assert.equal(s.length, 1);
+  assert.equal(s[0].nameEn, "Chicken breast");
+});
+
+test("sanitizeFilterTerm strips USDA comma lists so PostgREST or-filters stay valid", () => {
+  assert.equal(sanitizeFilterTerm("Beef, cured, corned beef, canned"), "beef");
+  assert.equal(sanitizeFilterTerm("  Chicken breast  "), "chicken breast");
+  assert.equal(sanitizeFilterTerm(""), "");
+});
+
+test("suggestions accepts USDA-style comma queries without throwing", async () => {
+  const db = mockDb({ foods: [
+    { id: "f1", name_zh: null, name_en: "Beef", normalized_name: "beef", brand_name: null, calories: 250, protein_g: 26, is_active: true, popularity_score: 3 },
+  ] });
+  const repo = createFoodRepository({ db });
+  const s = await repo.suggestions("Beef, cured, corned beef, canned", 8);
+  assert.equal(s.length, 1);
+  assert.equal(s[0].nameEn, "Beef");
+});
+
+test("isAdmin reads app_users.is_admin", async () => {
+  const db = mockDb({ app_users: [{ id: "u1", is_admin: true }] });
+  const repo = createFoodRepository({ db });
+  assert.equal(await repo.isAdmin("u1"), true);
+});
+
+test("createFoodRepository rejects missing db", () => {
+  assert.throws(() => createFoodRepository({}), /RDB client/);
+});

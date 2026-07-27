@@ -42,7 +42,7 @@ describe("local coach and profile", () => {
     const titleEnd = source.indexOf('className="coach-chat__status"');
 
     expect(source).toContain('title="你的营养教练"');
-    expect(source.slice(titleStart, titleEnd)).toContain("你的营养教练");
+    expect(source.slice(titleStart, titleEnd)).not.toContain("你的营养教练");
     expect(source.slice(titleStart, titleEnd)).not.toContain("NordicIcon");
     expect(source).not.toContain("coach-chat__avatar");
     expect(source).not.toContain("coach-chat__eyebrow");
@@ -50,10 +50,14 @@ describe("local coach and profile", () => {
 
   it("keeps the Coach tab focused on a daily action and direct conversation", () => {
     const source = coachPageSource();
+    const composer = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/coach/components/CoachComposer/index.tsx"),
+      "utf8",
+    );
 
     expect(source).toContain("今日还差");
-    expect(source).toContain("问问你的营养教练");
-    expect(source).toContain('className="coach-chat__status"');
+    expect(composer).toContain("问问你的营养教练");
+    expect(source).toContain('className="coach-chat__status-badge"');
     expect(source).toContain('className="coach-chat__suggestion-product"');
     expect(source).toContain("const defaultQuickPrompts");
     expect(source).toContain("quickPrompts.map");
@@ -61,8 +65,16 @@ describe("local coach and profile", () => {
 
   it("keeps progress, quick replies, composer, and tab bar in separate vertical lanes", () => {
     const source = coachPageSource();
+    const composer = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/coach/components/CoachComposer/index.tsx"),
+      "utf8",
+    );
     const pageStyles = readFileSync(
       resolve(import.meta.dirname, "../src/styles/page.scss"),
+      "utf8",
+    );
+    const composerStyles = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/coach/components/CoachComposer/index.scss"),
       "utf8",
     );
     const layoutStyles = readFileSync(
@@ -75,18 +87,18 @@ describe("local coach and profile", () => {
     expect(source).not.toContain("今日营养评分");
     expect(source).not.toContain('variant="hero"');
     expect(source).toContain("coach-chat__section-toggle");
-    expect(source).toContain('className="coach-chat__image-picker"');
-    expect(source).toContain('name="camera"');
+    expect(composer).toContain("coach-composer__image-picker");
+    expect(composer).toContain('name="camera"');
     expect(source).toContain('name="chevron-right"');
     expect(source).toContain("coach-chat__section-toggle--expanded");
     expect(source).toContain("coach-chat__section-toggle--collapsed");
     expect(source).toContain('className="coach-chat__progress-score-group"');
-    expect(source.indexOf('className="coach-chat__image-picker"')).toBeLessThan(
-      source.indexOf('className="coach-chat__send"'),
+    expect(composer.indexOf("coach-composer__image-picker")).toBeLessThan(
+      composer.indexOf("coach-composer__send"),
     );
     expect(pageStyles).toContain(".coach-chat__bottom-tools");
     expect(pageStyles).toContain(".coach-chat__section-toggle");
-    expect(pageStyles).toContain(".coach-chat__image-picker");
+    expect(composerStyles).toContain(".coach-composer__image-picker");
     expect(pageStyles).toContain(".coach-chat__section-toggle--expanded .nordic-icon");
     expect(pageStyles).toContain(".coach-chat__progress-score-group");
     expect(pageStyles).not.toContain('[aria-label*="展开"]');
@@ -120,7 +132,7 @@ describe("local coach and profile", () => {
 
     expect(source).toContain('title="个人中心"');
     expect(source).toContain('className="page-layout--profile"');
-    expect(source).toContain('className="profile-page-title"');
+    expect(source).not.toContain('className="profile-page-title"');
     expect(source).not.toContain('title="我的节奏"');
     expect(source).not.toContain('className="profile-rhythm__goal-progress"');
     expect(source).not.toContain("把目标、记录与改变放在同一张地图上。");
@@ -128,7 +140,6 @@ describe("local coach and profile", () => {
     expect(source).toContain("本周回顾");
     expect(source).toContain('setActiveKey("coach")');
     expect(source).toContain('Taro.switchTab({ url: "/pages/coach/index" })');
-    expect(source).toContain('setActiveKey("meal-records")');
     expect(source).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');
     expect(source).not.toContain('title="Theme"');
     expect(source).not.toContain('title="Language"');
@@ -184,7 +195,7 @@ describe("local coach and profile", () => {
     expect(profileEdit).toContain("profile.setProfile");
     expect(profileEdit).toContain("保存资料");
     expect(profileEdit).toContain('className="page-layout--profile-edit"');
-    expect(profileEdit).toContain('className="profile-subpage__page-title"');
+    expect(profileEdit).not.toContain('className="profile-subpage__page-title"');
     expect(profileEdit).toContain('className="profile-edit__notice"');
     expect(profileEdit).toContain('className="profile-edit__action"');
     expect(profileEdit).toContain("昵称会保存到你的账号");

@@ -136,6 +136,42 @@ test("resolves a signed-in user's stored avatar path into a temporary avatar URL
   assert.equal(result.avatarUrl, "https://temp.example/avatar.jpg");
 });
 
+test("repairs tiny WeChat placeholder data URLs back to a default robot avatar", async () => {
+  const tinyPng = `data:image/png;base64,${Buffer.alloc(1200, 1).toString("base64")}`;
+  const rows = {
+    profiles: { nickname: "果园探索家", avatar_path: tinyPng },
+    body_profiles: null,
+    user_goals: null,
+    user_settings: null,
+    nutrition_plans: null,
+  };
+  const updates = [];
+  const db = {
+    from: (table) => ({
+      select: () => ({
+        eq: () => ({
+          eq: () => ({ maybeSingle: async () => ({ data: rows[table], error: null }) }),
+          maybeSingle: async () => ({ data: rows[table], error: null }),
+        }),
+      }),
+      update: (payload) => ({
+        eq: async () => {
+          updates.push(payload);
+          return { data: null, error: null };
+        },
+      }),
+    }),
+  };
+
+  const result = await createProductDataService({
+    db,
+    resolveAvatarUrl: async (path) => path,
+  }).getAccount("user-1");
+
+  assert.match(result.avatarUrl, /^default:robot-[1-4]$/);
+  assert.match(updates[0]?.avatar_path, /^default:robot-[1-4]$/);
+});
+
 test("upserts settings for the authenticated user", async () => {
   const writes = [];
   const db = {

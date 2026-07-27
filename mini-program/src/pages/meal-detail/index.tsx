@@ -19,7 +19,6 @@ import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
 import { usePortionDraftStore } from "../../stores/portion-draft-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
-import { navigateBackOrHome } from "../../utils/navigation";
 import mealBowlImage from "../../assets/meal-bowl.svg";
 import mealOatsImage from "../../assets/meal-oats.svg";
 import mealSalmonImage from "../../assets/meal-salmon.svg";
@@ -74,7 +73,7 @@ export default function MealDetailPage() {
         eyebrow="饮食记录"
         showTabs={false}
         leading="‹"
-        onLeadingClick={() => navigateBackOrHome("/pages/meal-records/index")}
+        onLeadingClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
       >
         <ErrorState title="餐次不存在" description="它可能已被删除，或链接已经失效。" />
         <AppButton
@@ -105,7 +104,7 @@ export default function MealDetailPage() {
     },
     { icon: "fat" as const, label: "脂肪", target: 25, tone: "fat" as const, value: nutrition.fat },
   ];
-  const heroImage = meal.imageKey ? mealImages[meal.imageKey] : mealBowlImage;
+  const heroImage = meal.imageUrl || (meal.imageKey ? mealImages[meal.imageKey] : mealBowlImage);
   const edit = () => {
     store.setEditingMealId(meal.id);
     portion.startMealEdit(meal);
@@ -140,19 +139,11 @@ export default function MealDetailPage() {
       title="餐食详情"
       showTabs={false}
       hideNavigation
+      showBack
+      onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--meal-detail"
     >
       <View className="meal-detail-page">
-        <View className="meal-detail-page__page-title">
-          <View
-            className="meal-detail-page__back"
-            ariaLabel="返回饮食记录"
-            onClick={() => navigateBackOrHome("/pages/meal-records/index")}
-          >
-            <NordicIcon name="back" size={24} ariaLabel="返回饮食记录" />
-          </View>
-          <Text>餐食详情</Text>
-        </View>
         <View className="meal-detail-page__heading">
           <Text className="meal-detail-page__meal-title">{meal.title}</Text>
           <Text className="meal-detail-page__meta">
@@ -265,7 +256,7 @@ export default function MealDetailPage() {
               <Image
                 className="meal-detail-page__ingredient-thumb"
                 mode="aspectFill"
-                src={ingredientImages[index % ingredientImages.length]}
+                src={heroImage}
               />
               <View className="meal-detail-page__ingredient-copy">
                 <Text>{item.name}</Text>

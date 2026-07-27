@@ -32,6 +32,7 @@ export default function OnboardingPage() {
       title={onboardingCopy.brand}
       showTabs={false}
       hideNavigation
+      showBrandHeader={false}
       className="page-layout--onboarding"
     >
       <View className="onboarding-page">

@@ -36,7 +36,9 @@ export function BottomTabBar({ activeKey, items = defaultItems }: BottomTabBarPr
     const route = routeByKey[key];
     if (route && key !== activeKey) {
       useTabBarStore.getState().setActiveKey(key);
-      if (key === "food-catalog") {
+      if (key === "food-scanner") {
+        // Use navigateTo (not reLaunch) so the current tab page stays alive
+        // underneath. reLaunch destroys ALL pages causing a full white screen.
         void Taro.navigateTo({ url: route });
         return;
       }
@@ -48,6 +50,8 @@ export function BottomTabBar({ activeKey, items = defaultItems }: BottomTabBarPr
       {items.map((item) => (
         <View
           className={`bottom-tab-bar__item ${item.key === activeKey ? "bottom-tab-bar__item--active" : ""}`}
+          hoverClass="pressable--active"
+          hoverStayTime={70}
           key={item.key}
           ariaLabel={`切换到${item.label}`}
           onClick={() => navigate(item.key)}

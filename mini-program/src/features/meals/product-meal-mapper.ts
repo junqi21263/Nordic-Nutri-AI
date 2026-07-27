@@ -17,6 +17,7 @@ export interface ProductMeal {
   name: string;
   recordedAt: string;
   isFavorite: boolean;
+  imageUrl?: string | null;
   items: ProductMealItem[];
 }
 
@@ -54,6 +55,7 @@ export function mapProductMeal(meal: ProductMeal): Meal {
     mealType: meal.mealType,
     favorite: meal.isFavorite,
     imageKey: null,
+    imageUrl: meal.imageUrl ?? null,
     insight: "已同步到你的饮食记录。",
     items: meal.items.map(mapProductItem),
   };

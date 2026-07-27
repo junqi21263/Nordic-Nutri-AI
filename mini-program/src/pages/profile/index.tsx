@@ -10,6 +10,7 @@ import { ListItem } from "../../components/list-item";
 import { NordicIcon } from "../../components/nordic-icon";
 import { StatisticCard } from "../../components/statistic-card";
 import { submitProductFeedback } from "../../api/feedback-api";
+import { getProductAccount } from "../../api/product-data-api";
 import {
   getProductAchievements,
   getProductWeeklyReview,
@@ -70,6 +71,31 @@ export default function ProfilePage() {
       .catch(() => undefined);
   }, [achievements.setAchievements, date]);
 
+  // Silently refresh the user profile from the backend on page show,
+  // so nickname/avatar changes from other pages are reflected immediately.
+  useEffect(() => {
+    void getProductAccount()
+      .then((account) => {
+        const labels: Record<string, string> = {
+          muscle_gain: "精益增肌",
+          fat_loss: "轻盈减脂",
+          maintain: "保持状态",
+          performance: "运动表现",
+        };
+        const realNickname =
+          account.nickname && account.nickname !== "微信用户" ? account.nickname : null;
+        const changes: { nickname?: string; avatarUrl?: string | null; weight?: number; goalLabel?: string } = {};
+        if (realNickname) changes.nickname = realNickname;
+        if (account.avatarUrl) changes.avatarUrl = account.avatarUrl;
+        if (account.weightKg != null) changes.weight = account.weightKg;
+        if (account.goalType) changes.goalLabel = labels[account.goalType] ?? "精益增肌";
+        if (Object.keys(changes).length > 0) {
+          useProfileStore.getState().setProfile(changes);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
   const showNotice = (message: string) => feedback.show({ message, tone: "success" });
   const openPage = (url: string) => void Taro.navigateTo({ url });
   const openCoach = () => {
@@ -107,9 +133,6 @@ export default function ProfilePage() {
       hideNavigation
       className="page-layout--profile"
     >
-      <View className="profile-page-title">
-        <Text>个人中心</Text>
-      </View>
       <View className="profile-rhythm">
         <View ariaLabel="编辑个人资料" onClick={() => openPage("/pages/profile-edit/index")}>
           <AppCard tone="dark" className="profile-hero profile-rhythm__identity">

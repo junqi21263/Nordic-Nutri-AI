@@ -16,4 +16,13 @@ describe("份量调整交互", () => {
     expect(source).toContain("portion.setMultiplier(percent / 100)");
     expect(source).toContain("恢复原始份量");
   });
+
+  it("保存后先跳转餐食详情再清空草稿，避免卡在草稿不存在页", () => {
+    const source = read("pages/portion-adjustment/index.tsx");
+    const redirectIndex = source.indexOf("Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` })");
+    const resetIndex = source.indexOf("portion.reset()");
+    expect(redirectIndex).toBeGreaterThan(-1);
+    expect(resetIndex).toBeGreaterThan(-1);
+    expect(redirectIndex).toBeLessThan(resetIndex);
+  });
 });

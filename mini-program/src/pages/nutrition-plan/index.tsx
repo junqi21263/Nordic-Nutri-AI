@@ -1,6 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomActionLayout } from "../../components/bottom-action-layout";
@@ -11,13 +11,18 @@ import { OnboardingHeader } from "../../components/onboarding-header";
 import {
   calculateNutritionPlan,
   getLocalDateString,
+  macroEnergyPercents,
   validateBodyProfile,
 } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { navigateBackOrHome } from "../../utils/navigation";
-import { completeProductOnboarding } from "../../api/product-data-api";
+import {
+  completeProductOnboarding,
+  previewProductNutritionPlan,
+} from "../../api/product-data-api";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
+import { useProfileStore } from "../../stores/profile-store";
 import { markOnboardingCompleted } from "../../utils/local-experience";
 
 const today = getLocalDateString();
@@ -28,11 +33,92 @@ const goalLabels = {
   performance: "提升运动表现",
 };
 
+type PlanView = {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  insight: string;
+  source: string;
+};
+
 export default function NutritionPlanPage() {
   const { draft } = useOnboardingDraftStore();
   const feedback = useFeedbackStore();
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingPlan, setIsLoadingPlan] = useState(true);
+  const [plan, setPlan] = useState<PlanView | null>(null);
   const validation = validateBodyProfile(draft, today);
+
+  useEffect(() => {
+    if (!validation.valid || !validation.profile) {
+      setIsLoadingPlan(false);
+      return;
+    }
+    const profile = validation.profile;
+    const localFallback = (): PlanView => {
+      const formula = calculateNutritionPlan(profile);
+      return {
+        calories: formula.calories,
+        proteinG: formula.proteinG,
+        carbsG: formula.carbsG,
+        fatG: formula.fatG,
+        insight: "根据你的身体数据、目标和活动水平，这份计划将帮助你更稳定地接近目标。",
+        source: "formula",
+      };
+    };
+
+    let cancelled = false;
+    setIsLoadingPlan(true);
+    void (async () => {
+      try {
+        const preview = await previewProductNutritionPlan({
+          age: profile.age,
+          sex: profile.gender,
+          heightCm: profile.heightCm,
+          weightKg: profile.weightKg,
+          activityLevel: profile.activityLevel,
+          trainingDays: profile.trainingDays,
+          goalType: profile.goalType,
+          dietaryPattern: draft.dietaryPattern,
+          foodAvoidances: draft.foodAvoidances,
+        });
+        if (cancelled) return;
+        setPlan({
+          calories: preview.calories,
+          proteinG: preview.proteinG,
+          carbsG: preview.carbsG,
+          fatG: preview.fatG,
+          insight:
+            preview.insight?.trim() ||
+            "根据你的身体数据、目标和活动水平，这份计划将帮助你更稳定地接近目标。",
+          source: preview.source || "deepseek",
+        });
+      } catch {
+        if (!cancelled) setPlan(localFallback());
+      } finally {
+        if (!cancelled) setIsLoadingPlan(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Recompute when the validated body profile / diet prefs change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    validation.valid,
+    draft.nickname,
+    draft.age,
+    draft.gender,
+    draft.heightCm,
+    draft.weightKg,
+    draft.activityLevel,
+    draft.goalType,
+    draft.dietaryPattern,
+    draft.foodAvoidances.join(","),
+    draft.mealsPerDay,
+  ]);
 
   if (!validation.valid || !validation.profile) {
     return (
@@ -53,8 +139,18 @@ export default function NutritionPlanPage() {
   }
 
   const profile = validation.profile;
-  const plan = calculateNutritionPlan(profile);
+  const activePlan = plan ?? {
+    calories: 0,
+    proteinG: 0,
+    carbsG: 0,
+    fatG: 0,
+    insight: "正在根据你的身体数据计算营养目标…",
+    source: "loading",
+  };
+  const percents = macroEnergyPercents(activePlan);
+
   const completeOnboarding = async () => {
+    if (!plan) return;
     setIsSaving(true);
     try {
       await completeProductOnboarding({
@@ -76,6 +172,12 @@ export default function NutritionPlanPage() {
         carbsG: plan.carbsG,
         fatG: plan.fatG,
       });
+      useProfileStore.getState().setProfile({
+        nickname: profile.nickname,
+        weight: profile.weightKg,
+        targetCalories: plan.calories,
+        goalLabel: goalLabels[profile.goalType],
+      });
       markOnboardingCompleted();
       await Taro.switchTab({ url: "/pages/home/index" });
     } catch (error) {
@@ -87,34 +189,17 @@ export default function NutritionPlanPage() {
       setIsSaving(false);
     }
   };
+
   const macros: Array<{
     label: string;
     value: number;
-    total: number;
+    percent: number;
     icon: NordicIconName;
     tone: "forest" | "sage";
   }> = [
-    {
-      label: "蛋白质",
-      value: plan.proteinG,
-      total: Math.max(plan.proteinG * 3, 1),
-      icon: "protein",
-      tone: "forest",
-    },
-    {
-      label: "碳水",
-      value: plan.carbsG,
-      total: Math.max(plan.carbsG * 2, 1),
-      icon: "carbs",
-      tone: "sage",
-    },
-    {
-      label: "脂肪",
-      value: plan.fatG,
-      total: Math.max(plan.fatG * 4, 1),
-      icon: "fat",
-      tone: "forest",
-    },
+    { label: "蛋白质", value: activePlan.proteinG, percent: percents.proteinPct, icon: "protein", tone: "forest" },
+    { label: "碳水", value: activePlan.carbsG, percent: percents.carbsPct, icon: "carbs", tone: "sage" },
+    { label: "脂肪", value: activePlan.fatG, percent: percents.fatPct, icon: "fat", tone: "forest" },
   ];
 
   return (
@@ -122,6 +207,7 @@ export default function NutritionPlanPage() {
       title="NOVA AI"
       showTabs={false}
       hideNavigation
+      showBrandHeader={false}
       className="page-layout--onboarding page-layout--nutrition-plan"
     >
       <View className="nutrition-plan-page">
@@ -143,15 +229,13 @@ export default function NutritionPlanPage() {
             从今天开始，按自己的节奏稳步前进。
           </Text>
           <View className="nutrition-plan__goal-tag">
-            <Text>{goalLabels[plan.goalType]}</Text>
+            <Text>{goalLabels[profile.goalType]}</Text>
           </View>
         </AppCard>
 
         <View className="nutrition-plan__insight">
           <Text className="nutrition-plan__insight-label">AI INSIGHT</Text>
-          <Text className="nutrition-plan__insight-copy">
-            根据你的身体数据、目标和活动水平，这份计划将帮助你更稳定地接近目标。
-          </Text>
+          <Text className="nutrition-plan__insight-copy">{activePlan.insight}</Text>
         </View>
 
         <View className="nutrition-plan__section">
@@ -161,7 +245,7 @@ export default function NutritionPlanPage() {
               <View>
                 <Text className="nutrition-plan__calorie-label">热量</Text>
                 <Text className="nutrition-plan__calorie-value">
-                  {plan.calories}
+                  {isLoadingPlan ? "…" : activePlan.calories}
                   <Text className="nutrition-plan__calorie-unit"> kcal</Text>
                 </Text>
               </View>
@@ -177,13 +261,15 @@ export default function NutritionPlanPage() {
                     <NordicIcon name={macro.icon} size={16} ariaLabel={macro.label} />
                   </View>
                   <CircularProgress
-                    value={macro.value}
-                    total={macro.total}
+                    value={macro.percent}
+                    total={100}
                     label={macro.label}
                     compact
                     tone={macro.tone}
                   />
-                  <Text className="nutrition-plan__macro-value">{macro.value}g</Text>
+                  <Text className="nutrition-plan__macro-value">
+                    {isLoadingPlan ? "…" : `${macro.value}g`}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -217,7 +303,12 @@ export default function NutritionPlanPage() {
         </View>
 
         <BottomActionLayout>
-          <AppButton size="large" loading={isSaving} onClick={() => void completeOnboarding()}>
+          <AppButton
+            size="large"
+            loading={isSaving || isLoadingPlan}
+            disabled={!plan || isLoadingPlan}
+            onClick={() => void completeOnboarding()}
+          >
             开始我的计划
           </AppButton>
           <AppButton

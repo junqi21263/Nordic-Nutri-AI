@@ -19,7 +19,10 @@ describe("product data HTTPS boundary", () => {
     }
     const plan = readFileSync(resolve(sourceRoot, "pages/nutrition-plan/index.tsx"), "utf8");
     expect(plan).toContain("completeProductOnboarding");
+    expect(plan).toContain("previewProductNutritionPlan");
+    expect(plan).toContain("macroEnergyPercents");
     expect(plan).not.toContain("completeSupabaseOnboarding");
+    expect(plan).not.toContain("plan.proteinG * 3");
   });
 
   it("loads and updates settings and the active nutrition plan through the same HTTPS boundary", () => {
@@ -28,6 +31,7 @@ describe("product data HTTPS boundary", () => {
     expect(api).toContain("saveProductSettings");
     expect(api).toContain("getProductNutritionPlan");
     expect(api).toContain("saveProductNutritionPlan");
+    expect(api).toContain("previewProductNutritionPlan");
     expect(api).toContain('method: "PATCH"');
     expect(bootstrap).toContain("account.settings");
     expect(bootstrap).toContain("account.nutritionPlan");

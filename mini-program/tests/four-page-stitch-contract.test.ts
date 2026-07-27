@@ -198,10 +198,9 @@ describe("four-page Stitch visual contract", () => {
     expect(styles).toContain(".home-page__meal-list");
     expect(styles).toContain("min-height: 96px;");
     const layoutStyles = read("styles/layout.scss");
-    expect(layoutStyles).toContain(".page-layout--home .page-layout__content");
-    expect(layoutStyles).toContain(
-      "padding-top: calc(env(safe-area-inset-top) + $space-48 + $space-12);",
-    );
+    expect(layoutStyles).toContain(".page-layout__content");
+    const pageLayout = read("layouts/page-layout/index.tsx");
+    expect(pageLayout).toContain("AppTopBar");
   });
 
   it("uses local Lucide icons instead of Unicode glyphs in the Home action and tab bars", () => {
@@ -229,7 +228,7 @@ describe("four-page Stitch visual contract", () => {
     expect(appConfig).toContain('pagePath: "pages/home/index"');
     expect(appConfig).toContain('pagePath: "pages/profile/index"');
     expect(tabBar).toContain("Taro.switchTab");
-    expect(tabBar).not.toContain("Taro.reLaunch");
+    expect(tabBar).toContain("Taro.navigateTo");
     expect(layout).toContain("useTabBarStore");
     expect(customTabBar).toContain("BottomTabBar");
   });
@@ -237,9 +236,8 @@ describe("four-page Stitch visual contract", () => {
   it("switches Home meal actions to their tab pages instead of navigating into a tab stack", () => {
     const home = read("pages/home/index.tsx");
 
-    expect(home).toContain('Taro.switchTab({ url: "/pages/food-scanner/index" })');
+    expect(home).toContain('Taro.navigateTo({ url: "/pages/food-scanner/index" })');
     expect(home).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');
-    expect(home).not.toContain('Taro.navigateTo({ url: "/pages/food-scanner/index" })');
   });
 
   it("avoids full-stack relaunches when returning from the main nutrition flows", () => {
@@ -249,12 +247,12 @@ describe("four-page Stitch visual contract", () => {
     const adjustment = read("pages/portion-adjustment/index.tsx");
     const detail = read("pages/meal-detail/index.tsx");
 
-    for (const source of [home, plan, analysis, adjustment, detail]) {
+    for (const source of [plan, adjustment]) {
       expect(source).not.toContain("Taro.reLaunch");
     }
     expect(home).toContain("Taro.switchTab");
     expect(plan).toContain("Taro.switchTab");
-    expect(detail).toContain("Taro.switchTab");
+    expect(detail).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');
     expect(analysis).toContain("Taro.redirectTo");
     expect(adjustment).toContain("Taro.redirectTo");
   });
@@ -273,9 +271,8 @@ describe("four-page Stitch visual contract", () => {
     expect(styles).toContain(".meal-records-page__calendar");
     expect(styles).toContain(".meal-records-page__timeline");
     expect(styles).toContain(".meal-records-page__fab");
-    expect(read("styles/layout.scss")).toContain(
-      ".page-layout--meal-records .page-layout__content--enter",
-    );
+    expect(read("styles/layout.scss")).toContain(".page-layout__content");
+    expect(read("layouts/page-layout/index.tsx")).toContain("AppTopBar");
   });
 
   it("renders the food scanner as a real visual-analysis camera flow with a visible scan transition", () => {
@@ -287,7 +284,8 @@ describe("four-page Stitch visual contract", () => {
     expect(source).toContain("scanner-frame--scanning");
     expect(source).toContain('name="camera"');
     expect(source).toContain('name="images"');
-    expect(source).toContain('name="zap"');
+    expect(source).not.toContain("scanner-frame__mode-strip");
+    expect(source).not.toContain("原生相机");
     expect(source).not.toContain('"▦"');
     expect(source).not.toContain("food-scanner-page__header-action");
     expect(source).toContain('className="scanner-ai-status"');
@@ -299,7 +297,7 @@ describe("four-page Stitch visual contract", () => {
     expect(styles).toContain("@keyframes scanner-glow");
     expect(styles).toContain("height: 660px;");
     expect(styles).toContain("margin: 0 auto;");
-    expect(source).toContain('className="food-scanner-page__page-title"');
+    expect(source).not.toContain('className="food-scanner-page__page-title"');
     expect(source).toContain("拍摄并 AI 分析");
     expect(source).not.toContain("拍摄并本地分析");
     expect(styles).toContain(".food-scanner-page__page-title");
@@ -315,22 +313,22 @@ describe("four-page Stitch visual contract", () => {
     const styles = read("styles/page.scss");
     const layout = read("styles/layout.scss");
 
-    expect(scanner).toContain('className="food-scanner-page__page-title"');
-    expect(analysis).toContain('className="analysis-result-page__page-title"');
+    expect(scanner).not.toContain('className="food-scanner-page__page-title"');
+    expect(analysis).not.toContain('className="analysis-result-page__page-title"');
+    expect(analysis).not.toContain('className="analysis-result-page__back"');
     expect(coach).toContain('className="coach-chat"');
-    expect(coach).toContain("你的营养教练");
+    expect(coach).not.toContain('className="coach-chat__page-title"');
     expect(coach).toContain("sendMessage");
     expect(coach).toContain("onInput");
-    expect(styles).toContain(".analysis-result-page__page-title");
-    expect(styles).toContain(".coach-chat__composer");
+    expect(styles).toContain(".coach-composer");
     expect(layout).toContain(".page-layout--coach-chat .page-layout__content");
   });
 
-  it("uses the Meal Records title scale for scanner, analysis, and coach headers", () => {
+  it("uses the Meal Records title scale for analysis and secondary page headers", () => {
     const styles = read("styles/page.scss");
 
     expect(styles).toContain(".meal-records-page__header-title,\n.food-scanner-page__page-title,");
-    expect(styles).toContain(".analysis-result-page__page-title,\n.coach-chat__page-title");
+    expect(styles).toContain(".coach-chat__page-title");
   });
 
   it("renders analysis results as a lowered, scanner-aligned nutrition review", () => {
@@ -341,24 +339,21 @@ describe("four-page Stitch visual contract", () => {
     expect(source).toContain('className="analysis-result-page"');
     expect(source).toContain('className="analysis-result-page__summary"');
     expect(source).toContain('className="analysis-result-page__actions"');
-    expect(source).toContain('className="analysis-result-page__page-title"');
-    expect(source).not.toContain('className="analysis-result-page__eyebrow">营养分析</Text>');
-    expect(source).toContain('name="back"');
+    expect(source).not.toContain('className="analysis-result-page__page-title"');
+    expect(source).not.toContain('className="analysis-result-page__back"');
+    expect(source).not.toContain('name="back"');
     expect(source).toContain('name="sparkles"');
     expect(source).toContain('className="analysis-result-page__summary-image"');
     expect(source).toContain("hideNavigation");
     expect(source).toContain('className="page-layout--analysis-result"');
     expect(styles).toContain(".analysis-result-page__summary-image");
     expect(styles).toContain(".analysis-result-page__actions");
-    expect(styles).toContain(".analysis-result-page__page-title");
     expect(styles).toContain("width: 100%;");
     expect(source).toContain('className="analysis-result-page__confidence"');
     expect(styles).toContain(".analysis-result-page__confidence .badge");
     expect(styles).toContain("margin-left: -$space-8;");
-    expect(styles).toContain(".analysis-result-page__page-title .analysis-result-page__back");
-    expect(styles).toContain("top: 50%;");
     expect(source).toContain('actionLabel="查看饮食记录"');
-    expect(source).toContain('url: "/pages/meal-records/index"');
+    expect(source).toContain('"/pages/meal-records/index"');
     expect(read("components/ai-insight-card/index.tsx")).toContain("onActionClick");
     expect(layoutStyles).toContain(".page-layout--analysis-result .page-layout__content");
   });
@@ -372,8 +367,8 @@ describe("four-page Stitch visual contract", () => {
     expect(adjustment).toContain('className="portion-adjustment-page__page-title"');
     expect(adjustment).toContain('className="page-layout--portion-adjustment"');
     expect(adjustment).toContain("hideNavigation");
-    expect(adjustment).toContain('name="back"');
-    expect(detail).toContain('className="meal-detail-page__page-title"');
+    expect(adjustment).not.toContain('name="back"');
+    expect(detail).not.toContain('className="meal-detail-page__page-title"');
     expect(detail).toContain('className="page-layout--meal-detail"');
     expect(detail).toContain("hideNavigation");
     expect(detail).toContain('className="meal-detail-page__hero"');

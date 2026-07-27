@@ -4,19 +4,87 @@ const { URL, URLSearchParams } = require("node:url");
 const { createProductSessionService, PublicLoginError, verifyAccessToken } = require("./product-session-service.cjs");
 const { createProductDataService } = require("./product-data-service.cjs");
 const { createDeepseekMealService, PublicMealAnalysisError } = require("./deepseek-meal-service.cjs");
+const { createDeepseekEvaluationService } = require("./deepseek-evaluation-service.cjs");
+const { createDeepseekNutritionPlanService } = require("./deepseek-nutrition-plan-service.cjs");
 const { createMealDataService, PublicMealDataError } = require("./meal-data-service.cjs");
 const { createInsightDataService } = require("./insight-data-service.cjs");
 const { createDeepseekCoachService, createDeepseekCoachStreamService } = require("./deepseek-coach-service.cjs");
 const { createCoachDataService, PublicCoachDataError } = require("./coach-data-service.cjs");
 const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-data-service.cjs");
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
+const { createQwenVisionService, PublicQwenVisionError } = require("./qwen-vision-service.cjs");
 const { createVisionDataService, PublicVisionDataError } = require("./vision-data-service.cjs");
 const { createFoodCatalogService, PublicFoodCatalogError } = require("./food-catalog-service.cjs");
 const { createFoodQueryTranslator } = require("./food-query-translator.cjs");
+const { createNutritionBackfillService } = require("./nutrition-backfill-service.cjs");
 const { createProfileAvatarService, PublicProfileAvatarError } = require("./profile-avatar-service.cjs");
+const { createFoodRepository, FoodRepositoryError } = require("./food-repository.cjs");
+const { createUsdaService, UsdaServiceError } = require("./usda-service.cjs");
+const { createOpenFoodFactsService, OpenFoodFactsError } = require("./open-food-facts-service.cjs");
+const { normalizeFoodRecord } = require("./food-normalization-service.cjs");
+const { createFoodImageService, FoodImageError } = require("./food-image-service.cjs");
+const { createFoodBarcodeService, FoodBarcodeError } = require("./food-barcode-service.cjs");
+const { createFoodAdminService, FoodAdminError } = require("./food-admin-service.cjs");
+const { createHunyuanImageService, HunyuanImageError } = require("./hunyuan-image-service.cjs");
+const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
+
+// Random 5–6 hanzi Chinese nickname generator for default profile seeding.
+// Mirrors the frontend generator in features/profile/nickname-generator.ts.
+const NICKNAME_SCENES = ["林间", "山野", "森林", "溪畔", "云端", "晨光", "星野", "麦田", "果园", "茶园", "山间", "林荫", "花间", "竹林", "松林", "檐下", "湖畔", "原野", "谷地", "晨雾"];
+const NICKNAME_PLANTS = ["青柠", "薄荷", "柚子", "蓝莓", "樱桃", "柠檬", "茉莉", "桂花", "茴香", "麦穗", "稻穗", "芦笋", "秋葵", "山茶", "银杏", "枫叶", "苔藓", "藤蔓", "白桦", "桑葚"];
+const NICKNAME_ROLES = ["漫游者", "轻食客", "补给站", "小行星", "探索家", "收集者", "守望者", "漫步者", "记录员", "品鉴官", "慢行者", "寻味人", "拾光者", "阅光人", "采风客", "慢食家"];
+const NICKNAME_ACTIONS = ["慢慢走", "慢慢吃", "轻轻走", "慢慢品", "静静听", "慢慢来", "慢慢长", "慢慢见", "慢慢记"];
+const NICKNAME_ADVERBS = ["慢慢地", "静静地", "轻轻地", "慢慢儿"];
+const NICKNAME_VERBS = ["变更好", "走很远", "吃好饭", "见晨光", "等花开", "晒太阳"];
+const NICKNAME_PATTERNS = [
+  () => pick(NICKNAME_SCENES) + pick(NICKNAME_ROLES),
+  () => pick(NICKNAME_PLANTS) + pick(NICKNAME_ROLES),
+  () => pick(NICKNAME_SCENES) + pick(NICKNAME_ACTIONS),
+  () => pick(NICKNAME_PLANTS) + pick(NICKNAME_ACTIONS),
+  () => pick(NICKNAME_ADVERBS) + pick(NICKNAME_VERBS),
+];
+function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+function pickNickname() {
+  for (let i = 0; i < 32; i++) {
+    const candidate = pick(NICKNAME_PATTERNS)();
+    if (candidate.length >= 5 && candidate.length <= 6) return candidate;
+  }
+  return "林间慢慢走";
+}
+
+/** Local Mifflin-St Jeor fallback when DeepSeek is unavailable. */
+function formulaNutritionPlanFallback(input) {
+  const weightKg = Number(input?.weightKg);
+  const heightCm = Number(input?.heightCm);
+  const age = Number(input?.age);
+  const sex = input?.sex === "female" ? "female" : "male";
+  const activityLevel = input?.activityLevel || "moderate";
+  const goalType = input?.goalType === "maintain" ? "maintenance" : (input?.goalType || "maintenance");
+  const activityMultiplier = { sedentary: 1.2, light: 1.375, moderate: 1.55, high: 1.725, very_high: 1.9 };
+  const proteinPerKg = { muscle_gain: 2, fat_loss: 2, maintenance: 1.6, performance: 1.8 };
+  const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === "male" ? 5 : -161);
+  const tdee = bmr * (activityMultiplier[activityLevel] || 1.55);
+  const rawCalories =
+    goalType === "muscle_gain" ? tdee + 300
+      : goalType === "fat_loss" ? tdee - 400
+        : goalType === "performance" ? tdee * 1.08
+          : tdee;
+  const calories = Math.round(rawCalories / 10) * 10;
+  const proteinG = Math.round(weightKg * (proteinPerKg[goalType] || 1.6));
+  const fatG = Math.round(weightKg * 0.9);
+  const carbsG = Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
+  return {
+    calories,
+    proteinG,
+    carbsG,
+    fatG,
+    insight: "根据你的身体数据与目标，按标准公式生成了每日营养目标。",
+    source: "formula",
+  };
+}
 
 const MAX_BODY_BYTES = 4096;
-const MAX_VISION_BODY_BYTES = 4_300_000;
+const MAX_VISION_BODY_BYTES = 30 * 1024 * 1024;
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
@@ -125,6 +193,25 @@ function selectDeepseekModel(value) {
   return model;
 }
 
+function downloadImageBuffer(url) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, {
+      timeout: 7000,
+      headers: { "User-Agent": "NordicNutriAI/1.0 (food-catalog; support@nordicnutri.app)" },
+    }, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`Food image download failed (${response.statusCode ?? 0})`));
+        return;
+      }
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => resolve(Buffer.concat(chunks)));
+    });
+    request.on("timeout", () => request.destroy(new Error("Food image download timed out")));
+    request.on("error", reject);
+  });
+}
+
 function createRuntimeService(env = process.env, dependencies = {}) {
   const config = readRuntimeConfig(env);
   const cloudbase = dependencies.cloudbaseSdk ?? require("@cloudbase/js-sdk");
@@ -136,6 +223,12 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   const db = typeof app.rdb === "function" ? app.rdb() : app.rdb;
   if (!db || typeof db.from !== "function") throw new Error("Relational database client is unavailable");
   const deepseekModel = selectDeepseekModel(env.DEEPSEEK_MODEL);
+  const evaluateMeal = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
+    ? createDeepseekEvaluationService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
+    : null;
+  const calculateNutritionPlanWithAi = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
+    ? createDeepseekNutritionPlanService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
+    : null;
 
   const session = createProductSessionService({
     exchangeCode: (code) => requestWechatSession({ ...config, code }),
@@ -152,24 +245,123 @@ function createRuntimeService(env = process.env, dependencies = {}) {
         userId = created.data.id;
       }
 
+      // Seed a default profile (robot avatar + generated nickname) when missing, so
+      // home/profile screens show a friendly identity instead of the "微信用户" placeholder.
+      // Also backfills existing users who logged in before defaults were introduced.
+      const robotIndex = 1 + Math.floor(Math.random() * 4);
+      const defaultAvatarPath = `default:robot-${robotIndex}`;
+      const defaultNickname = pickNickname();
+      try {
+        const profileRow = await db
+          .from("profiles")
+          .select("id,nickname,avatar_path,onboarding_completed_at")
+          .eq("id", userId)
+          .maybeSingle();
+        if (profileRow.error) throw new Error("Product profile lookup failed");
+
+        if (!profileRow.data?.id) {
+          await db
+            .from("profiles")
+            .insert({ id: userId, nickname: defaultNickname, avatar_path: defaultAvatarPath })
+            .select("id")
+            .maybeSingle();
+        } else {
+          const needsNickname =
+            !profileRow.data.nickname ||
+            profileRow.data.nickname === "微信用户" ||
+            !String(profileRow.data.nickname).trim();
+          const needsAvatar = !profileRow.data.avatar_path;
+          if (needsNickname || needsAvatar) {
+            const patch = {};
+            if (needsNickname) patch.nickname = defaultNickname;
+            if (needsAvatar) patch.avatar_path = defaultAvatarPath;
+            await db.from("profiles").update(patch).eq("id", userId);
+          }
+        }
+      } catch {
+        // Non-fatal: profile can be completed later via onboarding/edit.
+      }
+
       const profile = await db.from("profiles").select("onboarding_completed_at").eq("id", userId).maybeSingle();
       if (profile.error) throw new Error("Product profile lookup failed");
       return { userId, onboardingRequired: !profile.data?.onboarding_completed_at };
     },
   });
   const cloudbaseNode = dependencies.cloudbaseNodeSdk ?? require("@cloudbase/node-sdk");
-  const admin = cloudbaseNode.init({ env: config.cloudbaseEnvId });
+  // HTTP cloud functions do not always inject TENCENTCLOUD_* temp keys the way event
+  // functions do. Pass the same server API key used by the relational DB client so
+  // storage uploadFile / getTempFileURL authenticate reliably.
+  const admin = cloudbaseNode.init({
+    env: config.cloudbaseEnvId,
+    accessKey: config.cloudbaseApiKey,
+  });
+  // Hunyuan image must use SCF runtime credentials (TENCENTCLOUD_SECRETID/KEY),
+  // not CLOUDBASE_APIKEY. node-sdk init() prefers CLOUDBASE_APIKEY from process.env
+  // when present — and this function requires that key for RDB — so AI init would
+  // silently auth as API-key and fail generateImage quickly (HY_IMAGE_GENERATE_FAILED).
+  // Temporarily hide the API key during AI init so each request refreshes ambient
+  // TENCENTCLOUD_* via prepareCredentials(). Explicit permanent secrets still win.
+  const explicitSecretId = String(env.TENCENTCLOUD_SECRET_ID || "").trim();
+  const explicitSecretKey = String(env.TENCENTCLOUD_SECRET_KEY || "").trim();
+  const ambientSecretId = String(env.TENCENTCLOUD_SECRETID || "").trim();
+  const ambientSecretKey = String(env.TENCENTCLOUD_SECRETKEY || "").trim();
+  const ambientSessionToken = String(env.TENCENTCLOUD_SESSIONTOKEN || "").trim();
+  const aiTimeoutMs = Number(env.HY_IMAGE_REQUEST_TIMEOUT_MS) || 300000;
+  const aiRuntimeInit = {
+    env: config.cloudbaseEnvId,
+    timeout: aiTimeoutMs,
+  };
+  let aiAuthMode = "scf-ambient";
+  if (explicitSecretId && explicitSecretKey) {
+    aiRuntimeInit.secretId = explicitSecretId;
+    aiRuntimeInit.secretKey = explicitSecretKey;
+    aiAuthMode = "explicit-secret";
+  }
+  const savedCloudbaseApiKey = process.env.CLOUDBASE_APIKEY;
+  if (aiAuthMode === "scf-ambient") {
+    delete process.env.CLOUDBASE_APIKEY;
+  }
+  let aiRuntime;
+  let aiClient = null;
+  try {
+    aiRuntime = cloudbaseNode.init(aiRuntimeInit);
+    aiClient = typeof aiRuntime.ai === "function" ? aiRuntime.ai() : aiRuntime.ai;
+  } finally {
+    if (aiAuthMode === "scf-ambient" && savedCloudbaseApiKey !== undefined) {
+      process.env.CLOUDBASE_APIKEY = savedCloudbaseApiKey;
+    }
+  }
+  if (aiAuthMode === "scf-ambient" && (!ambientSecretId || !ambientSecretKey)) {
+    console.error("[hunyuan] TENCENTCLOUD_SECRETID/KEY missing in runtime — image generation will fail");
+    aiAuthMode = "missing-credentials";
+  }
+  console.log(`[hunyuan] ai auth mode=${aiAuthMode} timeoutMs=${aiTimeoutMs} hasAmbientSecret=${Boolean(ambientSecretId && ambientSecretKey)}`);
   const getTemporaryUrl = async (fileId) => {
-    const result = await admin.getTempFileURL({ fileList: [fileId] });
-    return result?.fileList?.[0]?.tempFileURL ?? null;
+    // Inline / sentinel avatar refs are already displayable — never resolve via Storage.
+    if (typeof fileId === "string") {
+      if (fileId.startsWith("default:")) return fileId;
+      if (fileId.startsWith("data:")) return fileId;
+      if (/^https?:\/\//i.test(fileId)) return fileId;
+    }
+    try {
+      const result = await admin.getTempFileURL({ fileList: [fileId] });
+      return result?.fileList?.[0]?.tempFileURL ?? null;
+    } catch (error) {
+      console.error("[storage] getTempFileURL failed:", error?.message || error);
+      return null;
+    }
   };
   const data = createProductDataService({ db, resolveAvatarUrl: getTemporaryUrl });
   const avatar = createProfileAvatarService({
     data,
-    uploadImage: async ({ cloudPath, content }) => {
-      const uploaded = await admin.uploadFile({ cloudPath, fileContent: content });
-      if (!uploaded?.fileID) throw new Error("Avatar upload failed");
-      return { fileId: uploaded.fileID };
+    uploadImage: async ({ cloudPath, content, contentType }) => {
+      // Legacy CloudBase Storage JWT auth is broken in this HTTP function runtime.
+      // Skip cloud upload and let the avatar service persist an inline data URL instead
+      // so we never overwrite default:robot-N with an unresolvable storage ref.
+      void cloudPath;
+      void content;
+      void contentType;
+      throw new Error("Cloud storage unavailable; use inline avatar fallback");
     },
     createTemporaryUrl: getTemporaryUrl,
   });
@@ -179,6 +371,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     analyze: typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
       ? createDeepseekMealService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
       : null,
+    resolveImageUrl: async (fileID) => {
+      const temporary = await admin.getTempFileURL({ fileList: [fileID] });
+      return temporary?.fileList?.[0]?.tempFileURL || null;
+    },
   });
   const insights = createInsightDataService({
     listMealsRange: meals.listMealsRange,
@@ -189,22 +385,192 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       db,
       apiKey: env.USDA_FDC_API_KEY,
       translateQuery: createFoodQueryTranslator({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel }),
+      mirrorImage: async (imageUrl, foodKey) => {
+        const content = await downloadImageBuffer(imageUrl);
+        if (!content.length || content.length > 2 * 1024 * 1024) throw new Error("Food image mirror failed");
+        const cloudPath = `food-catalog/${String(foodKey).replace(/[^a-z0-9:_-]/gi, "-")}.jpg`;
+        const uploaded = await admin.uploadFile({ cloudPath, fileContent: content });
+        if (!uploaded?.fileID) throw new Error("Food image upload failed");
+        const temporary = await getTemporaryUrl(uploaded.fileID);
+        if (!temporary) throw new Error("Food image temporary URL failed");
+        return temporary;
+      },
     })
     : null;
+  const backfillNutrition = foodCatalog ? createNutritionBackfillService({ foodCatalog }) : null;
+
+  // Unified food data model services (food_catalog_v2). The repository wraps the
+  // same RDB client; USDA/OFF/image services are env-gated. These coexist with
+  // the legacy foodCatalog so existing /foods routes keep working while the new
+  // /foods/categories, /foods/tags, /foods/suggestions, /foods/barcode and
+  // /api/admin/foods routes serve the richer model.
+  const foodRepository = createFoodRepository({ db });
+  const usdaService = typeof env.USDA_FDC_API_KEY === "string" && env.USDA_FDC_API_KEY.trim()
+    ? createUsdaService({ apiKey: env.USDA_FDC_API_KEY, baseUrl: env.USDA_API_BASE_URL || "https://api.nal.usda.gov/fdc/v1" })
+    : null;
+  const openFoodFactsService = createOpenFoodFactsService({
+    baseUrl: env.OPEN_FOOD_FACTS_BASE_URL || "https://world.openfoodfacts.org",
+    userAgent: env.OPEN_FOOD_FACTS_USER_AGENT || "NordicNutriAI/1.0",
+  });
+  const foodImageService = createFoodImageService({
+    allowedHosts: (env.FOOD_IMAGE_ALLOWED_HOSTS || "images.openfoodfacts.org,world.openfoodfacts.org,static.openfoodfacts.org,images-us.openfoodfacts.org").split(",").map((h) => h.trim()).filter(Boolean),
+    maxBytes: Number(env.FOOD_IMAGE_MAX_BYTES) || 10 * 1024 * 1024,
+    storageBucket: env.FOOD_IMAGE_STORAGE_BUCKET || "food-images",
+    storagePrefix: env.FOOD_IMAGE_STORAGE_PREFIX || "food-library",
+    uploader: async ({ cloudPath, fileContent, contentType }) => {
+      // Prefer runtime-identity upload (same as Hunyuan docs). Fall back to accessKey admin.
+      const clients = [aiRuntime, admin].filter(Boolean);
+      let lastError = null;
+      for (const client of clients) {
+        try {
+          const uploaded = await client.uploadFile({ cloudPath, fileContent });
+          if (!uploaded?.fileID) throw new Error("Food image upload failed");
+          let url = null;
+          try {
+            const temporary = await client.getTempFileURL({ fileList: [uploaded.fileID] });
+            url = temporary?.fileList?.[0]?.tempFileURL ?? null;
+          } catch {
+            url = null;
+          }
+          // fileID alone is enough for later resolution; URL preferred for mini-program https display.
+          return { url: url || uploaded.fileID, fileID: uploaded.fileID };
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      void contentType;
+      throw lastError || new Error("Food image upload failed");
+    },
+  });
+  const foodBarcodeService = createFoodBarcodeService({
+    repository: foodRepository,
+    openFoodFacts: openFoodFactsService,
+    normalizer: { normalizeFoodRecord },
+    imageService: foodImageService,
+    imageSyncEnabled: true,
+  });
+  const foodAdminService = createFoodAdminService({
+    repository: foodRepository,
+    usdaService,
+    normalizer: { normalizeFoodRecord },
+    imageService: foodImageService,
+  });
+
+  // Hunyuan food-image generation (小程序成长计划). Model ID comes from env —
+  // never accept client-supplied model names. Disabled when FOOD_IMAGE_GENERATION_ENABLED=false.
+  const hunyuanEnabled = String(env.FOOD_IMAGE_GENERATION_ENABLED ?? "true").toLowerCase() !== "false";
+  let hunyuanImageService = null;
+  let foodImageJobs = null;
+  if (hunyuanEnabled) {
+    try {
+      if (!aiClient || typeof aiClient.createImageModel !== "function") {
+        throw new Error("CloudBase ai.createImageModel unavailable — check @cloudbase/ai >= 2.30.0");
+      }
+      hunyuanImageService = createHunyuanImageService({
+        ai: aiClient,
+        modelName: env.HY_IMAGE_MODEL,
+        size: env.HY_IMAGE_SIZE || `${env.HY_IMAGE_WIDTH || 1280}x${env.HY_IMAGE_HEIGHT || 720}`,
+        maxRetries: Number(env.HY_IMAGE_MAX_RETRIES) || 3,
+      });
+    } catch (error) {
+      console.error("[hunyuan] init failed:", error?.message || error);
+    }
+  }
+  foodImageJobs = createFoodImageJobService({
+    db,
+    repository: foodRepository,
+    hunyuan: hunyuanImageService,
+    imageService: foodImageService,
+    config: {
+      candidateCount: Number(env.HY_IMAGE_CANDIDATE_COUNT) || 3,
+      concurrency: Number(env.HY_IMAGE_CONCURRENCY) || 2,
+      dailyLimit: Number(env.HY_IMAGE_DAILY_LIMIT) || 500,
+      maxAttempts: Number(env.HY_IMAGE_MAX_RETRIES) || 3,
+      storagePrefix: env.FOOD_IMAGE_STORAGE_PREFIX || "food-library",
+      generationEnabled: hunyuanEnabled && Boolean(hunyuanImageService),
+    },
+    triggerWorker: async ({ jobId }) => {
+      // Fire-and-forget same-process worker (SCF may freeze after response —
+      // also expose POST /api/admin/food-image-jobs/worker for timer triggers).
+      setImmediate(() => {
+        foodImageJobs.processQueue(null, { jobId }).catch((err) => {
+          console.error("[food-image-jobs] async worker failed:", err?.code || err?.message || err);
+        });
+      });
+    },
+  });
   let vision = null;
-  if (typeof env.VITA_API_KEY === "string" && env.VITA_API_KEY) {
+  const qwenApiKey = typeof env.QWEN_API_KEY === "string" && env.QWEN_API_KEY.trim()
+    ? env.QWEN_API_KEY
+    : env.DASHSCOPE_API_KEY;
+  if (typeof qwenApiKey === "string" && qwenApiKey.trim()) {
+    vision = createVisionDataService({
+      db,
+      provider: "qwen",
+      model: env.QWEN_VL_FLASH_MODEL || "qwen3-vl-flash",
+      analyze: createQwenVisionService({
+        apiKey: qwenApiKey,
+        workspaceId: env.QWEN_WORKSPACE_ID || "llm-ekun6ter25w7d0ms",
+        flashModel: env.QWEN_VL_FLASH_MODEL,
+        plusModel: env.QWEN_VL_PLUS_MODEL,
+      }),
+      evaluateMeal,
+      backfillNutrition,
+      uploadImage: async ({ cloudPath, content, contentType }) => {
+        const toDataUrl = () => {
+          const mime = contentType || "image/jpeg";
+          return { cloudPath: null, imageUrl: `data:${mime};base64,${content.toString("base64")}` };
+        };
+        try {
+          const uploaded = await Promise.race([
+            (async () => {
+              const result = await admin.uploadFile({ cloudPath, fileContent: content });
+              const fileID = result?.fileID;
+              if (!fileID) throw new Error("Vision upload failed");
+              const temporary = await admin.getTempFileURL({ fileList: [fileID] });
+              const imageUrl = temporary?.fileList?.[0]?.tempFileURL;
+              if (!imageUrl) throw new Error("Vision temporary URL failed");
+              return { cloudPath: fileID, imageUrl };
+            })(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Vision upload timed out")), 2_000)),
+          ]);
+          return uploaded;
+        } catch (uploadErr) {
+          console.error("[vision] Storage upload failed, using data URL fallback:", uploadErr?.message || uploadErr);
+          return toDataUrl();
+        }
+      },
+    });
+  } else if (typeof env.VITA_API_KEY === "string" && env.VITA_API_KEY) {
     vision = createVisionDataService({
       db,
       model: env.VITA_MODEL,
       analyze: createVitaVisionService({ apiKey: env.VITA_API_KEY, model: env.VITA_MODEL }),
-      uploadImage: async ({ cloudPath, content }) => {
-        const uploaded = await admin.uploadFile({ cloudPath, fileContent: content });
-        const fileID = uploaded?.fileID;
-        if (!fileID) throw new Error("Vision upload failed");
-        const temporary = await admin.getTempFileURL({ fileList: [fileID] });
-        const imageUrl = temporary?.fileList?.[0]?.tempFileURL;
-        if (!imageUrl) throw new Error("Vision temporary URL failed");
-        return { cloudPath: fileID, imageUrl };
+      evaluateMeal,
+      backfillNutrition,
+      uploadImage: async ({ cloudPath, content, contentType }) => {
+        const toDataUrl = () => {
+          const mime = contentType || "image/jpeg";
+          return { cloudPath: null, imageUrl: `data:${mime};base64,${content.toString("base64")}` };
+        };
+        try {
+          const uploaded = await Promise.race([
+            (async () => {
+              const result = await admin.uploadFile({ cloudPath, fileContent: content });
+              const fileID = result?.fileID;
+              if (!fileID) throw new Error("Vision upload failed");
+              const temporary = await admin.getTempFileURL({ fileList: [fileID] });
+              const imageUrl = temporary?.fileList?.[0]?.tempFileURL;
+              if (!imageUrl) throw new Error("Vision temporary URL failed");
+              return { cloudPath: fileID, imageUrl };
+            })(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Vision upload timed out")), 2_000)),
+          ]);
+          return uploaded;
+        } catch (uploadErr) {
+          console.error("[vision] Storage upload failed, using data URL fallback:", uploadErr?.message || uploadErr);
+          return toDataUrl();
+        }
       },
     });
   }
@@ -229,8 +595,26 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     }),
     feedback: createFeedbackDataService({ db }),
     foodCatalog,
+    foodRepository,
+    foodBarcode: foodBarcodeService,
+    foodAdmin: foodAdminService,
+    foodImage: foodImageService,
+    foodImageJobs,
+    hunyuanImage: hunyuanImageService,
+    hunyuanAiAuthMode: aiAuthMode,
+    hunyuanAiDiagnostics: {
+      authMode: aiAuthMode,
+      timeoutMs: aiTimeoutMs,
+      hasAmbientSecretId: Boolean(ambientSecretId),
+      hasAmbientSecretKey: Boolean(ambientSecretKey),
+      hasAmbientSessionToken: Boolean(ambientSessionToken),
+      hasExplicitSecret: Boolean(explicitSecretId && explicitSecretKey),
+      hasCloudbaseApiKey: Boolean(savedCloudbaseApiKey || config.cloudbaseApiKey),
+      modelName: env.HY_IMAGE_MODEL || "HY-Image-3.0-Plus-4090-Tob-v1.0",
+    },
     avatar,
     vision,
+    calculateNutritionPlan: calculateNutritionPlanWithAi,
   };
 }
 
@@ -251,6 +635,7 @@ function getDataOperation(pathname) {
     "/account": "getAccount",
     "/settings": "saveSettings",
     "/nutrition-plan": "nutritionPlan",
+    "/nutrition-plan/preview": "previewNutritionPlan",
   })[path] ?? null;
 }
 
@@ -283,9 +668,44 @@ function getCoachRoute(pathname) {
 function getFoodRoute(pathname) {
   const path = pathname.replace(/^\/get-login-ticket/, "");
   if (path === "/foods/discover") return { operation: "discover" };
+  if (path === "/foods/categories") return { operation: "categories" };
+  if (path === "/foods/tags") return { operation: "tags" };
+  if (path === "/foods/suggestions") return { operation: "suggestions" };
+  if (path === "/foods/images/upload") return { operation: "imageUpload" };
+  if (path === "/foods/import/usda") return { operation: "usdaImport" };
+  const barcodeMatch = path.match(/^\/foods\/barcode\/(\d{6,14})$/);
+  if (barcodeMatch) return { operation: "barcode", barcode: barcodeMatch[1] };
+  const imageSyncMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/images\/sync$/i);
+  if (imageSyncMatch) return { operation: "imageSync", foodId: imageSyncMatch[1] };
   if (path === "/foods") return { operation: "search" };
   const match = path.match(/^\/foods\/([0-9a-f-]{36})$/i);
   return match ? { operation: "detail", foodId: match[1] } : null;
+}
+
+function getAdminFoodRoute(pathname) {
+  const path = pathname.replace(/^\/get-login-ticket/, "").replace(/^\/api\/admin/, "");
+  if (path === "/foods/missing-images") return { operation: "missingImages" };
+  if (path === "/foods/sync-jobs") return { operation: "syncJobs" };
+  if (path === "/food-image-jobs/batch") return { operation: "imageJobsBatch" };
+  if (path === "/food-image-jobs/worker") return { operation: "imageJobsWorker" };
+  if (path === "/food-image-jobs/stats") return { operation: "imageJobsStats" };
+  if (path === "/food-image-jobs/diagnose") return { operation: "imageJobsDiagnose" };
+  if (path === "/food-image-jobs") return { operation: "imageJobs" };
+  const jobMatch = path.match(/^\/food-image-jobs\/([0-9a-f-]{36})$/i);
+  if (jobMatch) return { operation: "imageJobDetail", jobId: jobMatch[1] };
+  const approveMatch = path.match(/^\/food-images\/([0-9a-f-]{36})\/approve$/i);
+  if (approveMatch) return { operation: "approveImage", imageId: approveMatch[1] };
+  const rejectMatch = path.match(/^\/food-images\/([0-9a-f-]{36})\/reject$/i);
+  if (rejectMatch) return { operation: "rejectImage", imageId: rejectMatch[1] };
+  const regenerateMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/regenerate-image$/i);
+  if (regenerateMatch) return { operation: "regenerateImage", foodId: regenerateMatch[1] };
+  const reviewMatch = path.match(/^\/food-images\/([0-9a-f-]{36})\/review$/i);
+  if (reviewMatch) return { operation: "reviewImage", imageId: reviewMatch[1] };
+  const setPrimaryMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/set-primary-image$/i);
+  if (setPrimaryMatch) return { operation: "setPrimaryImage", foodId: setPrimaryMatch[1] };
+  const foodPatchMatch = path.match(/^\/foods\/([0-9a-f-]{36})$/i);
+  if (foodPatchMatch) return { operation: "patchFood", foodId: foodPatchMatch[1] };
+  return null;
 }
 
 function isFeedbackRoute(pathname) {
@@ -323,10 +743,11 @@ function createHttpServer({ service }) {
     const insightOperation = getInsightRoute(url.pathname);
     const coachOperation = getCoachRoute(url.pathname);
     const foodRoute = getFoodRoute(url.pathname);
+    const adminFoodRoute = getAdminFoodRoute(url.pathname);
     const feedbackRoute = isFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !foodRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !foodRoute && !adminFoodRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
     }
@@ -337,17 +758,79 @@ function createHttpServer({ service }) {
       try {
         return sendJson(res, 200, await service.avatar.upload(session.sub, await readJsonBody(req, MAX_VISION_BODY_BYTES)));
       } catch (error) {
+        console.error("[avatar-upload] failed:", error?.message || error);
         if (error instanceof PublicProfileAvatarError) return sendJson(res, 400, { code: error.code });
-        return sendJson(res, 503, { code: "AVATAR_UPLOAD_FAILED" });
+        return sendJson(res, 503, { code: "AVATAR_UPLOAD_FAILED", message: String(error?.message || error) });
       }
     }
     if (foodRoute) {
       const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.foodCatalog) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-      if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try {
+        // New unified-model endpoints (food_repository). These do not require
+        // USDA_FDC_API_KEY; they read from the local foods/categories/tags tables.
+        if (foodRoute.operation === "categories") {
+          return sendJson(res, 200, { items: await service.foodRepository.listCategories() });
+        }
+        if (foodRoute.operation === "tags") {
+          return sendJson(res, 200, { items: await service.foodRepository.listTags() });
+        }
+        if (foodRoute.operation === "suggestions") {
+          const q = url.searchParams.get("q") ?? url.searchParams.get("query") ?? "";
+          const limit = Number(url.searchParams.get("limit") ?? "8");
+          return sendJson(res, 200, { items: await service.foodRepository.suggestions(q, limit) });
+        }
+        if (foodRoute.operation === "barcode") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.foodBarcode.lookup(foodRoute.barcode));
+        }
+        if (foodRoute.operation === "imageUpload") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          // Logged-in users may upload candidate images (status=pending, never primary).
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          if (!body?.imageBase64) return sendJson(res, 400, { code: "FOOD_IMAGE_UPLOAD_EMPTY" });
+          const buffer = Buffer.from(String(body.imageBase64), "base64");
+          const acquired = await service.foodImage.acquireFromUpload({
+            buffer, contentType: body.contentType || "image/jpeg",
+            imageEntityKey: body.imageEntityKey,
+            uploadedBy: session.sub,
+          });
+          const image = await service.foodRepository.insertImage({
+            food_id: body.foodId ?? null,
+            image_entity_key: acquired.storagePath ? acquired.storagePath.split("/")[1] : null,
+            image_type: body.imageType || "ingredient",
+            source: "user_upload",
+            storage_path: acquired.storagePath,
+            thumb_url: acquired.thumbUrl,
+            medium_url: acquired.mediumUrl,
+            detail_url: acquired.detailUrl,
+            mime_type: acquired.mimeType,
+            width: acquired.width,
+            height: acquired.height,
+            file_size: acquired.fileSize,
+            content_hash: acquired.contentHash,
+            is_primary: false,
+            is_verified: false,
+            status: "pending",
+            uploaded_by: session.sub,
+          });
+          return sendJson(res, 200, { image });
+        }
+        if (foodRoute.operation === "usdaImport") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.foodAdmin.importUsda(session.sub, body || {}));
+        }
+        if (foodRoute.operation === "imageSync") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.foodAdmin.syncImages(session.sub, foodRoute.foodId));
+        }
+        // Legacy USDA-backed catalog routes require USDA_FDC_API_KEY.
+        if (!service.foodCatalog) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+        if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         if (foodRoute.operation === "discover") {
-          return sendJson(res, 200, await service.foodCatalog.discover(session.sub));
+          const limit = Number(url.searchParams.get("limit") ?? "10");
+          return sendJson(res, 200, await service.foodCatalog.discover(session.sub, limit));
         }
         if (foodRoute.operation === "search") {
           const query = url.searchParams.get("query");
@@ -357,7 +840,150 @@ function createHttpServer({ service }) {
         return sendJson(res, 200, await service.foodCatalog.getById(session.sub, foodRoute.foodId));
       } catch (error) {
         if (error instanceof PublicFoodCatalogError) return sendJson(res, 400, { code: error.code });
+        if (error instanceof FoodBarcodeError) return sendJson(res, error.code === "FOOD_BARCODE_NOT_FOUND" ? 404 : 400, { code: error.code });
+        if (error instanceof FoodImageError) return sendJson(res, 400, { code: error.code });
+        if (error instanceof FoodAdminError) return sendJson(res, error.code === "FORBIDDEN" ? 403 : (error.code === "UNAUTHORIZED" ? 401 : 400), { code: error.code });
+        if (error instanceof FoodRepositoryError) return sendJson(res, 400, { code: error.code });
         return sendJson(res, 503, { code: "FOOD_CATALOG_UNAVAILABLE" });
+      }
+    }
+    if (adminFoodRoute) {
+      const session = service?.verifySession?.(readBearerToken(req));
+      if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      try {
+        if (adminFoodRoute.operation === "missingImages") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const limit = Number(url.searchParams.get("limit") ?? "50");
+          return sendJson(res, 200, { items: await service.foodAdmin.listMissingImages(session.sub, limit) });
+        }
+        if (adminFoodRoute.operation === "syncJobs") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const limit = Number(url.searchParams.get("limit") ?? "20");
+          return sendJson(res, 200, { items: await service.foodAdmin.listSyncJobs(session.sub, limit) });
+        }
+        if (adminFoodRoute.operation === "imageJobsStats") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.foodImageJobs.getStats(session.sub));
+        }
+        if (adminFoodRoute.operation === "imageJobsDiagnose") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.foodRepository) return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });
+          const ok = await service.foodRepository.isAdmin(session.sub);
+          if (!ok) return sendJson(res, 403, { code: "FORBIDDEN" });
+          if (!service.hunyuanImage) {
+            return sendJson(res, 200, {
+              ok: false,
+              stage: "init",
+              error: "hunyuanImage service is null — check FOOD_IMAGE_GENERATION_ENABLED and @cloudbase/ai",
+              diagnostics: service.hunyuanAiDiagnostics || null,
+            });
+          }
+          try {
+            const sample = await service.hunyuanImage.generateOne({
+              foodNameZh: "水煮鸡胸肉",
+              foodNameEn: "Boiled chicken breast",
+              category: "肉禽",
+              cookingMethod: "水煮",
+              extraPrompt: "diagnose only",
+            });
+            return sendJson(res, 200, {
+              ok: true,
+              stage: "generate",
+              diagnostics: service.hunyuanAiDiagnostics || null,
+              modelName: service.hunyuanImage.modelName,
+              size: service.hunyuanImage.size,
+              hasTemporaryUrl: Boolean(sample.temporaryUrl),
+              temporaryUrlHost: (() => {
+                try { return new URL(sample.temporaryUrl).host; } catch { return null; }
+              })(),
+              promptChars: sample.prompt?.length ?? 0,
+            });
+          } catch (error) {
+            return sendJson(res, 200, {
+              ok: false,
+              stage: "generate",
+              diagnostics: service.hunyuanAiDiagnostics || null,
+              modelName: service.hunyuanImage.modelName,
+              size: service.hunyuanImage.size,
+              errorCode: error?.code || "HY_IMAGE_GENERATE_FAILED",
+              errorMessage: String(error?.message || error).slice(0, 1200),
+              errorRaw: (() => {
+                try {
+                  return JSON.stringify(error, Object.getOwnPropertyNames(error)).slice(0, 1500);
+                } catch {
+                  return String(error).slice(0, 500);
+                }
+              })(),
+            });
+          }
+        }
+        if (adminFoodRoute.operation === "imageJobsBatch") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.foodImageJobs.createBatch(session.sub, body || {}));
+        }
+        if (adminFoodRoute.operation === "imageJobsWorker") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.foodImageJobs.processQueue(session.sub, body || {}));
+        }
+        if (adminFoodRoute.operation === "imageJobs") {
+          if (req.method === "GET") {
+            return sendJson(res, 200, await service.foodImageJobs.listJobs(session.sub, {
+              status: url.searchParams.get("status") || undefined,
+              foodId: url.searchParams.get("foodId") || undefined,
+              page: Number(url.searchParams.get("page") ?? "1"),
+              pageSize: Number(url.searchParams.get("pageSize") ?? "20"),
+            }));
+          }
+          if (req.method === "POST") {
+            const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+            return sendJson(res, 200, await service.foodImageJobs.createJob(session.sub, body || {}));
+          }
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "imageJobDetail") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.foodImageJobs.getJob(session.sub, adminFoodRoute.jobId));
+        }
+        if (adminFoodRoute.operation === "approveImage") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.foodImageJobs.approveImage(session.sub, adminFoodRoute.imageId));
+        }
+        if (adminFoodRoute.operation === "rejectImage") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.foodImageJobs.rejectImage(session.sub, adminFoodRoute.imageId, body || {}));
+        }
+        if (adminFoodRoute.operation === "regenerateImage") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.foodImageJobs.regenerate(session.sub, adminFoodRoute.foodId, body || {}));
+        }
+        if (adminFoodRoute.operation === "reviewImage") {
+          if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.foodAdmin.reviewImage(session.sub, adminFoodRoute.imageId, body || {}));
+        }
+        if (adminFoodRoute.operation === "setPrimaryImage") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.foodAdmin.setPrimaryImage(session.sub, adminFoodRoute.foodId, body?.imageId));
+        }
+        if (adminFoodRoute.operation === "patchFood") {
+          if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.foodAdmin.updateFood(session.sub, adminFoodRoute.foodId, body || {}));
+        }
+      } catch (error) {
+        if (error instanceof FoodAdminError || error instanceof FoodImageJobError || error instanceof HunyuanImageError) {
+          const code = error.code;
+          const status = code === "FORBIDDEN" ? 403 : code === "UNAUTHORIZED" ? 401 : 400;
+          return sendJson(res, status, { code });
+        }
+        if (error instanceof FoodRepositoryError) return sendJson(res, 400, { code: error.code });
+        console.error("[food-admin] failed:", error?.message || error);
+        return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });
       }
     }
     if (mealRoute) {
@@ -461,11 +1087,13 @@ function createHttpServer({ service }) {
       try {
         return sendJson(res, 200, await service.vision.analyzeImage(session.sub, await readJsonBody(req, MAX_VISION_BODY_BYTES)));
       } catch (error) {
-        if (error instanceof PublicVisionDataError || error instanceof PublicVisionError) {
-          const statusCode = error.code === "VISION_IMAGE_INVALID" || error.code === "VISION_RESULT_INVALID" ? 400 : 503;
-          return sendJson(res, statusCode, { code: error.code });
+        if (error instanceof PublicVisionDataError || error instanceof PublicVisionError || error instanceof PublicQwenVisionError) {
+          const statusCode = error.code === "VISION_IMAGE_INVALID" || error.code === "VISION_RESULT_INVALID" || error.code === "VISION_NON_FOOD" ? 400 : 503;
+          console.error("[vision] known error:", error.code, error.message);
+          return sendJson(res, statusCode, { code: error.code, message: error.message });
         }
-        return sendJson(res, 503, { code: "VISION_SERVICE_UNAVAILABLE" });
+        console.error("[vision] unexpected error:", error?.message || error, error?.stack || "");
+        return sendJson(res, 503, { code: "VISION_SERVICE_UNAVAILABLE", message: error?.message || "Unknown error" });
       }
     }
     if (dataOperation === "getAccount" && req.method === "GET") {
@@ -487,6 +1115,22 @@ function createHttpServer({ service }) {
       const session = service?.verifySession?.(readBearerToken(req));
       if (!session?.sub || !service.data?.saveNutritionPlan) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try { return sendJson(res, 200, await service.data.saveNutritionPlan(session.sub, await readJsonBody(req))); } catch { return sendJson(res, 400, { code: "NUTRITION_PLAN_SAVE_FAILED" }); }
+    }
+    if (dataOperation === "previewNutritionPlan" && req.method === "POST") {
+      const session = service?.verifySession?.(readBearerToken(req));
+      if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      try {
+        const body = await readJsonBody(req);
+        let plan = null;
+        if (typeof service.calculateNutritionPlan === "function") {
+          plan = await service.calculateNutritionPlan(body);
+        }
+        if (!plan) plan = formulaNutritionPlanFallback(body);
+        return sendJson(res, 200, plan);
+      } catch (error) {
+        console.error("[nutrition-plan/preview] failed:", error?.message || error);
+        return sendJson(res, 503, { code: "NUTRITION_PLAN_PREVIEW_FAILED" });
+      }
     }
     if (req.method !== "POST") {
       sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });

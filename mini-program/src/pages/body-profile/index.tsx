@@ -1,7 +1,7 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
-import { useState } from "react";
-import { saveProductBodyProfile } from "../../api/product-data-api";
+import { useEffect, useState } from "react";
+import { saveProductBodyProfile, saveProductProfile } from "../../api/product-data-api";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomActionLayout } from "../../components/bottom-action-layout";
@@ -19,8 +19,26 @@ import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
+import { useProfileStore } from "../../stores/profile-store";
+import { generateNickname } from "../../features/profile/nickname-generator";
 
 const today = getLocalDateString();
+const PLACEHOLDER_NICKNAMES = new Set(["", "Lewis", "微信用户"]);
+
+function isPlaceholderNickname(value: string | null | undefined) {
+  return !value || !value.trim() || PLACEHOLDER_NICKNAMES.has(value.trim());
+}
+
+async function syncNicknameEverywhere(nickname: string) {
+  const trimmed = nickname.trim();
+  if (!trimmed) return;
+  useProfileStore.getState().setProfile({ nickname: trimmed });
+  try {
+    await saveProductProfile({ nickname: trimmed });
+  } catch {
+    // Non-fatal: local profile store already updated for home/profile display.
+  }
+}
 const activityOptions: Array<{
   value: ActivityLevel;
   title: string;
@@ -68,11 +86,43 @@ export default function BodyProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const validation = validateBodyProfile(draft, today);
   const validate = () => setErrors(validation.errors);
+
+  // Keep onboarding nickname, home greeting, and profile page on the same value.
+  useEffect(() => {
+    const accountNickname = useProfileStore.getState().profile.nickname;
+    const draftNickname = draft.nickname?.trim() ?? "";
+
+    if (!isPlaceholderNickname(draftNickname)) {
+      if (draftNickname !== accountNickname) {
+        void syncNicknameEverywhere(draftNickname);
+      }
+      return;
+    }
+
+    if (!isPlaceholderNickname(accountNickname)) {
+      setField("nickname", accountNickname);
+      return;
+    }
+
+    const generated = generateNickname();
+    setField("nickname", generated);
+    void syncNicknameEverywhere(generated);
+    // Only seed / sync on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const refreshNickname = () => {
+    const next = generateNickname(draft.nickname);
+    setField("nickname", next);
+    void syncNicknameEverywhere(next);
+  };
+
   const continueToDietPreferences = async () => {
     validate();
     if (!validation.valid || !validation.profile) return;
     setIsSaving(true);
     try {
+      await syncNicknameEverywhere(validation.profile.nickname);
       await saveProductBodyProfile({
         age: validation.profile.age,
         birthDate: null,
@@ -95,6 +145,7 @@ export default function BodyProfilePage() {
       title="身体资料"
       showTabs={false}
       hideNavigation
+      showBrandHeader={false}
       className="page-layout--onboarding"
     >
       <View className="body-profile-page">
@@ -125,13 +176,28 @@ export default function BodyProfilePage() {
             <View className="profile-form">
               <View className="profile-form__field">
                 <Text>昵称</Text>
-                <Input
-                  value={draft.nickname}
-                  maxlength={16}
-                  placeholder="输入你的昵称"
-                  onInput={(event) => setField("nickname", event.detail.value)}
-                  onBlur={validate}
-                />
+                <View className="profile-form__input-row profile-form__input-row--with-action">
+                  <Input
+                    className="profile-form__input--with-action"
+                    value={draft.nickname}
+                    maxlength={16}
+                    placeholder="输入你的昵称"
+                    onInput={(event) => setField("nickname", event.detail.value)}
+                    onBlur={(event) => {
+                      const next = event.detail.value?.trim() || draft.nickname;
+                      setField("nickname", next);
+                      validate();
+                      void syncNicknameEverywhere(next);
+                    }}
+                  />
+                  <View
+                    className="profile-form__input-action"
+                    onClick={refreshNickname}
+                    ariaLabel="换一个昵称"
+                  >
+                    <NordicIcon name="refresh-cw" size={18} ariaLabel="换一个昵称" />
+                  </View>
+                </View>
                 <FormError message={errors.nickname} />
               </View>
             </View>

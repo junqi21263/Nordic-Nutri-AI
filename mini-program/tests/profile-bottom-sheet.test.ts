@@ -40,14 +40,15 @@ describe("profile information bottom sheets", () => {
     expect(pageStyles).toContain(".profile-sheet__action");
   });
 
-  it("hides the independent custom tab bar until the sheet exit animation finishes", () => {
+  it("hides the tab bar via the store visible flag until the sheet exit animation finishes", () => {
     const tabStore = readSource("../src/stores/tab-bar-store.ts");
-    const customTabBar = readSource("../src/custom-tab-bar/index.tsx");
+    const pageLayout = readSource("../src/layouts/page-layout/index.tsx");
     const profile = readSource("../src/pages/profile/index.tsx");
 
     expect(tabStore).toContain("visible: boolean");
     expect(tabStore).toContain("setVisible: (visible: boolean) => void");
-    expect(customTabBar).toContain("return visible ? <BottomTabBar");
+    expect(pageLayout).toContain("tabbarVisible");
+    expect(pageLayout).toContain("BottomTabBar");
     expect(profile).toContain("setTabBarVisible(false)");
     expect(profile).toContain("bottomSheetExitDuration");
   });

@@ -1,0 +1,165 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { buildFoodImagePrompt, MAX_PROMPT_CHARS } from "./food-image-prompts.cjs";
+import { createHunyuanImageService, HunyuanImageError, resolveSize } from "./hunyuan-image-service.cjs";
+import { createFoodImageJobService, FoodImageJobError } from "./food-image-job-service.cjs";
+import { transformFoodCardImage } from "./food-image-service.cjs";
+
+test("buildFoodImagePrompt stays within the 500-char Hunyuan limit", () => {
+  const prompt = buildFoodImagePrompt({
+    foodNameZh: "水煮鸡胸肉",
+    foodNameEn: "Boiled chicken breast",
+    category: "肉禽",
+    cookingMethod: "水煮",
+    servingDescription: "100g",
+    extraPrompt: "鸡胸肉必须是自然白色，没有煎痕烤痕酱汁，不增加米饭蔬菜",
+  });
+  assert.ok(prompt.includes("水煮鸡胸肉"));
+  assert.ok(prompt.includes("北欧"));
+  assert.ok(prompt.length <= MAX_PROMPT_CHARS);
+});
+
+test("resolveSize rejects unsupported 1024x768 and falls back to landscape", () => {
+  assert.equal(resolveSize("1024x768"), "1280x720");
+  assert.equal(resolveSize("1280x720"), "1280x720");
+});
+
+test("hunyuan generateOne retries empty results then fails", async () => {
+  let calls = 0;
+  const service = createHunyuanImageService({
+    modelName: "HY-Image-3.0-Plus-4090-Tob-v1.0",
+    maxRetries: 2,
+    generateImageImpl: async () => {
+      calls += 1;
+      return { data: [] };
+    },
+  });
+  await assert.rejects(
+    () => service.generateOne({ foodNameZh: "水煮鸡胸肉", cookingMethod: "水煮" }),
+    (err) => err instanceof HunyuanImageError && err.code === "HY_IMAGE_EMPTY_RESULT",
+  );
+  assert.equal(calls, 2);
+});
+
+test("hunyuan download validates mime type", async () => {
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9, ...Buffer.alloc(2000, 1)]);
+  const service = createHunyuanImageService({
+    generateImageImpl: async () => ({ data: [{ url: "https://example.com/a.jpg" }] }),
+    downloadImpl: async () => ({ buffer: jpeg, contentType: "image/jpeg", size: jpeg.length }),
+  });
+  const downloaded = await service.downloadGeneratedImage("https://example.com/a.jpg");
+  assert.equal(downloaded.mimeType, "image/jpeg");
+});
+
+test("createJob rejects non-admin and duplicate active jobs", async () => {
+  const jobs = [];
+  const db = {
+    from(table) {
+      if (table === "food_image_usage_daily") {
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { generated_count: 0 }, error: null }) }) }),
+          insert: async () => ({ data: null, error: null }),
+          update: () => ({ eq: async () => ({ data: null, error: null }) }),
+        };
+      }
+      if (table === "food_image_jobs") {
+        return {
+          select: () => ({
+            eq: () => ({
+              in: () => ({
+                order: () => ({
+                  limit: () => ({
+                    maybeSingle: async () => ({ data: jobs[0] || null, error: null }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+          insert: (payload) => ({
+            select: () => ({
+              maybeSingle: async () => {
+                const row = { id: "job-1", ...payload, created_at: new Date().toISOString() };
+                jobs.push(row);
+                return { data: row, error: null };
+              },
+            }),
+          }),
+          update: () => ({ eq: async () => ({ data: null, error: null }) }),
+        };
+      }
+      if (table === "food_images") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                limit: async () => ({ data: [], error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "foods") {
+        return { update: () => ({ eq: async () => ({ data: null, error: null }) }) };
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+
+  const repository = {
+    async isAdmin(userId) { return userId === "admin"; },
+    async getFoodById(id) {
+      return {
+        id,
+        nameZh: "水煮鸡胸肉",
+        nameEn: "Boiled chicken breast",
+        sourceId: "fixture-chicken",
+        category: { code: "meat", nameZh: "肉禽" },
+        primaryImageId: null,
+      };
+    },
+  };
+
+  const service = createFoodImageJobService({
+    db,
+    repository,
+    hunyuan: { modelName: "HY-Image-3.0-Plus-4090-Tob-v1.0" },
+    imageService: {},
+    config: { generationEnabled: true, dailyLimit: 100 },
+  });
+
+  await assert.rejects(
+    () => service.createJob("user", { foodId: "food-1" }),
+    (err) => err instanceof FoodImageJobError && err.code === "FORBIDDEN",
+  );
+
+  const created = await service.createJob("admin", { foodId: "food-1", candidateCount: 1 });
+  assert.equal(created.id, "job-1");
+  assert.equal(created.candidateCount, 1);
+
+  await assert.rejects(
+    () => service.createJob("admin", { foodId: "food-1", candidateCount: 1 }),
+    (err) => err instanceof FoodImageJobError && err.code === "FOOD_IMAGE_JOB_ACTIVE",
+  );
+});
+
+test("createBatch caps at 100 food ids", async () => {
+  const service = createFoodImageJobService({
+    db: { from: () => ({}) },
+    repository: { async isAdmin() { return true; } },
+    hunyuan: { modelName: "m" },
+    imageService: {},
+    config: { generationEnabled: true },
+  });
+  const ids = Array.from({ length: 101 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`);
+  await assert.rejects(
+    () => service.createBatch("admin", { foodIds: ids }),
+    (err) => err instanceof FoodImageJobError && err.code === "FOOD_IMAGE_BATCH_TOO_LARGE",
+  );
+});
+
+test("transformFoodCardImage falls back without sharp", async () => {
+  const buffer = Buffer.alloc(2048, 2);
+  const result = await transformFoodCardImage(buffer, null);
+  assert.equal(result.transformed, false);
+  assert.equal(result.detail, buffer);
+});

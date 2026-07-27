@@ -51,7 +51,7 @@ export default function IngredientDetailPage() {
         <ErrorState title="食材不存在" description="这条食材记录可能已被删除，或链接已经失效。" />
         <AppButton
           size="large"
-          onClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
+          onClick={() => Taro.navigateBack({ delta: 2 })}
         >
           返回饮食记录
         </AppButton>
@@ -71,17 +71,12 @@ export default function IngredientDetailPage() {
       title="食材详情"
       showTabs={false}
       hideNavigation
+      showBack
+      onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--ingredient-detail"
     >
       <View className="ingredient-detail-page">
         <View className="ingredient-detail-page__page-title">
-          <View
-            className="ingredient-detail-page__back"
-            ariaLabel="返回餐食详情"
-            onClick={returnToMeal}
-          >
-            <NordicIcon name="back" size={24} ariaLabel="返回餐食详情" />
-          </View>
           <Text>食材详情</Text>
         </View>
         <View className="ingredient-detail-page__heading">
