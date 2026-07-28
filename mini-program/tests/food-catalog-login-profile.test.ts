@@ -32,7 +32,8 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("getProductFoodCategories");
     expect(page).toContain("getProductFoodTags");
     expect(page).toContain("getProductFoodSuggestions");
-    expect(page).toContain("resolveCategorySearchQuery");
+    expect(page).toContain("STANDARD_FOOD_CATEGORY_ROOT_CODES");
+    expect(page).toContain('searchProductFoodCatalog("", 1, { categoryCode })');
     expect(page).toContain("searchProductFoodCatalog");
     expect(page).toMatch(/useDidShow\(\(\) => \{\s*void discover\(\);\s*void loadTaxonomy\(\);\s*\}\);/);
     expect(page).toContain("热门推荐");
@@ -46,6 +47,7 @@ describe("food catalog discovery and login profile sync", () => {
     expect(labels).toContain("高蛋白");
     expect(api).toContain("getProductFoodCategories");
     expect(api).toContain("getProductFoodByBarcode");
+    expect(api).toContain("standard_food_v1");
     expect(appConfig).toContain('"pages/food-detail/index"');
   });
 

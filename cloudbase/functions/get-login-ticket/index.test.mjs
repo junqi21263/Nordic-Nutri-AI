@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import test from "node:test";
 
-import { createHttpServer, createRuntimeService, readRuntimeConfig, selectDeepseekModel } from "./index.js";
+import {
+  createHttpServer,
+  createHunyuanGenerationService,
+  createRuntimeService,
+  readRuntimeConfig,
+  selectDeepseekModel,
+} from "./index.js";
 
 async function withServer(server, run) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -50,11 +56,81 @@ test("assembles every runtime service after the RDB client is available", () => 
   assert.equal(service.vision, null);
 });
 
+test("uses the primary runtime identity for generated-image storage in remote-worker mode", async () => {
+  const uploads = [];
+  const db = { from: () => ({}) };
+  const runtimeStorage = {
+    uploadFile: async ({ cloudPath }) => {
+      uploads.push(cloudPath);
+      return { fileID: `cloud://primary/${cloudPath}` };
+    },
+    getTempFileURL: async () => ({ fileList: [] }),
+  };
+  const apiKeyStorage = {
+    uploadFile: async () => {
+      throw new Error("API-key fallback must not be used when runtime identity works");
+    },
+  };
+  const service = createRuntimeService({
+    WX_APPID: "wx-app",
+    WX_SECRET: "wx-secret",
+    TCB_ENV: "env-id",
+    IDENTITY_HASH_PEPPER: "identity-pepper",
+    CLOUDBASE_APIKEY: "cloudbase-key",
+    APP_SESSION_SECRET: "session-secret",
+    HY_IMAGE_WORKER_ENDPOINT: "https://worker.example/generate",
+    AI_WORKER_SHARED_SECRET: "worker-secret",
+  }, {
+    cloudbaseSdk: { init: () => ({ rdb: () => db }) },
+    cloudbaseNodeSdk: { init: (options) => options.accessKey ? apiKeyStorage : runtimeStorage },
+  });
+
+  const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  const saved = await service.foodImage.persistGeneratedImage({
+    buffer: image,
+    mimeType: "image/png",
+    foodId: "food-1",
+    imageId: "image-1",
+  });
+
+  assert.ok(saved.originalFileId.startsWith("cloud://primary/"));
+  assert.ok(uploads.length >= 1);
+});
+
 test("maps deprecated DeepSeek aliases to the supported V4 Flash model", () => {
   assert.equal(selectDeepseekModel(undefined), "deepseek-v4-flash");
   assert.equal(selectDeepseekModel("deepseek-chat"), "deepseek-v4-flash");
   assert.equal(selectDeepseekModel("deepseek-reasoner"), "deepseek-v4-flash");
   assert.equal(selectDeepseekModel("deepseek-v4-pro"), "deepseek-v4-pro");
+});
+
+test("routes Hunyuan generation through the signed worker when configured", async () => {
+  const workerCalls = [];
+  const service = createHunyuanGenerationService({
+    env: {
+      FOOD_IMAGE_GENERATION_ENABLED: "true",
+      HY_IMAGE_MODEL: "HY-Image-3.0-Plus-4090-Tob-v1.0",
+      HY_IMAGE_SIZE: "1280x720",
+      HY_IMAGE_WORKER_ENDPOINT: "https://dev-d8g3hqv2b0de38046.service.tcloudbase.com/hunyuan-image-worker/generate",
+      AI_WORKER_SHARED_SECRET: "worker-secret",
+    },
+    aiClient: null,
+    createWorkerClient: (config) => {
+      assert.equal(config.sharedSecret, "worker-secret");
+      return {
+        generateImage: async (input) => {
+          workerCalls.push(input);
+          return { data: [{ url: "https://temporary.example/image.png" }] };
+        },
+      };
+    },
+  });
+
+  const generated = await service.generateOne({ foodNameZh: "水煮鸡胸肉", cookingMethod: "水煮" });
+  assert.equal(generated.temporaryUrl, "https://temporary.example/image.png");
+  assert.equal(workerCalls.length, 1);
+  assert.equal(workerCalls[0].model, "HY-Image-3.0-Plus-4090-Tob-v1.0");
+  assert.equal(workerCalls[0].size, "1280x720");
 });
 
 test("only accepts JSON POST requests and never exposes OpenID", async () => {
@@ -183,10 +259,13 @@ test("serves food catalog searches only through the authenticated product sessio
   const server = createHttpServer({
     service: {
       verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
-      foodCatalog: {
-        search: async (userId, query, page) => {
-          calls.push({ userId, query, page });
-          return { items: [{ id: "food-1", description: "Chicken breast" }], page, source: "cache" };
+      foodRepository: {
+        listFoods: async (options) => {
+          calls.push(options);
+          return {
+            items: [{ id: "food-1", source: "usda", sourceId: "1", nameEn: "Chicken breast", normalizedName: "chicken breast", category: { code: "meat_poultry" }, nutritionPer100g: { calories: 165, protein: 31, carbs: 0, fat: 3.6 } }],
+            pagination: { page: options.page, pageSize: options.pageSize, total: 1, hasMore: false },
+          };
         },
       },
     },
@@ -206,10 +285,11 @@ test("serves food catalog searches only through the authenticated product sessio
       headers: { authorization: "Bearer valid-session" },
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), {
-      items: [{ id: "food-1", description: "Chicken breast" }], page: 2, source: "cache",
-    });
-    assert.deepEqual(calls, [{ userId: "user-1", query: "chicken", page: 2 }]);
+    const body = await response.json();
+    assert.equal(body.source, "standard_food_v1");
+    assert.equal(body.page, 2);
+    assert.equal(body.items[0].description, "Chicken breast");
+    assert.deepEqual(calls, [{ q: "chicken", categoryCode: null, page: 2, pageSize: 20, sort: "recommended" }]);
   });
 });
 
@@ -218,10 +298,10 @@ test("serves randomized food catalog discovery only through the authenticated pr
   const server = createHttpServer({
     service: {
       verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
-      foodCatalog: {
-        discover: async (userId) => {
-          calls.push(userId);
-          return { items: [{ id: "curated:salmon", description: "Salmon" }], source: "fallback" };
+      foodRepository: {
+        listFoods: async (options) => {
+          calls.push(options);
+          return { items: [{ id: "food-1", source: "usda", sourceId: "2", nameEn: "Salmon", normalizedName: "salmon", nutritionPer100g: { calories: 206, protein: 22, carbs: 0, fat: 12 } }], pagination: { page: 1, pageSize: 10, total: 1, hasMore: false } };
         },
       },
     },
@@ -235,8 +315,10 @@ test("serves randomized food catalog discovery only through the authenticated pr
       headers: { authorization: "Bearer valid-session" },
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { items: [{ id: "curated:salmon", description: "Salmon" }], source: "fallback" });
-    assert.deepEqual(calls, ["user-1"]);
+    const body = await response.json();
+    assert.equal(body.source, "standard_food_v1");
+    assert.equal(body.items[0].description, "Salmon");
+    assert.deepEqual(calls, [{ page: 1, pageSize: 10, sort: "recommended" }]);
   });
 });
 

@@ -75,6 +75,13 @@ function mapFoodRow(row, { category, tags, image } = {}) {
     isVerified: Boolean(row.is_verified),
     isActive: Boolean(row.is_active),
     sourceUpdatedAt: row.raw_source_updated_at ?? null,
+    publishStatus: row.publish_status ?? null,
+    foodKind: row.food_kind ?? "ingredient",
+    foodForm: row.food_form ?? null,
+    defaultCookingMethod: row.default_cooking_method ?? null,
+    imagePolicy: row.image_policy ?? "none",
+    imageSubjectZh: row.image_subject_zh ?? null,
+    catalogVersion: row.catalog_version ?? null,
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
   };
@@ -180,6 +187,11 @@ function sanitizeFilterTerm(raw, { maxLength = 48 } = {}) {
   return normalized.slice(0, maxLength).trim();
 }
 
+function sanitizeCategoryCode(raw) {
+  const value = String(raw ?? "").trim().toLowerCase();
+  return /^[a-z0-9_]+(?:\.[a-z0-9_]+)*$/.test(value) ? value : "";
+}
+
 function sortClause(sort) {
   switch (sort) {
     case "popular": return { column: "popularity_score", ascending: false };
@@ -253,15 +265,24 @@ function createFoodRepository({ db }) {
       const p = clampPage(page);
       const size = clampPageSize(pageSize);
       const offset = (p - 1) * size;
-      let query = db.from("foods").select("*", { count: "exact" }).eq("is_active", true);
+      let query = db.from("foods").select("*", { count: "exact" })
+        .eq("is_active", true)
+        .eq("publish_status", "published");
       const filter = buildSearchFilter(q);
-      if (filter) query = query.or(filter.slice(3, -1)); // strip "or=" wrapper -> PostgREST accepts or=()
+      if (filter) query = query.or(filter.slice(4, -1)); // strip "or=(" wrapper -> `.or()` accepts comma-separated clauses
       if (featured) query = query.eq("is_featured", true);
       if (source) query = query.eq("source", source);
       if (categoryCode) {
-        const cat = await db.from("food_categories").select("id").eq("code", categoryCode).maybeSingle();
-        if (cat.error || !cat.data?.id) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-        query = query.eq("category_id", cat.data.id);
+        const code = sanitizeCategoryCode(categoryCode);
+        if (!code) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+        const categories = await db.from("food_categories").select("id").ilike("code", `${code}%`);
+        if (categories.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+        const categoryIds = (categories.data ?? []).map((category) => category.id).filter(Boolean);
+        if (!categoryIds.length) return {
+          items: [],
+          pagination: { page: p, pageSize: size, total: 0, hasMore: false },
+        };
+        query = query.in("category_id", categoryIds);
       }
       const order = sortClause(sort);
       query = query.range(offset, offset + size - 1).order(order.column, { ascending: order.ascending });
@@ -293,7 +314,10 @@ function createFoodRepository({ db }) {
     },
 
     async getFoodById(id) {
-      const result = await db.from("foods").select("*").eq("id", id).maybeSingle();
+      const result = await db.from("foods").select("*")
+        .eq("id", id)
+        .eq("publish_status", "published")
+        .maybeSingle();
       if (result.error) throw new FoodRepositoryError("FOOD_LOOKUP_FAILED");
       if (!result.data) return null;
       const row = result.data;
@@ -327,6 +351,7 @@ function createFoodRepository({ db }) {
       const result = await db.from("foods")
         .select("id,name_zh,name_en,normalized_name,brand_name,calories,protein_g")
         .eq("is_active", true)
+        .eq("publish_status", "published")
         .or(`name_zh.ilike.*${query}*,name_en.ilike.*${query}*,normalized_name.ilike.*${query}*`)
         .order("popularity_score", { ascending: false })
         .limit(Math.min(Math.max(Number(limit) || 8, 1), 10));
@@ -482,5 +507,5 @@ function createFoodRepository({ db }) {
 module.exports = {
   DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, FoodRepositoryError,
   clampPage, clampPageSize, mapFoodRow, mapCategoryRow, mapTagRow, mapImageRow,
-  toCamelNutrition, sanitizeFilterTerm, createFoodRepository,
+  toCamelNutrition, sanitizeFilterTerm, sanitizeCategoryCode, createFoodRepository,
 };

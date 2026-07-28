@@ -26,6 +26,7 @@ const { createFoodImageService, FoodImageError } = require("./food-image-service
 const { createFoodBarcodeService, FoodBarcodeError } = require("./food-barcode-service.cjs");
 const { createFoodAdminService, FoodAdminError } = require("./food-admin-service.cjs");
 const { createHunyuanImageService, HunyuanImageError } = require("./hunyuan-image-service.cjs");
+const { createHunyuanWorkerClient } = require("./hunyuan-worker-client.cjs");
 const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
 
 // Random 5–6 hanzi Chinese nickname generator for default profile seeding.
@@ -98,6 +99,37 @@ function sendJson(res, statusCode, data) {
     ...CORS_HEADERS,
   });
   res.end(JSON.stringify(data));
+}
+
+function mapRepositoryFoodForCatalog(food) {
+  const nutrition = food?.nutritionPer100g ?? {};
+  return {
+    id: food.id,
+    source: food.source,
+    sourceFoodId: food.sourceId,
+    description: food.nameZh || food.nameEn || food.normalizedName || "未命名食物",
+    brandName: food.brandName ?? null,
+    dataType: food.foodForm ?? null,
+    category: food.category?.code ?? null,
+    servingSize: food.servingSize ?? null,
+    servingUnit: food.servingUnit ?? null,
+    caloriesKcalPer100g: nutrition.calories ?? null,
+    proteinGPer100g: nutrition.protein ?? null,
+    carbsGPer100g: nutrition.carbs ?? null,
+    fatGPer100g: nutrition.fat ?? null,
+    imageUrl: food.imageUrl ?? null,
+    image: food.image ?? null,
+    sourceUrl: null,
+  };
+}
+
+function mapRepositoryCatalogResult(result) {
+  return {
+    items: (result?.items ?? []).map(mapRepositoryFoodForCatalog),
+    page: result?.pagination?.page ?? 1,
+    pagination: result?.pagination ?? { page: 1, pageSize: 20, total: 0, hasMore: false },
+    source: "standard_food_v1",
+  };
 }
 
 function readJsonBody(req, maxBytes = MAX_BODY_BYTES) {
@@ -191,6 +223,32 @@ function selectDeepseekModel(value) {
   const model = typeof value === "string" ? value.trim() : "";
   if (!model || model === "deepseek-chat" || model === "deepseek-reasoner") return "deepseek-v4-flash";
   return model;
+}
+
+function createHunyuanGenerationService({ env, aiClient, createWorkerClient = createHunyuanWorkerClient } = {}) {
+  const enabled = String(env?.FOOD_IMAGE_GENERATION_ENABLED ?? "true").toLowerCase() !== "false";
+  if (!enabled) return null;
+  const modelName = env?.HY_IMAGE_MODEL;
+  const size = env?.HY_IMAGE_SIZE || `${env?.HY_IMAGE_WIDTH || 1280}x${env?.HY_IMAGE_HEIGHT || 720}`;
+  const maxRetries = Number(env?.HY_IMAGE_MAX_RETRIES) || 3;
+  const workerEndpoint = typeof env?.HY_IMAGE_WORKER_ENDPOINT === "string" ? env.HY_IMAGE_WORKER_ENDPOINT.trim() : "";
+  if (workerEndpoint) {
+    const worker = createWorkerClient({
+      endpoint: workerEndpoint,
+      sharedSecret: env?.AI_WORKER_SHARED_SECRET,
+      timeoutMs: Number(env?.HY_IMAGE_REQUEST_TIMEOUT_MS) || 300000,
+    });
+    return createHunyuanImageService({
+      modelName,
+      size,
+      maxRetries,
+      generateImageImpl: worker.generateImage,
+    });
+  }
+  if (!aiClient || typeof aiClient.createImageModel !== "function") {
+    throw new Error("CloudBase ai.createImageModel unavailable — check @cloudbase/ai >= 2.30.0");
+  }
+  return createHunyuanImageService({ ai: aiClient, modelName, size, maxRetries });
 }
 
 function downloadImageBuffer(url) {
@@ -295,6 +353,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     env: config.cloudbaseEnvId,
     accessKey: config.cloudbaseApiKey,
   });
+  const workerEndpoint = typeof env.HY_IMAGE_WORKER_ENDPOINT === "string" ? env.HY_IMAGE_WORKER_ENDPOINT.trim() : "";
   // Hunyuan image must use SCF runtime credentials (TENCENTCLOUD_SECRETID/KEY),
   // not CLOUDBASE_APIKEY. node-sdk init() prefers CLOUDBASE_APIKEY from process.env
   // when present — and this function requires that key for RDB — so AI init would
@@ -311,24 +370,34 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     env: config.cloudbaseEnvId,
     timeout: aiTimeoutMs,
   };
-  let aiAuthMode = "scf-ambient";
-  if (explicitSecretId && explicitSecretKey) {
+  let aiAuthMode = workerEndpoint ? "remote-worker" : "scf-ambient";
+  if (!workerEndpoint && explicitSecretId && explicitSecretKey) {
     aiRuntimeInit.secretId = explicitSecretId;
     aiRuntimeInit.secretKey = explicitSecretKey;
     aiAuthMode = "explicit-secret";
   }
   const savedCloudbaseApiKey = process.env.CLOUDBASE_APIKEY;
-  if (aiAuthMode === "scf-ambient") {
-    delete process.env.CLOUDBASE_APIKEY;
-  }
-  let aiRuntime;
-  let aiClient = null;
+  // Storage must always use the function's ambient runtime identity. In remote-worker
+  // mode there is deliberately no local AI client, but generated files still belong in
+  // the primary environment's Storage. The API-key client remains only as a fallback.
+  let storageRuntime = null;
   try {
-    aiRuntime = cloudbaseNode.init(aiRuntimeInit);
-    aiClient = typeof aiRuntime.ai === "function" ? aiRuntime.ai() : aiRuntime.ai;
+    delete process.env.CLOUDBASE_APIKEY;
+    storageRuntime = cloudbaseNode.init(aiRuntimeInit);
+  } catch (error) {
+    console.error("[storage] ambient runtime init failed:", error?.message || error);
   } finally {
-    if (aiAuthMode === "scf-ambient" && savedCloudbaseApiKey !== undefined) {
-      process.env.CLOUDBASE_APIKEY = savedCloudbaseApiKey;
+    if (savedCloudbaseApiKey !== undefined) process.env.CLOUDBASE_APIKEY = savedCloudbaseApiKey;
+  }
+
+  let aiRuntime = null;
+  let aiClient = null;
+  if (!workerEndpoint) {
+    try {
+      aiRuntime = aiAuthMode === "scf-ambient" ? storageRuntime : cloudbaseNode.init(aiRuntimeInit);
+      aiClient = typeof aiRuntime.ai === "function" ? aiRuntime.ai() : aiRuntime.ai;
+    } finally {
+      if (savedCloudbaseApiKey !== undefined) process.env.CLOUDBASE_APIKEY = savedCloudbaseApiKey;
     }
   }
   if (aiAuthMode === "scf-ambient" && (!ambientSecretId || !ambientSecretKey)) {
@@ -418,8 +487,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     storageBucket: env.FOOD_IMAGE_STORAGE_BUCKET || "food-images",
     storagePrefix: env.FOOD_IMAGE_STORAGE_PREFIX || "food-library",
     uploader: async ({ cloudPath, fileContent, contentType }) => {
-      // Prefer runtime-identity upload (same as Hunyuan docs). Fall back to accessKey admin.
-      const clients = [aiRuntime, admin].filter(Boolean);
+      // Prefer primary-environment runtime identity. Remote-worker mode has no local
+      // AI client, but Storage still needs this client rather than API-key-only auth.
+      const clients = [storageRuntime, admin].filter(Boolean);
       let lastError = null;
       for (const client of clients) {
         try {
@@ -463,14 +533,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   let foodImageJobs = null;
   if (hunyuanEnabled) {
     try {
-      if (!aiClient || typeof aiClient.createImageModel !== "function") {
-        throw new Error("CloudBase ai.createImageModel unavailable — check @cloudbase/ai >= 2.30.0");
-      }
-      hunyuanImageService = createHunyuanImageService({
-        ai: aiClient,
-        modelName: env.HY_IMAGE_MODEL,
-        size: env.HY_IMAGE_SIZE || `${env.HY_IMAGE_WIDTH || 1280}x${env.HY_IMAGE_HEIGHT || 720}`,
-        maxRetries: Number(env.HY_IMAGE_MAX_RETRIES) || 3,
+      hunyuanImageService = createHunyuanGenerationService({
+        env,
+        aiClient,
+        createWorkerClient: dependencies.createHunyuanWorkerClient ?? createHunyuanWorkerClient,
       });
     } catch (error) {
       console.error("[hunyuan] init failed:", error?.message || error);
@@ -825,18 +891,29 @@ function createHttpServer({ service }) {
           if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           return sendJson(res, 200, await service.foodAdmin.syncImages(session.sub, foodRoute.foodId));
         }
-        // Legacy USDA-backed catalog routes require USDA_FDC_API_KEY.
-        if (!service.foodCatalog) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-        if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         if (foodRoute.operation === "discover") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           const limit = Number(url.searchParams.get("limit") ?? "10");
-          return sendJson(res, 200, await service.foodCatalog.discover(session.sub, limit));
+          return sendJson(res, 200, mapRepositoryCatalogResult(await service.foodRepository.listFoods({
+            page: 1, pageSize: limit, sort: "recommended",
+          })));
         }
         if (foodRoute.operation === "search") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           const query = url.searchParams.get("query");
           const page = Number(url.searchParams.get("page") ?? "1");
-          return sendJson(res, 200, await service.foodCatalog.search(session.sub, query, page));
+          const categoryCode = url.searchParams.get("category");
+          return sendJson(res, 200, mapRepositoryCatalogResult(await service.foodRepository.listFoods({
+            q: query,
+            categoryCode,
+            page,
+            pageSize: 20,
+            sort: "recommended",
+          })));
         }
+        // Legacy USDA-backed detail route remains available for old cached records.
+        if (!service.foodCatalog) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+        if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         return sendJson(res, 200, await service.foodCatalog.getById(session.sub, foodRoute.foodId));
       } catch (error) {
         if (error instanceof PublicFoodCatalogError) return sendJson(res, 400, { code: error.code });
@@ -1181,6 +1258,7 @@ if (require.main === module) {
 
 module.exports = {
   createHttpServer,
+  createHunyuanGenerationService,
   createRuntimeService,
   readRuntimeConfig,
   selectDeepseekModel,

@@ -31,6 +31,26 @@ export const FOOD_TAGS = [
 export type FoodCategory = (typeof FOOD_CATEGORIES)[number] | string;
 export type FoodTag = (typeof FOOD_TAGS)[number] | string;
 
+export const STANDARD_FOOD_CATEGORY_ROOT_CODES = new Set([
+  "meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables",
+  "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples",
+]);
+
+const STANDARD_CATEGORY_LABELS: Record<string, Exclude<FoodCategory, "全部">> = {
+  meat_poultry: "肉禽",
+  seafood: "鱼虾海鲜",
+  egg_dairy: "蛋类与乳制品",
+  plant_protein: "豆类与植物蛋白",
+  grains_tubers: "谷物与薯类",
+  vegetables: "蔬菜",
+  fruits: "水果",
+  nuts_seeds: "坚果与种子",
+  oils_seasonings: "油脂与调味",
+  beverages: "饮品",
+  basic_processed: "烘焙与基础加工食材",
+  regional_staples: "地域特色常用食材",
+};
+
 /**
  * English USDA search keywords keyed by Chinese category label.
  * Tapping a category must hit USDA/cache search — not filter the tiny discover list.
@@ -83,6 +103,8 @@ function sourceText(food: ProductFoodCatalogItem) {
 
 /** Infer a Chinese category label for USDA/cache items without a server category. */
 export function getFoodCategory(food: ProductFoodCatalogItem): Exclude<FoodCategory, "全部"> {
+  const categoryCode = String(food.category ?? "").split(".")[0];
+  if (STANDARD_CATEGORY_LABELS[categoryCode]) return STANDARD_CATEGORY_LABELS[categoryCode];
   const text = sourceText(food);
   if (
     /(salmon|tuna|fish|shrimp|prawn|crab|seafood|cod|sardine|mackerel|trout|lobster|clam|oyster|scallop|mussel|anchovy)/.test(

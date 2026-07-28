@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { getFoodVisualFallback, resolveFoodVisual } from "./food-visuals";
 
@@ -85,5 +87,28 @@ describe("getFoodVisualFallback", () => {
 
   it("keeps Orange chicken on meat instead of matching fruit orange", () => {
     expect(getFoodVisualFallback({ description: "Orange chicken", imageUrl: null }).tone).toBe("meat");
+  });
+});
+
+describe("standard food category icon coverage", () => {
+  it("assigns a distinct local icon to every standard root category", () => {
+    const page = readFileSync(resolve(import.meta.dirname, "../../pages/food-catalog/index.tsx"), "utf8");
+    const expectedIcons = {
+      meat_poultry: "protein",
+      seafood: "food-fish",
+      egg_dairy: "food-egg",
+      plant_protein: "food-bean",
+      grains_tubers: "carbs",
+      vegetables: "food-carrot",
+      fruits: "food-apple",
+      nuts_seeds: "food-nuts",
+      oils_seasonings: "food-oil",
+      beverages: "food-cup",
+      basic_processed: "food-bread",
+      regional_staples: "food-bowl",
+    } as const;
+    for (const [category, icon] of Object.entries(expectedIcons)) {
+      expect(page).toContain(`${category}: "${icon}"`);
+    }
   });
 });

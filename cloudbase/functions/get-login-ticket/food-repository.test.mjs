@@ -41,7 +41,7 @@ function mockDb(tables = {}) {
           if (op === "in") rows = rows.filter((r) => Array.isArray(val) && val.includes(r[col]));
           if (op === "is") rows = rows.filter((r) => (val ? r[col] != null : r[col] == null));
           if (op === "ilike") {
-            const pat = String(val).replace(/^\*|\*$/g, "").toLowerCase();
+            const pat = String(val).replace(/[\*%]/g, "").toLowerCase();
             rows = rows.filter((r) => String(r[col] ?? "").toLowerCase().includes(pat));
           }
         }
@@ -115,8 +115,8 @@ test("listCategories returns active categories sorted", async () => {
 test("listFoods applies search filter, pagination, and joins", async () => {
   const db = mockDb({
     foods: [
-      { id: "f1", source: "usda", source_id: "1", name_en: "Chicken breast", normalized_name: "chicken breast", calories: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6, is_active: true, popularity_score: 5, category_id: "c1" },
-      { id: "f2", source: "usda", source_id: "2", name_en: "Salmon", normalized_name: "salmon", calories: 206, protein_g: 22, carbs_g: 0, fat_g: 12, is_active: true, popularity_score: 3, category_id: "c2" },
+      { id: "f1", source: "usda", source_id: "1", name_en: "Chicken breast", normalized_name: "chicken breast", calories: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6, is_active: true, publish_status: "published", popularity_score: 5, category_id: "c1" },
+      { id: "f2", source: "usda", source_id: "2", name_en: "Salmon", normalized_name: "salmon", calories: 206, protein_g: 22, carbs_g: 0, fat_g: 12, is_active: true, publish_status: "published", popularity_score: 3, category_id: "c2" },
     ],
     food_categories: [{ id: "c1", code: "meat", name_zh: "肉禽", name_en: "Meat", sort_order: 1, is_active: true }],
     food_tag_relations: [],
@@ -130,6 +130,27 @@ test("listFoods applies search filter, pagination, and joins", async () => {
   assert.equal(result.pagination.pageSize, 10);
 });
 
+test("listFoods expands a standard root category to descendant categories", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-root", name_en: "Chicken breast", category_id: "c-root", is_active: true, publish_status: "published", popularity_score: 3 },
+      { id: "f-leaf", name_en: "Duck breast", category_id: "c-leaf", is_active: true, publish_status: "published", popularity_score: 2 },
+      { id: "f-other", name_en: "Apple", category_id: "c-other", is_active: true, publish_status: "published", popularity_score: 1 },
+    ],
+    food_categories: [
+      { id: "c-root", code: "meat_poultry", name_zh: "肉禽", is_active: true },
+      { id: "c-leaf", code: "meat_poultry.poultry", name_zh: "禽肉", is_active: true },
+      { id: "c-other", code: "fruits", name_zh: "水果", is_active: true },
+    ],
+    food_tag_relations: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+  const result = await repo.listFoods({ categoryCode: "meat_poultry", page: 1, pageSize: 20 });
+  assert.deepEqual(result.items.map((item) => item.id), ["f-root", "f-leaf"]);
+  assert.equal(result.pagination.total, 2);
+});
+
 test("getFoodById returns null when missing", async () => {
   const db = mockDb({ foods: [], food_categories: [], food_tag_relations: [], food_images: [] });
   const repo = createFoodRepository({ db });
@@ -138,7 +159,7 @@ test("getFoodById returns null when missing", async () => {
 
 test("suggestions returns up to limit items", async () => {
   const db = mockDb({ foods: [
-    { id: "f1", name_zh: "鸡胸肉", name_en: "Chicken breast", normalized_name: "chicken breast", brand_name: null, calories: 165, protein_g: 31, is_active: true, popularity_score: 5 },
+    { id: "f1", name_zh: "鸡胸肉", name_en: "Chicken breast", normalized_name: "chicken breast", brand_name: null, calories: 165, protein_g: 31, is_active: true, publish_status: "published", popularity_score: 5 },
   ] });
   const repo = createFoodRepository({ db });
   const s = await repo.suggestions("chicken", 8);
@@ -154,7 +175,7 @@ test("sanitizeFilterTerm strips USDA comma lists so PostgREST or-filters stay va
 
 test("suggestions accepts USDA-style comma queries without throwing", async () => {
   const db = mockDb({ foods: [
-    { id: "f1", name_zh: null, name_en: "Beef", normalized_name: "beef", brand_name: null, calories: 250, protein_g: 26, is_active: true, popularity_score: 3 },
+    { id: "f1", name_zh: null, name_en: "Beef", normalized_name: "beef", brand_name: null, calories: 250, protein_g: 26, is_active: true, publish_status: "published", popularity_score: 3 },
   ] });
   const repo = createFoodRepository({ db });
   const s = await repo.suggestions("Beef, cured, corned beef, canned", 8);

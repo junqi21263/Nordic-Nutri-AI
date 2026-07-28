@@ -16,7 +16,7 @@ import { NordicIcon, type NordicIconName } from "../../components/nordic-icon";
 import { FoodThumbnail } from "../../components/food-thumbnail";
 import {
   FOOD_TAGS,
-  resolveCategorySearchQuery,
+  STANDARD_FOOD_CATEGORY_ROOT_CODES,
   getFoodCategory,
   getFoodTags,
   matchesFoodFilters,
@@ -31,15 +31,26 @@ const numberText = (value: number | null, suffix: string) =>
   value === null ? "—" : `${Math.round(value)}${suffix}`;
 
 const CATEGORY_ICONS: Record<string, NordicIconName> = {
+  meat_poultry: "protein",
   meat: "protein",
   seafood: "food-fish",
+  egg_dairy: "food-egg",
   egg: "food-egg",
   dairy: "food-milk",
+  plant_protein: "food-bean",
   soy: "food-bean",
+  grains_tubers: "carbs",
   grain: "carbs",
+  vegetables: "food-carrot",
   vegetable: "food-carrot",
+  fruits: "food-apple",
   fruit: "food-apple",
+  nuts_seeds: "food-nuts",
+  oils_seasonings: "food-oil",
+  basic_processed: "food-bread",
+  regional_staples: "food-bowl",
   beverage: "food-cup",
+  beverages: "food-cup",
   seasoning: "food-salt",
   mixed_dish: "food-pot",
   other: "utensils",
@@ -51,18 +62,18 @@ const FALLBACK_CATEGORY_CHIPS: Array<{
   code?: string;
   icon: NordicIconName;
 }> = [
-  { label: "肉禽", category: "肉禽", code: "meat", icon: "protein" },
+  { label: "肉禽", category: "肉禽", code: "meat_poultry", icon: "protein" },
   { label: "鱼虾海鲜", category: "鱼虾海鲜", code: "seafood", icon: "food-fish" },
-  { label: "蛋类", category: "蛋类", code: "egg", icon: "food-egg" },
-  { label: "乳制品", category: "乳制品", code: "dairy", icon: "food-milk" },
-  { label: "豆制品", category: "豆制品", code: "soy", icon: "food-bean" },
-  { label: "谷物", category: "谷物", code: "grain", icon: "carbs" },
-  { label: "蔬菜", category: "蔬菜", code: "vegetable", icon: "food-carrot" },
-  { label: "水果", category: "水果", code: "fruit", icon: "food-apple" },
-  { label: "饮料", category: "饮料", code: "beverage", icon: "food-cup" },
-  { label: "调味品", category: "调味品", code: "seasoning", icon: "food-salt" },
-  { label: "混合菜", category: "混合菜", code: "mixed_dish", icon: "food-pot" },
-  { label: "其他", category: "其他", code: "other", icon: "utensils" },
+  { label: "蛋类与乳制品", category: "蛋类与乳制品", code: "egg_dairy", icon: "food-egg" },
+  { label: "豆类与植物蛋白", category: "豆类与植物蛋白", code: "plant_protein", icon: "food-bean" },
+  { label: "谷物与薯类", category: "谷物与薯类", code: "grains_tubers", icon: "carbs" },
+  { label: "蔬菜", category: "蔬菜", code: "vegetables", icon: "food-carrot" },
+  { label: "水果", category: "水果", code: "fruits", icon: "food-apple" },
+  { label: "坚果与种子", category: "坚果与种子", code: "nuts_seeds", icon: "food-nuts" },
+  { label: "油脂与调味", category: "油脂与调味", code: "oils_seasonings", icon: "food-oil" },
+  { label: "饮品", category: "饮品", code: "beverages", icon: "food-cup" },
+  { label: "烘焙与基础加工食材", category: "烘焙与基础加工食材", code: "basic_processed", icon: "food-bread" },
+  { label: "地域特色常用食材", category: "地域特色常用食材", code: "regional_staples", icon: "food-bowl" },
 ];
 
 function suggestionLabel(item: ProductFoodSuggestion) {
@@ -90,7 +101,7 @@ export default function FoodCatalogPage() {
   const categoryChips = useMemo(() => {
     if (!serverCategories.length) return FALLBACK_CATEGORY_CHIPS;
     return serverCategories
-      .filter((category) => category.isActive)
+      .filter((category) => category.isActive && STANDARD_FOOD_CATEGORY_ROOT_CODES.has(category.code))
       .map((category) => ({
         label: category.nameZh,
         category: category.nameZh as FoodCategory,
@@ -178,15 +189,13 @@ export default function FoodCatalogPage() {
       await discover();
       return;
     }
-    // Every category chip queries USDA/cache with a dedicated English keyword set.
-    const keyword = resolveCategorySearchQuery(category, categoryCode);
-    if (!keyword) {
+    if (!categoryCode) {
       await discover();
       return;
     }
     setIsSearching(true);
     try {
-      const result = await searchProductFoodCatalog(keyword);
+      const result = await searchProductFoodCatalog("", 1, { categoryCode });
       setItems(result.items);
       setHasSearched(true);
     } catch {

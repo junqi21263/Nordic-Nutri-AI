@@ -3,11 +3,20 @@ import {
   CATEGORY_SEARCH_BY_CODE,
   CATEGORY_SEARCH_QUERIES,
   FOOD_CATEGORIES,
+  STANDARD_FOOD_CATEGORY_ROOT_CODES,
   getFoodCategory,
   resolveCategorySearchQuery,
 } from "../src/features/food-catalog/food-labels";
 
 describe("category search coverage", () => {
+  it("defines exactly twelve standard root categories", () => {
+    expect(STANDARD_FOOD_CATEGORY_ROOT_CODES.size).toBe(12);
+    expect([...STANDARD_FOOD_CATEGORY_ROOT_CODES]).toEqual([
+      "meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables",
+      "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples",
+    ]);
+  });
+
   it("defines a USDA search query for every Chinese category except 全部", () => {
     for (const category of FOOD_CATEGORIES) {
       if (category === "全部") continue;

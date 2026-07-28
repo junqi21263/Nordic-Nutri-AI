@@ -29,14 +29,15 @@ export interface ProductFoodCatalogItem {
 
 export interface ProductFoodCatalogSearch {
   items: ProductFoodCatalogItem[];
-  source: "cache" | "cache-stale" | "usda_fdc" | "fallback";
+  source: "cache" | "cache-stale" | "usda_fdc" | "fallback" | "standard_food_v1";
   page: number;
+  pagination?: { page: number; pageSize: number; total: number; hasMore: boolean };
   resolvedQuery?: string;
 }
 
 export interface ProductFoodCatalogDiscovery {
   items: ProductFoodCatalogItem[];
-  source: "cache" | "fallback";
+  source: "cache" | "fallback" | "standard_food_v1";
 }
 
 export interface ProductFoodCategory {
@@ -67,9 +68,12 @@ export interface ProductFoodSuggestion {
   protein: number;
 }
 
-export function searchProductFoodCatalog(query: string, page = 1) {
+export function searchProductFoodCatalog(query: string, page = 1, options?: { categoryCode?: string }) {
+  const params = new URLSearchParams({ page: String(page) });
+  if (query.trim()) params.set("query", query.trim());
+  if (options?.categoryCode) params.set("category", options.categoryCode);
   return requestProductApi<ProductFoodCatalogSearch>(
-    `/foods?query=${encodeURIComponent(query)}&page=${page}`,
+    `/foods?${params.toString()}`,
     { method: "GET", fallbackMessage: "食物库暂时不可用，请稍后重试" },
   );
 }
