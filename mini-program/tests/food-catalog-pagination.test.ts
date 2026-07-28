@@ -98,4 +98,30 @@ describe("food catalog pagination and category presentation", () => {
     expect(api).toContain("new URLSearchParams({ page: String(page) })");
     expect(api).toContain("/foods/discover?${params.toString()}");
   });
+
+  it("uses food-name wording and only marks text searches as search results", () => {
+    const page = readFileSync(resolve(sourceRoot, "pages/food-catalog/index.tsx"), "utf8");
+
+    expect(page).toContain('placeholder="搜索食物名称"');
+    expect(page).not.toContain("搜索食物或扫码");
+    expect(page).toContain('setHasSearched(searchQuery.trim().length > 0)');
+  });
+
+  it("keeps the sticky tag rail opaque and clipped over scrolling content", () => {
+    const styles = readFileSync(resolve(sourceRoot, "styles/page.scss"), "utf8");
+    const tagRail = styles.match(/\.food-catalog-rail--tags\s*\{[^}]*\}/s)?.[0] ?? "";
+
+    expect(tagRail).toContain("background: $color-background;");
+    expect(tagRail).toContain("overflow: hidden;");
+    expect(tagRail).toContain("position: sticky;");
+  });
+
+  it("shows an explicit loading state while the catalog is reloading after detail return", () => {
+    const page = readFileSync(resolve(sourceRoot, "pages/food-catalog/index.tsx"), "utf8");
+
+    expect(page).toContain('import { LoadingState } from "../../components/loading-state";');
+    expect(page).toContain("const [isPageLoading, setIsPageLoading] = useState(true);");
+    expect(page).toContain("if (replace) setIsPageLoading(true);");
+    expect(page).toContain("{isPageLoading ? <LoadingState");
+  });
 });

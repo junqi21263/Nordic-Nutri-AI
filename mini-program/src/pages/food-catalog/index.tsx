@@ -14,6 +14,7 @@ import {
 } from "../../api/food-catalog-api";
 import { NordicIcon, type NordicIconName } from "../../components/nordic-icon";
 import { FoodThumbnail } from "../../components/food-thumbnail";
+import { LoadingState } from "../../components/loading-state";
 import {
   FOOD_TAGS,
   STANDARD_FOOD_CATEGORY_ROOT_CODES,
@@ -97,6 +98,7 @@ export default function FoodCatalogPage() {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<ProductFoodCatalogItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
   const [pagination, setPagination] = useState<CatalogPagination>();
   const [categoryFilter, setCategoryFilter] = useState<FoodCategory>("全部");
@@ -150,7 +152,9 @@ export default function FoodCatalogPage() {
   const popularItems = visibleItems;
 
   const discover = async (limit = 20, page = 1) => {
+    const replacingPage = page === 1;
     setIsSearching(true);
+    if (replacingPage) setIsPageLoading(true);
     try {
       const result = await discoverProductFoodCatalog(limit, page);
       setItems((current) => (page === 1 ? result.items : appendCatalogItems(current, result.items)));
@@ -164,6 +168,7 @@ export default function FoodCatalogPage() {
       feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
     } finally {
       setIsSearching(false);
+      if (replacingPage) setIsPageLoading(false);
     }
   };
 
@@ -202,12 +207,13 @@ export default function FoodCatalogPage() {
       loadMoreLockRef.current = true;
     }
     setIsSearching(true);
+    if (replace) setIsPageLoading(true);
     try {
       const result = await searchProductFoodCatalog(searchQuery, page, { categoryCode });
       setItems((current) => (replace ? result.items : appendCatalogItems(current, result.items)));
       setPagination(result.pagination);
       paginationRef.current = result.pagination;
-      setHasSearched(true);
+      setHasSearched(searchQuery.trim().length > 0);
       setActiveCategoryCode(categoryCode);
       catalogQueryRef.current = searchQuery;
       catalogCategoryRef.current = categoryCode;
@@ -215,6 +221,7 @@ export default function FoodCatalogPage() {
       feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
     } finally {
       setIsSearching(false);
+      if (replace) setIsPageLoading(false);
       if (loadingMore) loadMoreLockRef.current = false;
     }
   };
@@ -336,7 +343,7 @@ export default function FoodCatalogPage() {
             value={query}
             maxlength={80}
             confirmType="search"
-            placeholder="搜索食物或扫码"
+            placeholder="搜索食物名称"
             onConfirm={() => void search()}
             onFocus={() => {
               if (suggestions.length) setShowSuggestions(true);
@@ -425,53 +432,57 @@ export default function FoodCatalogPage() {
         </View>
 
         <View className="food-catalog-section">
-          <Text className="food-catalog-section__title">
-            {hasSearched ? "搜索结果" : "热门推荐"}
-          </Text>
-          {popularItems.length ? (
-            <View className="food-catalog-popular">
-              {popularItems.map((food) => (
-                <View className="food-catalog-popular-card" key={food.id} onClick={() => inspect(food)}>
-                  <FoodThumbnail className="food-catalog-popular-card__image" food={food} iconSize={22} />
-                  <View className="food-catalog-popular-card__copy">
-                    <Text className="food-catalog-popular-card__name">{food.description}</Text>
-                    <View className="food-catalog-popular-card__meta">
-                      <Text>{numberText(food.caloriesKcalPer100g, " kcal")}</Text>
-                      <Text>{numberText(food.proteinGPer100g, "g 蛋白")}</Text>
-                      <Text>{numberText(food.carbsGPer100g, "g 碳水")}</Text>
+          {isPageLoading ? <LoadingState label="正在加载食物库…" /> : (
+            <>
+              <Text className="food-catalog-section__title">
+                {hasSearched ? "搜索结果" : "热门推荐"}
+              </Text>
+              {popularItems.length ? (
+                <View className="food-catalog-popular">
+                  {popularItems.map((food) => (
+                    <View className="food-catalog-popular-card" key={food.id} onClick={() => inspect(food)}>
+                      <FoodThumbnail className="food-catalog-popular-card__image" food={food} iconSize={22} />
+                      <View className="food-catalog-popular-card__copy">
+                        <Text className="food-catalog-popular-card__name">{food.description}</Text>
+                        <View className="food-catalog-popular-card__meta">
+                          <Text>{numberText(food.caloriesKcalPer100g, " kcal")}</Text>
+                          <Text>{numberText(food.proteinGPer100g, "g 蛋白")}</Text>
+                          <Text>{numberText(food.carbsGPer100g, "g 碳水")}</Text>
+                        </View>
+                        <View className="food-catalog-item__labels">
+                          <Text className="food-catalog-item__category">{getFoodCategory(food)}</Text>
+                          {getFoodTags(food).slice(0, 2).map((tag) => (
+                            <Text className="food-catalog-item__tag" key={tag}>
+                              {tag}
+                            </Text>
+                          ))}
+                        </View>
+                      </View>
+                      <View
+                        className="food-catalog-popular-card__add"
+                        ariaLabel="快速添加"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          quickAdd(food);
+                        }}
+                      >
+                        <NordicIcon name="circle-plus" size={20} ariaLabel="快速添加" />
+                      </View>
                     </View>
-                    <View className="food-catalog-item__labels">
-                      <Text className="food-catalog-item__category">{getFoodCategory(food)}</Text>
-                      {getFoodTags(food).slice(0, 2).map((tag) => (
-                        <Text className="food-catalog-item__tag" key={tag}>
-                          {tag}
-                        </Text>
-                      ))}
-                    </View>
-                  </View>
-                  <View
-                    className="food-catalog-popular-card__add"
-                    ariaLabel="快速添加"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      quickAdd(food);
-                    }}
-                  >
-                    <NordicIcon name="circle-plus" size={20} ariaLabel="快速添加" />
-                  </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          ) : (
-            <View className="food-catalog-empty">
-              <NordicIcon name="sparkles" size={30} ariaLabel="食物库提示" />
-              <Text className="food-catalog-empty__title">
-                {isSearching ? "正在加载食物库" : "暂未找到匹配食物"}
-              </Text>
-              <Text className="food-catalog-empty__copy">
-                可尝试中文或英文食物名，例如 beef、鸡胸肉、salmon。
-              </Text>
-            </View>
+              ) : (
+                <View className="food-catalog-empty">
+                  <NordicIcon name="sparkles" size={30} ariaLabel="食物库提示" />
+                  <Text className="food-catalog-empty__title">
+                    {isSearching ? "正在加载食物库" : "暂未找到匹配食物"}
+                  </Text>
+                  <Text className="food-catalog-empty__copy">
+                    可尝试中文或英文食物名，例如 beef、鸡胸肉、salmon。
+                  </Text>
+                </View>
+              )}
+            </>
           )}
         </View>
 

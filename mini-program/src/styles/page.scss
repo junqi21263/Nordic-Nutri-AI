@@ -4258,10 +4258,10 @@
   overflow: visible;
 }
 .food-catalog-rail--tags {
-  background: rgba($color-sage, 0.12);
+  background: $color-background;
   border-radius: $radius-full;
   box-shadow: 0 8px 18px rgba($color-dark-forest, 0.06);
-  overflow: visible;
+  overflow: hidden;
   padding: $space-8 0;
   position: sticky;
   top: var(--app-header-height, 0px);
