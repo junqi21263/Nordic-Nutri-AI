@@ -65,6 +65,7 @@ test("importUsda persists foods and a sync job", async () => {
   assert.equal(Object.keys(repo._state.foods).length, 1);
   assert.equal(repo._state.jobs.length, 1);
   assert.equal(repo._state.jobs[0].status, "succeeded");
+  assert.equal(repo._state.foods.f1.nameZh, "鸡肉");
 });
 
 test("importUsda rejects invalid query", async () => {

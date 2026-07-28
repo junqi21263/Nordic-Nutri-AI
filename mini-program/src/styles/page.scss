@@ -4425,8 +4425,9 @@
 .food-catalog-popular-card__add {
   position: static;
   align-self: center;
-  background: $color-forest-green;
-  color: $color-warm-white;
+  background: $color-surface;
+  border: 1px solid rgba($color-forest-green, 0.32);
+  color: $color-forest-green;
   flex-shrink: 0;
 }
 .auth-entry-page__profile {

@@ -317,7 +317,7 @@ test("serves randomized food catalog discovery only through the authenticated pr
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.source, "standard_food_v1");
-    assert.equal(body.items[0].description, "Salmon");
+    assert.equal(body.items[0].description, "三文鱼");
     assert.deepEqual(calls, [{ page: 1, pageSize: 10, sort: "recommended" }]);
   });
 });

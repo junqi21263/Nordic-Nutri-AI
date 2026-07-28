@@ -28,6 +28,7 @@ const { createFoodAdminService, FoodAdminError } = require("./food-admin-service
 const { createHunyuanImageService, HunyuanImageError } = require("./hunyuan-image-service.cjs");
 const { createHunyuanWorkerClient } = require("./hunyuan-worker-client.cjs");
 const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
+const { getFoodDisplayName } = require("./food-display-name.cjs");
 
 // Random 5–6 hanzi Chinese nickname generator for default profile seeding.
 // Mirrors the frontend generator in features/profile/nickname-generator.ts.
@@ -107,7 +108,7 @@ function mapRepositoryFoodForCatalog(food) {
     id: food.id,
     source: food.source,
     sourceFoodId: food.sourceId,
-    description: food.nameZh || food.nameEn || food.normalizedName || "未命名食物",
+    description: getFoodDisplayName(food),
     brandName: food.brandName ?? null,
     dataType: food.foodForm ?? null,
     category: food.category?.code ?? null,

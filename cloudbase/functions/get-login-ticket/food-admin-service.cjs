@@ -3,6 +3,7 @@
 // food, image review, food patch, set-primary-image, missing-images listing,
 // sync-jobs listing. Every method requires an admin userId verified by the
 // repository; callers must also gate at the route layer.
+const { getFoodDisplayName } = require("./food-display-name.cjs");
 
 class FoodAdminError extends Error {
   constructor(code) { super(code); this.code = code; }
@@ -51,11 +52,13 @@ function createFoodAdminService({ repository, usdaService, normalizer, imageServ
                 sugar_g: food.sugar_g,
                 sodium_mg: food.sodium_mg,
               }, { categoryCode });
+              const displayName = getFoodDisplayName({ nameEn: food.name_en, description: food.description });
+              const nameZh = /[\u3400-\u9fff]/u.test(displayName) ? displayName : null;
               const inserted = await repository.upsertFood({
                 source: "usda",
                 sourceId: food.sourceId,
                 fdcId: food.fdcId,
-                nameZh: null,
+                nameZh,
                 nameEn: food.name_en,
                 normalizedName: normalized.normalized_name,
                 brandName: normalized.brand_name,

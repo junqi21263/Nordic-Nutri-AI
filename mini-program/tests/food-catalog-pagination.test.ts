@@ -56,8 +56,13 @@ describe("food catalog pagination and category presentation", () => {
     expect(styles).toContain("border-color: $color-forest-green;");
     expect(styles).toContain("white-space: normal;");
     expect(styles).toContain("word-break: break-all;");
+    expect(styles).toContain(".food-catalog-popular-card__add");
+    expect(styles).toContain("border: 1px solid rgba($color-forest-green, 0.32);");
     expect(styles).not.toMatch(
       /\.food-catalog-category__icon--active\s*\{[^}]*background:\s*\$color-primary-container;/s,
+    );
+    expect(styles).not.toMatch(
+      /\.food-catalog-popular-card__add\s*\{[^}]*background:\s*\$color-forest-green;/s,
     );
   });
 });
