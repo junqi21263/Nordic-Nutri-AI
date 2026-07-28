@@ -90,17 +90,16 @@ describe("P0 / P1 本地体验补全", () => {
     expect(goalAdjust).toContain('className="profile-subpage__page-title"');
   });
 
-  it("将手动记录的主标题置于教练同级的页面顶部", () => {
+  it("保持手动记录页面简洁并保留表单布局", () => {
     const manualMeal = read("pages/manual-meal/index.tsx");
     const styles = read("styles/page.scss");
     const layoutStyles = read("styles/layout.scss");
 
-    const titleStart = manualMeal.indexOf('className="manual-meal__page-title"');
-    const titleEnd = manualMeal.indexOf('className="manual-meal__form"');
-    expect(manualMeal.slice(titleStart, titleEnd)).toContain("补充这一餐");
+    expect(manualMeal).not.toContain("补充这一餐");
+    expect(manualMeal).not.toContain("manual-meal__catalog-link");
+    expect(manualMeal).toContain('className="manual-meal__form"');
     expect(manualMeal).not.toContain('className="manual-meal__intro"');
-    expect(styles).toContain(".manual-meal__page-title");
-    expect(styles).toContain("font-size: $font-h2;");
+    expect(styles).not.toContain(".manual-meal__page-title");
     expect(layoutStyles).toContain(".page-layout--manual-meal .page-layout__content");
     expect(layoutStyles).toContain("page-layout__content");
   });

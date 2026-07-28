@@ -3927,16 +3927,6 @@
   gap: $space-24;
   padding-bottom: 176px;
 }
-.manual-meal__page-title {
-  align-items: center;
-  color: $color-text-primary;
-  display: flex;
-  font-size: $font-h2;
-  font-weight: $font-weight-semibold;
-  justify-content: center;
-  min-height: 48px;
-  position: relative;
-}
 .manual-meal__back {
   align-items: center;
   border: 1px solid $color-divider;
@@ -3947,40 +3937,6 @@
   left: 0;
   position: absolute;
   width: 48px;
-}
-.manual-meal__description {
-  color: $color-text-secondary;
-  font-size: $font-body;
-  margin-top: $space-4;
-}
-.manual-meal__catalog-link {
-  align-items: center;
-  background: rgba($color-sage, 0.24);
-  border: 1px solid rgba($color-forest-green, 0.14);
-  border-radius: $radius-16;
-  color: $color-forest-green;
-  display: flex;
-  justify-content: space-between;
-  padding: $space-16;
-}
-.manual-meal__catalog-link-copy {
-  align-items: center;
-  display: flex;
-  gap: $space-12;
-}
-.manual-meal__catalog-link-copy view {
-  display: flex;
-  flex-direction: column;
-  gap: $space-4;
-}
-.manual-meal__catalog-link-copy text:first-child {
-  color: $color-text-primary;
-  font-size: $font-body;
-  font-weight: $font-weight-semibold;
-}
-.manual-meal__catalog-link-copy text:last-child {
-  color: $color-text-secondary;
-  font-size: $font-caption;
 }
 .manual-meal__form {
   background: $color-surface;
@@ -4504,14 +4460,14 @@
   text-align: center;
 }
 .food-detail-page__hero--wide {
-  border-radius: 0;
-  margin: 0 (-$page-horizontal);
+  border-radius: $radius-16;
+  margin: 0;
 }
 .food-detail-page__hero--wide .food-detail-page__image,
 .food-detail-page__hero--wide .food-thumbnail--fallback {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   height: auto;
-  min-height: 420px;
+  min-height: 0;
 }
 .food-detail-page__identity--split {
   align-items: flex-start;

@@ -117,10 +117,6 @@ export default function FoodDetailPage() {
           <Text>食物详情</Text>
         </View>
 
-        <View className="food-detail-page__hero food-detail-page__hero--wide">
-          <FoodThumbnail className="food-detail-page__image" food={displayedFood} iconSize={40} />
-        </View>
-
         <View className="food-detail-page__identity food-detail-page__identity--split">
           <View>
             <Text className="food-detail-page__name">{displayedFood.description}</Text>
@@ -140,6 +136,10 @@ export default function FoodDetailPage() {
             <Text>{scaleNutrition(displayedFood.caloriesKcalPer100g, 100)}</Text>
             <Text>kcal / 100g</Text>
           </View>
+        </View>
+
+        <View className="food-detail-page__hero food-detail-page__hero--wide">
+          <FoodThumbnail className="food-detail-page__image" food={displayedFood} iconSize={40} prefer="detail" />
         </View>
 
         {variants.length > 1 ? (

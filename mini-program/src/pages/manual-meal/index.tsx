@@ -151,23 +151,6 @@ export default function ManualMealPage() {
       className="page-layout--manual-meal"
     >
       <View className="manual-meal-page">
-        <View className="manual-meal__page-title">
-          <Text>补充这一餐</Text>
-        </View>
-        <Text className="manual-meal__description">不方便拍照时，也能快速把饮食节奏记下来。</Text>
-        <View
-          className="manual-meal__catalog-link"
-          onClick={() => void Taro.navigateTo({ url: "/pages/food-catalog/index" })}
-        >
-          <View className="manual-meal__catalog-link-copy">
-            <NordicIcon name="utensils" size={22} ariaLabel="标准食物库" />
-            <View>
-              <Text>从标准食物库添加</Text>
-              <Text>USDA 标准营养数据会自动回填</Text>
-            </View>
-          </View>
-          <NordicIcon name="chevron-right" size={20} ariaLabel="打开食物库" />
-        </View>
         <View className="manual-meal__form">
           {selectedFood ? (
             <View className="manual-meal__selected-food">
