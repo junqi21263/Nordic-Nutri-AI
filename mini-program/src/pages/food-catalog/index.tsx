@@ -1,5 +1,5 @@
 import { Input, ScrollView, Text, View } from "@tarojs/components";
-import Taro, { useDidShow } from "@tarojs/taro";
+import Taro, { useDidShow, useReachBottom } from "@tarojs/taro";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   discoverProductFoodCatalog,
@@ -23,6 +23,11 @@ import {
   type FoodCategory,
   type FoodTag,
 } from "../../features/food-catalog/food-labels";
+import {
+  appendCatalogItems,
+  canLoadMoreCatalogItems,
+  type CatalogPagination,
+} from "../../features/food-catalog/catalog-pagination";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
@@ -90,6 +95,7 @@ export default function FoodCatalogPage() {
   const [items, setItems] = useState<ProductFoodCatalogItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [pagination, setPagination] = useState<CatalogPagination>();
   const [categoryFilter, setCategoryFilter] = useState<FoodCategory>("全部");
   const [tagFilter, setTagFilter] = useState<FoodTag>("全部");
   const [serverCategories, setServerCategories] = useState<ProductFoodCategory[]>([]);
@@ -97,6 +103,8 @@ export default function FoodCatalogPage() {
   const [suggestions, setSuggestions] = useState<ProductFoodSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionSeq = useRef(0);
+  const catalogQueryRef = useRef("");
+  const catalogCategoryRef = useRef<string | undefined>();
 
   const categoryChips = useMemo(() => {
     if (!serverCategories.length) return FALLBACK_CATEGORY_CHIPS;
@@ -119,7 +127,7 @@ export default function FoodCatalogPage() {
     () => items.filter((food) => matchesFoodFilters(food, categoryFilter, tagFilter)),
     [categoryFilter, items, tagFilter],
   );
-  const popularItems = visibleItems.slice(0, hasSearched ? 20 : 10);
+  const popularItems = hasSearched ? visibleItems : visibleItems.slice(0, 10);
   const recentItems = (recentFoods.length ? recentFoods : visibleItems.slice(0, 3)).slice(0, 6);
 
   const discover = async (limit = 10, isFiltered = false) => {
@@ -127,7 +135,10 @@ export default function FoodCatalogPage() {
     try {
       const result = await discoverProductFoodCatalog(limit);
       setItems(result.items);
+      setPagination(undefined);
       setHasSearched(isFiltered);
+      catalogQueryRef.current = "";
+      catalogCategoryRef.current = undefined;
     } catch {
       feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
     } finally {
@@ -151,6 +162,47 @@ export default function FoodCatalogPage() {
   useDidShow(() => {
     void discover();
     void loadTaxonomy();
+  });
+
+  const loadCatalogPage = async ({
+    query: searchQuery,
+    categoryCode,
+    page,
+    replace,
+  }: {
+    query: string;
+    categoryCode?: string;
+    page: number;
+    replace: boolean;
+  }) => {
+    setIsSearching(true);
+    try {
+      const result = await searchProductFoodCatalog(searchQuery, page, { categoryCode });
+      setItems((current) => (replace ? result.items : appendCatalogItems(current, result.items)));
+      setPagination(result.pagination);
+      setHasSearched(true);
+      catalogQueryRef.current = searchQuery;
+      catalogCategoryRef.current = categoryCode;
+    } catch {
+      feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const loadNextCatalogPage = async () => {
+    const currentPagination = pagination;
+    if (!currentPagination || !canLoadMoreCatalogItems(currentPagination, isSearching)) return;
+    await loadCatalogPage({
+      query: catalogQueryRef.current,
+      categoryCode: catalogCategoryRef.current,
+      page: currentPagination.page + 1,
+      replace: false,
+    });
+  };
+
+  useReachBottom(() => {
+    if (hasSearched) void loadNextCatalogPage();
   });
 
   useEffect(() => {
@@ -193,16 +245,7 @@ export default function FoodCatalogPage() {
       await discover();
       return;
     }
-    setIsSearching(true);
-    try {
-      const result = await searchProductFoodCatalog("", 1, { categoryCode });
-      setItems(result.items);
-      setHasSearched(true);
-    } catch {
-      feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
-    } finally {
-      setIsSearching(false);
-    }
+    await loadCatalogPage({ query: "", categoryCode, page: 1, replace: true });
   };
 
   const search = async (forcedQuery?: string) => {
@@ -211,19 +254,10 @@ export default function FoodCatalogPage() {
       feedback.show({ message: "请输入至少两个字母或汉字", tone: "error" });
       return;
     }
-    setIsSearching(true);
     setShowSuggestions(false);
-    try {
-      const result = await searchProductFoodCatalog(keyword);
-      setItems(result.items);
-      setHasSearched(true);
-      setCategoryFilter("全部");
-      setTagFilter("全部");
-    } catch {
-      feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
-    } finally {
-      setIsSearching(false);
-    }
+    setCategoryFilter("全部");
+    setTagFilter("全部");
+    await loadCatalogPage({ query: keyword, page: 1, replace: true });
   };
 
   const pickSuggestion = (item: ProductFoodSuggestion) => {

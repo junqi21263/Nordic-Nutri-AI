@@ -4297,13 +4297,15 @@
   flex-direction: column;
   flex-shrink: 0;
   gap: $space-8;
-  min-width: 88px;
-  width: 88px;
+  min-width: 112px;
+  width: 112px;
 }
 .food-catalog-category__icon {
   align-items: center;
   background: $color-warm-white;
   border-radius: $radius-full;
+  border: 2px solid transparent;
+  box-sizing: border-box;
   box-shadow: 0 2px 10px rgba($color-dark-forest, 0.04);
   color: $color-text-secondary;
   display: flex;
@@ -4313,19 +4315,21 @@
   width: 88px;
 }
 .food-catalog-category__icon--active {
-  background: $color-primary-container;
-  box-shadow: 0 6px 16px rgba($color-dark-forest, 0.16);
-  color: $color-warm-white;
+  background: $color-warm-white;
+  border-color: $color-forest-green;
+  box-shadow: 0 4px 12px rgba($color-dark-forest, 0.08);
+  color: $color-forest-green;
 }
 .food-catalog-category__label {
   color: $color-text-secondary;
   font-size: $font-overline;
   line-height: 1.2;
-  max-width: 88px;
-  overflow: hidden;
+  max-width: 112px;
+  min-height: 2.4em;
+  overflow: visible;
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-all;
 }
 .food-catalog-category--active .food-catalog-category__label {
   color: $color-forest-green;

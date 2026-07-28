@@ -33,7 +33,7 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("getProductFoodTags");
     expect(page).toContain("getProductFoodSuggestions");
     expect(page).toContain("STANDARD_FOOD_CATEGORY_ROOT_CODES");
-    expect(page).toContain('searchProductFoodCatalog("", 1, { categoryCode })');
+    expect(page).toContain('await loadCatalogPage({ query: "", categoryCode, page: 1, replace: true });');
     expect(page).toContain("searchProductFoodCatalog");
     expect(page).toMatch(/useDidShow\(\(\) => \{\s*void discover\(\);\s*void loadTaxonomy\(\);\s*\}\);/);
     expect(page).toContain("热门推荐");
