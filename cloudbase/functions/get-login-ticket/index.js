@@ -118,6 +118,9 @@ function mapRepositoryFoodForCatalog(food) {
     proteinGPer100g: nutrition.protein ?? null,
     carbsGPer100g: nutrition.carbs ?? null,
     fatGPer100g: nutrition.fat ?? null,
+    foodGroupId: food.foodGroupId ?? null,
+    isPrimaryVariant: food.isPrimaryVariant !== false,
+    variantLabelZh: food.variantLabelZh ?? null,
     imageUrl: food.imageUrl ?? null,
     image: food.image ?? null,
     sourceUrl: null,
@@ -753,6 +756,8 @@ function getFoodRoute(pathname) {
   if (barcodeMatch) return { operation: "barcode", barcode: barcodeMatch[1] };
   const imageSyncMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/images\/sync$/i);
   if (imageSyncMatch) return { operation: "imageSync", foodId: imageSyncMatch[1] };
+  const variantsMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/variants$/i);
+  if (variantsMatch) return { operation: "variants", foodId: variantsMatch[1] };
   if (path === "/foods") return { operation: "search" };
   const match = path.match(/^\/foods\/([0-9a-f-]{36})$/i);
   return match ? { operation: "detail", foodId: match[1] } : null;
@@ -855,6 +860,11 @@ function createHttpServer({ service }) {
           const q = url.searchParams.get("q") ?? url.searchParams.get("query") ?? "";
           const limit = Number(url.searchParams.get("limit") ?? "8");
           return sendJson(res, 200, { items: await service.foodRepository.suggestions(q, limit) });
+        }
+        if (foodRoute.operation === "variants") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const variants = await service.foodRepository.listFoodVariants(foodRoute.foodId);
+          return sendJson(res, 200, { items: variants.map(mapRepositoryFoodForCatalog) });
         }
         if (foodRoute.operation === "barcode") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });

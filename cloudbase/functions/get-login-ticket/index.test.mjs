@@ -322,6 +322,31 @@ test("serves randomized food catalog discovery only through the authenticated pr
   });
 });
 
+test("serves food variants for a catalog item", async () => {
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      foodRepository: {
+        listFoodVariants: async (foodId) => [
+          { id: foodId, description: "牛肉", variantLabelZh: null },
+          { id: "variant-1", description: "牛肉", variantLabelZh: "熟制版本" },
+        ],
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/foods/11111111-1111-4111-8111-111111111111/variants`, {
+      headers: { authorization: "Bearer valid-session" },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).items.map((item) => item.id), [
+      "11111111-1111-4111-8111-111111111111",
+      "variant-1",
+    ]);
+  });
+});
+
 test("updates settings and nutrition plans only for the signed-in user", async () => {
   const calls = [];
   const server = createHttpServer({

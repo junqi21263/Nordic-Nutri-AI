@@ -34,6 +34,19 @@ function toCamelNutrition(row) {
   };
 }
 
+const VARIANT_LABEL_ZH = new Map([
+  ["raw", "生食"], ["cooked", "熟制"], ["boiled", "水煮"],
+  ["baked", "烘烤"], ["roasted", "烤制"], ["fried", "煎炸"],
+  ["grilled", "烧烤"], ["frozen", "冷冻"], ["canned", "罐装"],
+  ["dried", "干制"], ["smoked", "烟熏"],
+]);
+
+function mapVariantLabel(row) {
+  const value = row?.variant_label_zh ?? null;
+  if (!value) return null;
+  return VARIANT_LABEL_ZH.get(String(value).trim().toLowerCase()) ?? value;
+}
+
 function mapFoodRow(row, { category, tags, image } = {}) {
   if (!row?.id) return null;
   return {
@@ -82,6 +95,9 @@ function mapFoodRow(row, { category, tags, image } = {}) {
     imagePolicy: row.image_policy ?? "none",
     imageSubjectZh: row.image_subject_zh ?? null,
     catalogVersion: row.catalog_version ?? null,
+    foodGroupId: row.food_group_id ?? null,
+    isPrimaryVariant: row.is_primary_variant !== false,
+    variantLabelZh: mapVariantLabel(row),
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
   };
@@ -271,7 +287,9 @@ function createFoodRepository({ db }) {
       let regionalPageIds = null;
       let query = db.from("foods").select("*", { count: "exact" })
         .eq("is_active", true)
-        .eq("publish_status", "published");
+        .eq("publish_status", "published")
+        // New imports default to true; grouped variants are backfilled false.
+        .eq("is_primary_variant", true);
       const filter = buildSearchFilter(q);
       if (filter) query = query.or(filter.slice(4, -1)); // strip "or=(" wrapper -> `.or()` accepts comma-separated clauses
       if (featured) query = query.eq("is_featured", true);
@@ -360,6 +378,39 @@ function createFoodRepository({ db }) {
       });
     },
 
+    async listFoodVariants(id) {
+      const selected = await db.from("foods").select("*")
+        .eq("id", id)
+        .eq("is_active", true)
+        .eq("publish_status", "published")
+        .maybeSingle();
+      if (selected.error) throw new FoodRepositoryError("FOOD_LOOKUP_FAILED");
+      if (!selected.data) return [];
+
+      const groupId = selected.data.food_group_id;
+      const result = groupId
+        ? await db.from("foods").select("*")
+          .eq("food_group_id", groupId)
+          .eq("is_active", true)
+          .eq("publish_status", "published")
+          .order("is_primary_variant", { ascending: false })
+        : { data: [selected.data], error: null };
+      if (result.error) throw new FoodRepositoryError("FOOD_VARIANT_LOOKUP_FAILED");
+      const rows = result.data ?? [];
+      const foodIds = rows.map((row) => row.id);
+      const categoryIds = Array.from(new Set(rows.map((row) => row.category_id).filter(Boolean)));
+      const [categoryMap, tagMap, imageMap] = await Promise.all([
+        loadCategoriesByIds(db, categoryIds),
+        loadTagsForFoods(db, foodIds),
+        loadPrimaryImagesForFoods(db, foodIds),
+      ]);
+      return rows.map((row) => mapFoodRow(row, {
+        category: row.category_id ? categoryMap.get(row.category_id) : null,
+        tags: tagMap.get(row.id) ?? [],
+        image: imageMap.get(row.id) ?? null,
+      })).filter(Boolean);
+    },
+
     async getFoodByFdcId(fdcId) {
       const result = await db.from("foods").select("*").eq("fdc_id", fdcId).maybeSingle();
       if (result.error) throw new FoodRepositoryError("FOOD_LOOKUP_FAILED");
@@ -379,6 +430,7 @@ function createFoodRepository({ db }) {
         .select("id,name_zh,name_en,normalized_name,brand_name,calories,protein_g")
         .eq("is_active", true)
         .eq("publish_status", "published")
+        .eq("is_primary_variant", true)
         .or(`name_zh.ilike.*${query}*,name_en.ilike.*${query}*,normalized_name.ilike.*${query}*`)
         .order("popularity_score", { ascending: false })
         .limit(Math.min(Math.max(Number(limit) || 8, 1), 10));

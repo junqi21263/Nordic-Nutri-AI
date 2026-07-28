@@ -47,7 +47,9 @@ describe("food catalog discovery and login profile sync", () => {
     expect(labels).toContain("高蛋白");
     expect(api).toContain("getProductFoodCategories");
     expect(api).toContain("getProductFoodByBarcode");
+    expect(api).toContain("getProductFoodVariants");
     expect(api).toContain("standard_food_v1");
+    expect(detail).toContain("版本选择");
     expect(appConfig).toContain('"pages/food-detail/index"');
   });
 

@@ -37,7 +37,7 @@ function mockDb(tables = {}) {
       async _resolve() {
         let rows = state[this._table] ? [...state[this._table]] : [];
         for (const [op, col, val] of this._filters) {
-          if (op === "eq") rows = rows.filter((r) => r[col] === val);
+          if (op === "eq") rows = rows.filter((r) => col === "is_primary_variant" && r[col] === undefined ? true : r[col] === val);
           if (op === "in") rows = rows.filter((r) => Array.isArray(val) && val.includes(r[col]));
           if (op === "is") rows = rows.filter((r) => (val ? r[col] != null : r[col] == null));
           if (op === "ilike") {
@@ -48,9 +48,17 @@ function mockDb(tables = {}) {
         if (this._or) {
           const clauses = this._or.split(",").map((c) => {
             const m = c.match(/^(\w+)\.ilike\.\*(\w+)\*/);
-            return m ? { col: m[1], val: m[2] } : null;
+            if (m) return { op: "ilike", col: m[1], val: m[2] };
+            const isNull = c.match(/^(\w+)\.is\.null$/);
+            if (isNull) return { op: "isNull", col: isNull[1] };
+            const equals = c.match(/^(\w+)\.eq\.([^,]+)$/);
+            return equals ? { op: "eq", col: equals[1], val: equals[2] } : null;
           }).filter(Boolean);
-          rows = rows.filter((r) => clauses.some((c) => String(r[c.col] ?? "").toLowerCase().includes(c.val)));
+          rows = rows.filter((r) => clauses.some((c) => {
+            if (c.op === "isNull") return r[c.col] == null;
+            if (c.op === "eq") return String(r[c.col]) === c.val;
+            return String(r[c.col] ?? "").toLowerCase().includes(c.val);
+          }));
         }
         if (this._order) rows.sort((a, b) => {
           const av = a[this._order.col], bv = b[this._order.col];
@@ -95,6 +103,22 @@ test("mapFoodRow maps nutrition and flags", () => {
   assert.equal(f.fdcId, 123);
 });
 
+test("mapFoodRow maps food group metadata", () => {
+  const food = mapFoodRow({
+    id: "f1", source: "usda", source_id: "1", normalized_name: "beef",
+    calories: 200, protein_g: 20, carbs_g: 0, fat_g: 10,
+    food_group_id: "g1", is_primary_variant: false, variant_label_zh: "熟制版本",
+  });
+  assert.equal(food.foodGroupId, "g1");
+  assert.equal(food.isPrimaryVariant, false);
+  assert.equal(food.variantLabelZh, "熟制版本");
+});
+
+test("mapFoodRow localizes common variant preparation labels", () => {
+  const food = mapFoodRow({ id: "f1", variant_label_zh: "raw" });
+  assert.equal(food.variantLabelZh, "生食");
+});
+
 test("mapCategoryRow and mapTagRow", () => {
   assert.deepEqual(mapCategoryRow({ id: "c1", code: "meat", name_zh: "肉禽", name_en: "Meat", sort_order: 1, is_active: true }).code, "meat");
   assert.equal(mapTagRow({ id: "t1", code: "high_protein", name_zh: "高蛋白", sort_order: 1, is_active: true }).code, "high_protein");
@@ -128,6 +152,42 @@ test("listFoods applies search filter, pagination, and joins", async () => {
   assert.equal(result.items[0].nameEn, "Chicken breast");
   assert.equal(result.pagination.page, 1);
   assert.equal(result.pagination.pageSize, 10);
+});
+
+test("listFoods hides non-primary food variants while retaining ungrouped foods", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-primary", name_zh: "牛肉", food_group_id: "g-beef", is_primary_variant: true, calories: 176, protein_g: 21, carbs_g: 0, fat_g: 10, is_active: true, publish_status: "published", popularity_score: 5, category_id: "c1" },
+      { id: "f-variant", name_zh: "牛肉", food_group_id: "g-beef", is_primary_variant: false, calories: 291, protein_g: 17, carbs_g: 0, fat_g: 24, is_active: true, publish_status: "published", popularity_score: 4, category_id: "c1" },
+      { id: "f-ungrouped", name_zh: "苹果", food_group_id: null, is_primary_variant: true, calories: 52, protein_g: 0, carbs_g: 14, fat_g: 0, is_active: true, publish_status: "published", popularity_score: 3, category_id: "c2" },
+    ],
+    food_categories: [
+      { id: "c1", code: "meat", name_zh: "肉禽", is_active: true },
+      { id: "c2", code: "fruits", name_zh: "水果", is_active: true },
+    ],
+    food_tag_relations: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+  const result = await repo.listFoods({ page: 1, pageSize: 20 });
+  assert.deepEqual(result.items.map((item) => item.id), ["f-primary", "f-ungrouped"]);
+  assert.equal(result.pagination.total, 2);
+});
+
+test("listFoodVariants returns all published variants in a food group", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-primary", name_zh: "牛肉", food_group_id: "g-beef", is_primary_variant: true, variant_label_zh: null, calories: 176, protein_g: 21, carbs_g: 0, fat_g: 10, is_active: true, publish_status: "published", category_id: "c1" },
+      { id: "f-variant", name_zh: "牛肉", food_group_id: "g-beef", is_primary_variant: false, variant_label_zh: "熟制版本", calories: 291, protein_g: 17, carbs_g: 0, fat_g: 24, is_active: true, publish_status: "published", category_id: "c1" },
+    ],
+    food_categories: [{ id: "c1", code: "meat", name_zh: "肉禽", is_active: true }],
+    food_tag_relations: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+  const variants = await repo.listFoodVariants("f-primary");
+  assert.deepEqual(variants.map((item) => item.id), ["f-primary", "f-variant"]);
+  assert.equal(variants[1].variantLabelZh, "熟制版本");
 });
 
 test("listFoods expands a standard root category to descendant categories", async () => {
@@ -176,7 +236,7 @@ test("getFoodById returns null when missing", async () => {
 
 test("suggestions returns up to limit items", async () => {
   const db = mockDb({ foods: [
-    { id: "f1", name_zh: "鸡胸肉", name_en: "Chicken breast", normalized_name: "chicken breast", brand_name: null, calories: 165, protein_g: 31, is_active: true, publish_status: "published", popularity_score: 5 },
+    { id: "f1", name_zh: "鸡胸肉", name_en: "Chicken breast", normalized_name: "chicken breast", brand_name: null, calories: 165, protein_g: 31, is_primary_variant: true, is_active: true, publish_status: "published", popularity_score: 5 },
   ] });
   const repo = createFoodRepository({ db });
   const s = await repo.suggestions("chicken", 8);
@@ -192,7 +252,7 @@ test("sanitizeFilterTerm strips USDA comma lists so PostgREST or-filters stay va
 
 test("suggestions accepts USDA-style comma queries without throwing", async () => {
   const db = mockDb({ foods: [
-    { id: "f1", name_zh: null, name_en: "Beef", normalized_name: "beef", brand_name: null, calories: 250, protein_g: 26, is_active: true, publish_status: "published", popularity_score: 3 },
+    { id: "f1", name_zh: null, name_en: "Beef", normalized_name: "beef", brand_name: null, calories: 250, protein_g: 26, is_primary_variant: true, is_active: true, publish_status: "published", popularity_score: 3 },
   ] });
   const repo = createFoodRepository({ db });
   const s = await repo.suggestions("Beef, cured, corned beef, canned", 8);

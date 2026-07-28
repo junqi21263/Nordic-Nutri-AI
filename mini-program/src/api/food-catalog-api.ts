@@ -25,6 +25,9 @@ export interface ProductFoodCatalogItem {
   imageUrl: string | null;
   image?: ProductFoodImage | null;
   sourceUrl: string | null;
+  foodGroupId?: string | null;
+  isPrimaryVariant?: boolean;
+  variantLabelZh?: string | null;
 }
 
 export interface ProductFoodCatalogSearch {
@@ -117,5 +120,12 @@ export function getProductFoodByBarcode(barcode: string) {
   return requestProductApi<{ food: unknown; source: string }>(
     `/foods/barcode/${encodeURIComponent(barcode)}`,
     { method: "GET", fallbackMessage: "条码查询暂时不可用，请稍后重试" },
+  );
+}
+
+export function getProductFoodVariants(foodId: string) {
+  return requestProductApi<{ items: ProductFoodCatalogItem[] }>(
+    `/foods/${encodeURIComponent(foodId)}/variants`,
+    { method: "GET", fallbackMessage: "食物版本暂时不可用，请稍后重试" },
   );
 }
