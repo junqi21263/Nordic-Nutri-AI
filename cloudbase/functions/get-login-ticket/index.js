@@ -133,6 +133,15 @@ function mapRepositoryCatalogResult(result) {
   };
 }
 
+function shuffleCatalogItems(items) {
+  const shuffled = [...(items ?? [])];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
 function readJsonBody(req, maxBytes = MAX_BODY_BYTES) {
   return new Promise((resolve, reject) => {
     const contentType = typeof req.headers["content-type"] === "string" ? req.headers["content-type"] : "";
@@ -894,10 +903,15 @@ function createHttpServer({ service }) {
         }
         if (foodRoute.operation === "discover") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
-          const limit = Number(url.searchParams.get("limit") ?? "10");
-          return sendJson(res, 200, mapRepositoryCatalogResult(await service.foodRepository.listFoods({
-            page: 1, pageSize: limit, sort: "recommended",
-          })));
+          const limitValue = Number(url.searchParams.get("limit") ?? "10");
+          const limit = Number.isInteger(limitValue) && limitValue > 0 ? Math.min(limitValue, 50) : 10;
+          const pageValue = Number(url.searchParams.get("page") ?? "1");
+          const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+          const result = mapRepositoryCatalogResult(await service.foodRepository.listFoods({
+            page, pageSize: limit, sort: "recommended",
+          }));
+          result.items = shuffleCatalogItems(result.items);
+          return sendJson(res, 200, result);
         }
         if (foodRoute.operation === "search") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -1264,4 +1278,5 @@ module.exports = {
   readRuntimeConfig,
   selectDeepseekModel,
   requestWechatSession,
+  shuffleCatalogItems,
 };

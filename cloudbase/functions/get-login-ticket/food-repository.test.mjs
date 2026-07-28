@@ -151,6 +151,23 @@ test("listFoods expands a standard root category to descendant categories", asyn
   assert.equal(result.pagination.total, 2);
 });
 
+test("listFoods resolves regional lenses through memberships without changing the primary category", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-salmon", name_en: "Salmon", category_id: "c-seafood", is_active: true, publish_status: "published", popularity_score: 3 },
+      { id: "f-beef", name_en: "Beef", category_id: "c-meat", is_active: true, publish_status: "published", popularity_score: 2 },
+    ],
+    food_region_memberships: [{ food_id: "f-salmon", region_code: "nordic_staples" }],
+    food_categories: [{ id: "c-seafood", code: "seafood", name_zh: "鱼虾海鲜", is_active: true }],
+    food_tag_relations: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+  const result = await repo.listFoods({ categoryCode: "nordic_staples", page: 1, pageSize: 20 });
+  assert.deepEqual(result.items.map((item) => item.id), ["f-salmon"]);
+  assert.equal(result.items[0].category.code, "seafood");
+});
+
 test("getFoodById returns null when missing", async () => {
   const db = mockDb({ foods: [], food_categories: [], food_tag_relations: [], food_images: [] });
   const repo = createFoodRepository({ db });

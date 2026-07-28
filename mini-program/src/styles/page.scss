@@ -4260,7 +4260,12 @@
 .food-catalog-rail--tags {
   background: rgba($color-sage, 0.12);
   border-radius: $radius-full;
+  box-shadow: 0 8px 18px rgba($color-dark-forest, 0.06);
+  overflow: visible;
   padding: $space-8 0;
+  position: sticky;
+  top: var(--app-header-height, 0px);
+  z-index: 20;
 }
 .food-catalog-rail__spacer {
   flex-shrink: 0;

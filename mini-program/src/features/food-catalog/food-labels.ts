@@ -4,17 +4,19 @@ import type { ProductFoodCatalogItem } from "../../api/food-catalog-api";
 export const FOOD_CATEGORIES = [
   "全部",
   "肉禽",
+  "北欧常见食材",
+  "北美常见食材",
   "鱼虾海鲜",
-  "蛋类",
-  "乳制品",
-  "豆制品",
-  "谷物",
+  "蛋类与乳制品",
+  "豆类与植物蛋白",
+  "谷物与薯类",
   "蔬菜",
   "水果",
-  "饮料",
-  "调味品",
-  "混合菜",
-  "其他",
+  "坚果与种子",
+  "油脂与调味",
+  "饮品",
+  "烘焙与基础加工食材",
+  "地域特色常用食材",
 ] as const;
 
 /** Fallback tag labels when the tags API is unavailable. */
@@ -34,6 +36,7 @@ export type FoodTag = (typeof FOOD_TAGS)[number] | string;
 export const STANDARD_FOOD_CATEGORY_ROOT_CODES = new Set([
   "meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables",
   "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples",
+  "nordic_staples", "north_american_staples",
 ]);
 
 const STANDARD_CATEGORY_LABELS: Record<string, Exclude<FoodCategory, "全部">> = {
@@ -49,6 +52,8 @@ const STANDARD_CATEGORY_LABELS: Record<string, Exclude<FoodCategory, "全部">> 
   beverages: "饮品",
   basic_processed: "烘焙与基础加工食材",
   regional_staples: "地域特色常用食材",
+  nordic_staples: "北欧常见食材",
+  north_american_staples: "北美常见食材",
 };
 
 /**
@@ -68,6 +73,16 @@ export const CATEGORY_SEARCH_QUERIES: Record<string, string> = {
   调味品: "olive oil soy sauce honey mustard",
   混合菜: "salad stew soup casserole chili",
   其他: "almonds walnuts peanut butter",
+  "蛋类与乳制品": "egg whole cooked milk greek yogurt cheese",
+  "豆类与植物蛋白": "tofu soybeans chickpeas lentils tempeh",
+  "谷物与薯类": "rice oatmeal bread pasta quinoa potato",
+  坚果与种子: "almonds walnuts peanut seeds",
+  "油脂与调味": "olive oil soy sauce honey mustard",
+  饮品: "orange juice coffee tea almond milk",
+  "烘焙与基础加工食材": "bread flour oats pasta tofu",
+  地域特色常用食材: "salmon rye oats skyr maple syrup",
+  北欧常见食材: "salmon cod herring rye oats skyr lingonberry",
+  北美常见食材: "turkey corn maple syrup peanut butter pecan avocado",
 };
 
 /** Same keywords keyed by server food_categories.code for reliable lookup. */
@@ -88,6 +103,7 @@ export const CATEGORY_SEARCH_BY_CODE: Record<string, string> = {
 
 export function resolveCategorySearchQuery(category: FoodCategory, categoryCode?: string | null) {
   if (category === "全部") return null;
+  if (categoryCode === "nordic_staples" || categoryCode === "north_american_staples") return null;
   if (categoryCode && CATEGORY_SEARCH_BY_CODE[categoryCode]) {
     return CATEGORY_SEARCH_BY_CODE[categoryCode];
   }

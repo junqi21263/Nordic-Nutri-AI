@@ -9,11 +9,12 @@ import {
 } from "../src/features/food-catalog/food-labels";
 
 describe("category search coverage", () => {
-  it("defines exactly twelve standard root categories", () => {
-    expect(STANDARD_FOOD_CATEGORY_ROOT_CODES.size).toBe(12);
+  it("defines standard and regional root categories", () => {
+    expect(STANDARD_FOOD_CATEGORY_ROOT_CODES.size).toBe(14);
     expect([...STANDARD_FOOD_CATEGORY_ROOT_CODES]).toEqual([
       "meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables",
       "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples",
+      "nordic_staples", "north_american_staples",
     ]);
   });
 
@@ -48,6 +49,7 @@ describe("category search coverage", () => {
     expect(resolveCategorySearchQuery("肉禽", "seafood")).toBe(CATEGORY_SEARCH_BY_CODE.seafood);
     expect(resolveCategorySearchQuery("蛋类")).toBe(CATEGORY_SEARCH_QUERIES["蛋类"]);
     expect(resolveCategorySearchQuery("全部")).toBeNull();
+    expect(resolveCategorySearchQuery("北欧常见食材", "nordic_staples")).toBeNull();
   });
 
   it("classifies common foods into the expected categories", () => {

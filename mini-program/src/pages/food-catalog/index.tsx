@@ -54,6 +54,8 @@ const CATEGORY_ICONS: Record<string, NordicIconName> = {
   oils_seasonings: "food-oil",
   basic_processed: "food-bread",
   regional_staples: "food-bowl",
+  nordic_staples: "food-fish",
+  north_american_staples: "food-bowl",
   beverage: "food-cup",
   beverages: "food-cup",
   seasoning: "food-salt",
@@ -67,6 +69,7 @@ const FALLBACK_CATEGORY_CHIPS: Array<{
   code?: string;
   icon: NordicIconName;
 }> = [
+  { label: "全部", category: "全部", code: "all", icon: "sparkles" },
   { label: "肉禽", category: "肉禽", code: "meat_poultry", icon: "protein" },
   { label: "鱼虾海鲜", category: "鱼虾海鲜", code: "seafood", icon: "food-fish" },
   { label: "蛋类与乳制品", category: "蛋类与乳制品", code: "egg_dairy", icon: "food-egg" },
@@ -79,6 +82,8 @@ const FALLBACK_CATEGORY_CHIPS: Array<{
   { label: "饮品", category: "饮品", code: "beverages", icon: "food-cup" },
   { label: "烘焙与基础加工食材", category: "烘焙与基础加工食材", code: "basic_processed", icon: "food-bread" },
   { label: "地域特色常用食材", category: "地域特色常用食材", code: "regional_staples", icon: "food-bowl" },
+  { label: "北欧常见食材", category: "北欧常见食材", code: "nordic_staples", icon: "food-fish" },
+  { label: "北美常见食材", category: "北美常见食材", code: "north_american_staples", icon: "food-bowl" },
 ];
 
 function suggestionLabel(item: ProductFoodSuggestion) {
@@ -88,15 +93,14 @@ function suggestionLabel(item: ProductFoodSuggestion) {
 export default function FoodCatalogPage() {
   const feedback = useFeedbackStore();
   const inspectFood = useFoodSelectionStore((state) => state.inspectFood);
-  const addRecentFood = useFoodSelectionStore((state) => state.addRecentFood);
   const selectFood = useFoodSelectionStore((state) => state.selectFood);
-  const recentFoods = useFoodSelectionStore((state) => state.recentFoods);
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<ProductFoodCatalogItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [pagination, setPagination] = useState<CatalogPagination>();
   const [categoryFilter, setCategoryFilter] = useState<FoodCategory>("全部");
+  const [activeCategoryCode, setActiveCategoryCode] = useState<string | undefined>("all");
   const [tagFilter, setTagFilter] = useState<FoodTag>("全部");
   const [serverCategories, setServerCategories] = useState<ProductFoodCategory[]>([]);
   const [serverTags, setServerTags] = useState<ProductFoodTag[]>([]);
@@ -105,10 +109,11 @@ export default function FoodCatalogPage() {
   const suggestionSeq = useRef(0);
   const catalogQueryRef = useRef("");
   const catalogCategoryRef = useRef<string | undefined>();
+  const paginationRef = useRef<CatalogPagination>();
+  const loadMoreLockRef = useRef(false);
 
   const categoryChips = useMemo(() => {
-    if (!serverCategories.length) return FALLBACK_CATEGORY_CHIPS;
-    return serverCategories
+    const serverChips = serverCategories
       .filter((category) => category.isActive && STANDARD_FOOD_CATEGORY_ROOT_CODES.has(category.code))
       .map((category) => ({
         label: category.nameZh,
@@ -116,6 +121,17 @@ export default function FoodCatalogPage() {
         code: category.code,
         icon: CATEGORY_ICONS[category.code] ?? ("utensils" as NordicIconName),
       }));
+    const byCode = new Map(serverChips.filter((chip) => chip.code).map((chip) => [chip.code, chip]));
+    const merged = FALLBACK_CATEGORY_CHIPS.map((fallback) => byCode.get(fallback.code ?? "") ?? fallback);
+    for (const chip of serverChips) {
+      if (chip.code && !merged.some((item) => item.code === chip.code)) merged.push(chip);
+    }
+    const seenLabels = new Set<string>();
+    return merged.filter((chip) => {
+      if (seenLabels.has(chip.label)) return false;
+      seenLabels.add(chip.label);
+      return true;
+    });
   }, [serverCategories]);
 
   const tagChips = useMemo(() => {
@@ -124,19 +140,24 @@ export default function FoodCatalogPage() {
   }, [serverTags]);
 
   const visibleItems = useMemo(
-    () => items.filter((food) => matchesFoodFilters(food, categoryFilter, tagFilter)),
-    [categoryFilter, items, tagFilter],
+    () => items.filter((food) => matchesFoodFilters(
+      food,
+      activeCategoryCode && activeCategoryCode !== "all" ? "全部" : categoryFilter,
+      tagFilter,
+    )),
+    [activeCategoryCode, categoryFilter, items, tagFilter],
   );
-  const popularItems = hasSearched ? visibleItems : visibleItems.slice(0, 10);
-  const recentItems = (recentFoods.length ? recentFoods : visibleItems.slice(0, 3)).slice(0, 6);
+  const popularItems = visibleItems;
 
-  const discover = async (limit = 10, isFiltered = false) => {
+  const discover = async (limit = 20, page = 1) => {
     setIsSearching(true);
     try {
-      const result = await discoverProductFoodCatalog(limit);
-      setItems(result.items);
-      setPagination(undefined);
-      setHasSearched(isFiltered);
+      const result = await discoverProductFoodCatalog(limit, page);
+      setItems((current) => (page === 1 ? result.items : appendCatalogItems(current, result.items)));
+      setPagination(result.pagination);
+      paginationRef.current = result.pagination;
+      setHasSearched(false);
+      setActiveCategoryCode("all");
       catalogQueryRef.current = "";
       catalogCategoryRef.current = undefined;
     } catch {
@@ -175,24 +196,42 @@ export default function FoodCatalogPage() {
     page: number;
     replace: boolean;
   }) => {
+    const loadingMore = !replace;
+    if (loadingMore) {
+      if (loadMoreLockRef.current) return;
+      loadMoreLockRef.current = true;
+    }
     setIsSearching(true);
     try {
       const result = await searchProductFoodCatalog(searchQuery, page, { categoryCode });
       setItems((current) => (replace ? result.items : appendCatalogItems(current, result.items)));
       setPagination(result.pagination);
+      paginationRef.current = result.pagination;
       setHasSearched(true);
+      setActiveCategoryCode(categoryCode);
       catalogQueryRef.current = searchQuery;
       catalogCategoryRef.current = categoryCode;
     } catch {
       feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
     } finally {
       setIsSearching(false);
+      if (loadingMore) loadMoreLockRef.current = false;
     }
   };
 
   const loadNextCatalogPage = async () => {
-    const currentPagination = pagination;
-    if (!currentPagination || !canLoadMoreCatalogItems(currentPagination, isSearching)) return;
+    const currentPagination = paginationRef.current;
+    if (!currentPagination || !canLoadMoreCatalogItems(currentPagination, loadMoreLockRef.current)) return;
+    if (activeCategoryCode === "all") {
+      if (loadMoreLockRef.current) return;
+      loadMoreLockRef.current = true;
+      try {
+        await discover(20, currentPagination.page + 1);
+      } finally {
+        loadMoreLockRef.current = false;
+      }
+      return;
+    }
     await loadCatalogPage({
       query: catalogQueryRef.current,
       categoryCode: catalogCategoryRef.current,
@@ -202,7 +241,7 @@ export default function FoodCatalogPage() {
   };
 
   useReachBottom(() => {
-    if (hasSearched) void loadNextCatalogPage();
+    if (paginationRef.current?.hasMore) void loadNextCatalogPage();
   });
 
   useEffect(() => {
@@ -238,7 +277,7 @@ export default function FoodCatalogPage() {
     setShowSuggestions(false);
     if (category === "全部") {
       setQuery("");
-      await discover();
+      await discover(20, 1);
       return;
     }
     if (!categoryCode) {
@@ -269,7 +308,6 @@ export default function FoodCatalogPage() {
 
   const inspect = (food: ProductFoodCatalogItem) => {
     inspectFood(food);
-    addRecentFood(food);
     const pages = Taro.getCurrentPages();
     const fromManualMeal =
       pages.length > 1 && pages[pages.length - 2]?.route === "pages/manual-meal/index";
@@ -280,7 +318,6 @@ export default function FoodCatalogPage() {
 
   const quickAdd = (food: ProductFoodCatalogItem) => {
     selectFood(food);
-    addRecentFood(food);
     feedback.show({ message: "已选中，前往手动记录", tone: "success" });
     void Taro.navigateTo({ url: "/pages/manual-meal/index" });
   };
@@ -345,11 +382,12 @@ export default function FoodCatalogPage() {
           >
             <View className="food-catalog-categories__row">
               {categoryChips.map((chip) => {
-                const active = categoryFilter === chip.category;
+                const active = chip.code === activeCategoryCode
+                  || (!chip.code && !activeCategoryCode && categoryFilter === chip.category);
                 return (
                   <View
                     className={`food-catalog-category ${active ? "food-catalog-category--active" : ""}`}
-                    key={chip.label}
+                    key={chip.code ?? chip.label}
                     onClick={() => void updateCategory(chip.category, chip.code)}
                   >
                     <View className={`food-catalog-category__icon ${active ? "food-catalog-category__icon--active" : ""}`}>
@@ -364,42 +402,27 @@ export default function FoodCatalogPage() {
           </ScrollView>
         </View>
 
-        {recentItems.length ? (
-          <View className="food-catalog-section">
-            <Text className="food-catalog-section__title">最近记录</Text>
-            <View className="food-catalog-rail food-catalog-rail--recent">
-              <ScrollView
-                className="food-catalog-recent"
-                scrollX
-                showScrollbar={false}
-                scrollWithAnimation
-              >
-                <View className="food-catalog-recent__row">
-                  {recentItems.map((food) => (
-                    <View className="food-catalog-recent-card" key={food.id} onClick={() => inspect(food)}>
-                      <FoodThumbnail className="food-catalog-recent-card__image" food={food} iconSize={20} />
-                      <Text className="food-catalog-recent-card__name">{food.description}</Text>
-                      <Text className="food-catalog-recent-card__meta">
-                        {numberText(food.caloriesKcalPer100g, " kcal/100g")}
-                      </Text>
-                      <View
-                        className="food-catalog-recent-card__add"
-                        ariaLabel="快速添加"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          quickAdd(food);
-                        }}
-                      >
-                        <NordicIcon name="circle-plus" size={16} ariaLabel="快速添加" />
-                      </View>
-                    </View>
-                  ))}
-                  <View className="food-catalog-rail__spacer food-catalog-rail__spacer--wide" />
+        <View className="food-catalog-rail food-catalog-rail--tags">
+          <ScrollView
+            className="food-catalog-tags"
+            scrollX
+            showScrollbar={false}
+            scrollWithAnimation
+          >
+            <View className="food-catalog-tags__row">
+              {tagChips.map((tag) => (
+                <View
+                  className={`food-catalog-filter ${tagFilter === tag ? "food-catalog-filter--active" : ""}`}
+                  key={tag}
+                  onClick={() => setTagFilter(tag)}
+                >
+                  <Text>{tag}</Text>
                 </View>
-              </ScrollView>
+              ))}
+              <View className="food-catalog-rail__spacer" />
             </View>
-          </View>
-        ) : null}
+          </ScrollView>
+        </View>
 
         <View className="food-catalog-section">
           <Text className="food-catalog-section__title">
@@ -452,27 +475,6 @@ export default function FoodCatalogPage() {
           )}
         </View>
 
-        <View className="food-catalog-rail food-catalog-rail--tags">
-          <ScrollView
-            className="food-catalog-tags"
-            scrollX
-            showScrollbar={false}
-            scrollWithAnimation
-          >
-            <View className="food-catalog-tags__row">
-              {tagChips.map((tag) => (
-                <View
-                  className={`food-catalog-filter ${tagFilter === tag ? "food-catalog-filter--active" : ""}`}
-                  key={tag}
-                  onClick={() => setTagFilter(tag)}
-                >
-                  <Text>{tag}</Text>
-                </View>
-              ))}
-              <View className="food-catalog-rail__spacer" />
-            </View>
-          </ScrollView>
-        </View>
       </View>
     </PageLayout>
   );

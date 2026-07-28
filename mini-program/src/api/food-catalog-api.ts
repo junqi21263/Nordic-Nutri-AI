@@ -38,6 +38,8 @@ export interface ProductFoodCatalogSearch {
 export interface ProductFoodCatalogDiscovery {
   items: ProductFoodCatalogItem[];
   source: "cache" | "fallback" | "standard_food_v1";
+  page: number;
+  pagination?: { page: number; pageSize: number; total: number; hasMore: boolean };
 }
 
 export interface ProductFoodCategory {
@@ -78,12 +80,12 @@ export function searchProductFoodCatalog(query: string, page = 1, options?: { ca
   );
 }
 
-export function discoverProductFoodCatalog(limit?: number) {
-  const query =
-    Number.isInteger(limit) && (limit as number) > 10
-      ? `?limit=${Math.min(limit as number, 100)}`
-      : "";
-  return requestProductApi<ProductFoodCatalogDiscovery>(`/foods/discover${query}`, {
+export function discoverProductFoodCatalog(limit?: number, page = 1) {
+  const params = new URLSearchParams({ page: String(page) });
+  if (Number.isInteger(limit) && (limit as number) > 0) {
+    params.set("limit", String(Math.min(limit as number, 50)));
+  }
+  return requestProductApi<ProductFoodCatalogDiscovery>(`/foods/discover?${params.toString()}`, {
     method: "GET",
     fallbackMessage: "食物库暂时不可用，请稍后重试",
   });

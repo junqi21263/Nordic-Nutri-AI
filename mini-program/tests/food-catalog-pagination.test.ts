@@ -65,4 +65,37 @@ describe("food catalog pagination and category presentation", () => {
       /\.food-catalog-popular-card__add\s*\{[^}]*background:\s*\$color-forest-green;/s,
     );
   });
+
+  it("removes recent records and places sticky tags before the result list", () => {
+    const page = readFileSync(resolve(sourceRoot, "pages/food-catalog/index.tsx"), "utf8");
+    const styles = readFileSync(resolve(sourceRoot, "styles/page.scss"), "utf8");
+    const recentIndex = page.indexOf("最近记录");
+    const tagsIndex = page.indexOf('food-catalog-rail--tags');
+    const resultsIndex = page.indexOf('food-catalog-section__title');
+
+    expect(recentIndex).toBe(-1);
+    expect(page).not.toContain("recentFoods");
+    expect(page).not.toContain("addRecentFood");
+    expect(tagsIndex).toBeGreaterThan(-1);
+    expect(tagsIndex).toBeLessThan(resultsIndex);
+    expect(styles).toContain("position: sticky;");
+    expect(styles).toContain("top: var(--app-header-height, 0px);");
+  });
+
+  it("keeps all, Nordic, and North American category chips in the catalog", () => {
+    const page = readFileSync(resolve(sourceRoot, "pages/food-catalog/index.tsx"), "utf8");
+    expect(page).toContain('label: "全部"');
+    expect(page).toContain('code: "nordic_staples"');
+    expect(page).toContain('code: "north_american_staples"');
+    expect(page).toContain("activeCategoryCode");
+    expect(page).toContain("loadMoreLockRef");
+  });
+
+  it("supports paginated discovery responses for the all category", () => {
+    const api = readFileSync(resolve(sourceRoot, "api/food-catalog-api.ts"), "utf8");
+    expect(api).toContain("pagination?: { page: number; pageSize: number; total: number; hasMore: boolean }");
+    expect(api).toContain("page = 1");
+    expect(api).toContain("new URLSearchParams({ page: String(page) })");
+    expect(api).toContain("/foods/discover?${params.toString()}");
+  });
 });

@@ -192,6 +192,8 @@ function sanitizeCategoryCode(raw) {
   return /^[a-z0-9_]+(?:\.[a-z0-9_]+)*$/.test(value) ? value : "";
 }
 
+const REGIONAL_CATEGORY_CODES = new Set(["nordic_staples", "north_american_staples"]);
+
 function sortClause(sort) {
   switch (sort) {
     case "popular": return { column: "popularity_score", ascending: false };
@@ -265,6 +267,8 @@ function createFoodRepository({ db }) {
       const p = clampPage(page);
       const size = clampPageSize(pageSize);
       const offset = (p - 1) * size;
+      let regionalTotal = null;
+      let regionalPageIds = null;
       let query = db.from("foods").select("*", { count: "exact" })
         .eq("is_active", true)
         .eq("publish_status", "published");
@@ -275,17 +279,40 @@ function createFoodRepository({ db }) {
       if (categoryCode) {
         const code = sanitizeCategoryCode(categoryCode);
         if (!code) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-        const categories = await db.from("food_categories").select("id").ilike("code", `${code}%`);
-        if (categories.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-        const categoryIds = (categories.data ?? []).map((category) => category.id).filter(Boolean);
-        if (!categoryIds.length) return {
-          items: [],
-          pagination: { page: p, pageSize: size, total: 0, hasMore: false },
-        };
-        query = query.in("category_id", categoryIds);
+        if (REGIONAL_CATEGORY_CODES.has(code)) {
+          const memberships = await db.from("food_region_memberships")
+            .select("food_id", { count: "exact" })
+            .eq("region_code", code)
+            .limit(1);
+          if (memberships.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+          regionalTotal = Number(memberships.count ?? 0);
+          const pageMemberships = await db.from("food_region_memberships")
+            .select("food_id")
+            .eq("region_code", code)
+            .order("food_id", { ascending: true })
+            .range(offset, offset + size - 1);
+          if (pageMemberships.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+          regionalPageIds = (pageMemberships.data ?? []).map((row) => row.food_id).filter(Boolean);
+          if (!regionalPageIds.length) return {
+            items: [],
+            pagination: { page: p, pageSize: size, total: regionalTotal, hasMore: false },
+          };
+          query = query.in("id", regionalPageIds);
+        } else {
+          const categories = await db.from("food_categories").select("id").ilike("code", `${code}%`);
+          if (categories.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+          const categoryIds = (categories.data ?? []).map((category) => category.id).filter(Boolean);
+          if (!categoryIds.length) return {
+            items: [],
+            pagination: { page: p, pageSize: size, total: 0, hasMore: false },
+          };
+          query = query.in("category_id", categoryIds);
+        }
       }
       const order = sortClause(sort);
-      query = query.range(offset, offset + size - 1).order(order.column, { ascending: order.ascending });
+      query = query
+        .range(regionalPageIds ? 0 : offset, regionalPageIds ? size - 1 : offset + size - 1)
+        .order(order.column, { ascending: order.ascending });
       const result = await query;
       if (result.error) throw new FoodRepositoryError("FOOD_LIST_FAILED");
       const rows = result.data ?? [];
@@ -306,7 +333,7 @@ function createFoodRepository({ db }) {
         const wanted = new Set(tagCodes);
         items = items.filter((f) => wanted.size === 0 || wanted.size <= f.tags.length && f.tags.some((t) => wanted.has(t.code)));
       }
-      const total = Number(result.count ?? items.length);
+      const total = regionalTotal ?? Number(result.count ?? items.length);
       return {
         items,
         pagination: { page: p, pageSize: size, total, hasMore: offset + size < total },
@@ -507,5 +534,5 @@ function createFoodRepository({ db }) {
 module.exports = {
   DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, FoodRepositoryError,
   clampPage, clampPageSize, mapFoodRow, mapCategoryRow, mapTagRow, mapImageRow,
-  toCamelNutrition, sanitizeFilterTerm, sanitizeCategoryCode, createFoodRepository,
+  toCamelNutrition, sanitizeFilterTerm, sanitizeCategoryCode, REGIONAL_CATEGORY_CODES, createFoodRepository,
 };

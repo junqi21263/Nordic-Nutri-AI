@@ -37,7 +37,7 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("searchProductFoodCatalog");
     expect(page).toMatch(/useDidShow\(\(\) => \{\s*void discover\(\);\s*void loadTaxonomy\(\);\s*\}\);/);
     expect(page).toContain("热门推荐");
-    expect(page).toContain("最近记录");
+    expect(page).not.toContain("最近记录");
     expect(manualMeal).toContain("FoodThumbnail");
     expect(page).toContain("pages/food-detail/index");
     expect(page).toContain("FoodThumbnail");
