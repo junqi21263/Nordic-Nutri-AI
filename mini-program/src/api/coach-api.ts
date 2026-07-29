@@ -35,6 +35,15 @@ export interface ProductCoachBrief {
   quickPrompts: string[];
 }
 
+export interface ProductCoachDailyTip {
+  type: "nutrition_tip" | "food_function" | "food_knowledge";
+  headline: string;
+  content: string;
+  food: { name: string; proteinG: number } | null;
+  source: "deepseek" | "rule_v2";
+  model: string | null;
+}
+
 export type ProductCoachStreamEvent =
   | { type: "delta"; text: string }
   | {
@@ -151,6 +160,21 @@ export function getProductCoachBrief(date: string) {
   return requestProductApi<ProductCoachBrief>(`/coach/brief?date=${encodeURIComponent(date)}`, {
     method: "GET",
     fallbackMessage: "营养教练摘要暂时无法读取，请稍后重试",
+  });
+}
+
+export function getProductCoachDailyTip(date: string) {
+  return requestProductApi<ProductCoachDailyTip>(`/coach/daily-tip?date=${encodeURIComponent(date)}`, {
+    method: "GET",
+    fallbackMessage: "今日营养建议暂时无法读取，请稍后重试",
+  });
+}
+
+export function restartProductCoachConversation() {
+  return requestProductApi<{ conversationId: string; messages: ProductCoachMessage[] }>("/coach/restart", {
+    method: "POST",
+    data: {},
+    fallbackMessage: "重启对话失败，请稍后重试",
   });
 }
 
