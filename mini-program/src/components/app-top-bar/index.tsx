@@ -18,6 +18,9 @@ export interface AppTopBarProps extends PropsWithChildren {
   showDivider?: boolean;
   /** Extra className for custom styling. */
   className?: string;
+  /** Optional compact action rendered on the right side of the brand bar. */
+  rightAction?: string;
+  onRightAction?: () => void;
 }
 
 export function AppTopBar({
@@ -28,6 +31,8 @@ export function AppTopBar({
   transparent = false,
   showDivider = false,
   className = "",
+  rightAction,
+  onRightAction,
   children,
 }: AppTopBarProps) {
   const layout = useSystemLayout();
@@ -71,7 +76,13 @@ export function AppTopBar({
         <View
           className="app-top-bar__side app-top-bar__side--right"
           style={{ width: `${layout.rightInset}px` }}
-        />
+        >
+          {rightAction ? (
+            <View className="app-top-bar__right-action" ariaLabel={rightAction} onClick={onRightAction}>
+              <Text>{rightAction}</Text>
+            </View>
+          ) : null}
+        </View>
       </View>
     </View>
   );

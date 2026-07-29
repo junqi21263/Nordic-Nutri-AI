@@ -50,6 +50,22 @@
 .app-top-bar__btn:active {
   background: rgba($color-forest-green, 0.06);
 }
+.app-top-bar__right-action {
+  align-items: center;
+  border: 1px solid rgba($color-forest-green, 0.18);
+  border-radius: $radius-8;
+  color: $color-forest-green;
+  display: flex;
+  font-size: $font-overline;
+  font-weight: $font-weight-semibold;
+  height: 36px;
+  justify-content: center;
+  padding: 0 $space-8;
+  white-space: nowrap;
+}
+.app-top-bar__right-action:active {
+  background: rgba($color-forest-green, 0.06);
+}
 .app-top-bar__brand {
   align-items: center;
   display: flex;

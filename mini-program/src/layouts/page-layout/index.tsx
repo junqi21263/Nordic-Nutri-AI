@@ -29,6 +29,8 @@ export interface PageLayoutProps extends PropsWithChildren {
   onTopBarBack?: () => void;
   /** Click handler for the top bar home button. */
   onTopBarHome?: () => void;
+  topBarAction?: string;
+  onTopBarAction?: () => void;
   className?: string;
 }
 
@@ -48,6 +50,8 @@ export function PageLayout({
   showHome = false,
   onTopBarBack,
   onTopBarHome,
+  topBarAction,
+  onTopBarAction,
   className,
   children,
 }: PageLayoutProps) {
@@ -87,6 +91,8 @@ export function PageLayout({
           showHome={showHome}
           onBack={onTopBarBack}
           onHome={onTopBarHome}
+          rightAction={topBarAction}
+          onRightAction={onTopBarAction}
         />
       ) : null}
       <View

@@ -1085,6 +1085,27 @@
   font-weight: $font-weight-semibold;
   gap: $space-4;
 }
+.coach-chat__suggestion-actions {
+  align-items: center;
+  display: flex;
+  gap: $space-8;
+}
+.coach-chat__suggestion-refresh {
+  align-items: center;
+  color: $color-forest-green;
+  display: flex;
+  font-size: $font-overline;
+  font-weight: $font-weight-semibold;
+  gap: 3px;
+  padding: $space-4;
+}
+.coach-chat__suggestion-refresh--loading {
+  opacity: 0.5;
+}
+.coach-chat__suggestion-collapse {
+  align-items: center;
+  display: flex;
+}
 .coach-chat__section-toggle {
   align-items: center;
   display: flex;
