@@ -20,7 +20,7 @@ function createDb() {
   const inserts = [];
   const rows = {
     coach_conversations: [{ id: "conversation-1", user_id: "user-1", archived_at: null }],
-    coach_messages: [],
+    coach_messages: [{ id: "old-message", user_id: "user-1", conversation_id: "conversation-1", role: "assistant", content: "历史消息", created_at: "2026-07-20T10:00:00.000Z" }],
   };
   const db = {
     from(table) {
@@ -34,11 +34,19 @@ function createDb() {
         },
         limit(count) { selectedRows = selectedRows.slice(0, count); return chain; },
         select() { return chain; },
+        update(payload) {
+          for (const row of selectedRows) Object.assign(row, payload);
+          return chain;
+        },
         maybeSingle: async () => ({ data: selectedRows[0] ?? null, error: null }),
         then(resolve) { return Promise.resolve({ data: selectedRows, error: null }).then(resolve); },
       };
       return {
         select() { return chain; },
+        update(payload) {
+          for (const row of selectedRows) Object.assign(row, payload);
+          return chain;
+        },
         insert(payload) {
           const values = Array.isArray(payload) ? payload : [payload];
           const created = values.map((value, index) => ({ id: `${table}-${inserts.length + index + 1}`, created_at: `2026-07-20T10:00:0${inserts.length + index}.000Z`, ...value }));
@@ -49,7 +57,7 @@ function createDb() {
       };
     },
   };
-  return { db, inserts };
+  return { db, inserts, rows };
 }
 
 function dependencies(overrides = {}) {
@@ -196,4 +204,39 @@ test("returns record-aware coach quick prompts from authoritative context", asyn
     "今天其余营养怎么搭配？",
   ]);
   assert.equal(brief.remaining.protein, 40);
+});
+
+test("archives the active conversation, creates a new one, and keeps history", async () => {
+  const { db, rows } = createDb();
+  const service = createCoachDataService({ db, ...dependencies(), answer: null });
+
+  const result = await service.restartConversation("user-1");
+
+  assert.equal(result.messages.length, 0);
+  assert.notEqual(result.conversationId, "conversation-1");
+  assert.ok(rows.coach_conversations.find((row) => row.id === "conversation-1").archived_at);
+  assert.ok(rows.coach_messages.find((row) => row.id === "old-message"));
+  assert.equal((await service.getMessages("user-1")).length, 0);
+});
+
+test("returns a daily tip from the server context provider", async () => {
+  const { db } = createDb();
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    answer: null,
+    dailyTip: async ({ date, context }) => ({
+      type: "food_knowledge",
+      headline: "看营养成分表",
+      content: `${date} 的蛋白质缺口是 ${context.daily.remaining.protein}g。`,
+      food: null,
+      source: "rule_v2",
+      model: null,
+    }),
+  });
+
+  const result = await service.getDailyTip("user-1", "2026-07-20");
+
+  assert.equal(result.type, "food_knowledge");
+  assert.match(result.content, /40g/);
 });

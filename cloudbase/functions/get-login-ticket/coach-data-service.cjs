@@ -187,7 +187,7 @@ function takeCompleteSentences(value) {
   return match ? { text: match[1], rest: value.slice(match[1].length) } : { text: "", rest: value };
 }
 
-function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccount, answer, streamAnswer, model = "deepseek-v4-flash" }) {
+function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccount, answer, streamAnswer, dailyTip, model = "deepseek-v4-flash" }) {
   if (!db || typeof db.from !== "function" || typeof getDailySummary !== "function" || typeof getWeeklyReview !== "function" || typeof getAccount !== "function") {
     throw new Error("Coach dependencies are unavailable");
   }
@@ -208,6 +208,20 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       .order("created_at", { ascending: true }).limit(Math.min(50, Math.max(1, limit)));
     if (result.error) throw new Error("Coach messages read failed");
     return (result.data ?? []).map(mapMessage);
+  }
+
+  async function restartConversation(userId) {
+    const current = await db.from("coach_conversations").select("id").eq("user_id", userId).is("archived_at", null)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (current.error) throw new Error("Coach conversation read failed");
+    if (current.data?.id) {
+      const archived = await db.from("coach_conversations").update({ archived_at: new Date().toISOString() })
+        .eq("id", current.data.id).eq("user_id", userId).is("archived_at", null);
+      if (archived.error) throw new Error("Coach conversation archive failed");
+    }
+    const created = await db.from("coach_conversations").insert({ user_id: userId, title: "营养教练" }).select("id").single();
+    if (created.error || !created.data?.id) throw new Error("Coach conversation creation failed");
+    return { conversationId: created.data.id, messages: [] };
   }
 
   async function buildContext(userId, date) {
@@ -343,7 +357,21 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     };
   }
 
-  return { getMessages, sendMessage, streamMessage, getBrief };
+  async function getDailyTip(userId, date) {
+    const safeDate = normalizeDate(date);
+    const context = await buildContext(userId, safeDate);
+    if (typeof dailyTip === "function") return dailyTip({ date: safeDate, context });
+    return {
+      type: "nutrition_tip",
+      headline: "下一餐保持均衡",
+      content: "选择一份优质蛋白、半盘蔬菜和适量主食，让今天的饮食更完整。",
+      food: null,
+      source: "rule_v2",
+      model: null,
+    };
+  }
+
+  return { getMessages, sendMessage, streamMessage, getBrief, restartConversation, getDailyTip };
 }
 
 module.exports = { PublicCoachDataError, createCoachDataService };

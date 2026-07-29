@@ -10,6 +10,7 @@ const { createDeepseekNutritionPlanService } = require("./deepseek-nutrition-pla
 const { createMealDataService, PublicMealDataError } = require("./meal-data-service.cjs");
 const { createInsightDataService } = require("./insight-data-service.cjs");
 const { createDeepseekCoachService, createDeepseekCoachStreamService } = require("./deepseek-coach-service.cjs");
+const { createDailyTipService } = require("./daily-tip-service.cjs");
 const { createCoachDataService, PublicCoachDataError } = require("./coach-data-service.cjs");
 const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-data-service.cjs");
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
@@ -729,6 +730,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       streamAnswer: typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
         ? createDeepseekCoachStreamService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
         : null,
+      dailyTip: createDailyTipService({
+        apiKey: typeof env.DEEPSEEK_API_KEY === "string" ? env.DEEPSEEK_API_KEY : "",
+        model: deepseekModel,
+      }),
     }),
     feedback: createFeedbackDataService({ db }),
     foodCatalog,
@@ -804,6 +809,8 @@ function getCoachRoute(pathname) {
   if (path === "/coach/brief") return "getBrief";
   if (path === "/coach-answer") return "sendMessage";
   if (path === "/coach-answer/stream") return "streamMessage";
+  if (path === "/coach/restart") return "restartConversation";
+  if (path === "/coach/daily-tip") return "getDailyTip";
   return null;
 }
 
@@ -1300,6 +1307,14 @@ function createHttpServer({ service }) {
           const date = url.searchParams.get("date");
           if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
           return sendJson(res, 200, await service.coach.getBrief(session.sub, date));
+        }
+        if (coachOperation === "getDailyTip" && req.method === "GET") {
+          const date = url.searchParams.get("date");
+          if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
+          return sendJson(res, 200, await service.coach.getDailyTip(session.sub, date));
+        }
+        if (coachOperation === "restartConversation" && req.method === "POST") {
+          return sendJson(res, 200, await service.coach.restartConversation(session.sub));
         }
         if (coachOperation === "sendMessage" && req.method === "POST") {
           return sendJson(res, 200, await service.coach.sendMessage(session.sub, await readJsonBody(req)));

@@ -489,6 +489,8 @@ test("reads, writes, and summarizes coach data only for the signed-in user", asy
         getMessages: async (userId) => { calls.push(["read", userId]); return []; },
         sendMessage: async (userId, body) => { calls.push(["write", userId, body]); return { messages: [] }; },
         getBrief: async (userId, date) => { calls.push(["brief", userId, date]); return { date, priority: "protein" }; },
+        restartConversation: async (userId) => { calls.push(["restart", userId]); return { conversationId: "conversation-2", messages: [] }; },
+        getDailyTip: async (userId, date) => { calls.push(["daily-tip", userId, date]); return { type: "food_knowledge", headline: "看营养成分表", content: "先看每份含量。" }; },
       },
     },
   });
@@ -503,10 +505,14 @@ test("reads, writes, and summarizes coach data only for the signed-in user", asy
     })).status, 200);
     assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/brief?date=2026-07-20`, { headers })).status, 200);
     assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/brief?date=2026-07-20`, { method: "POST", headers })).status, 405);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/daily-tip?date=2026-07-20`, { headers })).status, 200);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/daily-tip`, { headers })).status, 400);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/restart`, { method: "POST", headers })).status, 200);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/restart`, { method: "GET", headers })).status, 405);
     assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/brief?date=2026-07-20`)).status, 401);
   });
 
-  assert.deepEqual(calls.map((call) => call.slice(0, 2)), [["read", "user-1"], ["write", "user-1"], ["brief", "user-1"]]);
+  assert.deepEqual(calls.map((call) => call.slice(0, 2)), [["read", "user-1"], ["write", "user-1"], ["brief", "user-1"], ["daily-tip", "user-1"], ["restart", "user-1"]]);
 });
 
 test("streams coach events only for the authenticated product user", async () => {
