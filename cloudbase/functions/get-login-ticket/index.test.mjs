@@ -809,3 +809,23 @@ test("rejecting a batch candidate immediately starts its server-controlled retry
     { op: "retry", userId: "admin-1", jobId: "11111111-2222-4333-8444-555555555555" },
   ]);
 });
+
+test("omits Access-Control-Allow-Origin so CloudBase gateway does not duplicate it", async () => {
+  const server = createHttpServer({ service: null });
+
+  await withServer(server, async (baseUrl) => {
+    const options = await fetch(baseUrl, { method: "OPTIONS" });
+    assert.equal(options.status, 204);
+    assert.equal(options.headers.get("access-control-allow-origin"), null);
+    assert.ok(options.headers.get("access-control-allow-methods"));
+    assert.ok(options.headers.get("access-control-allow-headers"));
+
+    const response = await fetch(baseUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "fresh-code" }),
+    });
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get("access-control-allow-origin"), null);
+  });
+});

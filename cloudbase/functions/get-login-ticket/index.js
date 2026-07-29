@@ -89,8 +89,11 @@ function formulaNutritionPlanFallback(input) {
 
 const MAX_BODY_BYTES = 4096;
 const MAX_VISION_BODY_BYTES = 30 * 1024 * 1024;
+// CloudBase HTTP access already injects Access-Control-Allow-Origin for the
+// request origin. Setting it here as "*" produces duplicate values and browsers
+// reject the response ("The 'Access-Control-Allow-Origin' header contains
+// multiple values '... , *', but only one is allowed").
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
