@@ -823,32 +823,6 @@
   color: $color-success;
   font-weight: $font-weight-semibold;
 }
-.coach-composer {
-  align-items: center;
-  background: $color-surface;
-  border: 1px solid $color-divider;
-  border-radius: $radius-full;
-  display: flex;
-  justify-content: space-between;
-  min-height: 88px;
-  padding: 0 $space-8 0 $space-16;
-}
-.coach-composer__placeholder {
-  color: $color-neutral-gray;
-  font-size: $font-caption;
-}
-.coach-composer__send {
-  align-items: center;
-  background: $color-forest-green;
-  border-radius: $radius-full;
-  color: $color-warm-white;
-  display: flex;
-  font-size: $font-h2;
-  height: 64px;
-  justify-content: center;
-  width: 64px;
-}
-
 // NOVA AI coach: proactive advice with a lightweight local chat experience.
 .coach-chat {
   display: flex;
