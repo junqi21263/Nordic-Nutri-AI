@@ -160,7 +160,7 @@ test("listCategories returns active categories sorted", async () => {
   assert.equal(cats[0].code, "meat");
 });
 
-test("listBatchImageCandidates selects published primary foods without a primary image from one category", async () => {
+test("listBatchImageCandidates selects published primary foods from one category so an additional visual state can be generated", async () => {
   const db = mockDb({
     foods: [
       { id: "f-1", name_zh: "番茄", category_id: "c-vegetables", is_active: true, publish_status: "published", is_primary_variant: true, primary_image_id: null },
@@ -173,8 +173,8 @@ test("listBatchImageCandidates selects published primary foods without a primary
 
   const result = await repo.listBatchImageCandidates({ categoryId: "c-vegetables", count: 20 });
 
-  assert.deepEqual(result.items.map((item) => item.id), ["f-1"]);
-  assert.equal(result.total, 1);
+  assert.deepEqual(result.items.map((item) => item.id), ["f-1", "f-2"]);
+  assert.equal(result.total, 2);
 });
 
 test("listFoods applies search filter, pagination, and joins", async () => {
@@ -229,6 +229,32 @@ test("listFoodVariants returns all published variants in a food group", async ()
   const variants = await repo.listFoodVariants("f-primary");
   assert.deepEqual(variants.map((item) => item.id), ["f-primary", "f-variant"]);
   assert.equal(variants[1].variantLabelZh, "熟制版本");
+});
+
+test("listFoodVariants resolves one shared image per visual state, not per nutrition row", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-primary", name_zh: "鸡胸肉", food_group_id: "g-chicken", image_owner_food_id: "f-primary", visual_profile_key: "raw", is_primary_variant: true, calories: 106, protein_g: 22.5, is_active: true, publish_status: "published", category_id: "c1" },
+      { id: "f-cooked", name_zh: "鸡胸肉", food_group_id: "g-chicken", image_owner_food_id: "f-primary", visual_profile_key: "cooked_plain", is_primary_variant: false, variant_label_zh: "熟制", calories: 165, protein_g: 31, is_active: true, publish_status: "published", category_id: "c1" },
+    ],
+    food_categories: [{ id: "c1", code: "meat", name_zh: "肉禽", is_active: true }],
+    food_tag_relations: [],
+    food_image_visual_profiles: [
+      { id: "profile-raw", food_id: "f-primary", profile_key: "raw", is_default: true },
+      { id: "profile-cooked", food_id: "f-primary", profile_key: "cooked_plain", is_default: false },
+    ],
+    food_images: [
+      { id: "image-raw", food_id: "f-primary", visual_profile_id: "profile-raw", is_primary: true, status: "ready", review_status: "approved", medium_url: "https://images.example/raw.webp", detail_url: "https://images.example/raw-detail.webp" },
+      { id: "image-cooked", food_id: "f-primary", visual_profile_id: "profile-cooked", is_primary: true, status: "ready", review_status: "approved", medium_url: "https://images.example/cooked.webp", detail_url: "https://images.example/cooked-detail.webp" },
+    ],
+  });
+  const repo = createFoodRepository({ db });
+
+  const variants = await repo.listFoodVariants("f-primary");
+
+  assert.equal(variants[0].image.listUrl, "https://images.example/raw.webp");
+  assert.equal(variants[1].image.listUrl, "https://images.example/cooked.webp");
+  assert.equal(variants[1].visualProfileKey, "cooked_plain");
 });
 
 test("listFoods expands a standard root category to descendant categories", async () => {

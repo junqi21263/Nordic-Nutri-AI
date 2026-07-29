@@ -98,6 +98,8 @@ function mapFoodRow(row, { category, tags, image } = {}) {
     imageSubjectZh: row.image_subject_zh ?? null,
     catalogVersion: row.catalog_version ?? null,
     foodGroupId: row.food_group_id ?? null,
+    imageOwnerFoodId: row.image_owner_food_id ?? row.id,
+    visualProfileKey: row.visual_profile_key ?? "standard",
     isPrimaryVariant: row.is_primary_variant !== false,
     variantLabelZh: mapVariantLabel(row),
     createdAt: row.created_at ?? null,
@@ -141,6 +143,7 @@ function mapImageRow(row, { imageUrlResolver } = {}) {
   return {
     id: row.id,
     foodId: row.food_id ?? null,
+    visualProfileId: row.visual_profile_id ?? null,
     imageEntityKey: row.image_entity_key ?? null,
     imageType: row.image_type,
     source,
@@ -260,17 +263,54 @@ async function loadTagsForFoods(db, foodIds) {
   return byFood;
 }
 
-async function loadPrimaryImagesForFoods(db, foodIds, imageUrlResolver) {
-  if (!foodIds.length) return new Map();
-  const result = await db.from("food_images")
-    .select("*")
-    .in("food_id", foodIds)
-    .eq("is_primary", true)
-    .eq("status", "ready");
-  if (result.error) throw new FoodRepositoryError("FOOD_IMAGE_LOOKUP_FAILED");
-  // Only expose approved / ready primaries — pending Hunyuan candidates stay hidden.
-  const rows = (result.data ?? []).filter((r) => !r.review_status || r.review_status === "approved");
-  return new Map(rows.map((r) => [r.food_id, mapImageRow(r, { imageUrlResolver })]));
+async function loadPrimaryImagesForFoods(db, foodsOrIds, imageUrlResolver) {
+  if (!foodsOrIds.length) return new Map();
+  const foods = typeof foodsOrIds[0] === "object"
+    ? foodsOrIds
+    : foodsOrIds.map((id) => ({ id, image_owner_food_id: id, visual_profile_key: "standard" }));
+  const foodIds = foods.map((food) => food.id).filter(Boolean);
+  const ownerIds = Array.from(new Set(foods.map((food) => food.image_owner_food_id || food.id).filter(Boolean)));
+  const profileResult = await db.from("food_image_visual_profiles").select("*").in("food_id", ownerIds);
+  if (profileResult.error) throw new FoodRepositoryError("FOOD_IMAGE_LOOKUP_FAILED");
+
+  const profiles = profileResult.data ?? [];
+  const selectedProfileByFoodId = new Map();
+  for (const food of foods) {
+    const ownerId = food.image_owner_food_id || food.id;
+    const profileKey = food.visual_profile_key || "standard";
+    const candidates = profiles.filter((profile) => profile.food_id === ownerId);
+    const selected = candidates.find((profile) => profile.profile_key === profileKey)
+      || candidates.find((profile) => profile.is_default)
+      || candidates[0];
+    if (selected?.id) selectedProfileByFoodId.set(food.id, selected.id);
+  }
+
+  const profileIds = Array.from(new Set(selectedProfileByFoodId.values()));
+  const profileImages = profileIds.length
+    ? await db.from("food_images").select("*").in("visual_profile_id", profileIds).eq("is_primary", true).eq("status", "ready")
+    : { data: [], error: null };
+  if (profileImages.error) throw new FoodRepositoryError("FOOD_IMAGE_LOOKUP_FAILED");
+  const imageByProfileId = new Map((profileImages.data ?? [])
+    .filter((row) => !row.review_status || row.review_status === "approved")
+    .map((row) => [row.visual_profile_id, mapImageRow(row, { imageUrlResolver })]));
+
+  const mapped = new Map();
+  for (const [foodId, profileId] of selectedProfileByFoodId) {
+    const image = imageByProfileId.get(profileId);
+    if (image) mapped.set(foodId, image);
+  }
+  // Compatibility during migration / for manually uploaded legacy images.
+  const missingIds = foodIds.filter((id) => !mapped.has(id));
+  if (!missingIds.length) return mapped;
+  const legacy = await db.from("food_images").select("*")
+    .in("food_id", missingIds).eq("is_primary", true).eq("status", "ready");
+  if (legacy.error) throw new FoodRepositoryError("FOOD_IMAGE_LOOKUP_FAILED");
+  for (const row of legacy.data ?? []) {
+    if ((!row.review_status || row.review_status === "approved") && !mapped.has(row.food_id)) {
+      mapped.set(row.food_id, mapImageRow(row, { imageUrlResolver }));
+    }
+  }
+  return mapped;
 }
 
 function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
@@ -293,7 +333,6 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
         .eq("is_active", true)
         .eq("publish_status", "published")
         .eq("is_primary_variant", true)
-        .is("primary_image_id", null)
         .order("name_zh", { ascending: true })
         .order("id", { ascending: true })
         .range(0, size - 1);
@@ -368,7 +407,7 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       const [catMap, tagMap, imageMap] = await Promise.all([
         loadCategoriesByIds(db, catIds),
         loadTagsForFoods(db, foodIds),
-        loadPrimaryImagesForFoods(db, foodIds, imageUrlResolver),
+        loadPrimaryImagesForFoods(db, rows, imageUrlResolver),
       ]);
       // Tag filter (AND: food must have all tagCodes).
       let items = rows.map((r) => mapFoodRow(r, {
@@ -398,7 +437,7 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       const [catMap, tagMap, imageMap] = await Promise.all([
         loadCategoriesByIds(db, row.category_id ? [row.category_id] : []),
         loadTagsForFoods(db, [row.id]),
-        loadPrimaryImagesForFoods(db, [row.id], imageUrlResolver),
+        loadPrimaryImagesForFoods(db, [row], imageUrlResolver),
       ]);
       return mapFoodRow(row, {
         category: row.category_id ? catMap.get(row.category_id) : null,
@@ -431,7 +470,7 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       const [categoryMap, tagMap, imageMap] = await Promise.all([
         loadCategoriesByIds(db, categoryIds),
         loadTagsForFoods(db, foodIds),
-        loadPrimaryImagesForFoods(db, foodIds, imageUrlResolver),
+        loadPrimaryImagesForFoods(db, rows, imageUrlResolver),
       ]);
       return rows.map((row) => mapFoodRow(row, {
         category: row.category_id ? categoryMap.get(row.category_id) : null,

@@ -5,6 +5,7 @@
 const crypto = require("node:crypto");
 const { buildFoodImagePrompt } = require("./food-image-prompts.cjs");
 const { createFoodStorageUrlResolver } = require("./food-storage-url-service.cjs");
+const { resolveVisualProfile } = require("./food-image-visual-profile.cjs");
 
 class FoodImageJobError extends Error {
   constructor(code, message) {
@@ -39,6 +40,8 @@ function mapJobRow(row) {
     extraPrompt: row.extra_prompt ?? null,
     cookingMethod: row.cooking_method ?? null,
     servingDescription: row.serving_description ?? null,
+    visualProfileId: row.visual_profile_id ?? null,
+    visualProfileKey: row.visual_profile_key ?? "standard",
     startedAt: row.started_at ?? null,
     finishedAt: row.finished_at ?? null,
     createdBy: row.created_by ?? null,
@@ -94,10 +97,11 @@ function createFoodImageJobService({
     });
   }
 
-  async function findActiveJob(foodId) {
+  async function findActiveJob(foodId, visualProfileId = null) {
     const result = await db.from("food_image_jobs")
       .select("*")
       .eq("food_id", foodId)
+      .eq("visual_profile_id", visualProfileId)
       .in("status", ["pending", "processing"])
       .order("created_at", { ascending: false })
       .limit(1)
@@ -105,23 +109,40 @@ function createFoodImageJobService({
     return result.data ?? null;
   }
 
-  async function foodHasApprovedPrimary(foodId) {
-    const food = await repository.getFoodById(foodId);
-    if (!food?.id) return { food: null, hasPrimary: false };
-    if (food.imageStatus === "ready" && food.primaryImageId) {
-      return { food, hasPrimary: true };
-    }
-    if (food.image && food.image.isFallback === false && (food.image.listUrl || food.image.detailUrl)) {
-      return { food, hasPrimary: true };
-    }
+  async function ensureVisualProfile(food, requestedProfileKey = "auto") {
+    const definition = resolveVisualProfile(food, requestedProfileKey);
+    const ownerFoodId = food.imageOwnerFoodId || food.id;
+    const existing = await db.from("food_image_visual_profiles").select("*")
+      .eq("food_id", ownerFoodId).eq("profile_key", definition.key).maybeSingle();
+    if (existing.error) throw new FoodImageJobError("FOOD_IMAGE_PROFILE_LOOKUP_FAILED");
+    if (existing.data) return { food, profile: existing.data, definition };
+    const currentDefault = await db.from("food_image_visual_profiles").select("id")
+      .eq("food_id", ownerFoodId).eq("is_default", true).maybeSingle();
+    if (currentDefault.error) throw new FoodImageJobError("FOOD_IMAGE_PROFILE_LOOKUP_FAILED");
+    const inserted = await db.from("food_image_visual_profiles").insert({
+      food_id: ownerFoodId,
+      profile_key: definition.key,
+      label_zh: definition.labelZh,
+      prompt_hint: definition.promptHint,
+      // A nutrition variant must never silently replace the canonical default
+      // image. Extra states (for example cooked chicken breast) are additions.
+      is_default: !currentDefault.data && ownerFoodId === food.id && definition.key === (food.visualProfileKey || "standard"),
+      status: "missing",
+    }).select("*").maybeSingle();
+    if (inserted.error || !inserted.data) throw new FoodImageJobError("FOOD_IMAGE_PROFILE_CREATE_FAILED");
+    return { food, profile: inserted.data, definition };
+  }
+
+  async function profileHasApprovedPrimary(profile) {
+    if (profile?.primary_image_id) return true;
     const images = await db.from("food_images")
       .select("id,is_primary,review_status,status")
-      .eq("food_id", foodId)
+      .eq("visual_profile_id", profile.id)
       .eq("is_primary", true)
       .limit(1);
     const primary = images.data?.[0];
     const approved = primary && (primary.review_status === "approved" || primary.status === "ready");
-    return { food, hasPrimary: Boolean(approved) };
+    return Boolean(approved);
   }
 
   async function createJob(userId, {
@@ -133,6 +154,7 @@ function createFoodImageJobService({
     extraPrompt,
     cookingMethod,
     servingDescription,
+    visualProfileKey = "auto",
     deferWorker = false,
   } = {}) {
     await requireAdmin(userId);
@@ -143,13 +165,16 @@ function createFoodImageJobService({
     const usage = await getDailyUsage();
     if (usage >= dailyLimit) throw new FoodImageJobError("HY_IMAGE_DAILY_LIMIT");
 
-    const { food, hasPrimary } = await foodHasApprovedPrimary(foodId);
+    const sourceFood = await repository.getFoodById(foodId);
+    if (!sourceFood) throw new FoodImageJobError("FOOD_NOT_FOUND");
+    const { food, profile, definition } = await ensureVisualProfile(sourceFood, visualProfileKey);
+    const hasPrimary = await profileHasApprovedPrimary(profile);
     if (!food) throw new FoodImageJobError("FOOD_NOT_FOUND");
     if (hasPrimary && !force && jobType !== "regenerate") {
       throw new FoodImageJobError("FOOD_IMAGE_ALREADY_READY");
     }
 
-    const active = await findActiveJob(foodId);
+    const active = await findActiveJob(profile.food_id, profile.id);
     if (active) throw new FoodImageJobError("FOOD_IMAGE_JOB_ACTIVE");
 
     const count = Math.min(Math.max(Number(candidateCount) || candidateDefault, 1), 6);
@@ -160,10 +185,13 @@ function createFoodImageJobService({
       cookingMethod: cookingMethod || (reason?.includes("水煮") ? "水煮" : undefined),
       servingDescription,
       extraPrompt: extraPrompt || (jobType === "regenerate" ? reason : undefined),
+      visualProfileKey: definition.key,
     });
 
     const inserted = await db.from("food_image_jobs").insert({
-      food_id: foodId,
+      food_id: profile.food_id,
+      visual_profile_id: profile.id,
+      visual_profile_key: definition.key,
       job_type: jobType,
       status: "pending",
       prompt,
@@ -180,7 +208,8 @@ function createFoodImageJobService({
 
     if (inserted.error || !inserted.data) throw new FoodImageJobError("FOOD_IMAGE_JOB_CREATE_FAILED");
 
-    await db.from("foods").update({ image_status: "generating" }).eq("id", foodId);
+    await db.from("food_image_visual_profiles").update({ status: "generating" }).eq("id", profile.id);
+    await db.from("foods").update({ image_status: "generating" }).eq("id", profile.food_id);
 
     const job = mapJobRow(inserted.data);
     if (shouldTriggerWorker({ deferWorker }) && typeof triggerWorker === "function") {
@@ -196,6 +225,7 @@ function createFoodImageJobService({
     candidateCount,
     onlyMissing = true,
     force = false,
+    visualProfileKey = "auto",
   } = {}) {
     await requireAdmin(userId);
     const ids = Array.from(new Set((Array.isArray(foodIds) ? foodIds : []).filter(Boolean)));
@@ -209,12 +239,16 @@ function createFoodImageJobService({
     for (const foodId of ids) {
       try {
         if (onlyMissing && !force) {
-          const { hasPrimary } = await foodHasApprovedPrimary(foodId);
+          const food = await repository.getFoodById(foodId);
+          const target = food ? await ensureVisualProfile(food, visualProfileKey) : null;
+          const hasPrimary = target ? await profileHasApprovedPrimary(target.profile) : false;
           if (hasPrimary) { skipped += 1; continue; }
         }
-        const active = await findActiveJob(foodId);
+        const food = await repository.getFoodById(foodId);
+        const target = food ? await ensureVisualProfile(food, visualProfileKey) : null;
+        const active = target ? await findActiveJob(target.profile.food_id, target.profile.id) : null;
         if (active) { skipped += 1; continue; }
-        const job = await createJob(userId, { foodId, candidateCount, force, jobType: "generate" });
+        const job = await createJob(userId, { foodId, candidateCount, force, jobType: "generate", visualProfileKey });
         jobs.push(job);
         created += 1;
       } catch (error) {
@@ -299,6 +333,7 @@ function createFoodImageJobService({
           cookingMethod: row.cooking_method,
           servingDescription: row.serving_description,
           extraPrompt: row.extra_prompt,
+          visualProfileKey: row.visual_profile_key,
         });
         const downloaded = await hunyuan.downloadGeneratedImage(generatedImage.temporaryUrl);
         const persisted = await imageService.persistGeneratedImage({
@@ -319,6 +354,7 @@ function createFoodImageJobService({
         await db.from("food_images").insert({
           id: imageId,
           food_id: food.id,
+          visual_profile_id: row.visual_profile_id,
           image_entity_key: food.imageEntityKey || food.sourceId,
           image_type: "candidate",
           source: "hunyuan",
@@ -366,6 +402,7 @@ function createFoodImageJobService({
         error_code: null,
         error_message: null,
       }).eq("id", row.id);
+      if (row.visual_profile_id) await db.from("food_image_visual_profiles").update({ status: "reviewing" }).eq("id", row.visual_profile_id);
       await db.from("foods").update({ image_status: "reviewing" }).eq("id", food.id);
       return { jobId: row.id, generated, failed: false };
     }
@@ -392,6 +429,7 @@ function createFoodImageJobService({
       error_message: lastCandidateError || "exhausted retries with zero candidates",
       finished_at: new Date().toISOString(),
     }).eq("id", row.id);
+    if (row.visual_profile_id) await db.from("food_image_visual_profiles").update({ status: "failed" }).eq("id", row.visual_profile_id);
     await db.from("foods").update({ image_status: "failed" }).eq("id", food.id);
     return {
       jobId: row.id,
@@ -439,7 +477,10 @@ function createFoodImageJobService({
     const image = imageResult.data;
     if (!image?.food_id) throw new FoodImageJobError("FOOD_IMAGE_NOT_FOUND");
 
-    await db.from("food_images").update({ is_primary: false }).eq("food_id", image.food_id).eq("is_primary", true);
+    const profileId = image.visual_profile_id ?? null;
+    let clearPrimary = db.from("food_images").update({ is_primary: false });
+    clearPrimary = profileId ? clearPrimary.eq("visual_profile_id", profileId) : clearPrimary.eq("food_id", image.food_id);
+    await clearPrimary.eq("is_primary", true);
     await db.from("food_images").update({
       is_primary: true,
       is_verified: true,
@@ -447,11 +488,22 @@ function createFoodImageJobService({
       review_status: "approved",
       image_type: "primary",
     }).eq("id", imageId);
+    if (profileId) {
+      const profileResult = await db.from("food_image_visual_profiles").select("*").eq("id", profileId).maybeSingle();
+      const profile = profileResult.data;
+      await db.from("food_image_visual_profiles").update({ primary_image_id: imageId, status: "ready" }).eq("id", profileId);
+      if (profile?.is_default) await db.from("foods").update({
+        primary_image_id: imageId,
+        image_status: "ready",
+        image_quality_score: image.quality_score == null ? 80 : Number(image.quality_score),
+      }).eq("id", image.food_id);
+    } else {
     await db.from("foods").update({
       primary_image_id: imageId,
       image_status: "ready",
       image_quality_score: image.quality_score == null ? 80 : Number(image.quality_score),
     }).eq("id", image.food_id);
+    }
 
     if (image.job_id) {
       await db.from("food_image_jobs").update({
@@ -465,7 +517,7 @@ function createFoodImageJobService({
         next_retry_at: null,
       }).eq("job_id", image.job_id);
     }
-    return { imageId, foodId: image.food_id, jobId: image.job_id ?? null, approved: true };
+    return { imageId, foodId: image.food_id, jobId: image.job_id ?? null, visualProfileId: profileId, approved: true };
   }
 
   async function rejectImage(userId, imageId, { reason } = {}) {

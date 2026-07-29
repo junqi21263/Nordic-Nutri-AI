@@ -13,6 +13,15 @@ const {
   createFoodImageBatchService,
 } = batchModule;
 
+test("normalizeBatchPayload keeps the requested visual profile for a batch", () => {
+  const payload = normalizeBatchPayload({
+    name: "鸡胸肉熟制图",
+    visualProfileKey: "cooked_plain",
+  });
+  assert.equal(payload.visualProfileKey, "cooked_plain");
+  assert.equal(payload.selection.visualProfileKey, "cooked_plain");
+});
+
 test("normalizeBatchPayload forces one candidate and bounds worker settings", () => {
   const payload = normalizeBatchPayload({
     name: "  首轮样本  ",
@@ -63,6 +72,7 @@ test("normalizeCategoryBatchPayload requires one category and bounds its request
     name: "蔬菜首批",
     concurrency: 2,
     maxAttempts: 3,
+    visualProfileKey: "auto",
   });
 });
 
@@ -93,6 +103,7 @@ test("previewCategory only exposes image-ready candidates selected by the server
     requestedCount: 20,
     selectableCount: 36,
     selectedCount: 2,
+    visualProfileKey: "auto",
     foods: [
       { id: "food-1", nameZh: "番茄" },
       { id: "food-2", nameZh: "西兰花" },

@@ -2,6 +2,7 @@
 // Centralized Hunyuan food-photo prompts. Official API limit: 500 characters.
 
 const MAX_PROMPT_CHARS = 500;
+const { resolveVisualProfile } = require("./food-image-visual-profile.cjs");
 
 const COOKING_HINTS = {
   水煮: "水煮，无焦痕无煎烤无酱汁无油脂",
@@ -101,7 +102,14 @@ function buildFoodImagePromptPlan(input = {}) {
     retryReason ? `根据审核反馈修正：${retryReason}` : "",
   ].filter(Boolean).join("；"), 180);
   const template = resolveFoodPhotoTemplate({ foodNameZh: nameZh, foodNameEn: nameEn, category: cat });
-  const cookingHint = COOKING_HINTS[cook] || (cook ? `${cook}烹饪，保持食材真实可食用` : template.defaultCooking);
+  const visualProfile = resolveVisualProfile({
+    nameZh,
+    nameEn,
+    category: input.category ? { nameZh: input.category } : null,
+    defaultCookingMethod: cook,
+    visualProfileKey: input.visualProfileKey,
+  }, input.visualProfileKey);
+  const cookingHint = COOKING_HINTS[cook] || (cook ? `${cook}烹饪，保持食材真实可食用` : visualProfile.promptHint || template.defaultCooking);
   const plan = {
     template: template.id,
     foodNameZh: nameZh,
@@ -113,6 +121,8 @@ function buildFoodImagePromptPlan(input = {}) {
     negativePrompt: template.negative,
     extraPrompt: extra,
     retryReason: retryReason || null,
+    visualProfileKey: visualProfile.key,
+    visualProfileLabelZh: visualProfile.labelZh,
   };
   plan.prompt = buildFoodImagePrompt(plan);
   return plan;
@@ -133,7 +143,8 @@ function buildFoodImagePrompt(input = {}) {
   const cook = clampText(cookingMethod, 12);
   const serving = clampText(servingDescription, 24);
   const inferred = resolveFoodPhotoTemplate({ foodNameZh: nameZh, foodNameEn: nameEn, category: cat });
-  const cookHint = clampText(input.cookingHint, 120) || COOKING_HINTS[cook] || (cook ? `${cook}烹饪` : inferred.defaultCooking);
+  const visualProfile = resolveVisualProfile({ nameZh, nameEn, category: { nameZh: cat }, defaultCookingMethod: cook, visualProfileKey: input.visualProfileKey }, input.visualProfileKey);
+  const cookHint = clampText(input.cookingHint, 120) || COOKING_HINTS[cook] || (cook ? `${cook}烹饪` : visualProfile.promptHint || inferred.defaultCooking);
   const subject = clampText(input.subject, 120) || inferred.subject;
   const negative = clampText(input.negativePrompt, 160) || inferred.negative;
   const extra = clampText(extraPrompt, 120);

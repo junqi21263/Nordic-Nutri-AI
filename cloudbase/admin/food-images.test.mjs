@@ -51,6 +51,15 @@ test("category-based batch creation replaces manual food and job identifiers", a
   assert.doesNotMatch(source, /autoRun|runAutoWorker|toggleAutoWorker/);
 });
 
+test("batch creation explicitly selects one reusable visual state", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="visualProfileKey"/);
+  assert.match(source, /value="raw">生鲜原料/);
+  assert.match(source, /value="cooked_plain">清淡熟制/);
+  assert.match(source, /visualProfileKey, selectionSource: "category"/);
+  assert.match(source, /视觉状态：/);
+});
+
 test("active batch controls only expose lifecycle actions, not browser-side workers", async () => {
   const source = await pageSource();
   assert.match(source, /id="startBatch"/);

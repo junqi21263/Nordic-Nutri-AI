@@ -4,6 +4,7 @@
 
 const { buildFoodImagePromptPlan } = require("./food-image-prompts.cjs");
 const { getFoodDisplayName } = require("./food-display-name.cjs");
+const { normalizeVisualProfileKey, resolveVisualProfile } = require("./food-image-visual-profile.cjs");
 
 const BATCH_STATUSES = new Set(["draft", "running", "paused", "completed", "completed_with_errors", "cancelled"]);
 const ITEM_STATUSES = new Set(["pending", "generating", "needs_retry", "needs_review", "completed", "failed", "skipped"]);
@@ -44,7 +45,9 @@ function normalizeBatchPayload(input = {}) {
   const name = String(input.name || "未命名图片批次").trim().slice(0, 120);
   if (!name) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_NAME_REQUIRED");
   const selectionMeta = input.selectionMeta && typeof input.selectionMeta === "object" ? input.selectionMeta : {};
+  const visualProfileKey = normalizeVisualProfileKey(input.visualProfileKey || selectionMeta.visualProfileKey);
   const selection = { source: String(input.selectionSource || "manual").slice(0, 40) };
+  selection.visualProfileKey = visualProfileKey;
   if (selection.source === "category" && selectionMeta.categoryId) {
     selection.categoryId = String(selectionMeta.categoryId).trim();
     selection.requestedCount = clampInt(selectionMeta.requestedCount, 20, 1, 100);
@@ -55,6 +58,7 @@ function normalizeBatchPayload(input = {}) {
     candidateCount: 1,
     concurrency: clampInt(input.concurrency, 2, 1, 5),
     maxAttempts: clampInt(input.maxAttempts, 3, 1, 3),
+    visualProfileKey,
     selection,
   };
 }
@@ -70,6 +74,7 @@ function normalizeCategoryBatchPayload(input = {}) {
     name,
     concurrency: clampInt(input.concurrency, 2, 1, 5),
     maxAttempts: clampInt(input.maxAttempts, 3, 1, 3),
+    visualProfileKey: normalizeVisualProfileKey(input.visualProfileKey),
   };
 }
 
@@ -126,6 +131,8 @@ function mapBatchItemRow(row, food = null) {
     errorMessage: row.error_message ?? null,
     lastImageId: row.last_image_id ?? null,
     retryReason: row.retry_reason ?? null,
+    visualProfileKey: row.visual_profile_key ?? row.prompt_plan_json?.visualProfileKey ?? "standard",
+    visualProfileLabelZh: row.visual_profile_label_zh ?? row.prompt_plan_json?.visualProfileLabelZh ?? "默认食材",
     nextRetryAt: row.next_retry_at ?? null,
     food: food ? {
       id: food.id,
@@ -164,6 +171,7 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
       requestedCount: payload.count,
       selectableCount: Number(result.total ?? foods.length),
       selectedCount: foods.length,
+      visualProfileKey: payload.visualProfileKey,
       foods,
     };
   }
@@ -221,16 +229,20 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
 
     for (const foodId of foodIds) {
       const food = await repository.getFoodById(foodId);
-      const isReady = food?.image && food.image.isFallback === false && (food.image.listUrl || food.image.detailUrl);
+      const profile = food ? resolveVisualProfile(food, payload.visualProfileKey) : null;
+      const isReady = Boolean(food?.image && food.image.isFallback === false && (food.image.listUrl || food.image.detailUrl) && profile?.key === (food.visualProfileKey || "standard"));
       const item = {
         batch_id: inserted.data.id,
         food_id: foodId,
+        visual_profile_key: profile?.key || "standard",
+        visual_profile_label_zh: profile?.labelZh || "默认食材",
         status: food && !isReady ? "pending" : "skipped",
         prompt_plan_json: food ? buildFoodImagePromptPlan({
           foodNameZh: food.nameZh,
           foodNameEn: food.nameEn,
           category: food.category?.nameZh || food.category?.code,
           cookingMethod: food.defaultCookingMethod,
+          visualProfileKey: profile?.key,
           servingDescription: food.servingSize ? `${food.servingSize}${food.servingUnit || "g"}` : undefined,
         }) : null,
         error_code: food ? null : "FOOD_NOT_FOUND",
@@ -258,6 +270,7 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
       foodIds: preview.foods.map((food) => food.id),
       concurrency: payload.concurrency,
       maxAttempts: payload.maxAttempts,
+      visualProfileKey: payload.visualProfileKey,
       selectionSource: "category",
       selectionMeta: {
         categoryId: payload.categoryId,
@@ -356,17 +369,18 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
         category: food.category?.nameZh || food.category?.code,
         cookingMethod: food.defaultCookingMethod,
         retryReason: locked.data.retry_reason,
+        visualProfileKey: locked.data.visual_profile_key,
       });
       const job = await jobs.createJob(executionUserId, {
         foodId: food.id, candidateCount: 1, extraPrompt: plan.extraPrompt,
-        cookingMethod: food.defaultCookingMethod, deferWorker: true,
+        cookingMethod: food.defaultCookingMethod, visualProfileKey: locked.data.visual_profile_key, deferWorker: true,
       });
       const processed = await jobs.processQueue(null, { jobId: job.id });
       const result = processed.results?.[0];
       const attempts = Number(locked.data.attempt_count || 0) + 1;
       const status = result?.generated > 0 ? "needs_review" : (attempts >= Number(batch.max_attempts || 3) ? "failed" : "needs_retry");
       await db.from("food_image_batch_items").update({
-        status, job_id: job.id, attempt_count: attempts,
+        status, job_id: job.id, visual_profile_id: job.visualProfileId || null, attempt_count: attempts,
         prompt_plan_json: plan,
         error_code: result?.errorCode || null, error_message: result?.errorMessage || null,
         last_image_id: null,

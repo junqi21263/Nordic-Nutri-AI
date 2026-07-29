@@ -30,6 +30,8 @@ export interface ProductFoodCatalogItem {
   foodGroupId?: string | null;
   isPrimaryVariant?: boolean;
   variantLabelZh?: string | null;
+  imageOwnerFoodId?: string | null;
+  visualProfileKey?: "standard" | "raw" | "cooked_plain" | "fresh" | "dry" | null;
 }
 
 export interface ProductFoodCatalogSearch {
