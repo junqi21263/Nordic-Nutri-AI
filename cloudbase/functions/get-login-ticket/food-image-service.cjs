@@ -2,8 +2,8 @@
 // Food image acquisition: SSRF-safe download from allow-listed hosts, SHA-256
 // content-hash dedup, square crop + thumb/medium/detail WebP generation (via
 // sharp when available; graceful fallback to the original bytes), and upload to
-// CloudBase Storage. The repository persists the resulting CDN URLs; external
-// third-party URLs are never stored as the canonical image.
+// CloudBase Storage. Storage paths are the only canonical image address;
+// display URLs are derived from the active CDN at read time.
 
 const https = require("node:https");
 const crypto = require("node:crypto");
@@ -97,11 +97,12 @@ function loadSharp() {
 
 async function transformImage(buffer, sharp) {
   if (!sharp) {
-    // Fallback: no transform; store original as the detail variant only.
+    // Fallback: no transform; store the original bytes for every display
+    // variant so derived CDN paths remain valid even without sharp.
     return {
       detail: buffer,
-      medium: null,
-      thumb: null,
+      medium: buffer,
+      thumb: buffer,
       original: buffer,
       mime: "image/webp",
       transformed: false,
@@ -130,8 +131,8 @@ async function transformFoodCardImage(buffer, sharp) {
     return {
       original: buffer,
       detail: buffer,
-      list: null,
-      thumb: null,
+      list: buffer,
+      thumb: buffer,
       mime: "image/jpeg",
       transformed: false,
       width: null,
@@ -170,7 +171,7 @@ function createFoodImageService({
 
     /**
      * Persist a Hunyuan (or other) generated buffer into food-library/...
-     * Returns permanent CDN URLs / fileIDs — never the temporary model URL.
+     * Returns permanent Storage paths/fileIDs — never temporary or persisted URLs.
      */
     async persistGeneratedImage({
       buffer,
@@ -199,14 +200,18 @@ function createFoodImageService({
       for (const v of variants) {
         try {
           const result = await uploader({ cloudPath: v.path, fileContent: v.buffer, contentType: v.contentType });
-          uploaded[v.name] = result?.url ?? null;
+          // Ignore uploader URLs deliberately. They may be temporary; the
+          // repository derives stable URLs from storage_path at read time.
+          uploaded[v.name] = null;
           fileIds[v.name] = result?.fileID ?? result?.fileId ?? null;
         } catch {
           uploaded[v.name] = null;
           fileIds[v.name] = null;
         }
       }
-      if (!uploaded.detail && !uploaded.original) throw new FoodImageError("FOOD_IMAGE_UPLOAD_FAILED");
+      if (variants.some((variant) => !fileIds[variant.name])) {
+        throw new FoodImageError("FOOD_IMAGE_UPLOAD_FAILED");
+      }
       return {
         contentHash: sha256(buffer),
         mimeType: transformed.mime,
@@ -215,10 +220,10 @@ function createFoodImageService({
         fileSize: buffer.length,
         storagePath: basePath,
         originalFileId: fileIds.original || fileIds.detail || null,
-        originalUrl: uploaded.original || uploaded.detail || null,
-        thumbUrl: uploaded.thumb || uploaded.list || uploaded.detail || null,
-        mediumUrl: uploaded.list || uploaded.detail || null,
-        detailUrl: uploaded.detail || uploaded.original || null,
+        originalUrl: null,
+        thumbUrl: null,
+        mediumUrl: null,
+        detailUrl: null,
         transformed: transformed.transformed,
       };
     },
@@ -241,12 +246,15 @@ function createFoodImageService({
           const cloudPath = `foods/${entityKey}/${hash}/${v.suffix}.webp`;
           try {
             const result = await uploader({ cloudPath, fileContent: v.buffer, contentType: "image/webp" });
-            uploaded[v.name] = result?.url ?? result?.fileID ?? null;
+            uploaded[v.name] = result?.fileID ?? result?.fileId ?? null;
           } catch (err) {
             // A failed variant should not abort the others.
             uploaded[v.name] = null;
           }
         }
+      }
+      if (variants.some((variant) => !uploaded[variant.name])) {
+        throw new FoodImageError("FOOD_IMAGE_UPLOAD_FAILED");
       }
       return {
         contentHash: hash,
@@ -254,9 +262,9 @@ function createFoodImageService({
         width: transformed.width,
         height: transformed.height,
         fileSize: size,
-        thumbUrl: uploaded.thumb ?? null,
-        mediumUrl: uploaded.medium ?? null,
-        detailUrl: uploaded.detail ?? null,
+        thumbUrl: null,
+        mediumUrl: null,
+        detailUrl: null,
         storagePath: variants.length ? `foods/${entityKey}/${hash}` : null,
         transformed: transformed.transformed,
         sourceUrl: url.toString(),
@@ -283,9 +291,12 @@ function createFoodImageService({
       if (typeof uploader === "function") {
         for (const v of variants) {
           const cloudPath = `foods/${entityKey}/${hash}/${v.suffix}.webp`;
-          try { const r = await uploader({ cloudPath, fileContent: v.buffer, contentType: "image/webp" }); uploaded[v.name] = r?.url ?? r?.fileID ?? null; }
+          try { const r = await uploader({ cloudPath, fileContent: v.buffer, contentType: "image/webp" }); uploaded[v.name] = r?.fileID ?? r?.fileId ?? null; }
           catch { uploaded[v.name] = null; }
         }
+      }
+      if (variants.some((variant) => !uploaded[variant.name])) {
+        throw new FoodImageError("FOOD_IMAGE_UPLOAD_FAILED");
       }
       return {
         contentHash: hash,
@@ -293,9 +304,9 @@ function createFoodImageService({
         width: transformed.width,
         height: transformed.height,
         fileSize: buffer.length,
-        thumbUrl: uploaded.thumb ?? null,
-        mediumUrl: uploaded.medium ?? null,
-        detailUrl: uploaded.detail ?? null,
+        thumbUrl: null,
+        mediumUrl: null,
+        detailUrl: null,
         storagePath: variants.length ? `foods/${entityKey}/${hash}` : null,
         transformed: transformed.transformed,
         uploadedBy: uploadedBy ?? null,

@@ -24,6 +24,7 @@ const pages = [
 
 export default defineAppConfig({
   pages,
+  lazyCodeLoading: "requiredComponents",
   window: {
     navigationStyle: "custom",
     navigationBarBackgroundColor: "#faf9f6",

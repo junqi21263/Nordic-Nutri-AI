@@ -1,7 +1,8 @@
 # Food AI Image Generation (Hunyuan)
 
-Async Hunyuan food-photo pipeline for Nordic Nutri AI. Mini-program clients never
-call image generation — they only load **approved permanent** Storage/CDN URLs.
+Async Hunyuan food-photo pipeline for Nordic Nutri AI. Mini-program clients
+never call image generation. They load **approved image paths resolved to the
+active CDN** by the server.
 
 ## Architecture decisions
 
@@ -49,7 +50,19 @@ food-library/{foodId}/{imageId}/list.webp
 food-library/{foodId}/{imageId}/detail.webp
 ```
 
-Temporary Hunyuan URLs are **never** written to `source_url` / permanent fields.
+`storage_path` is the only canonical image address. `thumbnailUrl`, `listUrl`
+and `detailUrl` are derived at read time from `FOOD_IMAGE_CDN_BASE_URL`;
+temporary Hunyuan URLs and temporary Storage URLs are never written to the
+permanent URL columns.
+
+Current main-environment default CDN:
+
+```text
+https://6c65-lewis-healthy-d4glgqqzv73a5bc10-1420560890.tcb.qcloud.la
+```
+
+If a custom HTTPS domain is added later, replace only
+`FOOD_IMAGE_CDN_BASE_URL`; no image rows or mini-program code need changing.
 
 ## Migration
 
@@ -62,7 +75,8 @@ cloudbase/pg/migrations/0013_food_image_generation.sql
 
 1. Ensure 小程序成长计划 / Token Credits + 生图额度 active for env `lewis-healthy-d4glgqqzv73a5bc10`.
 2. Cloud function timeout ≥ 300s (prefer 900s) for `get-login-ticket`.
-3. Set env vars from `.env.example` (`HY_IMAGE_*`, `FOOD_IMAGE_*`).
+3. Set env vars from `.env.example` (`HY_IMAGE_*`, `FOOD_IMAGE_*`). Set
+   `FOOD_IMAGE_CDN_BASE_URL` to the Storage CDN/custom-domain base URL.
 4. Bump `@cloudbase/node-sdk` ≥ 3.18.3 and redeploy (forces `@cloudbase/ai` ≥ 2.30.0).
 5. Promote admin: `update public.app_users set is_admin = true where id = '<uuid>';`
 6. Optional: timer trigger every 1–5 minutes → `POST .../api/admin/food-image-jobs/worker`.
@@ -92,7 +106,9 @@ Expect `ok: true` and `hasTemporaryUrl: true` (URL is 24h temp — worker still 
 2. `POST /api/admin/food-image-jobs` with `candidateCount: 1`, `cookingMethod: "水煮"`, force true.
 3. `POST .../worker` if async worker did not run.
 4. Approve the candidate.
-5. Confirm DB stores Storage CDN URLs only (no `hy-*.cos` temp host as permanent).
+5. Confirm new image rows have `storage_path`, while `original_url`,
+   `thumb_url`, `medium_url` and `detail_url` remain null; API responses should
+   contain URLs derived from the configured CDN base.
 
 ## Quota dashboard
 

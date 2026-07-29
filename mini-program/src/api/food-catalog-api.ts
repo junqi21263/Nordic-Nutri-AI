@@ -6,6 +6,8 @@ export interface ProductFoodImage {
   detailUrl: string;
   source: string;
   isFallback: boolean;
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface ProductFoodCatalogItem {

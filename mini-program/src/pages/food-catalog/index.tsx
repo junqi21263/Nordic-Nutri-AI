@@ -94,7 +94,6 @@ function suggestionLabel(item: ProductFoodSuggestion) {
 export default function FoodCatalogPage() {
   const feedback = useFeedbackStore();
   const inspectFood = useFoodSelectionStore((state) => state.inspectFood);
-  const selectFood = useFoodSelectionStore((state) => state.selectFood);
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<ProductFoodCatalogItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -323,12 +322,6 @@ export default function FoodCatalogPage() {
     });
   };
 
-  const quickAdd = (food: ProductFoodCatalogItem) => {
-    selectFood(food);
-    feedback.show({ message: "已选中，前往手动记录", tone: "success" });
-    void Taro.navigateTo({ url: "/pages/manual-meal/index" });
-  };
-
   return (
     <PageLayout
       title="食物库"
@@ -460,13 +453,10 @@ export default function FoodCatalogPage() {
                       </View>
                       <View
                         className="food-catalog-popular-card__add"
-                        ariaLabel="快速添加"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          quickAdd(food);
-                        }}
+                        ariaLabel="查看食物详情"
+                        onClick={() => inspect(food)}
                       >
-                        <NordicIcon name="circle-plus" size={20} ariaLabel="快速添加" />
+                        <NordicIcon name="chevron-right" size={20} ariaLabel="查看食物详情" />
                       </View>
                     </View>
                   ))}

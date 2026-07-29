@@ -13,7 +13,7 @@ contracts backward-compatible.
 | API boundary | Single HTTP cloud function `get-login-ticket` (Node `http`, not Express) |
 | Database | CloudBase PostgreSQL via `@cloudbase/js-sdk` `app.rdb()`, `public` schema |
 | Auth | Custom HMAC Bearer tokens (`product-session-service.cjs`); admin gate via `app_users.is_admin` |
-| Storage | CloudBase Storage via `@cloudbase/node-sdk` (`uploadFile` / `getTempFileURL`) |
+| Storage | CloudBase Storage via `@cloudbase/node-sdk`; `storage_path` is canonical and display URLs are derived from the active CDN |
 | External sources | USDA FoodData Central, Open Food Facts |
 | Image processing | `sharp` when available (optional dependency); graceful fallback to original bytes |
 
@@ -31,7 +31,7 @@ No third-party API key or raw source payload ever reaches the mini program.
 - `food_tags` (6 seeded: high_protein, low_fat, high_carb, low_calorie, plant_protein, high_fiber)
 - `foods` (canonical store; unique `(source, source_id)`; unique nullable `fdc_id` / `barcode`; non-negative nutrition checks; trigram + GIN search indexes)
 - `food_tag_relations` (composite PK `food_id, tag_id`; `source` = manual | rule)
-- `food_images` (unique `content_hash`; one primary per food via partial unique index)
+- `food_images` (unique `content_hash`; one primary per food via partial unique index; `storage_path` is the canonical image address)
 - `food_source_payloads` (raw USDA/OFF JSON, server-only)
 - `food_sync_jobs` (import/sync audit)
 - `food_image_tasks` (async image backfill queue)
@@ -148,8 +148,10 @@ When resolving a food image, the repository returns the first available:
 5. Category placeholder
 6. Default placeholder
 
-The response marks `isPlaceholder: true` when a placeholder is used; external
-third-party URLs are never returned as the canonical image.
+The response marks `isPlaceholder: true` when a placeholder is used. For rows
+with `storage_path`, display URLs are generated from `FOOD_IMAGE_CDN_BASE_URL`
+and legacy persisted URL fields are not used. External or temporary URLs are
+never returned as the canonical image.
 
 ## Caching & resilience
 

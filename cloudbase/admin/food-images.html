@@ -5,166 +5,424 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Nordic Nutri · 食物图片管理</title>
   <style>
-    :root { font-family: "SF Pro Text", "PingFang SC", sans-serif; color: #1f2a24; background: #f6f1ea; }
-    body { margin: 0; padding: 24px; }
-    h1 { font-size: 22px; margin: 0 0 8px; }
-    .muted { color: #66736b; font-size: 13px; margin-bottom: 20px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-    .card { background: #fff; border-radius: 16px; padding: 14px 16px; min-width: 140px; box-shadow: 0 8px 24px rgba(31,42,36,.06); }
-    .card b { display: block; font-size: 22px; margin-top: 6px; }
-    label { display: block; font-size: 13px; margin: 8px 0 4px; }
-    input, textarea, select, button { font: inherit; }
-    input, textarea, select { width: min(520px, 100%); padding: 10px 12px; border: 1px solid #d7d0c6; border-radius: 10px; background: #fff; }
-    button { border: 0; border-radius: 999px; padding: 10px 16px; background: #2f5d50; color: #fff; cursor: pointer; }
-    button.secondary { background: #e8efe9; color: #2f5d50; }
-    pre { background: #1f2a24; color: #e8efe9; padding: 14px; border-radius: 12px; overflow: auto; max-height: 420px; }
-    .panel { background: #fff; border-radius: 18px; padding: 18px; margin-top: 16px; box-shadow: 0 8px 24px rgba(31,42,36,.06); }
-    .candidates { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-    .candidates img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 12px; background: #eee; }
+    :root {
+      --ink: #173d2a;
+      --green: #2e6046;
+      --mist: #e8efe7;
+      --linen: #faf8f3;
+      --paper: #ffffff;
+      --text: #24312b;
+      --muted: #66746c;
+      --line: #d7ded5;
+      --danger: #b64a3b;
+      --danger-mist: #f8ece8;
+      --shadow: 0 18px 42px rgba(23, 61, 42, .08);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: #eef0ea; color: var(--text); font: 15px/1.5 "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+    .ops-shell { min-height: 100vh; padding: 28px; }
+    .ops-header { max-width: 1540px; margin: 0 auto 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark { width: 38px; height: 38px; border: 1px solid var(--green); border-radius: 50%; display: grid; place-items: center; color: var(--green); font: 700 18px Georgia, serif; }
+    .eyebrow { margin: 0 0 2px; color: var(--green); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    h1, h2, h3, p { margin: 0; }
+    h1, h2, h3 { font-family: "Noto Serif SC", "Songti SC", serif; }
+    h1 { color: var(--ink); font-size: 24px; line-height: 1.2; }
+    h2 { color: var(--ink); font-size: 20px; }
+    h3 { color: var(--ink); font-size: 15px; }
+    .header-actions, .action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .button { border: 1px solid transparent; border-radius: 10px; padding: 10px 13px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 700; }
+    .button:hover:not(:disabled) { background: #0f3020; }
+    .button.secondary { border-color: var(--line); background: var(--paper); color: var(--ink); }
+    .button.secondary:hover:not(:disabled) { background: var(--mist); }
+    .button.danger { background: var(--danger); }
+    .button.link { padding: 0; border: 0; background: transparent; color: var(--green); }
+    .batch-controller { max-width: 1540px; margin: 0 auto 18px; display: grid; grid-template-columns: minmax(280px, 1fr) auto; gap: 20px; align-items: center; padding: 17px 20px; border: 1px solid var(--line); border-radius: 18px; background: rgba(250,248,243,.9); box-shadow: 0 10px 26px rgba(23, 61, 42, .05); }
+    .batch-controller-copy p:last-child { margin-top: 4px; }
+    .batch-control-fields { display: flex; align-items: flex-end; justify-content: flex-end; gap: 9px; flex-wrap: wrap; }
+    .batch-control-field { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .batch-control-field select, .batch-control-field input { height: 40px; min-width: 126px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; background: var(--paper); color: var(--text); }
+    .batch-control-field select { min-width: 190px; }
+    .batch-control-field input { width: 82px; min-width: 82px; }
+    .batch-selection-note { flex: 1 1 100%; min-height: 18px; color: var(--muted); font-size: 12px; text-align: right; }
+    .selection-preview-panel { display: none; grid-column: 1 / -1; padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--linen); }
+    .selection-preview-panel.visible { display: block; }
+    .selection-preview-panel p { color: var(--muted); font-size: 12px; }
+    .preview-foods { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
+    .preview-food { border: 1px solid var(--line); border-radius: 99px; padding: 6px 9px; background: var(--paper); color: var(--ink); font-size: 12px; }
+    .preview-food.selected { border-color: var(--green); background: var(--mist); }
+    .batch-lifecycle { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; grid-column: 1 / -1; }
+    .ops-workspace { max-width: 1540px; min-height: calc(100vh - 226px); margin: 0 auto; display: grid; grid-template-columns: 248px minmax(420px, 1fr) 330px; overflow: visible; border: 1px solid var(--line); border-radius: 22px; background: var(--linen); box-shadow: var(--shadow); }
+    .batch-rail, .review-inspector { background: rgba(255,255,255,.54); }
+    .batch-rail { border-right: 1px solid var(--line); padding: 20px 15px; }
+    .review-queue { min-width: 0; padding: 24px; }
+    .review-inspector { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 32px); overflow-y: auto; border-left: 1px solid var(--line); padding: 20px; }
+    .rail-heading, .queue-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .rail-heading { margin-bottom: 13px; }
+    .rail-note, .muted { color: var(--muted); font-size: 12px; }
+    .batch-list { display: grid; gap: 8px; }
+    .batch-item { width: 100%; border: 1px solid transparent; border-radius: 13px; padding: 12px; text-align: left; background: transparent; color: var(--text); }
+    .batch-item:hover { background: var(--mist); }
+    .batch-item.active { border-color: var(--green); background: var(--mist); }
+    .batch-name { display: block; overflow: hidden; color: var(--ink); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .batch-meta { display: flex; justify-content: space-between; margin-top: 7px; color: var(--muted); font-size: 11px; }
+    .mini-progress { display: block; height: 5px; overflow: hidden; margin-top: 9px; border-radius: 99px; background: #d7dfd5; }
+    .mini-progress > i { display: block; height: 5px; border-radius: inherit; background: var(--green); }
+    .queue-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 19px; }
+    .summary-number { color: var(--ink); font: 700 31px/1 "Noto Serif SC", "Songti SC", serif; }
+    .summary-copy { color: var(--muted); font-size: 12px; }
+    .batch-status-panel { margin: 0 0 14px; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
+    .status-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .status-panel-head h3 { font-family: inherit; font-size: 13px; }
+    .scheduler-hint { margin-top: 8px; padding: 8px 10px; border-radius: 9px; background: var(--mist); color: var(--ink); font-size: 12px; }
+    .scheduler-hint.warning { background: #fbf1dc; color: #855b16; }
+    .scheduler-hint.danger { background: var(--danger-mist); color: var(--danger); }
+    .status-metrics { display: flex; gap: 7px; overflow-x: auto; margin-top: 11px; padding-bottom: 2px; }
+    .status-metric { flex: 0 0 auto; min-width: 62px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); color: var(--muted); font-size: 10px; }
+    .status-metric b { display: block; margin-top: 1px; color: var(--ink); font-size: 16px; }
+    .status-metric.warning b { color: #855b16; }
+    .status-metric.danger b { color: var(--danger); }
+    .filter-row { display: flex; gap: 7px; overflow-x: auto; padding: 4px 0 14px; }
+    .filter { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 99px; padding: 7px 11px; background: transparent; color: var(--muted); font-size: 12px; }
+    .filter.active { border-color: var(--green); background: var(--ink); color: #fff; }
+    .bulk-review-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -4px 0 13px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.72); }
+    .bulk-review-label, .card-select-label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .bulk-review-label input, .card-select-label input { accent-color: var(--green); }
+    .review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .food-card { overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); text-align: left; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+    .food-card:hover { transform: translateY(-2px); border-color: #9cb1a0; box-shadow: 0 12px 22px rgba(23, 61, 42, .08); }
+    .food-card.selected { border: 2px solid var(--green); }
+    .food-card-select { display: block; width: 100%; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; }
+    .food-card-image { position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; background: #dfe5da; }
+    .food-card-image img { width: 100%; height: 100%; object-fit: cover; }
+    .food-card-placeholder { display: grid; width: 100%; height: 100%; place-items: center; color: var(--green); font: 700 34px Georgia, serif; }
+    .image-status { position: absolute; top: 10px; left: 10px; border-radius: 99px; padding: 4px 7px; background: rgba(250,248,243,.92); color: var(--ink); font-size: 10px; font-weight: 700; }
+    .image-status.warning { background: #fbf1dc; color: #855b16; }
+    .image-status.danger { background: var(--danger-mist); color: var(--danger); }
+    .food-card-body { display: grid; gap: 7px; padding: 13px; }
+    .food-card-title { display: block; color: var(--ink); font-size: 15px; font-weight: 700; }
+    .food-card-meta { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; }
+    .food-card-action { display: block; padding-top: 2px; }
+    .card-exception { display: block; overflow: hidden; padding: 6px 8px; border-radius: 8px; background: var(--danger-mist); color: var(--danger); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .food-card .button { display: block; width: 100%; margin-top: 0; padding: 8px; text-align: center; }
+    .food-card-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 13px 13px; }
+    .queue-loading, .empty-state { display: grid; min-height: 340px; place-items: center; border: 1px dashed #c4cec2; border-radius: 16px; color: var(--muted); text-align: center; }
+    .empty-state > div { max-width: 290px; }
+    .empty-state strong { display: block; color: var(--ink); font: 700 20px "Noto Serif SC", "Songti SC", serif; }
+    .empty-state p { margin-top: 8px; font-size: 13px; }
+    .inspector-intro { display: grid; min-height: 430px; place-items: center; color: var(--muted); text-align: center; }
+    .inspector-intro p { max-width: 210px; font-size: 13px; }
+    .inspector-image { position: relative; overflow: hidden; border-radius: 14px; background: #dfe5da; aspect-ratio: 4 / 3; }
+    .inspector-image img { width: 100%; height: 100%; object-fit: cover; }
+    .inspector-image .food-card-placeholder { font-size: 44px; }
+    .inspector-title { margin-top: 15px; }
+    .inspector-title h2 { font-size: 24px; }
+    .category-badge, .status-badge { display: inline-block; margin-top: 8px; border-radius: 99px; padding: 4px 8px; background: var(--mist); color: var(--green); font-size: 11px; font-weight: 700; }
+    .status-badge.failed, .status-badge.danger { background: var(--danger-mist); color: var(--danger); }
+    .status-badge.warning { background: #fbf1dc; color: #855b16; }
+    .candidate-strip { display: flex; gap: 8px; overflow-x: auto; margin: 14px 0; }
+    .candidate-thumb { flex: 0 0 56px; height: 56px; overflow: hidden; border: 2px solid transparent; border-radius: 9px; padding: 0; background: #dfe5da; }
+    .candidate-thumb.active { border-color: var(--green); }
+    .candidate-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .detail-block { padding: 13px 0; border-top: 1px solid var(--line); }
+    .detail-block summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 700; }
+    .detail-block p { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .inspector-actions { display: grid; gap: 8px; margin-top: 16px; }
+    .inspector-actions .button { width: 100%; }
+    .item-health { margin-top: 13px; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--linen); }
+    .item-health-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .item-health-copy { margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .item-error { margin-top: 8px; padding: 8px; border-radius: 8px; background: var(--danger-mist); color: var(--danger); font-size: 12px; line-height: 1.5; }
+    .item-error b { display: block; font-size: 11px; }
+    .operation-panel { margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--line); }
+    .operation-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .operation-panel-head h3 { font-family: inherit; font-size: 13px; }
+    .operation-feed { display: grid; gap: 7px; margin-top: 10px; }
+    .operation-empty { color: var(--muted); font-size: 12px; }
+    .operation-item { padding: 8px; border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; background: var(--linen); }
+    .operation-item.error { border-left-color: var(--danger); background: var(--danger-mist); }
+    .operation-item strong, .operation-item span { display: block; }
+    .operation-item strong { color: var(--ink); font-size: 11px; }
+    .operation-item.error strong { color: var(--danger); }
+    .operation-item span { margin-top: 2px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+    .toast { position: fixed; z-index: 10; right: 24px; bottom: 24px; max-width: min(400px, calc(100vw - 48px)); border-radius: 11px; padding: 12px 15px; background: var(--ink); box-shadow: 0 10px 25px rgba(0,0,0,.16); color: #fff; font-size: 13px; opacity: 0; pointer-events: none; transform: translateY(10px); transition: .18s ease; }
+    .toast.visible { opacity: 1; transform: translateY(0); }
+    .toast.error { background: var(--danger); }
+    .utility-drawer { max-width: 1540px; margin: 14px auto 0; overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: rgba(255,255,255,.68); }
+    .workflow-guide { max-width: 1540px; margin: 0 auto 18px; overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: rgba(255,255,255,.68); }
+    .workflow-guide > summary { padding: 13px 18px; color: var(--ink); font-weight: 700; cursor: pointer; }
+    .workflow-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; padding: 0 18px 17px; }
+    .workflow-step { min-height: 76px; padding: 10px; border-left: 3px solid var(--green); border-radius: 0 9px 9px 0; background: var(--linen); }
+    .workflow-step b, .workflow-step span { display: block; }
+    .workflow-step span { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .utility-drawer > summary { padding: 14px 18px; color: var(--ink); font-weight: 700; cursor: pointer; }
+    .utility-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 0 18px 18px; }
+    .utility-panel { padding: 15px; border-radius: 12px; background: var(--linen); }
+    .utility-panel label { display: block; margin: 10px 0 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .utility-panel input, .utility-panel textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px; background: #fff; color: var(--text); }
+    .utility-panel textarea { resize: vertical; min-height: 78px; }
+    .utility-panel pre { max-height: 270px; overflow: auto; margin: 10px 0 0; padding: 10px; border-radius: 8px; background: #183428; color: #e5eee6; font: 11px/1.5 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .stat { padding: 10px; border-radius: 9px; background: var(--paper); color: var(--muted); font-size: 11px; }
+    .stat b { display: block; margin-top: 3px; color: var(--ink); font-size: 19px; }
+    @media (max-width: 1160px) { .batch-controller { grid-template-columns: 1fr; } .batch-control-fields, .batch-lifecycle { justify-content: flex-start; } .batch-selection-note { text-align: left; } .ops-workspace { grid-template-columns: 218px minmax(380px, 1fr); } .review-inspector { position: static; max-height: none; grid-column: 1 / -1; border-top: 1px solid var(--line); border-left: 0; } .inspector-content { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(260px, 1fr); gap: 20px; align-items: start; } .inspector-title { margin-top: 0; } }
+    @media (max-width: 760px) { .ops-shell { padding: 12px; } .ops-header { align-items: flex-start; } .header-actions { justify-content: flex-end; } h1 { font-size: 20px; } .batch-controller { padding: 15px; } .batch-control-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; } .batch-control-field select, .batch-control-field input { width: 100%; min-width: 0; } .batch-control-fields .button { width: 100%; } .batch-selection-note, .selection-preview-panel { grid-column: 1 / -1; } .workflow-steps { grid-template-columns: 1fr; } .bulk-review-bar { align-items: flex-start; flex-direction: column; } .batch-lifecycle { justify-content: stretch; } .batch-lifecycle .button { flex: 1 1 42%; } .ops-workspace { display: block; min-height: 0; } .batch-rail, .review-inspector { border: 0; } .batch-rail { border-bottom: 1px solid var(--line); } .review-queue { padding: 18px 14px; } .review-grid { grid-template-columns: 1fr; } .inspector-content, .utility-body { display: block; } .utility-panel { margin-top: 12px; } .inspector-actions { position: sticky; bottom: 0; padding: 12px 0; background: rgba(250,248,243,.96); } }
   </style>
 </head>
 <body>
-  <h1>食物图片管理</h1>
-  <p class="muted">调用 CloudBase `get-login-ticket` 管理端 API。需要管理员 Bearer Token（`app_users.is_admin = true`）。小程序前端不参与生图。</p>
+  <main class="ops-shell">
+    <header class="ops-header">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">N</div><div><p class="eyebrow">Nordic Nutri · Image Operations</p><h1>食物图片审核台</h1></div></div>
+      <div class="header-actions"><span id="connectionStatus" class="muted">尚未连接</span><button id="refreshAll" class="button secondary">刷新批次</button><button id="openTools" class="button secondary">连接设置</button></div>
+    </header>
 
-  <div class="panel">
-    <label>API Base（含 /get-login-ticket）</label>
-    <input id="baseUrl" placeholder="https://xxx.tcloudbaseapp.com/get-login-ticket" />
-    <label>Bearer Token</label>
-    <input id="token" placeholder="产品会话 access token" />
-    <div class="row" style="margin-top:12px">
-      <button id="loadStats">刷新统计</button>
-      <button class="secondary" id="runWorker">消费队列 Worker</button>
-      <button class="secondary" id="runDiagnose">诊断混元生图</button>
+    <details id="workflowGuide" class="workflow-guide">
+      <summary>操作流程与状态说明</summary>
+      <div class="workflow-steps"><div class="workflow-step"><b>1. 连接后台</b><span>确认默认 API Base 与管理员 Token。</span></div><div class="workflow-step"><b>2. 预览选材</b><span>点击食材可取消或恢复本批生成范围。</span></div><div class="workflow-step"><b>3. 创建并启动</b><span>草稿确认后启动，云端持续生成。</span></div><div class="workflow-step"><b>4. 审核候选图</b><span>可单张或批量通过并设为主图。</span></div><div class="workflow-step"><b>5. 处理异常</b><span>拒绝理由会写入提示词并立即重试。</span></div></div>
+    </details>
+
+    <section class="batch-controller" aria-label="创建图片批次">
+      <div class="batch-controller-copy"><p class="eyebrow">Batch composer</p><h2>按分类创建图片批次</h2><p class="muted">系统只选择已发布、有主营养版本且尚未设主图的食物；每次最多 100 条。</p></div>
+      <div class="batch-control-fields">
+        <label class="batch-control-field" for="batchCategory">食物分类<select id="batchCategory"><option value="">连接后台后加载分类</option></select></label>
+        <label class="batch-control-field" for="batchCountInput">生成数量<input id="batchCountInput" type="number" value="20" min="1" max="100" /></label>
+        <button id="previewCategory" class="button secondary">预览选材</button><button id="createCategoryBatch" class="button">创建草稿</button>
+        <span id="selectionPreview" class="batch-selection-note">选择分类后可预览可生成食物数量。</span>
+        <div id="selectionPreviewPanel" class="selection-preview-panel" aria-live="polite"></div>
+      </div>
+      <div class="batch-lifecycle" aria-label="当前批次控制"><button id="startBatch" class="button" disabled>启动批次</button><button id="pauseBatch" class="button secondary" disabled>暂停</button><button id="resumeBatch" class="button secondary" disabled>继续</button><button id="cancelBatch" class="button secondary" disabled>取消</button></div>
+    </section>
+
+    <section class="ops-workspace" aria-label="食物图片审核工作台">
+      <aside class="batch-rail">
+        <div class="rail-heading"><h2>批次</h2><span id="batchCount" class="rail-note">0 个</span></div>
+        <div id="batchList" class="batch-list"><p class="muted">请先在下方连接设置中填写管理员会话。</p></div>
+      </aside>
+
+      <section class="review-queue">
+        <div class="queue-heading"><div><p class="eyebrow">Review queue</p><h2 id="queueTitle">待审核候选图</h2></div><button id="refreshQueue" class="button link">重新加载</button></div>
+        <div class="queue-summary"><strong id="reviewCount" class="summary-number">—</strong><span id="reviewCopy" class="summary-copy">连接后显示批次进度</span></div>
+        <section id="batchStatusPanel" class="batch-status-panel" aria-live="polite"><div class="status-panel-head"><h3>运行状态</h3><span class="status-badge">等待连接</span></div><p id="schedulerHint" class="scheduler-hint">连接后台后会显示云端调度、重试和审核状态。</p><div class="status-metrics"></div></section>
+        <div id="filterRow" class="filter-row" aria-label="批次项目筛选">
+          <button class="filter active" data-filter="needs_review">待审核</button><button class="filter" data-filter="needs_retry">待重试</button><button class="filter" data-filter="failed">失败</button><button class="filter" data-filter="generating">生成中</button><button class="filter" data-filter="all">全部</button>
+        </div>
+        <div id="bulkReviewBar" class="bulk-review-bar" hidden><label class="bulk-review-label"><input id="selectAllReview" type="checkbox" /> 选择当前待审核候选图</label><button id="approveSelected" class="button" disabled>批量通过并设为主图（0）</button></div>
+        <div id="reviewGrid" class="queue-loading">请连接后台后加载候选图。</div>
+      </section>
+
+      <aside class="review-inspector">
+        <div id="inspector" class="inspector-intro"><div><h2>选择一张候选图</h2><p>从中央审核队列点击食物，即可查看大图、自动提示词和审核操作。</p></div></div>
+        <section class="operation-panel" aria-label="最近操作与接口异常"><div class="operation-panel-head"><h3>状态变化与接口异常</h3><button id="clearOperationFeed" class="button link">清空</button></div><div id="operationFeed" class="operation-feed"><p class="operation-empty">尚无操作记录。</p></div></section>
+      </aside>
+    </section>
+  </main>
+
+  <details id="utilityDrawer" class="utility-drawer">
+    <summary>连接设置与运行诊断</summary>
+    <div class="utility-body">
+      <section class="utility-panel"><h3>连接设置</h3><label for="baseUrl">API Base（含 /get-login-ticket）</label><input id="baseUrl" placeholder="https://xxx.service.tcloudbase.com/get-login-ticket" autocomplete="off" /><label for="token">管理员 Bearer Token</label><input id="token" type="password" placeholder="仅保存在当前页面内存" autocomplete="off" /><div class="action-row" style="margin-top:12px"><button id="connect" class="button">连接后台</button><button id="loadStats" class="button secondary">刷新统计</button><button id="runDiagnose" class="button secondary">诊断生图</button></div><div id="stats" class="stats" style="margin-top:12px"></div></section>
+      <section class="utility-panel"><h3>运行说明</h3><p class="muted">创建草稿后，点击“启动批次”交由云端调度器持续生成。审核拒绝的候选图会携带原因进入下一次重试，最多三次。</p><p class="muted" style="margin-top:12px">本页不再支持手动录入 foodId、jobId 或浏览器端消费任务，避免绕开批次和审核链路。</p></section>
+      <section class="utility-panel"><h3>响应与排障</h3><p class="muted">仅显示最近一次后台操作响应，不保存密钥或任务标识。</p><pre id="out">{}</pre></section>
     </div>
-  </div>
-
-  <div class="row" id="stats"></div>
-
-  <div class="panel">
-    <h3>创建生图任务</h3>
-    <label>foodId</label>
-    <input id="foodId" />
-    <label>candidateCount（默认 3，冒烟可用 1）</label>
-    <input id="candidateCount" type="number" value="1" min="1" max="6" />
-    <label>cookingMethod</label>
-    <input id="cookingMethod" value="水煮" />
-    <label>extraPrompt</label>
-    <textarea id="extraPrompt" rows="3">鸡胸肉自然白色，无煎痕烤痕酱汁，不增加米饭蔬菜</textarea>
-    <div class="row" style="margin-top:12px">
-      <button id="createJob">创建任务</button>
-      <button class="secondary" id="loadJob">查看任务</button>
-    </div>
-    <label>jobId</label>
-    <input id="jobId" />
-  </div>
-
-  <div class="panel">
-    <h3>候选图审核</h3>
-    <div class="candidates" id="candidates"></div>
-    <label>imageId</label>
-    <input id="imageId" />
-    <div class="row" style="margin-top:12px">
-      <button id="approve">设为主图 / 通过</button>
-      <button class="secondary" id="reject">拒绝</button>
-    </div>
-  </div>
-
-  <div class="panel">
-    <h3>响应</h3>
-    <pre id="out">{}</pre>
-  </div>
+  </details>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
     const $ = (id) => document.getElementById(id);
+    const DEFAULT_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
+    $("baseUrl").value = DEFAULT_API_BASE;
+    const state = { activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [] };
+    const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", "\"":"&quot;" })[char]);
     const out = (data) => { $("out").textContent = JSON.stringify(data, null, 2); };
+    const toast = (message, isError = false) => { const el = $("toast"); el.textContent = message; el.className = `toast visible${isError ? " error" : ""}`; window.setTimeout(() => { el.className = "toast"; }, 3600); };
+    const selectedBatch = () => state.batches.find((batch) => batch.id === state.activeBatchId) || null;
+    const progress = (batch) => { const total = Number(batch?.totalCount || 0); const terminal = Number(batch?.reviewCount || 0) + Number(batch?.completedCount || 0) + Number(batch?.failedCount || 0) + Number(batch?.skippedCount || 0); return { total, terminal, percent: total ? Math.round((terminal / total) * 100) : 0 }; };
+    const statusLabel = (status) => ({ draft: "草稿", running: "运行中", paused: "已暂停", completed: "已通过", completed_with_errors: "完成（有失败）", cancelled: "已取消", needs_review: "待审核", failed: "失败", generating: "生成中", pending: "待生成", needs_retry: "待重试", skipped: "已跳过" }[status] || status || "未知");
+    const statusTone = (status) => (status === "failed" || status === "completed_with_errors" ? "danger" : status === "needs_retry" || status === "paused" ? "warning" : "");
+    const preferredUrl = (candidate) => candidate?.detailUrl || candidate?.listUrl || candidate?.mediumUrl || candidate?.thumbnailUrl || "";
+    const formatTime = (value) => { if (!value) return "—"; const date = new Date(value); return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("zh-CN", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); };
+    const selectedItem = () => (state.batchDetail?.items || []).find((item) => item.id === state.selectedItemId || (state.selectedJobId && item.jobId === state.selectedJobId)) || null;
+    const apiErrorMessage = (error) => error?.json?.message || error?.json?.errorMessage || error?.json?.error || error?.code || error?.message || "接口请求失败";
+    function createApiError({ endpoint, method, status = 0, json = {}, cause } = {}) {
+      const code = json.code || json.errorCode || (status ? `HTTP_${status}` : "NETWORK_ERROR");
+      return Object.assign(new Error(json.message || json.errorMessage || json.error || code), { code, endpoint, method, status, json, cause });
+    }
+    function renderOperationFeed() {
+      const host = $("operationFeed"); if (!host) return;
+      host.innerHTML = state.operations.length ? state.operations.map((entry) => `<div class="operation-item ${entry.isError ? "error" : ""}"><strong>${escapeHtml(entry.title)}</strong><span>${escapeHtml(entry.detail)} · ${escapeHtml(formatTime(entry.at))}</span></div>`).join("") : "<p class=\"operation-empty\">尚无操作记录。接口报错、批次状态变化和审核结果会显示在这里。</p>";
+    }
+    function recordOperation({ title, detail = "", isError = false } = {}) {
+      state.operations.unshift({ title: title || (isError ? "接口异常" : "状态已更新"), detail, isError, at: new Date().toISOString() });
+      state.operations = state.operations.slice(0, 12); renderOperationFeed();
+    }
 
     async function api(path, { method = "GET", body } = {}) {
-      const base = $("baseUrl").value.replace(/\/$/, "");
+      const base = $("baseUrl").value.trim().replace(/\/$/, "");
       const token = $("token").value.trim();
-      if (!base || !token) throw new Error("请填写 baseUrl 和 token");
-      const res = await fetch(`${base}/api/admin${path}`, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw Object.assign(new Error(json.code || res.statusText), { json, status: res.status });
+      if (!base || !token) throw new Error("请先填写 API Base 和管理员 Bearer Token");
+      const endpoint = `/api/admin${path}`; let response;
+      try { response = await fetch(`${base}${endpoint}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
+      catch (cause) { const error = createApiError({ endpoint, method, cause }); recordOperation({ title: "接口连接失败", detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) { const error = createApiError({ endpoint, method, status: response.status, json }); recordOperation({ title: `接口错误 ${response.status}`, detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
+      if (method !== "GET") recordOperation({ title: "接口操作已完成", detail: `${method} ${endpoint} · HTTP ${response.status}` });
+      return json;
+    }
+    async function foodApi(path, { method = "GET", body } = {}) {
+      const base = $("baseUrl").value.trim().replace(/\/$/, "");
+      const token = $("token").value.trim();
+      if (!base || !token) throw new Error("请先填写 API Base 和管理员 Bearer Token");
+      const endpoint = path; let response;
+      try { response = await fetch(`${base}${endpoint}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
+      catch (cause) { const error = createApiError({ endpoint, method, cause }); recordOperation({ title: "接口连接失败", detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) { const error = createApiError({ endpoint, method, status: response.status, json }); recordOperation({ title: `接口错误 ${response.status}`, detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
+      if (method !== "GET") recordOperation({ title: "接口操作已完成", detail: `${method} ${endpoint} · HTTP ${response.status}` });
       return json;
     }
 
-    $("loadStats").onclick = async () => {
+    function setConnected(connected) { $("connectionStatus").textContent = connected ? "管理员会话已连接" : "尚未连接"; }
+    function selectedCategory() { return state.categories.find((category) => category.id === $("batchCategory").value) || null; }
+    function renderBatchControls() {
+      const batch = selectedBatch();
+      $("startBatch").disabled = !batch || !["draft", "paused"].includes(batch.status);
+      $("pauseBatch").disabled = !batch || batch.status !== "running";
+      $("resumeBatch").disabled = !batch || batch.status !== "paused";
+      $("cancelBatch").disabled = !batch || !["draft", "running", "paused"].includes(batch.status);
+    }
+    function batchItemCounts(batch) {
+      const counts = { pending: 0, generating: 0, needs_retry: 0, needs_review: 0, completed: 0, failed: 0, skipped: 0 };
+      const items = state.batchDetail?.batch?.id === batch?.id ? state.batchDetail.items || [] : [];
+      if (items.length) { items.forEach((item) => { if (Object.hasOwn(counts, item.status)) counts[item.status] += 1; }); return counts; }
+      return { pending: Number(batch?.pendingCount || 0), generating: Number(batch?.generatingCount || 0), needs_retry: Number(batch?.retryCount || 0), needs_review: Number(batch?.reviewCount || 0), completed: Number(batch?.completedCount || 0), failed: Number(batch?.failedCount || 0), skipped: Number(batch?.skippedCount || 0) };
+    }
+    function schedulerState(batch, counts) {
+      if (!batch) return { tone: "", text: "连接后台后会显示云端调度、重试和审核状态。" };
+      if (batch.status === "draft") return { tone: "warning", text: "草稿尚未启动，不会创建生图任务。确认选材后点击“启动批次”。" };
+      if (batch.status === "paused") return { tone: "warning", text: "批次已暂停；云端调度器不会继续创建任务。点击“继续”后恢复。" };
+      if (batch.status === "cancelled") return { tone: "danger", text: "批次已取消；未完成项目不会再被调度。" };
+      if (counts.failed) return { tone: "danger", text: `有 ${counts.failed} 条已耗尽重试次数；在“失败”筛选中查看失败码和原因。` };
+      if (counts.needs_retry) return { tone: "warning", text: `有 ${counts.needs_retry} 条等待云端重试；调度器会按 next retry 时间继续处理。` };
+      if (counts.generating || counts.pending) return { tone: "", text: `云端调度中：待生成 ${counts.pending} 条、生成中 ${counts.generating} 条。调度器每分钟检查一次。` };
+      if (counts.needs_review) return { tone: "", text: `本批次有 ${counts.needs_review} 张候选图等待人工审核。` };
+      if (batch.status === "completed_with_errors") return { tone: "danger", text: "批次已结束，但存在生成失败项；请在失败筛选中处理。" };
+      if (batch.status === "completed") return { tone: "", text: "批次已完成，所有项目已通过审核、跳过或按规则结束。" };
+      return { tone: "", text: `当前批次状态：${statusLabel(batch.status)}。` };
+    }
+    function renderBatchStatusPanel() {
+      const host = $("batchStatusPanel"); const batch = selectedBatch();
+      if (!batch) { host.innerHTML = "<div class=\"status-panel-head\"><h3>运行状态</h3><span class=\"status-badge\">等待连接</span></div><p id=\"schedulerHint\" class=\"scheduler-hint\">连接后台后会显示云端调度、重试和审核状态。</p><div class=\"status-metrics\"></div>"; return; }
+      const counts = batchItemCounts(batch); const hint = schedulerState(batch, counts);
+      const metrics = [["pending", "待生成"], ["generating", "生成中"], ["needs_retry", "待重试"], ["needs_review", "待审核"], ["completed", "已通过"], ["failed", "失败"], ["skipped", "跳过"]];
+      host.innerHTML = `<div class="status-panel-head"><h3>运行状态</h3><span class="status-badge ${statusTone(batch.status)}">${escapeHtml(statusLabel(batch.status))}</span></div><p id="schedulerHint" class="scheduler-hint ${hint.tone}">${escapeHtml(hint.text)}</p><div class="status-metrics">${metrics.map(([key, label]) => `<span class="status-metric ${statusTone(key)}">${label}<b>${counts[key]}</b></span>`).join("")}</div>`;
+    }
+    async function loadCategories() {
+      const data = await foodApi("/foods/categories");
+      state.categories = (data.items || data || []).filter((category) => category.isActive !== false);
+      const select = $("batchCategory"); const selectedId = select.value;
+      select.innerHTML = `<option value="">请选择分类</option>${state.categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.nameZh || category.name || "未命名分类")}</option>`).join("")}`;
+      if (state.categories.some((category) => category.id === selectedId)) select.value = selectedId;
+    }
+    function batchCount() { return Math.max(1, Math.min(100, Number($("batchCountInput").value || 20))); }
+    function renderSelectionPreview() {
+      const host = $("selectionPreviewPanel"); const foods = state.previewFoods;
+      if (!foods.length) { host.classList.remove("visible"); host.innerHTML = ""; return; }
+      host.classList.add("visible");
+      host.innerHTML = `<p>已选择 ${state.previewSelectedFoodIds.size}/${foods.length} 条。点击食材可取消或恢复本批生成范围。</p><div class="preview-foods">${foods.map((food) => `<button class="preview-food ${state.previewSelectedFoodIds.has(food.id) ? "selected" : ""}" type="button" data-preview-food-id="${escapeHtml(food.id)}">${escapeHtml(food.nameZh || food.name || food.id)}</button>`).join("")}</div>`;
+      host.querySelectorAll("button[data-preview-food-id]").forEach((button) => { button.onclick = () => { const id = button.dataset.previewFoodId; if (state.previewSelectedFoodIds.has(id)) state.previewSelectedFoodIds.delete(id); else state.previewSelectedFoodIds.add(id); renderSelectionPreview(); }; });
+    }
+    async function previewCategory() {
+      const category = selectedCategory();
+      if (!category) { $("selectionPreview").textContent = "请选择一个食物分类。"; state.previewFoods = []; renderSelectionPreview(); return null; }
       try {
-        const stats = await api("/food-image-jobs/stats");
-        out(stats);
-        $("stats").innerHTML = [
-          ["缺失图片", stats.missingImages],
-          ["待生成", stats.pendingJobs],
-          ["生成中", stats.processingJobs],
-          ["待审核", stats.pendingReviewImages],
-          ["已有主图", stats.readyFoods],
-          ["失败任务", stats.failedJobs],
-          ["今日已生成", `${stats.dailyGenerated}/${stats.dailyLimit}`],
-        ].map(([k, v]) => `<div class="card">${k}<b>${v}</b></div>`).join("");
-      } catch (e) { out(e.json || { error: e.message }); }
-    };
-
-    $("runWorker").onclick = async () => {
-      try { out(await api("/food-image-jobs/worker", { method: "POST", body: {} })); }
-      catch (e) { out(e.json || { error: e.message }); }
-    };
-
-    $("runDiagnose").onclick = async () => {
-      try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); }
-      catch (e) { out(e.json || { error: e.message }); }
-    };
-
-    $("createJob").onclick = async () => {
+        const data = await api("/food-image-batches/preview", { method: "POST", body: { categoryId: category.id, count: batchCount() } });
+        state.previewCategoryId = category.id; state.previewFoods = Array.isArray(data.foods) ? data.foods : []; state.previewSelectedFoodIds = new Set(state.previewFoods.map((food) => food.id)); renderSelectionPreview();
+        $("selectionPreview").textContent = `“${category.nameZh || category.name}”可选 ${data.selectableCount || 0} 条，本次将生成 ${data.selectedCount || 0} 条。`;
+        out(data); return data;
+      } catch (error) { out(error.json || { error: error.message }); $("selectionPreview").textContent = "无法预览本分类，请检查连接和数据状态。"; state.previewFoods = []; renderSelectionPreview(); toast(error.message, true); return null; }
+    }
+    async function createCategoryBatch() {
+      const category = selectedCategory();
+      if (!category) return toast("请先选择食物分类", true);
       try {
-        const job = await api("/food-image-jobs", {
-          method: "POST",
-          body: {
-            foodId: $("foodId").value.trim(),
-            candidateCount: Number($("candidateCount").value || 1),
-            cookingMethod: $("cookingMethod").value.trim(),
-            extraPrompt: $("extraPrompt").value.trim(),
-            force: true,
-          },
-        });
-        $("jobId").value = job.id;
-        out(job);
-      } catch (e) { out(e.json || { error: e.message }); }
-    };
-
-    $("loadJob").onclick = async () => {
-      try {
-        const data = await api(`/food-image-jobs/${$("jobId").value.trim()}`);
-        out(data);
-        $("candidates").innerHTML = (data.candidates || []).map((c) => `
-          <div>
-            <img src="${c.listUrl || c.detailUrl || c.thumbnailUrl || ""}" alt="" />
-            <div style="font-size:12px;margin-top:6px">${c.id}<br/>${c.reviewStatus || c.status}</div>
-            <button class="secondary" data-id="${c.id}">选用</button>
-          </div>
-        `).join("");
-        $("candidates").querySelectorAll("button[data-id]").forEach((btn) => {
-          btn.onclick = () => { $("imageId").value = btn.getAttribute("data-id"); };
-        });
-      } catch (e) { out(e.json || { error: e.message }); }
-    };
-
-    $("approve").onclick = async () => {
-      try { out(await api(`/food-images/${$("imageId").value.trim()}/approve`, { method: "POST", body: {} })); }
-      catch (e) { out(e.json || { error: e.message }); }
-    };
-    $("reject").onclick = async () => {
-      const reason = prompt("拒绝原因") || "不符合要求";
-      try { out(await api(`/food-images/${$("imageId").value.trim()}/reject`, { method: "POST", body: { reason } })); }
-      catch (e) { out(e.json || { error: e.message }); }
-    };
+        const hasPreview = state.previewCategoryId === category.id && state.previewFoods.length; const foodIds = hasPreview ? [...state.previewSelectedFoodIds] : [];
+        if (hasPreview && !foodIds.length) return toast("请至少保留一条预览食材", true);
+        const count = hasPreview ? foodIds.length : batchCount(); const body = hasPreview ? { foodIds, name: `${category.nameZh || category.name} · ${count} 条`, concurrency: 2, maxAttempts: 3, selectionSource: "category", selectionMeta: { categoryId: category.id, requestedCount: batchCount(), previewSelectedCount: count } } : { categoryId: category.id, count, name: `${category.nameZh || category.name} · ${count} 条`, concurrency: 2, maxAttempts: 3 };
+        const data = await api("/food-image-batches", { method: "POST", body });
+        out(data); state.activeBatchId = data.id || data.batch?.id || ""; state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; state.jobs.clear();
+        await refreshBatches(); toast("批次草稿已创建，可点击“启动批次”交由云端生成");
+      } catch (error) { out(error.json || { error: error.message }); toast(error.message, true); }
+    }
+    function renderBatches() {
+      $("batchCount").textContent = `${state.batches.length} 个`;
+      $("batchList").innerHTML = state.batches.length ? state.batches.map((batch) => { const p = progress(batch); return `<button class="batch-item ${batch.id === state.activeBatchId ? "active" : ""}" data-batch-id="${batch.id}"><span class="batch-name">${escapeHtml(batch.name)}</span><span class="batch-meta"><span>${p.terminal}/${p.total} 已处理</span><span>${statusLabel(batch.status)}</span></span><span class="mini-progress"><i style="width:${p.percent}%"></i></span></button>`; }).join("") : "<p class=\"muted\">暂无可查看批次。</p>";
+      $("batchList").querySelectorAll("button[data-batch-id]").forEach((button) => { button.onclick = () => selectBatch(button.dataset.batchId); });
+      renderBatchControls();
+    }
+    async function refreshBatches() {
+      const data = await api("/food-image-batches?page=1&pageSize=50"); state.batches = data.items || [];
+      const next = state.batches.find((batch) => batch.status === "running") || state.batches.find((batch) => Number(batch.reviewCount || 0) > 0) || state.batches[0];
+      if (!state.activeBatchId || !state.batches.some((batch) => batch.id === state.activeBatchId)) state.activeBatchId = next?.id || "";
+      renderBatches(); if (state.activeBatchId) await loadBatchDetail(); else renderQueue();
+    }
+    async function selectBatch(batchId) { state.activeBatchId = batchId; state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; state.jobs.clear(); renderBatches(); await loadBatchDetail(); }
+    async function loadBatchDetail() { const data = await api(`/food-image-batches/${state.activeBatchId}?page=1&pageSize=100`); state.batchDetail = data; renderBatches(); await renderQueue(); }
+    function filteredItems() { const items = state.batchDetail?.items || []; return state.activeFilter === "all" ? items : items.filter((item) => item.status === state.activeFilter); }
+    async function loadJobCandidates(jobId) { if (!jobId) return null; if (state.jobs.has(jobId)) return state.jobs.get(jobId); const data = await api(`/food-image-jobs/${jobId}`); state.jobs.set(jobId, data); return data; }
+    async function hydrateQueue(items) { const result = new Map(); let cursor = 0; const workers = Array.from({ length: Math.min(4, items.length) }, async () => { while (cursor < items.length) { const item = items[cursor++]; if (!item.jobId) continue; try { result.set(item.jobId, await loadJobCandidates(item.jobId)); } catch { result.set(item.jobId, null); } } }); await Promise.all(workers); return result; }
+    function syncBulkControls(candidateIds = []) {
+      const bar = $("bulkReviewBar"); const selectAll = $("selectAllReview"); const approve = $("approveSelected");
+      state.selectedImageIds = new Set([...state.selectedImageIds].filter((id) => candidateIds.includes(id)));
+      bar.hidden = state.activeFilter !== "needs_review" || !candidateIds.length;
+      selectAll.checked = Boolean(candidateIds.length) && candidateIds.every((id) => state.selectedImageIds.has(id));
+      approve.disabled = !state.selectedImageIds.size;
+      approve.textContent = `批量通过并设为主图（${state.selectedImageIds.size}）`;
+    }
+    async function renderQueue() {
+      const batch = selectedBatch(); const items = filteredItems(); const reviewCount = Number(batch?.reviewCount || 0); $("queueTitle").textContent = batch ? batch.name : "待审核候选图"; $("reviewCount").textContent = batch ? String(reviewCount) : "—"; $("reviewCopy").textContent = batch ? `总数 ${batch.totalCount || 0} · 已完成 ${progress(batch).terminal} · 失败 ${batch.failedCount || 0}` : "连接后显示批次进度";
+      renderBatchStatusPanel(); const host = $("reviewGrid"); if (!batch) { host.className = "empty-state"; host.innerHTML = "<div><strong>尚未选择批次</strong><p>连接后台后可在左侧选择一个批次。</p></div>"; syncBulkControls(); renderInspector(); return; }
+      if (!items.length) { host.className = "empty-state"; host.innerHTML = `<div><strong>${state.activeFilter === "needs_review" ? "当前批次已审核完" : "没有匹配项目"}</strong><p>可切换筛选或在左侧选择其他批次。</p></div>`; syncBulkControls(); renderInspector(); return; }
+      host.className = "queue-loading"; host.textContent = "正在加载候选图…"; const jobs = await hydrateQueue(items.filter((item) => item.jobId));
+      const queue = items.map((item) => { const job = item.jobId ? jobs.get(item.jobId) : null; const candidate = job?.candidates?.find((entry) => (entry.reviewStatus || entry.status) === "pending") || job?.candidates?.[0]; return { item, candidate }; });
+      const selectableIds = queue.filter(({ item, candidate }) => item.status === "needs_review" && candidate?.id).map(({ candidate }) => candidate.id);
+      host.className = "review-grid"; host.innerHTML = queue.map(({ item, candidate }) => { const imageUrl = preferredUrl(candidate); const selected = item.id === state.selectedItemId; const canSelect = item.status === "needs_review" && candidate?.id; const exception = item.errorCode ? `<span class="card-exception">${escapeHtml(item.errorCode)}${item.errorMessage ? ` · ${escapeHtml(item.errorMessage)}` : ""}</span>` : ""; return `<article class="food-card ${selected ? "selected" : ""}"><button class="food-card-select" data-item-id="${item.id}" data-food-name="${escapeHtml(item.food?.nameZh || item.foodId)}"><span class="food-card-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.food?.nameZh || "食物候选图")}" />` : "<span class=\"food-card-placeholder\">N</span>"}<span class="image-status ${statusTone(item.status)}">${statusLabel(item.status)}</span></span><span class="food-card-body"><span class="food-card-title">${escapeHtml(item.food?.nameZh || item.foodId)}</span><span class="food-card-meta"><span>${escapeHtml(item.food?.category || "未分类")}</span><span>${item.attemptCount || 0} 次尝试</span></span>${exception}</span></button><div class="food-card-toolbar">${canSelect ? `<label class="card-select-label"><input type="checkbox" data-candidate-select="${candidate.id}" ${state.selectedImageIds.has(candidate.id) ? "checked" : ""} /> 批量选择</label>` : "<span></span>"}<button class="button secondary" data-item-id="${item.id}" data-food-name="${escapeHtml(item.food?.nameZh || item.foodId)}">${item.jobId ? "查看详情" : "查看异常"}</button></div></article>`; }).join("");
+      host.querySelectorAll("button[data-item-id]").forEach((button) => { button.onclick = () => selectItem(button.dataset.itemId, button.dataset.foodName); });
+      host.querySelectorAll("input[data-candidate-select]").forEach((input) => { input.onchange = () => { if (input.checked) state.selectedImageIds.add(input.dataset.candidateSelect); else state.selectedImageIds.delete(input.dataset.candidateSelect); syncBulkControls(selectableIds); }; });
+      syncBulkControls(selectableIds); renderInspector();
+    }
+    async function selectItem(itemId, foodName) { const item = (state.batchDetail?.items || []).find((entry) => entry.id === itemId); if (!item) return; state.selectedItemId = itemId; state.selectedFoodName = foodName || item.food?.nameZh || "食物"; state.selectedJobId = item.jobId || ""; state.selectedImageId = ""; if (item.jobId) { const job = await loadJobCandidates(item.jobId); const candidate = job?.candidates?.find((entry) => (entry.reviewStatus || entry.status) === "pending") || job?.candidates?.[0]; state.selectedImageId = candidate?.id || ""; } await renderQueue(); renderInspector(); }
+    function itemHealthMarkup(item, job) { if (!item) return ""; const retry = item.nextRetryAt ? `下次重试：${formatTime(item.nextRetryAt)}` : item.status === "needs_retry" ? "等待云端调度器安排下一次重试。" : ""; const action = item.status === "failed" ? "已达到最大重试次数，需要查看失败原因后重新建批次。" : item.status === "needs_review" ? "候选图已生成，等待人工审核。" : retry; const error = item.errorCode ? `<div class="item-error"><b>${escapeHtml(item.errorCode)}</b>${escapeHtml(item.errorMessage || item.retryReason || "生成任务失败")}</div>` : ""; return `<section class="item-health"><div class="item-health-head"><strong>任务状态</strong><span class="status-badge ${statusTone(item.status)}">${escapeHtml(statusLabel(item.status))}</span></div><p class="item-health-copy">尝试 ${item.attemptCount || 0}/${job?.maxAttempts || 3} 次${item.retryReason ? ` · 重试原因：${escapeHtml(item.retryReason)}` : ""}<br>${escapeHtml(action || "当前状态正常。")}</p>${error}</section>`; }
+    function renderInspector() { const host = $("inspector"); const item = selectedItem(); const job = state.selectedJobId ? state.jobs.get(state.selectedJobId) : null; const candidates = job?.candidates || []; const candidate = candidates.find((entry) => entry.id === state.selectedImageId) || candidates[0]; if (!item) { host.className = "inspector-intro"; host.innerHTML = "<div><h2>选择一张候选图</h2><p>从中央审核队列点击食物，即可查看大图、自动提示词、任务状态和异常原因。</p></div>"; return; }
+      const plan = item.promptPlan?.prompt || "暂无自动提示词。"; const category = item.food?.category || "未分类"; if (!candidate) { host.className = ""; host.innerHTML = `<div class="inspector-content"><div><div class="inspector-title"><h2>${escapeHtml(state.selectedFoodName)}</h2><span class="category-badge">${escapeHtml(category)}</span></div>${itemHealthMarkup(item, job)}<details class="detail-block"><summary>查看自动提示词</summary><p>${escapeHtml(plan)}</p></details></div></div>`; return; }
+      const imageUrl = preferredUrl(candidate);
+      host.className = ""; host.innerHTML = `<div class="inspector-content"><div class="inspector-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(state.selectedFoodName)}" />` : "<span class=\"food-card-placeholder\">N</span>"}</div><div><div class="inspector-title"><h2>${escapeHtml(state.selectedFoodName)}</h2><span class="category-badge">${escapeHtml(category)}</span></div>${itemHealthMarkup(item, job)}<div class="candidate-strip">${candidates.map((entry) => { const url = preferredUrl(entry); return `<button class="candidate-thumb ${entry.id === candidate.id ? "active" : ""}" data-candidate-id="${entry.id}">${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(state.selectedFoodName)} 候选图" />` : "<span class=\"food-card-placeholder\">N</span>"}</button>`; }).join("")}</div><details class="detail-block"><summary>查看自动提示词</summary><p>${escapeHtml(plan)}</p></details><details class="detail-block"><summary>生成信息</summary><p>任务 ${escapeHtml(state.selectedJobId)}<br>候选状态 ${escapeHtml(candidate.reviewStatus || candidate.status || "pending")}</p></details><div class="inspector-actions"><button id="approve" class="button">通过并设为主图</button><button id="reject" class="button secondary">拒绝并填写原因</button></div></div></div>`;
+      host.querySelectorAll("button[data-candidate-id]").forEach((button) => { button.onclick = () => { state.selectedImageId = button.dataset.candidateId; renderInspector(); }; }); $("approve")?.addEventListener("click", approveSelected); $("reject")?.addEventListener("click", rejectSelected);
+    }
+    async function approveImage(imageId, foodName = "食物") { const data = await api(`/food-images/${imageId}/approve`, { method: "POST", body: {} }); recordOperation({ title: "审核通过", detail: `${foodName} 已设为主图` }); return data; }
+    async function approveSelected() { if (!state.selectedImageId) return; try { const data = await approveImage(state.selectedImageId, state.selectedFoodName); out(data); toast("已通过并设为主图"); state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function approveSelectedImages() {
+      const imageIds = [...state.selectedImageIds]; if (!imageIds.length) return;
+      if (!window.confirm(`确认通过并设为主图 ${imageIds.length} 张候选图？`)) return;
+      $("approveSelected").disabled = true; const failures = [];
+      for (const imageId of imageIds) { try { await approveImage(imageId); } catch (error) { failures.push(apiErrorMessage(error)); } }
+      state.selectedImageIds.clear(); await refreshBatches();
+      if (failures.length) { recordOperation({ title: "批量审核部分失败", detail: failures.join("；"), isError: true }); toast(`${imageIds.length - failures.length}/${imageIds.length} 张已通过，${failures.length} 张失败`, true); } else toast(`已通过并设为主图 ${imageIds.length} 张候选图`);
+    }
+    async function rejectSelected() { if (!state.selectedImageId) return; const reason = window.prompt("请填写拒绝原因；该原因会自动写入下一次生图提示词。"); if (!reason?.trim()) return; try { const data = await api(`/food-images/${state.selectedImageId}/reject`, { method: "POST", body: { reason: reason.trim() } }); out(data); const retryScheduled = Boolean(data.retry?.retryScheduled); const detail = retryScheduled ? `${state.selectedFoodName} · 拒绝原因已写入提示词，重试任务已提交` : `${state.selectedFoodName} · 已拒绝，但未能立即重试：${data.retry?.reason || data.retry?.errorMessage || "请查看异常"}`; recordOperation({ title: retryScheduled ? "候选图已拒绝并立即重试" : "候选图已拒绝，重试待处理", detail, isError: !retryScheduled }); toast(retryScheduled ? "拒绝原因已写入提示词，重试任务已提交" : detail, !retryScheduled); state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function mutateBatch(action) { if (!state.activeBatchId) return; try { const data = await api(`/food-image-batches/${state.activeBatchId}/${action}`, { method: "POST", body: {} }); const message = { start: "批次已启动，云端将持续处理", pause: "批次已暂停", resume: "批次已继续", cancel: "批次已取消" }[action] || "批次状态已更新"; out(data); recordOperation({ title: "批次状态已变化", detail: message }); toast(message); await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function loadStats() { try { const stats = await api("/food-image-jobs/stats"); out(stats); $("stats").innerHTML = [["待审核", stats.pendingReviewImages], ["已有主图", stats.readyFoods], ["失败任务", stats.failedJobs], ["今日生成", `${stats.dailyGenerated}/${stats.dailyLimit}`], ["缺失图片", stats.missingImages], ["待处理", stats.pendingJobs]].map(([name, value]) => `<div class="stat">${name}<b>${escapeHtml(value)}</b></div>`).join(""); } catch (error) { out(error.json || { error: error.message }); toast(error.message, true); } }
+    async function connect() { try { await loadCategories(); await refreshBatches(); setConnected(true); await loadStats(); recordOperation({ title: "后台已连接", detail: "分类、批次与生图统计已刷新" }); toast("后台已连接"); } catch (error) { setConnected(false); out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    $("connect").onclick = connect; $("refreshAll").onclick = connect; $("refreshQueue").onclick = () => loadBatchDetail().catch((error) => toast(apiErrorMessage(error), true)); $("loadStats").onclick = loadStats; $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
+    $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory;
+    $("startBatch").onclick = () => mutateBatch("start"); $("pauseBatch").onclick = () => mutateBatch("pause"); $("resumeBatch").onclick = () => mutateBatch("resume"); $("cancelBatch").onclick = () => mutateBatch("cancel");
+    $("openTools").onclick = () => { $("utilityDrawer").open = true; $("utilityDrawer").scrollIntoView({ behavior: "smooth", block: "start" }); };
+    $("clearOperationFeed").onclick = () => { state.operations = []; renderOperationFeed(); };
+    $("filterRow").querySelectorAll("button[data-filter]").forEach((button) => { button.onclick = async () => { state.activeFilter = button.dataset.filter; $("filterRow").querySelectorAll(".filter").forEach((item) => item.classList.toggle("active", item === button)); await renderQueue(); }; });
+    $("selectAllReview").onchange = () => { const candidateIds = [...document.querySelectorAll("input[data-candidate-select]")].map((input) => input.dataset.candidateSelect); state.selectedImageIds = new Set($("selectAllReview").checked ? candidateIds : []); renderQueue(); };
+    $("approveSelected").onclick = approveSelectedImages;
   </script>
 </body>
 </html>

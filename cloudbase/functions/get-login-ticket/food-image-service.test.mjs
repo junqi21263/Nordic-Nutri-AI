@@ -51,12 +51,13 @@ test("acquireFromUrl downloads, hashes, transforms (fallback), and uploads varia
       return { buffer: fakeBuffer, contentType: "image/jpeg", size: fakeBuffer.length };
     },
     sharpLoader: () => null, // force no-transform fallback
-    uploader: async ({ cloudPath }) => ({ url: `https://cdn.test/${cloudPath}` }),
+    uploader: async ({ cloudPath }) => ({ fileID: `cloud://env/${cloudPath}` }),
   });
   const result = await svc.acquireFromUrl("https://images.openfoodfacts.org/x.jpg", { imageEntityKey: "ent1" });
   assert.equal(result.contentHash, sha256(fakeBuffer));
   assert.equal(result.transformed, false);
-  assert.match(result.detailUrl, /\/foods\/ent1\/.+\/detail\.webp/);
+  assert.equal(result.storagePath.startsWith("foods/ent1/"), true);
+  assert.equal(result.detailUrl, null);
   assert.equal(result.thumbUrl, null);
   assert.equal(result.mediumUrl, null);
   assert.equal(downloads.length, 1);
@@ -85,10 +86,11 @@ test("acquireFromUpload stores variants when sharp unavailable", async () => {
   const svc = createFoodImageService({
     maxBytes: 1024 * 1024,
     sharpLoader: () => null,
-    uploader: async ({ cloudPath }) => ({ url: `https://cdn.test/${cloudPath}` }),
+    uploader: async ({ cloudPath }) => ({ fileID: `cloud://env/${cloudPath}` }),
   });
   const result = await svc.acquireFromUpload({ buffer: Buffer.from("data12345"), contentType: "image/png", imageEntityKey: "u1" });
   assert.equal(result.transformed, false);
-  assert.match(result.detailUrl, /\/foods\/u1\/.+\/detail\.webp/);
+  assert.equal(result.storagePath.startsWith("foods/u1/"), true);
+  assert.equal(result.detailUrl, null);
   assert.equal(result.status, "pending");
 });

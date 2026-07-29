@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { getFoodVisualFallback, resolveFoodVisual } from "./food-visuals";
+import { getFoodVisualAspectRatio, getFoodVisualFallback, resolveFoodVisual } from "./food-visuals";
 
 describe("resolveFoodVisual", () => {
   it("returns null when the catalog does not provide a remote image", () => {
@@ -87,6 +87,22 @@ describe("getFoodVisualFallback", () => {
 
   it("keeps Orange chicken on meat instead of matching fruit orange", () => {
     expect(getFoodVisualFallback({ description: "Orange chicken", imageUrl: null }).tone).toBe("meat");
+  });
+});
+
+describe("getFoodVisualAspectRatio", () => {
+  it("defaults missing image dimensions to a square detail frame", () => {
+    expect(getFoodVisualAspectRatio({ description: "Avocado", imageUrl: null })).toBe(1);
+  });
+
+  it("uses the supplied image dimensions for future non-square detail frames", () => {
+    expect(
+      getFoodVisualAspectRatio({
+        description: "Egg",
+        imageUrl: null,
+        image: { width: 1600, height: 900 },
+      }),
+    ).toBeCloseTo(16 / 9);
   });
 });
 

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildFoodImagePrompt, MAX_PROMPT_CHARS } from "./food-image-prompts.cjs";
 import { createHunyuanImageService, HunyuanImageError, resolveSize } from "./hunyuan-image-service.cjs";
-import { createFoodImageJobService, FoodImageJobError } from "./food-image-job-service.cjs";
+import foodImageJobModule from "./food-image-job-service.cjs";
 import { transformFoodCardImage } from "./food-image-service.cjs";
+
+const { createFoodImageJobService, FoodImageJobError, shouldTriggerWorker } = foodImageJobModule;
 
 test("buildFoodImagePrompt stays within the 500-char Hunyuan limit", () => {
   const prompt = buildFoodImagePrompt({
@@ -162,4 +164,111 @@ test("transformFoodCardImage falls back without sharp", async () => {
   const result = await transformFoodCardImage(buffer, null);
   assert.equal(result.transformed, false);
   assert.equal(result.detail, buffer);
+});
+
+test("batch-owned jobs defer the legacy fire-and-forget worker", () => {
+  assert.equal(shouldTriggerWorker({ deferWorker: true }), false);
+  assert.equal(shouldTriggerWorker({}), true);
+});
+
+test("approving a batch candidate completes its matching batch item", async () => {
+  const writes = [];
+  const image = {
+    id: "image-1",
+    food_id: "food-1",
+    job_id: "job-1",
+    quality_score: 92,
+  };
+  const db = {
+    from(table) {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                maybeSingle: async () => ({ data: table === "food_images" ? image : null, error: null }),
+              };
+            },
+          };
+        },
+        update(payload) {
+          const write = { table, payload, filters: [] };
+          writes.push(write);
+          const query = {
+            eq(column, value) {
+              write.filters.push([column, value]);
+              return query;
+            },
+          };
+          return query;
+        },
+      };
+    },
+  };
+  const service = createFoodImageJobService({
+    db,
+    repository: { async isAdmin(userId) { return userId === "admin"; } },
+    hunyuan: { modelName: "test" },
+    imageService: {},
+    config: { generationEnabled: true },
+  });
+
+  const result = await service.approveImage("admin", "image-1");
+  assert.deepEqual(result, { imageId: "image-1", foodId: "food-1", jobId: "job-1", approved: true });
+  assert.deepEqual(
+    writes.find((write) => write.table === "food_image_batch_items"),
+    {
+      table: "food_image_batch_items",
+      payload: { status: "completed", error_code: null, error_message: null, next_retry_at: null },
+      filters: [["job_id", "job-1"]],
+    },
+  );
+});
+
+test("rejecting a batch candidate records the review reason for one retry", async () => {
+  const writes = [];
+  const image = { id: "image-2", food_id: "food-2", job_id: "job-2", is_primary: false };
+  const db = {
+    from(table) {
+      return {
+        select() {
+          return { eq() { return { maybeSingle: async () => ({ data: table === "food_images" ? image : null, error: null }) }; } };
+        },
+        update(payload) {
+          const write = { table, payload, filters: [] };
+          writes.push(write);
+          const query = { eq(column, value) { write.filters.push([column, value]); return query; } };
+          return query;
+        },
+      };
+    },
+  };
+  const service = createFoodImageJobService({
+    db,
+    repository: { async isAdmin(userId) { return userId === "admin"; } },
+    hunyuan: { modelName: "test" },
+    imageService: {},
+    config: { generationEnabled: true },
+  });
+
+  const result = await service.rejectImage("admin", "image-2", { reason: "主体不像鸡蛋，保留完整水煮蛋切面" });
+  assert.deepEqual(result, { imageId: "image-2", foodId: "food-2", jobId: "job-2", rejected: true });
+
+  assert.deepEqual(
+    writes.find((write) => write.table === "food_image_batch_items"),
+    {
+      table: "food_image_batch_items",
+      payload: {
+        status: "needs_retry",
+        last_image_id: "image-2",
+        retry_reason: "主体不像鸡蛋，保留完整水煮蛋切面",
+        error_code: "FOOD_IMAGE_REJECTED",
+        error_message: "主体不像鸡蛋，保留完整水煮蛋切面",
+        next_retry_at: null,
+        locked_at: null,
+        locked_by: null,
+      },
+      filters: [["job_id", "job-2"]],
+    },
+  );
 });

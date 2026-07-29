@@ -113,32 +113,24 @@ export default function FoodDetailPage() {
       className="page-layout--food-detail"
     >
       <View className="food-detail-page">
-        <View className="food-detail-page__title-row">
-          <Text>食物详情</Text>
-        </View>
-
-        <View className="food-detail-page__identity food-detail-page__identity--split">
-          <View>
+        <View className="food-detail-page__identity">
+          <View className="food-detail-page__name-row">
             <Text className="food-detail-page__name">{displayedFood.description}</Text>
-            <Text className="food-detail-page__source">
-              {displayedFood.brandName || displayedFood.category || "标准食物"}
+            <Text className="food-detail-page__calories-inline">
+              ｜{scaleNutrition(displayedFood.caloriesKcalPer100g, 100)}kcal/100g
             </Text>
-            <View className="food-detail-page__labels">
-              <Text className="food-detail-page__category">{getFoodCategory(displayedFood)}</Text>
-              {tags.map((tag) => (
-                <Text className="food-detail-page__tag" key={tag}>
-                  {tag}
-                </Text>
-              ))}
-            </View>
           </View>
-          <View className="food-detail-page__calories">
-            <Text>{scaleNutrition(displayedFood.caloriesKcalPer100g, 100)}</Text>
-            <Text>kcal / 100g</Text>
+          <View className="food-detail-page__labels">
+            <Text className="food-detail-page__category">{getFoodCategory(displayedFood)}</Text>
+            {tags.map((tag) => (
+              <Text className="food-detail-page__tag" key={tag}>
+                {tag}
+              </Text>
+            ))}
           </View>
         </View>
 
-        <View className="food-detail-page__hero food-detail-page__hero--wide">
+        <View className="food-detail-page__hero food-detail-page__hero--square">
           <FoodThumbnail className="food-detail-page__image" food={displayedFood} iconSize={40} prefer="detail" />
         </View>
 

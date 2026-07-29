@@ -3,6 +3,8 @@
 // CloudBase RDB client (db.from(...)). Returns plain camelCase rows; never
 // leaks third-party raw payloads to callers.
 
+const { createFoodStorageUrlResolver } = require("./food-storage-url-service.cjs");
+
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 
@@ -121,11 +123,17 @@ function mapTagRow(row) {
   };
 }
 
-function mapImageRow(row) {
+function mapImageRow(row, { imageUrlResolver } = {}) {
   if (!row?.id) return null;
-  const thumbUrl = row.thumb_url ?? null;
-  const mediumUrl = row.medium_url ?? null;
-  const detailUrl = row.detail_url ?? null;
+  const resolveVariants = typeof imageUrlResolver === "function"
+    ? imageUrlResolver
+    : imageUrlResolver?.resolveVariants;
+  const derived = row.storage_path && resolveVariants
+    ? resolveVariants.call(imageUrlResolver, row.storage_path)
+    : null;
+  const thumbUrl = derived?.thumbnailUrl ?? row.thumb_url ?? null;
+  const mediumUrl = derived?.listUrl ?? row.medium_url ?? null;
+  const detailUrl = derived?.detailUrl ?? row.detail_url ?? null;
   const source = row.source;
   const reviewStatus = row.review_status
     ?? (row.status === "ready" ? "approved" : row.status === "rejected" ? "rejected" : "pending");
@@ -139,7 +147,9 @@ function mapImageRow(row) {
     sourceUrl: row.source_url ?? null,
     storagePath: row.storage_path ?? null,
     originalFileId: row.original_file_id ?? null,
-    originalUrl: row.original_url ?? null,
+    // Storage path is canonical; legacy URL columns are only a compatibility
+    // fallback for rows that have no path or no CDN configuration.
+    originalUrl: derived ? null : (row.original_url ?? null),
     thumbUrl,
     mediumUrl,
     detailUrl,
@@ -250,7 +260,7 @@ async function loadTagsForFoods(db, foodIds) {
   return byFood;
 }
 
-async function loadPrimaryImagesForFoods(db, foodIds) {
+async function loadPrimaryImagesForFoods(db, foodIds, imageUrlResolver) {
   if (!foodIds.length) return new Map();
   const result = await db.from("food_images")
     .select("*")
@@ -260,17 +270,36 @@ async function loadPrimaryImagesForFoods(db, foodIds) {
   if (result.error) throw new FoodRepositoryError("FOOD_IMAGE_LOOKUP_FAILED");
   // Only expose approved / ready primaries — pending Hunyuan candidates stay hidden.
   const rows = (result.data ?? []).filter((r) => !r.review_status || r.review_status === "approved");
-  return new Map(rows.map((r) => [r.food_id, mapImageRow(r)]));
+  return new Map(rows.map((r) => [r.food_id, mapImageRow(r, { imageUrlResolver })]));
 }
 
-function createFoodRepository({ db }) {
+function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
   if (!db || typeof db.from !== "function") throw new Error("Food repository requires an RDB client");
+  const imageUrlResolver = createFoodStorageUrlResolver({ baseUrl: imageCdnBaseUrl });
 
   return {
     async listCategories() {
       const result = await db.from("food_categories").select("*").eq("is_active", true).order("sort_order", { ascending: true });
       if (result.error) throw new FoodRepositoryError("FOOD_CATEGORY_LOOKUP_FAILED");
       return (result.data ?? []).map(mapCategoryRow).filter(Boolean);
+    },
+
+    async listBatchImageCandidates({ categoryId, count = 20 } = {}) {
+      const normalizedCategoryId = String(categoryId || "").trim();
+      if (!normalizedCategoryId) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+      const size = Math.min(Math.max(Number(count) || 20, 1), 100);
+      const result = await db.from("foods").select("id,name_zh,name_en,category_id", { count: "exact" })
+        .eq("category_id", normalizedCategoryId)
+        .eq("is_active", true)
+        .eq("publish_status", "published")
+        .eq("is_primary_variant", true)
+        .is("primary_image_id", null)
+        .order("name_zh", { ascending: true })
+        .order("id", { ascending: true })
+        .range(0, size - 1);
+      if (result.error) throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED");
+      const items = result.data ?? [];
+      return { items, total: Number(result.count ?? items.length) };
     },
 
     async listTags() {
@@ -339,7 +368,7 @@ function createFoodRepository({ db }) {
       const [catMap, tagMap, imageMap] = await Promise.all([
         loadCategoriesByIds(db, catIds),
         loadTagsForFoods(db, foodIds),
-        loadPrimaryImagesForFoods(db, foodIds),
+        loadPrimaryImagesForFoods(db, foodIds, imageUrlResolver),
       ]);
       // Tag filter (AND: food must have all tagCodes).
       let items = rows.map((r) => mapFoodRow(r, {
@@ -369,7 +398,7 @@ function createFoodRepository({ db }) {
       const [catMap, tagMap, imageMap] = await Promise.all([
         loadCategoriesByIds(db, row.category_id ? [row.category_id] : []),
         loadTagsForFoods(db, [row.id]),
-        loadPrimaryImagesForFoods(db, [row.id]),
+        loadPrimaryImagesForFoods(db, [row.id], imageUrlResolver),
       ]);
       return mapFoodRow(row, {
         category: row.category_id ? catMap.get(row.category_id) : null,
@@ -402,7 +431,7 @@ function createFoodRepository({ db }) {
       const [categoryMap, tagMap, imageMap] = await Promise.all([
         loadCategoriesByIds(db, categoryIds),
         loadTagsForFoods(db, foodIds),
-        loadPrimaryImagesForFoods(db, foodIds),
+        loadPrimaryImagesForFoods(db, foodIds, imageUrlResolver),
       ]);
       return rows.map((row) => mapFoodRow(row, {
         category: row.category_id ? categoryMap.get(row.category_id) : null,
@@ -513,7 +542,7 @@ function createFoodRepository({ db }) {
     async insertImage(record) {
       const result = await db.from("food_images").insert(record).select("*").maybeSingle();
       if (result.error) throw new FoodRepositoryError("FOOD_IMAGE_INSERT_FAILED");
-      return result.data ? mapImageRow(result.data) : null;
+      return result.data ? mapImageRow(result.data, { imageUrlResolver }) : null;
     },
 
     async setPrimaryImage(foodId, imageId) {

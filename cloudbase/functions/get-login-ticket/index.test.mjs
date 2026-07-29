@@ -8,6 +8,7 @@ import {
   createRuntimeService,
   readRuntimeConfig,
   selectDeepseekModel,
+  signFoodImageDispatch,
 } from "./index.js";
 
 async function withServer(server, run) {
@@ -54,6 +55,16 @@ test("assembles every runtime service after the RDB client is available", () => 
   for (const capability of ["issue", "verifySession"]) assert.equal(typeof service[capability], "function");
   for (const capability of ["data", "meals", "insights", "coach", "feedback"]) assert.ok(service[capability]);
   assert.equal(service.vision, null);
+  assert.equal(service.foodImageDispatchSecret, "");
+});
+
+test("uses the existing worker secret only as a first-rollout fallback for dispatch", () => {
+  const db = { from: () => ({}) };
+  const service = createRuntimeService({
+    WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
+    CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret", AI_WORKER_SHARED_SECRET: "worker-secret",
+  }, { cloudbaseSdk: { init: () => ({ rdb: () => db }) } });
+  assert.equal(service.foodImageDispatchSecret, "worker-secret");
 });
 
 test("uses the primary runtime identity for generated-image storage in remote-worker mode", async () => {
@@ -94,6 +105,8 @@ test("uses the primary runtime identity for generated-image storage in remote-wo
   });
 
   assert.ok(saved.originalFileId.startsWith("cloud://primary/"));
+  assert.equal(saved.originalUrl, null);
+  assert.equal(saved.detailUrl, null);
   assert.ok(uploads.length >= 1);
 });
 
@@ -658,4 +671,141 @@ test("food image upload requires authentication and a base64 payload", async () 
     assert.equal(ok.status, 200);
     assert.equal((await ok.json()).image.status, "pending");
   });
+});
+
+test("batch image routes are admin-session protected and expose live batch state", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      foodImageBatches: {
+        list: async (userId) => ({ items: [{ id: "11111111-2222-4333-8444-555555555555", status: "running", pendingCount: 19 }], userId }),
+        createFirstSample: async (userId) => { calls.push(userId); return { id: "11111111-2222-4333-8444-555555555555", status: "draft" }; },
+        start: async () => ({ id: "11111111-2222-4333-8444-555555555555", status: "running" }),
+        get: async () => ({ batch: { id: "11111111-2222-4333-8444-555555555555", status: "running" }, items: [] }),
+        processNext: async () => ({ processed: 1, batch: { id: "11111111-2222-4333-8444-555555555555", status: "running" } }),
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-image-batches`);
+    assert.equal(denied.status, 401);
+    const listed = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-image-batches`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal((await listed.json()).items[0].pendingCount, 19);
+    const created = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-image-batches/first-sample`, { method: "POST", headers: { authorization: "Bearer valid-session" } });
+    assert.equal((await created.json()).id, "11111111-2222-4333-8444-555555555555");
+    assert.deepEqual(calls, ["admin-1"]);
+  });
+});
+
+test("internal batch dispatcher requires an HMAC signature and does not use an admin session", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      foodImageDispatchSecret: "dispatch-test-secret",
+      foodImageBatches: {
+        dispatchTrusted: async (input) => {
+          calls.push(input);
+          return { dispatched: 2, attempted: 2 };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const path = "/get-login-ticket/api/internal/food-image-batches/dispatch";
+    const body = JSON.stringify({ maxItems: 2 });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = signFoodImageDispatch("dispatch-test-secret", { timestamp, path: "/api/internal/food-image-batches/dispatch", body });
+    const denied = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    assert.equal(denied.status, 401);
+    const accepted = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-food-image-dispatch-timestamp": timestamp,
+        "x-food-image-dispatch-signature": signature,
+      },
+      body,
+    });
+    assert.equal(accepted.status, 200);
+    assert.deepEqual(await accepted.json(), { dispatched: 2, attempted: 2 });
+    assert.deepEqual(calls, [{ maxItems: 2 }]);
+  });
+});
+
+test("admin creates and previews a batch from one category without posting food ids", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      foodImageBatches: {
+        previewCategory: async (userId, body) => {
+          calls.push({ op: "preview", userId, body });
+          return { categoryId: body.categoryId, selectedCount: 20 };
+        },
+        createFromCategory: async (userId, body) => {
+          calls.push({ op: "create", userId, body });
+          return { id: "11111111-2222-4333-8444-555555555555", selection: { source: "category" } };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const headers = { authorization: "Bearer valid-session", "content-type": "application/json" };
+    const preview = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-image-batches/preview`, {
+      method: "POST", headers, body: JSON.stringify({ categoryId: "c-vegetables", count: 20 }),
+    });
+    assert.equal((await preview.json()).selectedCount, 20);
+    const created = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-image-batches`, {
+      method: "POST", headers, body: JSON.stringify({ categoryId: "c-vegetables", count: 20 }),
+    });
+    assert.equal((await created.json()).selection.source, "category");
+  });
+  assert.deepEqual(calls, [
+    { op: "preview", userId: "admin-1", body: { categoryId: "c-vegetables", count: 20 } },
+    { op: "create", userId: "admin-1", body: { categoryId: "c-vegetables", count: 20 } },
+  ]);
+});
+
+test("rejecting a batch candidate immediately starts its server-controlled retry", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      foodImageJobs: {
+        rejectImage: async (userId, imageId, body) => {
+          calls.push({ op: "reject", userId, imageId, body });
+          return { imageId, jobId: imageId, rejected: true };
+        },
+      },
+      foodImageBatches: {
+        retryRejectedJob: async (userId, jobId) => {
+          calls.push({ op: "retry", userId, jobId });
+          return { processed: 1, retryScheduled: true, jobId: "replacement-job" };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-images/11111111-2222-4333-8444-555555555555/reject`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({ reason: "主体不是瘦牛肉，请保留瘦肉切片和自然纹理" }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      imageId: "11111111-2222-4333-8444-555555555555",
+      jobId: "11111111-2222-4333-8444-555555555555",
+      rejected: true,
+      retry: { processed: 1, retryScheduled: true, jobId: "replacement-job" },
+    });
+  });
+  assert.deepEqual(calls, [
+    { op: "reject", userId: "admin-1", imageId: "11111111-2222-4333-8444-555555555555", body: { reason: "主体不是瘦牛肉，请保留瘦肉切片和自然纹理" } },
+    { op: "retry", userId: "admin-1", jobId: "11111111-2222-4333-8444-555555555555" },
+  ]);
 });

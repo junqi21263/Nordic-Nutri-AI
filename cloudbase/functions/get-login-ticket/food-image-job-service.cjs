@@ -4,6 +4,7 @@
 
 const crypto = require("node:crypto");
 const { buildFoodImagePrompt } = require("./food-image-prompts.cjs");
+const { createFoodStorageUrlResolver } = require("./food-storage-url-service.cjs");
 
 class FoodImageJobError extends Error {
   constructor(code, message) {
@@ -14,6 +15,10 @@ class FoodImageJobError extends Error {
 
 function todayUtcDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function shouldTriggerWorker({ deferWorker = false } = {}) {
+  return deferWorker !== true;
 }
 
 function mapJobRow(row) {
@@ -56,6 +61,7 @@ function createFoodImageJobService({
   const concurrency = Math.min(Math.max(Number(config.concurrency) || 2, 1), 5);
   const dailyLimit = Math.min(Math.max(Number(config.dailyLimit) || 500, 1), 5000);
   const storagePrefix = config.storagePrefix || "food-library";
+  const imageUrlResolver = createFoodStorageUrlResolver({ baseUrl: config.imageCdnBaseUrl });
   const generationEnabled = config.generationEnabled !== false;
 
   async function requireAdmin(userId) {
@@ -127,6 +133,7 @@ function createFoodImageJobService({
     extraPrompt,
     cookingMethod,
     servingDescription,
+    deferWorker = false,
   } = {}) {
     await requireAdmin(userId);
     if (!generationEnabled) throw new FoodImageJobError("HY_IMAGE_DISABLED");
@@ -176,7 +183,7 @@ function createFoodImageJobService({
     await db.from("foods").update({ image_status: "generating" }).eq("id", foodId);
 
     const job = mapJobRow(inserted.data);
-    if (typeof triggerWorker === "function") {
+    if (shouldTriggerWorker({ deferWorker }) && typeof triggerWorker === "function") {
       Promise.resolve(triggerWorker({ jobId: job.id })).catch((err) => {
         console.error("[food-image-jobs] trigger worker failed:", err?.message || err);
       });
@@ -241,7 +248,7 @@ function createFoodImageJobService({
     const { mapImageRow } = require("./food-repository.cjs");
     return {
       job: mapJobRow(result.data),
-      candidates: (images.data ?? []).map(mapImageRow).filter(Boolean),
+      candidates: (images.data ?? []).map((row) => mapImageRow(row, { imageUrlResolver })).filter(Boolean),
     };
   }
 
@@ -451,8 +458,14 @@ function createFoodImageJobService({
         status: "completed",
         finished_at: new Date().toISOString(),
       }).eq("id", image.job_id);
+      await db.from("food_image_batch_items").update({
+        status: "completed",
+        error_code: null,
+        error_message: null,
+        next_retry_at: null,
+      }).eq("job_id", image.job_id);
     }
-    return { imageId, foodId: image.food_id, approved: true };
+    return { imageId, foodId: image.food_id, jobId: image.job_id ?? null, approved: true };
   }
 
   async function rejectImage(userId, imageId, { reason } = {}) {
@@ -461,12 +474,25 @@ function createFoodImageJobService({
     const image = imageResult.data;
     if (!image) throw new FoodImageJobError("FOOD_IMAGE_NOT_FOUND");
     if (image.is_primary) throw new FoodImageJobError("FOOD_IMAGE_PRIMARY_LOCKED");
+    const reviewReason = String(reason || "审核未通过，请准确还原食材主体、形态与质地").trim().slice(0, 500);
     await db.from("food_images").update({
       status: "rejected",
       review_status: "rejected",
-      reject_reason: reason ? String(reason).slice(0, 500) : null,
+      reject_reason: reviewReason,
     }).eq("id", imageId);
-    return { imageId, rejected: true };
+    if (image.job_id) {
+      await db.from("food_image_batch_items").update({
+        status: "needs_retry",
+        last_image_id: imageId,
+        retry_reason: reviewReason,
+        error_code: "FOOD_IMAGE_REJECTED",
+        error_message: reviewReason,
+        next_retry_at: null,
+        locked_at: null,
+        locked_by: null,
+      }).eq("job_id", image.job_id);
+    }
+    return { imageId, foodId: image.food_id, jobId: image.job_id ?? null, rejected: true };
   }
 
   async function regenerate(userId, foodId, { reason, extraPrompt, cookingMethod, candidateCount } = {}) {
@@ -524,4 +550,5 @@ module.exports = {
   createFoodImageJobService,
   mapJobRow,
   todayUtcDate,
+  shouldTriggerWorker,
 };

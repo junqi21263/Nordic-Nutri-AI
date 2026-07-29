@@ -200,9 +200,9 @@ function createHunyuanImageService({
       if (!payload?.fileId && !payload?.storagePath) {
         throw new HunyuanImageError("HY_IMAGE_STORAGE_MISSING");
       }
-      if (!payload?.detailUrl && !payload?.originalUrl) {
-        throw new HunyuanImageError("HY_IMAGE_CDN_MISSING");
-      }
+      // The generated file is downloaded and re-uploaded by the main
+      // function. Its stable CDN URL is derived later from storagePath, so a
+      // URL is not required in the persisted payload.
       return true;
     },
   };

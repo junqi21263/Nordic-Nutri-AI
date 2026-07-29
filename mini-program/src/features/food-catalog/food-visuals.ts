@@ -6,6 +6,8 @@ export type FoodImagePayload = {
   detailUrl?: string | null;
   source?: string | null;
   isFallback?: boolean;
+  width?: number | null;
+  height?: number | null;
 };
 
 type FoodVisualInput = {
@@ -78,6 +80,16 @@ function pickPreferredUrl(food: FoodVisualInput, prefer: "list" | "detail" | "th
 
 export function resolveFoodVisual(food: FoodVisualInput, prefer: "list" | "detail" | "thumb" = "list") {
   return pickPreferredUrl(food, prefer);
+}
+
+/** Keep detail pages square by default, but honor dimensions when the API provides them. */
+export function getFoodVisualAspectRatio(food: FoodVisualInput) {
+  const width = Number(food.image?.width);
+  const height = Number(food.image?.height);
+  if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+    return width / height;
+  }
+  return 1;
 }
 
 /** Category-aware placeholder metadata — rendered as View + NordicIcon. */

@@ -4459,30 +4459,15 @@
   margin-top: $space-12;
   text-align: center;
 }
-.food-detail-page__hero--wide {
+.food-detail-page__hero--square {
   border-radius: $radius-16;
   margin: 0;
 }
-.food-detail-page__hero--wide .food-detail-page__image,
-.food-detail-page__hero--wide .food-thumbnail--fallback {
-  aspect-ratio: 16 / 9;
+.food-detail-page__hero--square .food-detail-page__image,
+.food-detail-page__hero--square .food-thumbnail--fallback {
+  aspect-ratio: 1 / 1;
   height: auto;
   min-height: 0;
-}
-.food-detail-page__identity--split {
-  align-items: flex-start;
-  display: flex;
-  justify-content: space-between;
-}
-.food-detail-page__calories text:first-child {
-  color: $color-forest-green;
-  display: block;
-  font-size: $font-h2;
-  font-weight: $font-weight-semibold;
-}
-.food-detail-page__calories text:last-child {
-  color: $color-text-secondary;
-  font-size: $font-caption;
 }
 .food-detail-page__portion {
   background: $color-soft-beige;
@@ -4528,7 +4513,6 @@
   gap: $space-8;
 }
 .food-detail-page__portion-input input {
-  border-bottom: 1px solid $color-divider;
   color: $color-forest-green;
   font-size: $font-h3;
   text-align: right;
@@ -4862,16 +4846,6 @@
   flex-direction: column;
   gap: $space-20;
 }
-.food-detail-page__title-row {
-  align-items: center;
-  color: $color-text-primary;
-  display: flex;
-  font-size: $font-h2;
-  font-weight: $font-weight-semibold;
-  justify-content: center;
-  min-height: 48px;
-  position: relative;
-}
 .food-detail-page__back {
   align-items: center;
   border: 1px solid $color-divider;
@@ -4911,9 +4885,17 @@
   font-weight: $font-weight-semibold;
   line-height: 1.35;
 }
-.food-detail-page__source {
-  color: $color-text-secondary;
+.food-detail-page__name-row {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-4;
+}
+.food-detail-page__calories-inline {
+  color: $color-forest-green;
   font-size: $font-body;
+  font-weight: $font-weight-semibold;
+  white-space: nowrap;
 }
 .food-detail-page__section-heading {
   align-items: end;

@@ -1,5 +1,6 @@
 const http = require("node:http");
 const https = require("node:https");
+const crypto = require("node:crypto");
 const { URL, URLSearchParams } = require("node:url");
 const { createProductSessionService, PublicLoginError, verifyAccessToken } = require("./product-session-service.cjs");
 const { createProductDataService } = require("./product-data-service.cjs");
@@ -28,6 +29,7 @@ const { createFoodAdminService, FoodAdminError } = require("./food-admin-service
 const { createHunyuanImageService, HunyuanImageError } = require("./hunyuan-image-service.cjs");
 const { createHunyuanWorkerClient } = require("./hunyuan-worker-client.cjs");
 const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
+const { createFoodImageBatchService, FoodImageBatchError } = require("./food-image-batch-service.cjs");
 const { getFoodDisplayName } = require("./food-display-name.cjs");
 
 // Random 5–6 hanzi Chinese nickname generator for default profile seeding.
@@ -177,6 +179,56 @@ function readJsonBody(req, maxBytes = MAX_BODY_BYTES) {
     });
     req.on("error", reject);
   });
+}
+
+function readRawJsonBody(req, maxBytes = MAX_BODY_BYTES) {
+  return new Promise((resolve, reject) => {
+    const contentType = typeof req.headers["content-type"] === "string" ? req.headers["content-type"] : "";
+    if (!contentType.toLowerCase().startsWith("application/json")) {
+      reject(new PublicLoginError("REQUEST_INVALID", "请求无效"));
+      return;
+    }
+    let size = 0;
+    let raw = "";
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        reject(new PublicLoginError("REQUEST_TOO_LARGE", "请求无效"));
+        req.destroy();
+        return;
+      }
+      raw += chunk;
+    });
+    req.on("end", () => {
+      if (!raw) {
+        reject(new PublicLoginError("REQUEST_INVALID", "请求无效"));
+        return;
+      }
+      try {
+        resolve({ raw, body: JSON.parse(raw) });
+      } catch {
+        reject(new PublicLoginError("REQUEST_INVALID", "请求无效"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+function signFoodImageDispatch(secret, { timestamp, method = "POST", path, body = "" } = {}) {
+  const canonical = `${timestamp}\n${String(method).toUpperCase()}\n${path}\n${body}`;
+  return crypto.createHmac("sha256", String(secret || "")).update(canonical).digest("hex");
+}
+
+function verifyFoodImageDispatchSignature(secret, req, { path, body, now = Date.now() } = {}) {
+  if (!secret || !path) return false;
+  const timestamp = String(req.headers["x-food-image-dispatch-timestamp"] || "");
+  const signature = String(req.headers["x-food-image-dispatch-signature"] || "");
+  const numericTimestamp = Number(timestamp);
+  if (!Number.isInteger(numericTimestamp) || Math.abs(Math.floor(now / 1000) - numericTimestamp) > 300) return false;
+  const expected = signFoodImageDispatch(secret, { timestamp, method: req.method, path, body });
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const actualBuffer = Buffer.from(signature, "utf8");
+  return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
 function readRuntimeConfig(env) {
@@ -486,7 +538,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   // the legacy foodCatalog so existing /foods routes keep working while the new
   // /foods/categories, /foods/tags, /foods/suggestions, /foods/barcode and
   // /api/admin/foods routes serve the richer model.
-  const foodRepository = createFoodRepository({ db });
+  const foodRepository = createFoodRepository({
+    db,
+    imageCdnBaseUrl: env.FOOD_IMAGE_CDN_BASE_URL,
+  });
   const usdaService = typeof env.USDA_FDC_API_KEY === "string" && env.USDA_FDC_API_KEY.trim()
     ? createUsdaService({ apiKey: env.USDA_FDC_API_KEY, baseUrl: env.USDA_API_BASE_URL || "https://api.nal.usda.gov/fdc/v1" })
     : null;
@@ -508,15 +563,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
         try {
           const uploaded = await client.uploadFile({ cloudPath, fileContent });
           if (!uploaded?.fileID) throw new Error("Food image upload failed");
-          let url = null;
-          try {
-            const temporary = await client.getTempFileURL({ fileList: [uploaded.fileID] });
-            url = temporary?.fileList?.[0]?.tempFileURL ?? null;
-          } catch {
-            url = null;
-          }
-          // fileID alone is enough for later resolution; URL preferred for mini-program https display.
-          return { url: url || uploaded.fileID, fileID: uploaded.fileID };
+          // Storage path is the canonical address. Do not persist a temporary
+          // URL or expose a fileID as a display URL.
+          return { fileID: uploaded.fileID };
         } catch (error) {
           lastError = error;
         }
@@ -566,6 +615,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       dailyLimit: Number(env.HY_IMAGE_DAILY_LIMIT) || 500,
       maxAttempts: Number(env.HY_IMAGE_MAX_RETRIES) || 3,
       storagePrefix: env.FOOD_IMAGE_STORAGE_PREFIX || "food-library",
+      imageCdnBaseUrl: env.FOOD_IMAGE_CDN_BASE_URL,
       generationEnabled: hunyuanEnabled && Boolean(hunyuanImageService),
     },
     triggerWorker: async ({ jobId }) => {
@@ -577,6 +627,11 @@ function createRuntimeService(env = process.env, dependencies = {}) {
         });
       });
     },
+  });
+  const foodImageBatches = createFoodImageBatchService({
+    db,
+    repository: foodRepository,
+    jobs: foodImageJobs,
   });
   let vision = null;
   const qwenApiKey = typeof env.QWEN_API_KEY === "string" && env.QWEN_API_KEY.trim()
@@ -679,6 +734,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodAdmin: foodAdminService,
     foodImage: foodImageService,
     foodImageJobs,
+    foodImageBatches,
     hunyuanImage: hunyuanImageService,
     hunyuanAiAuthMode: aiAuthMode,
     hunyuanAiDiagnostics: {
@@ -691,6 +747,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       hasCloudbaseApiKey: Boolean(savedCloudbaseApiKey || config.cloudbaseApiKey),
       modelName: env.HY_IMAGE_MODEL || "HY-Image-3.0-Plus-4090-Tob-v1.0",
     },
+    // Prefer a purpose-specific secret.  The fallback keeps the first rollout
+    // compatible with the already protected image-worker deployment, without
+    // replacing the main function's complete environment-variable set.
+    foodImageDispatchSecret: env.FOOD_IMAGE_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
     avatar,
     vision,
     calculateNutritionPlan: calculateNutritionPlanWithAi,
@@ -767,6 +827,13 @@ function getAdminFoodRoute(pathname) {
   const path = pathname.replace(/^\/get-login-ticket/, "").replace(/^\/api\/admin/, "");
   if (path === "/foods/missing-images") return { operation: "missingImages" };
   if (path === "/foods/sync-jobs") return { operation: "syncJobs" };
+  if (path === "/food-image-batches") return { operation: "imageBatches" };
+  if (path === "/food-image-batches/preview") return { operation: "imageBatchPreview" };
+  if (path === "/food-image-batches/first-sample") return { operation: "imageBatchFirstSample" };
+  const batchActionMatch = path.match(/^\/food-image-batches\/([0-9a-f-]{36})\/(start|pause|resume|cancel|worker)$/i);
+  if (batchActionMatch) return { operation: "imageBatchAction", batchId: batchActionMatch[1], action: batchActionMatch[2].toLowerCase() };
+  const batchMatch = path.match(/^\/food-image-batches\/([0-9a-f-]{36})$/i);
+  if (batchMatch) return { operation: "imageBatchDetail", batchId: batchMatch[1] };
   if (path === "/food-image-jobs/batch") return { operation: "imageJobsBatch" };
   if (path === "/food-image-jobs/worker") return { operation: "imageJobsWorker" };
   if (path === "/food-image-jobs/stats") return { operation: "imageJobsStats" };
@@ -787,6 +854,15 @@ function getAdminFoodRoute(pathname) {
   const foodPatchMatch = path.match(/^\/foods\/([0-9a-f-]{36})$/i);
   if (foodPatchMatch) return { operation: "patchFood", foodId: foodPatchMatch[1] };
   return null;
+}
+
+function getInternalFoodImageRoute(pathname) {
+  const path = normalizeFoodImageDispatchPath(pathname);
+  return path === "/api/internal/food-image-batches/dispatch" ? { operation: "dispatchImageBatches" } : null;
+}
+
+function normalizeFoodImageDispatchPath(pathname) {
+  return String(pathname || "").replace(/^\/get-login-ticket/, "");
 }
 
 function isFeedbackRoute(pathname) {
@@ -825,12 +901,31 @@ function createHttpServer({ service }) {
     const coachOperation = getCoachRoute(url.pathname);
     const foodRoute = getFoodRoute(url.pathname);
     const adminFoodRoute = getAdminFoodRoute(url.pathname);
+    const internalFoodImageRoute = getInternalFoodImageRoute(url.pathname);
     const feedbackRoute = isFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !foodRoute && !adminFoodRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
+    }
+    if (internalFoodImageRoute) {
+      if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      try {
+        const payload = await readRawJsonBody(req);
+        if (!verifyFoodImageDispatchSignature(service?.foodImageDispatchSecret, req, {
+          // The CloudBase service gateway strips the function prefix before
+          // forwarding, while local HTTP tests keep it.  HMAC only signs the
+          // stable route below the function prefix so both forms match.
+          path: normalizeFoodImageDispatchPath(url.pathname),
+          body: payload.raw,
+        })) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+        if (!service?.foodImageBatches?.dispatchTrusted) return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_UNAVAILABLE" });
+        return sendJson(res, 200, await service.foodImageBatches.dispatchTrusted({ maxItems: payload.body?.maxItems }));
+      } catch (error) {
+        console.error("[food-image-dispatch] failed:", error?.code || error?.message || error);
+        return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_FAILED" });
+      }
     }
     if (avatarRoute) {
       const session = service?.verifySession?.(readBearerToken(req));
@@ -963,6 +1058,42 @@ function createHttpServer({ service }) {
           const limit = Number(url.searchParams.get("limit") ?? "20");
           return sendJson(res, 200, { items: await service.foodAdmin.listSyncJobs(session.sub, limit) });
         }
+        if (adminFoodRoute.operation === "imageBatches") {
+          if (req.method === "GET") {
+            return sendJson(res, 200, await service.foodImageBatches.list(session.sub, {
+              page: Number(url.searchParams.get("page") ?? "1"),
+              pageSize: Number(url.searchParams.get("pageSize") ?? "20"),
+            }));
+          }
+          if (req.method === "POST") {
+            const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+            const create = body?.categoryId ? service.foodImageBatches.createFromCategory : service.foodImageBatches.create;
+            return sendJson(res, 200, await create.call(service.foodImageBatches, session.sub, body || {}));
+          }
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "imageBatchPreview") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.foodImageBatches.previewCategory(session.sub, body || {}));
+        }
+        if (adminFoodRoute.operation === "imageBatchFirstSample") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.foodImageBatches.createFirstSample(session.sub));
+        }
+        if (adminFoodRoute.operation === "imageBatchDetail") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.foodImageBatches.get(session.sub, adminFoodRoute.batchId, {
+            page: Number(url.searchParams.get("page") ?? "1"),
+            pageSize: Number(url.searchParams.get("pageSize") ?? "50"),
+          }));
+        }
+        if (adminFoodRoute.operation === "imageBatchAction") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          const action = adminFoodRoute.action;
+          if (action === "worker") return sendJson(res, 200, await service.foodImageBatches.processNext(session.sub, adminFoodRoute.batchId));
+          return sendJson(res, 200, await service.foodImageBatches[action](session.sub, adminFoodRoute.batchId));
+        }
         if (adminFoodRoute.operation === "imageJobsStats") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           return sendJson(res, 200, await service.foodImageJobs.getStats(session.sub));
@@ -1055,7 +1186,21 @@ function createHttpServer({ service }) {
         if (adminFoodRoute.operation === "rejectImage") {
           if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
-          return sendJson(res, 200, await service.foodImageJobs.rejectImage(session.sub, adminFoodRoute.imageId, body || {}));
+          const rejected = await service.foodImageJobs.rejectImage(session.sub, adminFoodRoute.imageId, body || {});
+          let retry = { processed: 0, retryScheduled: false };
+          if (rejected.jobId && typeof service.foodImageBatches?.retryRejectedJob === "function") {
+            try {
+              retry = await service.foodImageBatches.retryRejectedJob(session.sub, rejected.jobId);
+            } catch (error) {
+              retry = {
+                processed: 0,
+                retryScheduled: false,
+                errorCode: error?.code || "FOOD_IMAGE_RETRY_START_FAILED",
+                errorMessage: String(error?.message || error).slice(0, 500),
+              };
+            }
+          }
+          return sendJson(res, 200, { ...rejected, retry });
         }
         if (adminFoodRoute.operation === "regenerateImage") {
           if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -1078,7 +1223,7 @@ function createHttpServer({ service }) {
           return sendJson(res, 200, await service.foodAdmin.updateFood(session.sub, adminFoodRoute.foodId, body || {}));
         }
       } catch (error) {
-        if (error instanceof FoodAdminError || error instanceof FoodImageJobError || error instanceof HunyuanImageError) {
+        if (error instanceof FoodAdminError || error instanceof FoodImageJobError || error instanceof FoodImageBatchError || error instanceof HunyuanImageError) {
           const code = error.code;
           const status = code === "FORBIDDEN" ? 403 : code === "UNAUTHORIZED" ? 401 : 400;
           return sendJson(res, status, { code });
@@ -1289,4 +1434,6 @@ module.exports = {
   selectDeepseekModel,
   requestWechatSession,
   shuffleCatalogItems,
+  signFoodImageDispatch,
+  verifyFoodImageDispatchSignature,
 };

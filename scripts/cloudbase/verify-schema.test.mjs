@@ -147,6 +147,15 @@ test("food image generation migration adds jobs queue and review metadata", asyn
   assert.match(sql, /'candidate'/i);
 });
 
+test("food image batch dispatch migration records retry feedback and the latest candidate", async () => {
+  const sql = await readFile(new URL("../../cloudbase/pg/migrations/0018_food_image_batch_dispatch.sql", import.meta.url), "utf8");
+
+  assert.match(sql, /add column if not exists last_image_id uuid references public\.food_images/i);
+  assert.match(sql, /add column if not exists retry_reason text/i);
+  assert.match(sql, /check \(retry_reason is null or char_length\(retry_reason\) <= 500\)/i);
+  assert.match(sql, /food_image_batch_items_running_claim_idx/i);
+});
+
 test("food seed inserts 50 high-frequency fixture foods idempotently", async () => {
   const sql = await readFile(new URL("../../cloudbase/pg/seeds/0012_food_seed.sql", import.meta.url), "utf8");
   assert.match(sql, /insert into public\.foods[\s\S]*on conflict \(source, source_id\) do nothing/i);
@@ -155,4 +164,3 @@ test("food seed inserts 50 high-frequency fixture foods idempotently", async () 
   const slugs = sql.match(/\('([a-z-]+)','[^']+','[^']+',/g) ?? [];
   assert.ok(slugs.length >= 50, `expected >=50 seed foods, got ${slugs.length}`);
 });
-

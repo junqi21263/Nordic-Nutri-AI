@@ -1,7 +1,7 @@
 import { Image, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
 import type { ProductFoodCatalogItem } from "../../api/food-catalog-api";
-import { getFoodVisualFallback, resolveFoodVisual } from "../../features/food-catalog/food-visuals";
+import { getFoodVisualAspectRatio, getFoodVisualFallback, resolveFoodVisual } from "../../features/food-catalog/food-visuals";
 import { NordicIcon } from "../nordic-icon";
 
 interface FoodThumbnailProps {
@@ -22,6 +22,9 @@ export function FoodThumbnail({
 }: FoodThumbnailProps) {
   const preferred = resolveFoodVisual(food, prefer);
   const fallback = getFoodVisualFallback(food);
+  const frameStyle = prefer === "detail"
+    ? { aspectRatio: String(getFoodVisualAspectRatio(food)), height: "auto" }
+    : undefined;
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -35,6 +38,7 @@ export function FoodThumbnail({
     return (
       <View
         className={`${className} food-thumbnail food-thumbnail--fallback food-thumbnail--${fallback.tone}`}
+        style={frameStyle}
       >
         <NordicIcon name={fallback.icon} size={iconSize} ariaLabel={food.description} />
       </View>
@@ -42,7 +46,7 @@ export function FoodThumbnail({
   }
 
   return (
-    <View className={`${className} food-thumbnail food-thumbnail--frame`}>
+    <View className={`${className} food-thumbnail food-thumbnail--frame`} style={frameStyle}>
       {showSkeleton && !loaded ? (
         <View className={`food-thumbnail__skeleton food-thumbnail--${fallback.tone}`} />
       ) : null}

@@ -8,9 +8,11 @@ import {
   mapFoodRow,
   mapCategoryRow,
   mapTagRow,
+  mapImageRow,
   sanitizeFilterTerm,
   createFoodRepository,
 } from "./food-repository.cjs";
+import { createFoodStorageUrlResolver } from "./food-storage-url-service.cjs";
 
 function mockDb(tables = {}) {
   const calls = [];
@@ -124,6 +126,28 @@ test("mapCategoryRow and mapTagRow", () => {
   assert.equal(mapTagRow({ id: "t1", code: "high_protein", name_zh: "高蛋白", sort_order: 1, is_active: true }).code, "high_protein");
 });
 
+test("mapImageRow prefers stable CDN URLs derived from storage_path", () => {
+  const resolver = createFoodStorageUrlResolver({
+    baseUrl: "https://cdn.example.test",
+  });
+  const image = mapImageRow({
+    id: "img-1",
+    food_id: "food-1",
+    storage_path: "food-library/food-1/img-1",
+    thumb_url: "https://temporary.example/thumb",
+    medium_url: "https://temporary.example/medium",
+    detail_url: "https://temporary.example/detail",
+    original_url: "https://temporary.example/original",
+    source: "hunyuan",
+    status: "ready",
+    review_status: "approved",
+  }, { imageUrlResolver: resolver });
+  assert.equal(image.thumbnailUrl, "https://cdn.example.test/food-library/food-1/img-1/thumbnail.webp");
+  assert.equal(image.listUrl, "https://cdn.example.test/food-library/food-1/img-1/list.webp");
+  assert.equal(image.detailUrl, "https://cdn.example.test/food-library/food-1/img-1/detail.webp");
+  assert.equal(image.originalUrl, null);
+});
+
 test("listCategories returns active categories sorted", async () => {
   const db = mockDb({ food_categories: [
     { id: "c1", code: "meat", name_zh: "肉禽", name_en: "Meat", sort_order: 1, is_active: true },
@@ -134,6 +158,23 @@ test("listCategories returns active categories sorted", async () => {
   const cats = await repo.listCategories();
   assert.equal(cats.length, 2);
   assert.equal(cats[0].code, "meat");
+});
+
+test("listBatchImageCandidates selects published primary foods without a primary image from one category", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-1", name_zh: "番茄", category_id: "c-vegetables", is_active: true, publish_status: "published", is_primary_variant: true, primary_image_id: null },
+      { id: "f-2", name_zh: "胡萝卜", category_id: "c-vegetables", is_active: true, publish_status: "published", is_primary_variant: true, primary_image_id: "img-2" },
+      { id: "f-3", name_zh: "西兰花", category_id: "c-vegetables", is_active: true, publish_status: "draft", is_primary_variant: true, primary_image_id: null },
+      { id: "f-4", name_zh: "鸡蛋", category_id: "c-eggs", is_active: true, publish_status: "published", is_primary_variant: true, primary_image_id: null },
+    ],
+  });
+  const repo = createFoodRepository({ db });
+
+  const result = await repo.listBatchImageCandidates({ categoryId: "c-vegetables", count: 20 });
+
+  assert.deepEqual(result.items.map((item) => item.id), ["f-1"]);
+  assert.equal(result.total, 1);
 });
 
 test("listFoods applies search filter, pagination, and joins", async () => {
