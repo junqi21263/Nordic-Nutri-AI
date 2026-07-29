@@ -3,6 +3,7 @@
 // is created from client-side state and only an administrator can advance it.
 
 const { buildFoodImagePromptPlan } = require("./food-image-prompts.cjs");
+const { getFoodDisplayName } = require("./food-display-name.cjs");
 
 const BATCH_STATUSES = new Set(["draft", "running", "paused", "completed", "completed_with_errors", "cancelled"]);
 const ITEM_STATUSES = new Set(["pending", "generating", "needs_retry", "needs_review", "completed", "failed", "skipped"]);
@@ -126,7 +127,11 @@ function mapBatchItemRow(row, food = null) {
     lastImageId: row.last_image_id ?? null,
     retryReason: row.retry_reason ?? null,
     nextRetryAt: row.next_retry_at ?? null,
-    food: food ? { id: food.id, nameZh: food.nameZh, category: food.category?.nameZh || null } : null,
+    food: food ? {
+      id: food.id,
+      nameZh: getFoodDisplayName(food),
+      category: food.category?.nameZh || null,
+    } : null,
   };
 }
 
@@ -147,7 +152,12 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
     });
     const foods = (result.items || []).map((food) => ({
       id: food.id,
-      nameZh: food.nameZh || food.name_zh || "未命名食材",
+      nameZh: getFoodDisplayName({
+        nameZh: food.nameZh || food.name_zh,
+        nameEn: food.nameEn || food.name_en,
+        description: food.description,
+        normalizedName: food.normalizedName || food.normalized_name,
+      }),
     })).filter((food) => food.id);
     return {
       categoryId: payload.categoryId,
@@ -341,7 +351,8 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
       const food = await repository.getFoodById(locked.data.food_id);
       if (!food) throw new FoodImageBatchError("FOOD_NOT_FOUND");
       const plan = buildFoodImagePromptPlan({
-        foodNameZh: food.nameZh, foodNameEn: food.nameEn,
+        foodNameZh: getFoodDisplayName(food),
+        foodNameEn: food.nameEn,
         category: food.category?.nameZh || food.category?.code,
         cookingMethod: food.defaultCookingMethod,
         retryReason: locked.data.retry_reason,
@@ -405,7 +416,8 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
 
   async function retryRejectedJob(userId, jobId) {
     await requireAdmin(userId);
-    const result = await db.from("food_image_batch_items").select("*").eq("job_id", jobId).eq("status", "needs_retry").maybeSingle();
+    const result = await db.from("food_image_batch_items").select("*").eq("job_id", jobId)
+      .in("status", ["needs_retry", "failed"]).maybeSingle();
     if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_RETRY_ITEM_LOOKUP_FAILED");
     if (!result.data) return { processed: 0, retryScheduled: false, reason: "RETRY_ITEM_NOT_READY" };
     const batch = await findBatch(result.data.batch_id);
@@ -414,6 +426,18 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
       if (resumed.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_RETRY_RESUME_FAILED");
     } else if (batch.status !== "running") {
       return { processed: 0, retryScheduled: false, reason: "RETRY_BATCH_NOT_RUNNING", batch };
+    }
+    if (result.data.status === "failed") {
+      const reopened = await db.from("food_image_batch_items").update({
+        status: "needs_retry",
+        attempt_count: Math.max(0, Number(result.data.attempt_count || 0) - 1),
+        error_code: null,
+        error_message: null,
+        next_retry_at: null,
+        locked_at: null,
+        locked_by: null,
+      }).eq("id", result.data.id).eq("status", "failed");
+      if (reopened.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_RETRY_REOPEN_FAILED");
     }
     const retried = await processNext(userId, result.data.batch_id, { itemId: result.data.id });
     return { ...retried, retryScheduled: Boolean(retried.processed), retryItemId: result.data.id };

@@ -110,3 +110,29 @@ test("rejecting a candidate triggers its server-controlled retry and carries the
   assert.match(source, /重试任务已提交/);
   assert.match(source, /retryScheduled/);
 });
+
+test("queue summary drops the hero review count and keeps left-aligned progress copy", async () => {
+  const source = await pageSource();
+  assert.doesNotMatch(source, /id="reviewCount"/);
+  assert.doesNotMatch(source, /class="summary-number"/);
+  assert.match(source, /id="reviewCopy"/);
+  assert.match(source, /\.queue-summary \{ display: flex;[^}]*justify-content: flex-start;/);
+});
+
+test("all-items filter is the leftmost queue filter control", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="filterRow"[\s\S]*?data-filter="all"[\s\S]*?data-filter="needs_review"/);
+});
+
+test("candidate cards keep a bare checkbox without repeating batch-select wording", async () => {
+  const source = await pageSource();
+  assert.match(source, /data-candidate-select=/);
+  assert.doesNotMatch(source, /批量选择<\/label>/);
+  assert.doesNotMatch(source, /card-select-label[\s\S]{0,120}批量/);
+});
+
+test("retryable failed items expose an immediate retry action", async () => {
+  const source = await pageSource();
+  assert.match(source, /立即重试/);
+  assert.match(source, /food-image-jobs\/\$\{[^}]+\}\/retry|\/food-image-jobs\/.*\/retry|retryRejected|retryItem/);
+});

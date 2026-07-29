@@ -229,3 +229,22 @@ test("retries the exact rejected batch item immediately and reopens a completed 
   assert.equal(item.attempt_count, 2);
   assert.match(created[0].input.extraPrompt, /主体偏肥/);
 });
+
+test("previewCategory falls back to localized English food names when name_zh is missing", async () => {
+  const repository = {
+    isAdmin: async () => true,
+    listBatchImageCandidates: async () => ({
+      total: 2,
+      items: [
+        { id: "food-1", name_zh: null, name_en: "Beef, NFS" },
+        { id: "food-2", name_zh: null, name_en: "Chicken breast" },
+      ],
+    }),
+  };
+  const service = createFoodImageBatchService({ db: {}, repository, jobs: {} });
+  const preview = await service.previewCategory("admin-1", { categoryId: "c-meat", count: 20 });
+  assert.deepEqual(preview.foods, [
+    { id: "food-1", nameZh: "牛肉" },
+    { id: "food-2", nameZh: "Chicken breast" },
+  ]);
+});

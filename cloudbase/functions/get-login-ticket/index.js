@@ -842,6 +842,8 @@ function getAdminFoodRoute(pathname) {
   if (path === "/food-image-jobs/stats") return { operation: "imageJobsStats" };
   if (path === "/food-image-jobs/diagnose") return { operation: "imageJobsDiagnose" };
   if (path === "/food-image-jobs") return { operation: "imageJobs" };
+  const jobRetryMatch = path.match(/^\/food-image-jobs\/([0-9a-f-]{36})\/retry$/i);
+  if (jobRetryMatch) return { operation: "retryImageJob", jobId: jobRetryMatch[1] };
   const jobMatch = path.match(/^\/food-image-jobs\/([0-9a-f-]{36})$/i);
   if (jobMatch) return { operation: "imageJobDetail", jobId: jobMatch[1] };
   const approveMatch = path.match(/^\/food-images\/([0-9a-f-]{36})\/approve$/i);
@@ -1181,6 +1183,13 @@ function createHttpServer({ service }) {
         if (adminFoodRoute.operation === "imageJobDetail") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           return sendJson(res, 200, await service.foodImageJobs.getJob(session.sub, adminFoodRoute.jobId));
+        }
+        if (adminFoodRoute.operation === "retryImageJob") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (typeof service.foodImageBatches?.retryRejectedJob !== "function") {
+            return sendJson(res, 503, { code: "FOOD_IMAGE_BATCH_UNAVAILABLE" });
+          }
+          return sendJson(res, 200, await service.foodImageBatches.retryRejectedJob(session.sub, adminFoodRoute.jobId));
         }
         if (adminFoodRoute.operation === "approveImage") {
           if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });

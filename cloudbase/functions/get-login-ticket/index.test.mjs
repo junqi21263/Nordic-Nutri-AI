@@ -810,6 +810,31 @@ test("rejecting a batch candidate immediately starts its server-controlled retry
   ]);
 });
 
+test("admin can immediately retry a rejected or failed image job", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      foodImageBatches: {
+        retryRejectedJob: async (userId, jobId) => {
+          calls.push({ userId, jobId });
+          return { processed: 1, retryScheduled: true, retryItemId: "item-1" };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-image-jobs/11111111-2222-4333-8444-555555555555/retry`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { processed: 1, retryScheduled: true, retryItemId: "item-1" });
+  });
+  assert.deepEqual(calls, [{ userId: "admin-1", jobId: "11111111-2222-4333-8444-555555555555" }]);
+});
+
 test("omits Access-Control-Allow-Origin so CloudBase gateway does not duplicate it", async () => {
   const server = createHttpServer({ service: null });
 
