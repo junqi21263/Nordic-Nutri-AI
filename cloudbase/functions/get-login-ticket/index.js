@@ -31,6 +31,7 @@ const { normalizeFoodRecord } = require("./food-normalization-service.cjs");
 const { createFoodImageService, FoodImageError } = require("./food-image-service.cjs");
 const { createFoodBarcodeService, FoodBarcodeError } = require("./food-barcode-service.cjs");
 const { createFoodAdminService, FoodAdminError } = require("./food-admin-service.cjs");
+const { createAdminConsoleService, AdminConsoleError } = require("./admin-console-service.cjs");
 const { createHunyuanImageService, HunyuanImageError } = require("./hunyuan-image-service.cjs");
 const { createHunyuanWorkerClient } = require("./hunyuan-worker-client.cjs");
 const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
@@ -589,6 +590,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     requestCompletion: nutritionContentWorker ? (context) => nutritionContentWorker.generateInsight(context) : null,
     model: devTextModel,
     source: "hunyuan-exp",
+    db,
   });
   const usdaService = typeof env.USDA_FDC_API_KEY === "string" && env.USDA_FDC_API_KEY.trim()
     ? createUsdaService({ apiKey: env.USDA_FDC_API_KEY, baseUrl: env.USDA_API_BASE_URL || "https://api.nal.usda.gov/fdc/v1" })
@@ -634,6 +636,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     usdaService,
     normalizer: { normalizeFoodRecord },
     imageService: foodImageService,
+  });
+  const adminConsoleService = createAdminConsoleService({
+    db,
+    isAdmin: (userId) => foodRepository.isAdmin(userId),
   });
 
   // Hunyuan food-image generation (小程序成长计划). Model ID comes from env —
@@ -788,6 +794,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodInsight,
     foodBarcode: foodBarcodeService,
     foodAdmin: foodAdminService,
+    adminConsole: adminConsoleService,
     foodImage: foodImageService,
     foodImageJobs,
     foodImageBatches,
@@ -884,7 +891,13 @@ function getFoodRoute(pathname) {
 }
 
 function getAdminFoodRoute(pathname) {
-  const path = pathname.replace(/^\/get-login-ticket/, "").replace(/^\/api\/admin/, "");
+  const stripped = pathname.replace(/^\/get-login-ticket/, "");
+  if (!stripped.startsWith("/api/admin")) return null;
+  const path = stripped.replace(/^\/api\/admin/, "") || "/";
+  if (path === "/users") return { operation: "listUsers" };
+  if (path === "/feedback") return { operation: "listFeedback" };
+  const feedbackMatch = path.match(/^\/feedback\/([0-9a-f-]{36})$/i);
+  if (feedbackMatch) return { operation: "patchFeedback", feedbackId: feedbackMatch[1] };
   if (path === "/foods/missing-images") return { operation: "missingImages" };
   if (path === "/foods/sync-jobs") return { operation: "syncJobs" };
   if (path === "/food-image-batches") return { operation: "imageBatches" };
@@ -1117,6 +1130,28 @@ function createHttpServer({ service }) {
       const session = service?.verifySession?.(readBearerToken(req));
       if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try {
+        if (adminFoodRoute.operation === "listUsers") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.adminConsole) return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });
+          return sendJson(res, 200, await service.adminConsole.listUsers(session.sub, {
+            q: url.searchParams.get("q") || "",
+            limit: url.searchParams.get("limit"),
+          }));
+        }
+        if (adminFoodRoute.operation === "listFeedback") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.adminConsole) return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });
+          return sendJson(res, 200, await service.adminConsole.listFeedback(session.sub, {
+            status: url.searchParams.get("status") || undefined,
+            limit: url.searchParams.get("limit"),
+          }));
+        }
+        if (adminFoodRoute.operation === "patchFeedback") {
+          if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.adminConsole) return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });
+          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+          return sendJson(res, 200, await service.adminConsole.updateFeedbackStatus(session.sub, adminFoodRoute.feedbackId, body || {}));
+        }
         if (adminFoodRoute.operation === "missingImages") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           const limit = Number(url.searchParams.get("limit") ?? "50");
@@ -1299,6 +1334,15 @@ function createHttpServer({ service }) {
           return sendJson(res, 200, await service.foodAdmin.updateFood(session.sub, adminFoodRoute.foodId, body || {}));
         }
       } catch (error) {
+        if (error instanceof AdminConsoleError) {
+          const code = error.code;
+          const status = code === "FORBIDDEN" ? 403
+            : code === "UNAUTHORIZED" ? 401
+            : code === "FEEDBACK_NOT_FOUND" ? 404
+            : code === "FEEDBACK_STATUS_INVALID" ? 400
+            : 503;
+          return sendJson(res, status, { code });
+        }
         if (error instanceof FoodAdminError || error instanceof FoodImageJobError || error instanceof FoodImageBatchError || error instanceof HunyuanImageError) {
           const code = error.code;
           const status = code === "FORBIDDEN" ? 403 : code === "UNAUTHORIZED" ? 401 : 400;
@@ -1368,7 +1412,8 @@ function createHttpServer({ service }) {
         if (coachOperation === "getDailyTip" && req.method === "GET") {
           const date = url.searchParams.get("date");
           if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
-          return sendJson(res, 200, await service.coach.getDailyTip(session.sub, date));
+          const refresh = url.searchParams.get("refresh") === "1" || url.searchParams.get("refresh") === "true";
+          return sendJson(res, 200, await service.coach.getDailyTip(session.sub, date, { refresh }));
         }
         if (coachOperation === "restartConversation" && req.method === "POST") {
           return sendJson(res, 200, await service.coach.restartConversation(session.sub));

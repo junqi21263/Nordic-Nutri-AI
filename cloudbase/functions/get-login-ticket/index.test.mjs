@@ -940,6 +940,51 @@ test("admin can immediately retry a rejected or failed image job", async () => {
   assert.deepEqual(calls, [{ userId: "admin-1", jobId: "11111111-2222-4333-8444-555555555555" }]);
 });
 
+test("admin users and feedback routes require session and accept admin", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => (token === "valid-session" ? { sub: "admin-1" } : null),
+      adminConsole: {
+        listUsers: async (userId, query) => {
+          calls.push(["users", userId, query]);
+          return { items: [], nextCursor: null };
+        },
+        listFeedback: async (userId, query) => {
+          calls.push(["feedback", userId, query]);
+          return { items: [], nextCursor: null };
+        },
+        updateFeedbackStatus: async (userId, id, body) => {
+          calls.push(["patch", userId, id, body]);
+          return { id, status: body.status };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/get-login-ticket/api/admin/users`);
+    assert.equal(denied.status, 401);
+
+    const users = await fetch(`${baseUrl}/get-login-ticket/api/admin/users?q=%E5%8C%97`, {
+      headers: { authorization: "Bearer valid-session" },
+    });
+    assert.equal(users.status, 200);
+
+    const feedback = await fetch(`${baseUrl}/get-login-ticket/api/admin/feedback?status=new`, {
+      headers: { authorization: "Bearer valid-session" },
+    });
+    assert.equal(feedback.status, 200);
+
+    const patched = await fetch(`${baseUrl}/get-login-ticket/api/admin/feedback/11111111-2222-4333-8444-555555555555`, {
+      method: "PATCH",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({ status: "resolved" }),
+    });
+    assert.equal(patched.status, 200);
+    assert.equal(calls.some((c) => c[0] === "patch"), true);
+  });
+});
+
 test("omits Access-Control-Allow-Origin so CloudBase gateway does not duplicate it", async () => {
   const server = createHttpServer({ service: null });
 

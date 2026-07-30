@@ -155,3 +155,35 @@ test("retryable failed items expose an immediate retry action", async () => {
   assert.match(source, /立即重试/);
   assert.match(source, /food-image-jobs\/\$\{[^}]+\}\/retry|\/food-image-jobs\/.*\/retry|retryRejected|retryItem/);
 });
+
+test("admin console shell uses left nav modules and renames the page", async () => {
+  const source = await pageSource();
+  assert.match(source, /<h1>管理后台<\/h1>/);
+  assert.match(source, /Admin Console/);
+  assert.match(source, /data-module="users"/);
+  assert.match(source, /data-module="feedback"/);
+  assert.match(source, /data-module="system"/);
+  assert.match(source, /id="moduleUsers"/);
+  assert.match(source, /id="moduleFeedback"/);
+  assert.match(source, /id="moduleSystem"/);
+});
+
+test("connection settings sit below the workflow guide inside system config", async () => {
+  const source = await pageSource();
+  const guide = source.indexOf('id="workflowGuide"');
+  const tools = source.indexOf('id="utilityDrawer"');
+  const batch = source.indexOf('class="batch-controller"');
+  assert.ok(guide >= 0 && tools > guide, "tools after guide");
+  assert.ok(batch > tools, "batch composer after connection tools");
+});
+
+test("users and feedback modules call admin list endpoints", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="userSearch"/);
+  assert.match(source, /id="userTable"/);
+  assert.match(source, /\/users\?/);
+  assert.match(source, /id="feedbackStatusFilter"/);
+  assert.match(source, /id="feedbackTable"/);
+  assert.match(source, /\/feedback/);
+  assert.match(source, /method:\s*"PATCH"/);
+});
