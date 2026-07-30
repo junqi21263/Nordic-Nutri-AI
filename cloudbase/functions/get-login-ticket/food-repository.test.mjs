@@ -168,6 +168,10 @@ test("listBatchImageCandidates selects published primary foods from one category
       { id: "f-3", name_zh: "西兰花", category_id: "c-vegetables", is_active: true, publish_status: "draft", is_primary_variant: true, primary_image_id: null },
       { id: "f-4", name_zh: "鸡蛋", category_id: "c-eggs", is_active: true, publish_status: "published", is_primary_variant: true, primary_image_id: null },
     ],
+    food_categories: [
+      { id: "c-vegetables", code: "vegetables", name_zh: "蔬菜", is_active: true },
+      { id: "c-eggs", code: "eggs", name_zh: "蛋类", is_active: true },
+    ],
   });
   const repo = createFoodRepository({ db });
 
@@ -175,6 +179,63 @@ test("listBatchImageCandidates selects published primary foods from one category
 
   assert.deepEqual(result.items.map((item) => item.id), ["f-1", "f-2"]);
   assert.equal(result.total, 2);
+});
+
+test("listBatchImageCandidates expands a selected parent category to all descendant categories", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-root", name_zh: "三文鱼罐头", category_id: "c-seafood", is_active: true, publish_status: "published", is_primary_variant: true },
+      { id: "f-fish", name_zh: "三文鱼", category_id: "c-marine-fish", is_active: true, publish_status: "published", is_primary_variant: true },
+      { id: "f-shrimp", name_zh: "虾", category_id: "c-shrimp-crab", is_active: true, publish_status: "published", is_primary_variant: true },
+      { id: "f-other", name_zh: "鸡胸肉", category_id: "c-meat", is_active: true, publish_status: "published", is_primary_variant: true },
+    ],
+    food_categories: [
+      { id: "c-seafood", code: "seafood", name_zh: "鱼虾海鲜", is_active: true },
+      { id: "c-marine-fish", code: "seafood.marine_fish", name_zh: "海水鱼", is_active: true },
+      { id: "c-shrimp-crab", code: "seafood.shrimp_crab", name_zh: "虾蟹", is_active: true },
+      { id: "c-meat", code: "meat_poultry", name_zh: "肉禽", is_active: true },
+    ],
+    food_image_visual_profiles: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+
+  const result = await repo.listBatchImageCandidates({ categoryId: "c-seafood", count: 20 });
+
+  assert.deepEqual(result.items.map((item) => item.id), ["f-fish", "f-root", "f-shrimp"]);
+  assert.equal(result.total, 3);
+  assert.equal(result.candidateCount, 3);
+});
+
+test("listBatchImageCandidates excludes only foods already ready for the requested visual profile", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-raw-ready", name_zh: "鸡胸肉", category_id: "c-meat", image_owner_food_id: "f-raw-ready", visual_profile_key: "raw", is_active: true, publish_status: "published", is_primary_variant: true },
+      { id: "f-cooked-ready", name_zh: "水煮鸡胸肉", category_id: "c-meat", image_owner_food_id: "f-cooked-ready", visual_profile_key: "cooked_plain", is_active: true, publish_status: "published", is_primary_variant: true },
+      { id: "f-cooked-missing", name_zh: "鸡腿肉", category_id: "c-meat", image_owner_food_id: "f-cooked-missing", visual_profile_key: "raw", is_active: true, publish_status: "published", is_primary_variant: true },
+    ],
+    food_categories: [{ id: "c-meat", code: "meat_poultry", name_zh: "肉禽", is_active: true }],
+    food_image_visual_profiles: [
+      { id: "profile-raw", food_id: "f-raw-ready", profile_key: "raw", is_default: true },
+      { id: "profile-cooked", food_id: "f-cooked-ready", profile_key: "cooked_plain", is_default: true },
+      { id: "profile-missing-raw", food_id: "f-cooked-missing", profile_key: "raw", is_default: true },
+    ],
+    food_images: [
+      { id: "image-raw", food_id: "f-raw-ready", visual_profile_id: "profile-raw", is_primary: true, status: "ready", review_status: "approved" },
+      { id: "image-cooked", food_id: "f-cooked-ready", visual_profile_id: "profile-cooked", is_primary: true, status: "ready", review_status: "approved" },
+    ],
+  });
+  const repo = createFoodRepository({ db });
+
+  const auto = await repo.listBatchImageCandidates({ categoryId: "c-meat", count: 20, visualProfileKey: "auto" });
+  assert.deepEqual(auto.items.map((item) => item.id), ["f-cooked-missing"]);
+  assert.equal(auto.total, 1);
+  assert.equal(auto.excludedReadyCount, 2);
+
+  const cooked = await repo.listBatchImageCandidates({ categoryId: "c-meat", count: 20, visualProfileKey: "cooked_plain" });
+  assert.deepEqual(cooked.items.map((item) => item.id), ["f-cooked-missing", "f-raw-ready"]);
+  assert.equal(cooked.total, 2);
+  assert.equal(cooked.excludedReadyCount, 1);
 });
 
 test("listFoods applies search filter, pagination, and joins", async () => {

@@ -1,0 +1,11 @@
+{
+  "name": "nordic-nutri-nutrition-insight-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test *.test.mjs"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.18.3"
+  }
+}

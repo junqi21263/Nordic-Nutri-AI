@@ -13,6 +13,8 @@ describe("persisted coach boundary", () => {
     expect(api).toContain("getProductCoachBrief");
     expect(api).toContain("ProductCoachReply");
     expect(api).toContain("ProductCoachBrief");
+    expect(api).toContain("serverTime: string");
+    expect(api).toContain("heroPrompt: string");
     expect(api).toContain("ProductCoachDailyTip");
     expect(api).toContain("getProductCoachDailyTip");
     expect(api).toContain("restartProductCoachConversation");
@@ -38,6 +40,8 @@ describe("persisted coach boundary", () => {
     expect(page).toContain("restartProductCoachConversation");
     expect(page).toContain("今日营养建议");
     expect(page).toContain("重启对话");
+    expect(page).toContain("heroPrompt");
+    expect(page).toContain("getCoachGreeting");
     expect(page).toContain("analyzeProductImage");
     expect(page).toContain("Taro.chooseMedia");
     expect(page).toContain('event.type === "delta"');

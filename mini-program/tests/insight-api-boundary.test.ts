@@ -10,13 +10,26 @@ describe("persisted insight API boundary", () => {
     const mealApi = read("src/api/meal-data-api.ts");
 
     expect(insightApi).toContain("getProductDailySummary");
+    expect(insightApi).toContain("ProductDailyInsight");
     expect(insightApi).toContain("getProductWeeklyReview");
     expect(insightApi).toContain("getProductAchievements");
+    expect(insightApi).toContain("serverTime: string");
     expect(insightApi).toContain("/meal-summary?date=");
     expect(insightApi).toContain("/weekly-review?date=");
     expect(insightApi).toContain("/achievements?date=");
     expect(mealApi).toContain("getProductMealsRange");
     expect(mealApi).toContain("getProductMeal");
+  });
+
+  it("uses the daily-summary server time and persisted insight for the home greeting and card", () => {
+    const homePage = read("src/pages/home/index.tsx");
+
+    expect(homePage).toContain("getCoachGreeting");
+    expect(homePage).toContain("remoteSummary?.serverTime ?? null");
+    expect(homePage).toContain("remoteSummary?.insight ?? null");
+    expect(homePage).toContain("headline={remoteInsight?.headline ?? undefined}");
+    expect(homePage).toContain("remoteInsight?.content");
+    expect(homePage).not.toContain("function createInsight(");
   });
 
   it("loads weekly reviews and achievements from the server without changing their page structure", () => {

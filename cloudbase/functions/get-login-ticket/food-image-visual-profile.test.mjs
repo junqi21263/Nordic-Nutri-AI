@@ -29,6 +29,15 @@ test("a cooked nutrition variant resolves to the cooked-plain profile", () => {
   }), "cooked_plain");
 });
 
+test("a grilled food form resolves to its own cooked visual profile", () => {
+  assert.equal(inferVisualProfileKey({
+    nameZh: "烤海螺",
+    category: { nameZh: "贝类" },
+    defaultCookingMethod: "烤",
+    foodForm: "cooked",
+  }), "cooked_grilled");
+});
+
 test("an explicit batch profile overrides automatic inference and exposes a safe prompt hint", () => {
   const profile = resolveVisualProfile({
     nameZh: "鸡胸肉",

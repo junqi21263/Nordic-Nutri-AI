@@ -33,7 +33,9 @@ export default function WeeklyReviewPage() {
       (summary.completion + localProteinCompletion + Math.min(100, todayMeals.length * 25)) / 3,
     );
   const proteinCompletion = remoteReview?.proteinCompletion ?? localProteinCompletion;
-  const proteinLeft = Math.max(0, summary.protein - summary.consumed.protein);
+  const proteinLeft = remoteReview?.progress?.protein
+    ? remoteReview.progress.protein.remaining
+    : Math.max(0, summary.protein - summary.consumed.protein);
   const [year, month, day] = date.split("-").map(Number);
   const weekRhythm = Array.from({ length: 7 }, (_, index) => {
     const current = new Date(year, month - 1, day - (6 - index));
@@ -58,6 +60,7 @@ export default function WeeklyReviewPage() {
     remoteReview?.recordedDays ?? weekRhythm.filter((item) => item.recorded).length;
   const recordedMeals = remoteReview?.recordedMeals ?? todayMeals.length;
   const targetCalories = remoteReview?.calorieTarget ?? profile.profile.targetCalories;
+  const weeklyInsight = remoteReview?.insight;
 
   useEffect(() => {
     void getProductWeeklyReview(date)
@@ -111,21 +114,17 @@ export default function WeeklyReviewPage() {
           <View className="weekly-review__insights">
             <View>
               <NordicIcon name="check" size={18} ariaLabel="记录" />
-              <Text>本周已记录 {recordedMeals} 餐，持续记录会让建议更贴近你的节奏。</Text>
+              <Text>{weeklyInsight?.strengths?.[0] ?? `本周已记录 ${recordedMeals} 餐，持续记录会让建议更贴近你的节奏。`}</Text>
             </View>
             <View>
               <NordicIcon name="protein" size={18} ariaLabel="蛋白" />
-              <Text>
-                {proteinLeft
-                  ? `距离蛋白目标还差 ${proteinLeft} g，可优先补充一份高蛋白食物。`
-                  : "今日蛋白目标已完成，恢复节奏很好。"}
-              </Text>
+              <Text>{weeklyInsight?.summary ?? (proteinLeft
+                ? `距离本周蛋白目标还差 ${proteinLeft} g，可优先补充一份高蛋白食物。`
+                : "本周蛋白目标已完成，恢复节奏很好。")}</Text>
             </View>
             <View>
               <NordicIcon name="zap" size={18} ariaLabel="能量" />
-              <Text>
-                营养节奏分为 {rhythmScore}，当前每日目标为 {targetCalories} kcal。
-              </Text>
+              <Text>营养节奏分为 {rhythmScore}，本周热量完成度 {remoteReview?.calorieCompletion ?? summary.completion}%。</Text>
             </View>
           </View>
         </View>
@@ -133,12 +132,10 @@ export default function WeeklyReviewPage() {
         <View className="weekly-review__advice">
           <NordicIcon name="sparkles" size={22} ariaLabel="本周建议" />
           <View>
-            <Text>本周建议</Text>
-            <Text>
-              {proteinLeft
-                ? "下一餐优先安排瘦肉、鸡蛋或高蛋白酸奶，让目标更容易完成。"
-                : "维持当前的记录频率，并留意睡眠和补水，让恢复同样跟上。"}
-            </Text>
+            <Text>{weeklyInsight?.headline ?? "本周建议"}</Text>
+            <Text>{weeklyInsight?.nextSteps?.[0] ?? (proteinLeft
+              ? "下一周优先安排瘦肉、鸡蛋或高蛋白酸奶，让目标更容易完成。"
+              : "维持当前的记录频率，并留意睡眠和补水，让恢复同样跟上。")}</Text>
           </View>
         </View>
 

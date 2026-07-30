@@ -11,12 +11,12 @@ import {
   type ProductCoachDailyTip,
   type ProductCoachMessage,
 } from "../../api/coach-api";
-import { createProductMeal } from "../../api/meal-data-api";
 import { analyzeProductImage } from "../../api/vision-api";
 import { CoachAvatar } from "../../components/coach-avatar";
 import { NordicIcon } from "../../components/nordic-icon";
 import { CoachComposer } from "./components/CoachComposer";
 import { createCoachAdvice } from "../../features/coach/domain";
+import { getCoachGreeting } from "../../features/coach/server-time";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { createClientRequestId } from "../../repositories/client-request-id";
@@ -33,7 +33,8 @@ type ChatMessage = {
   imageLabel?: string;
 };
 
-const defaultQuickPrompts = ["晚餐怎么补蛋白？", "如何补充蛋白质？", "加餐推荐", "外食怎么选？"];
+const defaultHeroPrompt = "下一餐怎么补充蛋白质？";
+const defaultQuickPrompts = ["我想补记今天的一餐", "这餐怎么记录更准确？", "今天还差哪些营养？", "下一餐怎么搭配？"];
 const defaultDailyTip: ProductCoachDailyTip = {
   type: "nutrition_tip",
   headline: "下一餐加一份深色蔬菜",
@@ -42,11 +43,6 @@ const defaultDailyTip: ProductCoachDailyTip = {
   source: "rule_v2",
   model: null,
 };
-const nowTime = () => {
-  const date = new Date();
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-};
-
 export default function CoachPage() {
   const meals = useMealStore();
   const coach = useCoachStore();
@@ -59,6 +55,8 @@ export default function CoachPage() {
   const [sending, setSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [quickPrompts, setQuickPrompts] = useState(defaultQuickPrompts);
+  const [heroPrompt, setHeroPrompt] = useState(defaultHeroPrompt);
+  const [serverTime, setServerTime] = useState<string | null>(null);
   const [dailyTip, setDailyTip] = useState<ProductCoachDailyTip | null>(null);
   const [dailyTipLoading, setDailyTipLoading] = useState(false);
   const [selectedImagePath, setSelectedImagePath] = useState<string | null>(null);
@@ -67,13 +65,14 @@ export default function CoachPage() {
     progress: true,
     quickReplies: true,
   });
+  const greeting = getCoachGreeting(serverTime);
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: "proactive-message",
       role: "coach",
       content:
         advice[0]?.message ||
-        `早上好，Lewis。今天还差 ${proteinLeft}g 蛋白质，晚餐加一份优质蛋白就能更接近目标。`,
+        `你好，Lewis。今天还差 ${proteinLeft}g 蛋白质，晚餐加一份优质蛋白就能更接近目标。`,
     },
   ]);
 
@@ -103,6 +102,8 @@ export default function CoachPage() {
     try {
       const brief = await getProductCoachBrief(date);
       if (brief.quickPrompts.length) setQuickPrompts(brief.quickPrompts);
+      if (brief.heroPrompt) setHeroPrompt(brief.heroPrompt);
+      setServerTime(brief.serverTime);
     } catch {
       // A previous server brief or the local defaults remain usable offline.
     }
@@ -125,7 +126,7 @@ export default function CoachPage() {
     role: "coach",
     content:
       advice[0]?.message ||
-      `早上好，Lewis。今天还差 ${proteinLeft}g 蛋白质，晚餐加一份优质蛋白就能更接近目标。`,
+      `${greeting}，Lewis。今天还差 ${proteinLeft}g 蛋白质，晚餐加一份优质蛋白就能更接近目标。`,
   });
 
   const handleRestartConversation = async () => {
@@ -268,107 +269,33 @@ export default function CoachPage() {
     }
   };
 
-  const addSuggestedSnack = async () => {
-    const alreadyAdded = meals
-      .getMealsByDate(date)
-      .some((meal) => meal.title === "希腊酸奶" && meal.mealType === "snack");
-    if (alreadyAdded) {
-      feedback.show({ message: "今晚加餐里已经有希腊酸奶", tone: "success" });
-      return;
-    }
-    const time = nowTime();
-    try {
-      const saved = await createProductMeal({
-        mealType: "snack",
-        name: "希腊酸奶",
-        recordedAt: `${date}T${time}:00+08:00`,
-        items: [
-          {
-            name: "希腊酸奶",
-            quantityG: 200,
-            caloriesPer100g: 65,
-            proteinPer100g: 10,
-            carbsPer100g: 4,
-            fatPer100g: 1.5,
-          },
-        ],
-      });
-      meals.addMeal(saved);
-      feedback.show({ message: "已加入今晚加餐", tone: "success" });
-      await sendMessage("已将希腊酸奶加入今晚加餐");
-      await refreshCoachBrief();
-    } catch {
-      feedback.show({ message: "加餐保存失败，请稍后重试", tone: "error" });
-    }
-  };
-
   return (
     <PageLayout
       activeTab="coach"
       hideNavigation
       title="你的营养教练"
-      topBarAction="重启对话"
-      onTopBarAction={() => void handleRestartConversation()}
       className="page-layout--coach-chat"
     >
       <View className="coach-chat">
         <View className="coach-chat__hero">
           <View className="coach-chat__hero-copy">
+            <View className="coach-chat__hero-toolbar">
+              <Text className="coach-chat__hero-kicker">NOVA · 今日营养陪伴</Text>
+              <View
+                className="coach-chat__restart-action"
+                ariaLabel="重启对话"
+                onClick={() => void handleRestartConversation()}
+              >
+                <NordicIcon name="refresh-cw" size={15} ariaLabel="重启对话" />
+                <Text>重启对话</Text>
+              </View>
+            </View>
+            <Text className="coach-chat__hero-title">{greeting}，{"\n"}我来帮你补齐今天的蛋白质</Text>
             <View className="coach-chat__status-badge">
               <NordicIcon name="sparkles" size={15} ariaLabel="今日营养状态" />
               <Text>增肌目标 · 今日还差 {proteinLeft}g 蛋白质</Text>
             </View>
-            <Text className="coach-chat__hero-kicker">NOVA · 今日营养陪伴</Text>
-            <Text className="coach-chat__hero-title">晚上好，{"\n"}我来帮你补齐今天的蛋白质</Text>
-            <View className="coach-chat__hero-actions">
-              <View
-                className="coach-chat__hero-action"
-                onClick={() => void sendMessage("晚餐怎么补蛋白？")}
-              >
-                <NordicIcon name="protein" size={18} ariaLabel="晚餐补蛋白" />
-                <Text>晚餐怎么补蛋白？</Text>
-              </View>
-              <View
-                className="coach-chat__hero-action"
-                onClick={() => void sendMessage("查看今日进度")}
-              >
-                <NordicIcon name="list-checks" size={18} ariaLabel="查看今日进度" />
-                <Text>查看今日进度</Text>
-              </View>
-            </View>
           </View>
-        </View>
-
-        <View className="coach-chat__conversation">
-          {messages.map((message) => (
-            <View
-              key={message.id}
-              className={`coach-chat__message coach-chat__message--${message.role}`}
-            >
-              {message.role === "coach" ? (
-                <CoachAvatar status={message.streaming ? "thinking" : "idle"} />
-              ) : null}
-              <View className="coach-chat__message-body">
-                {message.imagePath ? (
-                  <Image
-                    className="coach-chat__message-image"
-                    src={message.imagePath}
-                    mode="aspectFill"
-                  />
-                ) : null}
-                {message.imageLabel ? (
-                  <Text className="coach-chat__message-image-label">{message.imageLabel}</Text>
-                ) : null}
-                <Text
-                  className={
-                    message.streaming ? "coach-chat__streaming-copy" : "coach-chat__message-copy"
-                  }
-                >
-                  {message.content || "NOVA 正在整理建议…"}
-                </Text>
-              </View>
-            </View>
-          ))}
         </View>
 
         <View className="coach-chat__suggestion">
@@ -415,22 +342,13 @@ export default function CoachPage() {
               <Text className="coach-chat__suggestion-copy">
                 {dailyTipLoading ? "正在结合你的今日记录准备一条小建议。" : (dailyTip ?? defaultDailyTip).content}
               </Text>
-              {(dailyTip ?? defaultDailyTip).food?.name === "希腊酸奶" ? (
-                <View className="coach-chat__suggestion-product" onClick={addSuggestedSnack}>
-                  <View className="coach-chat__suggestion-product-copy">
-                    <View className="coach-chat__suggestion-product-icon">
-                      <NordicIcon name="protein" size={20} ariaLabel="蛋白质加餐" />
-                    </View>
-                    <View>
-                      <Text className="coach-chat__suggestion-product-name">希腊酸奶</Text>
-                      <Text className="coach-chat__suggestion-product-meta">
-                        约 {(dailyTip ?? defaultDailyTip).food?.proteinG ?? 20}g 蛋白质
-                      </Text>
-                    </View>
-                  </View>
-                  <NordicIcon name="circle-plus" size={24} ariaLabel="加入今晚加餐" />
-                </View>
-              ) : null}
+              <View
+                className="coach-chat__suggestion-question"
+                onClick={() => void sendMessage(heroPrompt)}
+              >
+                <NordicIcon name="protein" size={18} ariaLabel="营养建议延伸提问" />
+                <Text>{heroPrompt}</Text>
+              </View>
             </>
           ) : null}
         </View>
@@ -495,6 +413,38 @@ export default function CoachPage() {
               : null}
           </View>
 
+          <View className="coach-chat__conversation">
+            {messages.map((message) => (
+              <View
+                key={message.id}
+                className={`coach-chat__message coach-chat__message--${message.role}`}
+              >
+                {message.role === "coach" ? (
+                  <CoachAvatar status={message.streaming ? "thinking" : "idle"} />
+                ) : null}
+                <View className="coach-chat__message-body">
+                  {message.imagePath ? (
+                    <Image
+                      className="coach-chat__message-image"
+                      src={message.imagePath}
+                      mode="aspectFill"
+                    />
+                  ) : null}
+                  {message.imageLabel ? (
+                    <Text className="coach-chat__message-image-label">{message.imageLabel}</Text>
+                  ) : null}
+                  <Text
+                    className={
+                      message.streaming ? "coach-chat__streaming-copy" : "coach-chat__message-copy"
+                    }
+                  >
+                    {message.content || "NOVA 正在整理建议…"}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
           <View className="coach-chat__quick-section">
             <View
               className={`coach-chat__section-toggle ${
@@ -519,7 +469,7 @@ export default function CoachPage() {
             </View>
             {expandedSections.quickReplies ? (
               <View className="coach-chat__quick-actions">
-                {quickPrompts.map((prompt) => (
+                {quickPrompts.slice(0, 4).map((prompt) => (
                   <View
                     key={prompt}
                     className="coach-chat__quick-chip"

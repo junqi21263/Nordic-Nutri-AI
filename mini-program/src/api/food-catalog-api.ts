@@ -77,6 +77,13 @@ export interface ProductFoodSuggestion {
   protein: number;
 }
 
+export interface ProductFoodInsight {
+  headline: string;
+  content: string;
+  source: "cloudbase" | "hunyuan-exp" | "rule_v1";
+  model: string | null;
+}
+
 export function searchProductFoodCatalog(query: string, page = 1, options?: { categoryCode?: string }) {
   const params = new URLSearchParams({ page: String(page) });
   if (query.trim()) params.set("query", query.trim());
@@ -131,5 +138,12 @@ export function getProductFoodVariants(foodId: string) {
   return requestProductApi<{ items: ProductFoodCatalogItem[] }>(
     `/foods/${encodeURIComponent(foodId)}/variants`,
     { method: "GET", fallbackMessage: "食物版本暂时不可用，请稍后重试" },
+  );
+}
+
+export function getProductFoodInsight(foodId: string) {
+  return requestProductApi<ProductFoodInsight>(
+    `/foods/${encodeURIComponent(foodId)}/insight`,
+    { method: "GET", fallbackMessage: "营养洞察暂时不可用，请稍后重试" },
   );
 }

@@ -67,6 +67,74 @@ test("accepts a valid signed generation request without trusting the caller mode
   }]);
 });
 
+test("accepts a signed nutrition-insight request through the existing dev worker", async () => {
+  const calls = [];
+  const server = createWorkerHttpServer({
+    sharedSecret: "test-shared-secret",
+    service: {
+      generate: async () => assert.fail("image generation must not run"),
+      generateInsight: async (foodContext) => {
+        calls.push(foodContext);
+        return { headline: "鸡胸肉的营养参考", content: "每100g约含31g蛋白质，可搭配蔬菜和主食。", source: "hunyuan-exp", model: "hunyuan-2.0-instruct-20251111" };
+      },
+    },
+  });
+  const body = JSON.stringify({
+    foodContext: { name: "鸡胸肉", category: "肉禽", nutritionPer100g: { caloriesKcal: 165, proteinG: 31, carbsG: 0, fatG: 3.6 } },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/nutrition-insight`, {
+      method: "POST",
+      headers: signedHeaders("test-shared-secret", body),
+      body,
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).source, "hunyuan-exp");
+  });
+
+  assert.deepEqual(calls, [{ name: "鸡胸肉", category: "肉禽", nutritionPer100g: { caloriesKcal: 165, proteinG: 31, carbsG: 0, fatG: 3.6 } }]);
+});
+
+test("accepts signed fixed nutrition-content requests through the dev worker", async () => {
+  const calls = [];
+  const server = createWorkerHttpServer({
+    sharedSecret: "test-shared-secret",
+    service: {
+      generate: async () => assert.fail("image generation must not run"),
+      generateInsight: async () => assert.fail("food insight must not run"),
+      generateDailyInsight: async (input) => {
+        calls.push(["daily-insight", input]);
+        return { focus: "protein", headline: "晚餐优先补蛋白", content: "还差约20g蛋白质，晚餐加一份鱼或豆腐。", source: "hunyuan-exp", model: "hunyuan-2.0-instruct-20251111" };
+      },
+      generateDailyTip: async (input) => {
+        calls.push(["daily-tip", input]);
+        return { type: "nutrition_tip", headline: "下一餐补一份蛋白质", content: "午餐可搭配鸡蛋或豆腐。", food: null, source: "hunyuan-exp", model: "hunyuan-2.0-instruct-20251111" };
+      },
+      generateCoachQuickPrompt: async (input) => {
+        calls.push(["coach-quick-prompt", input]);
+        return { prompt: "晚餐怎么补充蛋白质？", source: "hunyuan-exp", model: "hunyuan-2.0-instruct-20251111" };
+      },
+    },
+  });
+  const cases = [
+    ["/daily-insight", { date: "2026-07-29", context: { daily: { remaining: { protein: 20 } } } }, "focus"],
+    ["/daily-tip", { type: "nutrition_tip", context: { goalType: "muscle_gain" } }, "type"],
+    ["/coach-quick-prompt", { context: { daily: { mealCount: 2 } } }, "prompt"],
+  ];
+
+  await withServer(server, async (baseUrl) => {
+    for (const [path, payload, key] of cases) {
+      const body = JSON.stringify(payload);
+      const response = await fetch(`${baseUrl}${path}`, { method: "POST", headers: signedHeaders("test-shared-secret", body), body });
+      assert.equal(response.status, 200);
+      assert.equal(typeof (await response.json())[key], "string");
+    }
+  });
+
+  assert.deepEqual(calls.map(([route]) => route), ["daily-insight", "daily-tip", "coach-quick-prompt"]);
+});
+
 test("rejects unsigned and stale generation requests", async () => {
   const server = createWorkerHttpServer({
     sharedSecret: "test-shared-secret",

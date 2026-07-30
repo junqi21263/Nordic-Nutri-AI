@@ -6,6 +6,7 @@ const VISUAL_PROFILES = Object.freeze({
   standard: { key: "standard", labelZh: "默认食材", promptHint: "按该食材最常见、最容易辨识的可食用形态呈现，不制作成复杂菜肴" },
   raw: { key: "raw", labelZh: "生鲜原料", promptHint: "生鲜未烹调原料状态，保持自然色泽、切面与肌理，不出现熟制、煎烤或酱汁" },
   cooked_plain: { key: "cooked_plain", labelZh: "清淡熟制", promptHint: "清淡熟制状态，以水煮、清蒸或白灼为主，无焦痕、煎烤、浓酱或油炸" },
+  cooked_grilled: { key: "cooked_grilled", labelZh: "轻烤熟制", promptHint: "轻烤熟制状态，表面自然微焦且不焦黑，肉质熟透、不透明，无浓酱或油炸" },
   fresh: { key: "fresh", labelZh: "新鲜食材", promptHint: "新鲜可食用状态，保留自然表皮、叶片、果肉或切面，不制作成拼盘、沙拉或甜品" },
   dry: { key: "dry", labelZh: "干制原料", promptHint: "干制或干货原料状态，颗粒、片状或干燥质地清晰，不加汤汁或熟菜搭配" },
 });
@@ -36,6 +37,7 @@ function profileEvidence(food = {}) {
 
 function inferVisualProfileKey(food = {}) {
   const evidence = profileEvidence(food);
+  if (/(烤|煎烤|烘烤|roasted|grilled|baked)/i.test(evidence)) return "cooked_grilled";
   if (/(熟制|熟食|水煮|白灼|清蒸|蒸制|炖煮|煮熟|cooked|boiled|steamed)/i.test(evidence)) return "cooked_plain";
   if (/(干制|干货|风干|晒干|dried|dehydrated)/i.test(evidence)) return "dry";
   if (/(肉禽|牛肉|猪肉|羊肉|鸡肉|鸡胸|火鸡|鱼虾海鲜|海鲜|三文鱼|金枪鱼|虾|蟹|贝类|meat|poultry|seafood|fish|shellfish)/i.test(evidence)) return "raw";

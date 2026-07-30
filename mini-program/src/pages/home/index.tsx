@@ -9,7 +9,8 @@ import { MealGroup } from "../../components/meal-group";
 import { SectionTitle } from "../../components/section-title";
 import { Avatar } from "../../components/avatar";
 import { NordicIcon } from "../../components/nordic-icon";
-import { clampProgress, type MealType } from "../../features/meals/domain";
+import { type MealType } from "../../features/meals/domain";
+import { getCoachGreeting } from "../../features/coach/server-time";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
@@ -18,25 +19,6 @@ import { getProductDailySummary, type ProductDailySummary } from "../../api/insi
 import { useProfileStore } from "../../stores/profile-store";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
-
-function createInsight(
-  summary: ReturnType<typeof useMealStore.getState>["getDailySummary"] extends (
-    ...args: never[]
-  ) => infer Result
-    ? Result
-    : never,
-) {
-  const protein = clampProgress(summary.consumed.protein, summary.protein);
-  const fat = clampProgress(summary.consumed.fat, summary.fat);
-  const calories = clampProgress(summary.consumed.calories, summary.calories);
-  if (fat.exceeded) return "脂肪已超出目标，下一餐优先选择瘦肉、蔬菜和清淡烹饪方式。";
-  if (protein.remaining > 25)
-    return `今天还差 ${protein.remaining}g 蛋白质。鸡胸肉、Skyr 或豆腐都是轻松的选择。`;
-  if (calories.percent >= 90) return "热量已接近目标，晚餐保持蔬菜与优质蛋白质即可。";
-  if (summary.consumed.carbs < summary.carbs * 0.6)
-    return "碳水进度偏低，训练前可加入土豆、米饭或全麦面包。";
-  return "今天的能量与三大营养素节奏很稳定，继续保持这份从容。";
-}
 
 export default function HomePage() {
   const store = useMealStore();
@@ -54,6 +36,8 @@ export default function HomePage() {
       }
     : localSummary;
   const meals = store.getMealsByDate(today);
+  const greeting = getCoachGreeting(remoteSummary?.serverTime ?? null);
+  const remoteInsight = remoteSummary?.insight ?? null;
   useEffect(() => {
     store.setLoadingState("loading");
     setSyncError(null);
@@ -94,7 +78,7 @@ export default function HomePage() {
             size="home"
           />
           <View className="home-page__greeting-copy">
-            <Text className="home-page__greeting">早上好，{profile.profile.nickname}</Text>
+            <Text className="home-page__greeting">{greeting}，{profile.profile.nickname}</Text>
             <Text className="home-page__goal">目标：{profile.profile.goalLabel}</Text>
           </View>
         </View>
@@ -111,7 +95,13 @@ export default function HomePage() {
           <DailyNutritionSummary summary={summary} dashboard />
         </View>
         <View onClick={openRecords}>
-          <AIInsightCard content={createInsight(summary)} actionLabel="查看饮食记录" />
+          <AIInsightCard
+            label="NOVA · 营养洞察"
+            headline={remoteInsight?.headline ?? undefined}
+            content={remoteInsight?.content ?? "云端洞察暂不可用；记录下一餐后可获得更贴合当天进度的建议。"}
+            loading={!remoteInsight && !syncError}
+            actionLabel="查看饮食记录"
+          />
         </View>
         <View className="home-page__actions">
           <View className="home-page__action home-page__action--primary" onClick={openScanner}>

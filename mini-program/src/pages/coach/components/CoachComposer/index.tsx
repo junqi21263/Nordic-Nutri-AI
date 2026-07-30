@@ -42,7 +42,7 @@ export function CoachComposer({
   // When keyboard is closed, sit above the tab bar.
   const bottomOffset = keyboardHeight > 0
     ? `${keyboardHeight}px`
-    : `calc(${layout.tabBarHeight}px + ${layout.safeBottom}px + 8px)`;
+    : `calc(${layout.tabBarHeight}px + ${layout.safeBottom}px)`;
 
   return (
     <View

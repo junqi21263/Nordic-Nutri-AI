@@ -58,9 +58,33 @@ describe("local coach and profile", () => {
     expect(source).toContain("今日还差");
     expect(composer).toContain("问问你的营养教练");
     expect(source).toContain('className="coach-chat__status-badge"');
-    expect(source).toContain('className="coach-chat__suggestion-product"');
+    expect(source).not.toContain('className="coach-chat__suggestion-product"');
+    expect(source).not.toContain("addSuggestedSnack");
     expect(source).toContain("const defaultQuickPrompts");
-    expect(source).toContain("quickPrompts.map");
+    expect(source).toContain("quickPrompts.slice(0, 4).map");
+    expect(source).not.toContain('className="coach-chat__hero-actions"');
+    expect(source).not.toContain("查看今日进度");
+  });
+
+  it("keeps restart parallel to NOVA and places the dynamic question below the nutrition tip", () => {
+    const source = coachPageSource();
+    const toolbarStart = source.indexOf('className="coach-chat__hero-toolbar"');
+    const titleStart = source.indexOf('className="coach-chat__hero-title"');
+    const tipCopy = source.indexOf('className="coach-chat__suggestion-copy"');
+    const tipQuestion = source.indexOf('className="coach-chat__suggestion-question"');
+
+    expect(toolbarStart).toBeGreaterThan(-1);
+    expect(source.indexOf('className="coach-chat__hero-kicker"', toolbarStart)).toBeGreaterThan(toolbarStart);
+    expect(source.indexOf('className="coach-chat__restart-action"', toolbarStart)).toBeGreaterThan(toolbarStart);
+    expect(titleStart).toBeGreaterThan(toolbarStart);
+    expect(tipQuestion).toBeGreaterThan(tipCopy);
+  });
+
+  it("raises the hero copy and safety note clear of the fixed composer", () => {
+    const styles = readFileSync(resolve(import.meta.dirname, "../src/styles/page.scss"), "utf8");
+
+    expect(styles).toContain("padding: $space-16 $space-16 $space-16;");
+    expect(styles).toContain(".coach-chat__safety-note {\n  color: $color-text-secondary;\n  font-size: $font-overline;\n  line-height: $line-caption;\n  margin-bottom: $space-16;");
   });
 
   it("keeps progress, quick replies, composer, and tab bar in separate vertical lanes", () => {
@@ -122,6 +146,20 @@ describe("local coach and profile", () => {
     expect(source).not.toContain('name="bot"');
     expect(styles).toContain(".coach-chat__hero");
     expect(styles).toContain(".coach-chat__progress-card");
+  });
+
+  it("places suggestion and progress before the conversation after the NOVA hero", () => {
+    const source = coachPageSource();
+
+    const hero = source.indexOf('className="coach-chat__hero"');
+    const suggestion = source.indexOf('className="coach-chat__suggestion"');
+    const progress = source.indexOf('className="coach-chat__progress-card"');
+    const conversation = source.indexOf('className="coach-chat__conversation"');
+
+    expect(hero).toBeGreaterThan(-1);
+    expect(suggestion).toBeGreaterThan(hero);
+    expect(progress).toBeGreaterThan(suggestion);
+    expect(conversation).toBeGreaterThan(progress);
   });
 
   it("uses a coach-aligned personal-center header and synchronizes tab selection from profile metrics", () => {

@@ -842,7 +842,7 @@
   display: flex;
   min-height: 214px;
   overflow: hidden;
-  padding: $space-20 $space-16 $space-16;
+  padding: $space-16 $space-16 $space-16;
   position: relative;
 }
 .coach-chat__hero::after {
@@ -862,26 +862,60 @@
   position: relative;
   z-index: 1;
 }
+.coach-chat__hero-toolbar {
+  align-items: center;
+  display: flex;
+  gap: $space-8;
+  justify-content: space-between;
+  margin-bottom: $space-12;
+  min-width: 0;
+}
 .coach-chat__status-badge {
   align-items: center;
   background: rgba($color-forest-green, 0.08);
   border-radius: $radius-full;
   color: $color-forest-green;
   display: inline-flex;
+  flex: 0 1 auto;
   font-size: $font-overline;
   font-weight: $font-weight-semibold;
   gap: $space-4;
-  margin-bottom: $space-8;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: $space-8;
   padding: $space-4 $space-12;
   align-self: flex-start;
 }
-.coach-chat__hero-kicker,
-.coach-chat__progress-kicker {
+.coach-chat__status-badge text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.coach-chat__restart-action {
+  align-items: center;
+  background: rgba($color-warm-white, 0.9);
+  border: 1px solid rgba($color-forest-green, 0.16);
+  border-radius: $radius-8;
   color: $color-forest-green;
+  display: flex;
+  flex: 0 0 auto;
   font-size: $font-overline;
+  font-weight: $font-weight-semibold;
+  gap: $space-4;
+  min-height: 36px;
+  padding: 0 $space-8;
+  white-space: nowrap;
+}
+.coach-chat__restart-action:active {
+  background: rgba($color-forest-green, 0.08);
+}
+.coach-chat__hero-kicker {
+  color: $color-forest-green;
+  font-size: $font-h3;
   font-weight: $font-weight-semibold;
 }
 .coach-chat__progress-kicker {
+  color: $color-forest-green;
   font-size: $font-body;
   line-height: 1.2;
 }
@@ -893,15 +927,10 @@
   margin-top: $space-8;
   white-space: pre-line;
 }
-.coach-chat__hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $space-8;
-  margin-top: auto;
-}
-.coach-chat__hero-action {
+.coach-chat__suggestion-question {
   align-items: center;
-  background: rgba($color-warm-white, 0.9);
+  align-self: flex-start;
+  background: rgba($color-warm-white, 0.82);
   border: 1px solid rgba($color-forest-green, 0.1);
   border-radius: $radius-12;
   color: $color-forest-green;
@@ -909,6 +938,7 @@
   font-size: $font-overline;
   font-weight: $font-weight-semibold;
   gap: $space-4;
+  margin-top: $space-12;
   padding: $space-8;
 }
 .coach-avatar {
@@ -1105,45 +1135,6 @@
   color: $color-text-secondary;
   font-size: $font-body;
   line-height: $line-body;
-}
-.coach-chat__suggestion-product {
-  align-items: center;
-  background: $color-surface;
-  border-radius: $radius-16;
-  color: $color-forest-green;
-  display: flex;
-  justify-content: space-between;
-  margin-top: $space-4;
-  padding: $space-12;
-}
-.coach-chat__suggestion-product-copy {
-  align-items: center;
-  display: flex;
-  gap: $space-8;
-}
-.coach-chat__suggestion-product-icon {
-  align-items: center;
-  background: $color-sage-light;
-  border-radius: $radius-12;
-  display: flex;
-  height: 56px;
-  justify-content: center;
-  width: 56px;
-}
-.coach-chat__suggestion-product-name,
-.coach-chat__suggestion-product-meta {
-  display: block;
-}
-.coach-chat__suggestion-product-name {
-  color: $color-text-primary;
-  font-size: $font-caption;
-  font-weight: $font-weight-semibold;
-}
-.coach-chat__suggestion-product-meta {
-  color: $color-success;
-  font-size: $font-overline;
-  font-weight: $font-weight-semibold;
-  margin-top: 2px;
 }
 .coach-chat__bottom-tools {
   display: flex;
@@ -4555,6 +4546,13 @@
   font-weight: $font-weight-semibold;
   margin-bottom: $space-4;
 }
+.food-detail-page__insight-headline {
+  color: $color-forest-green;
+  display: block;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+  margin-bottom: $space-4;
+}
 .food-detail-page__insight-copy {
   color: $color-text-secondary;
   font-size: $font-body;
@@ -5028,6 +5026,7 @@
   color: $color-text-secondary;
   font-size: $font-overline;
   line-height: $line-caption;
+  margin-bottom: $space-16;
   text-align: center;
 }
 .analysis-ingredient {
@@ -5553,6 +5552,10 @@
   font-size: 26px;
   letter-spacing: 0;
   text-transform: none;
+}
+.home-page .ai-insight__headline {
+  color: $stitch-brand-green;
+  font-size: 32px;
 }
 .home-page .ai-insight__content {
   font-size: 28px;

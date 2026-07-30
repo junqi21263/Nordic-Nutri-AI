@@ -156,6 +156,7 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
     const result = await repository.listBatchImageCandidates({
       categoryId: payload.categoryId,
       count: payload.count,
+      visualProfileKey: payload.visualProfileKey,
     });
     const foods = (result.items || []).map((food) => ({
       id: food.id,
@@ -171,6 +172,7 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
       requestedCount: payload.count,
       selectableCount: Number(result.total ?? foods.length),
       selectedCount: foods.length,
+      excludedReadyCount: Number(result.excludedReadyCount) || 0,
       visualProfileKey: payload.visualProfileKey,
       foods,
     };
@@ -242,6 +244,7 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
           foodNameEn: food.nameEn,
           category: food.category?.nameZh || food.category?.code,
           cookingMethod: food.defaultCookingMethod,
+          imageSubjectZh: food.imageSubjectZh,
           visualProfileKey: profile?.key,
           servingDescription: food.servingSize ? `${food.servingSize}${food.servingUnit || "g"}` : undefined,
         }) : null,
@@ -276,6 +279,8 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
         categoryId: payload.categoryId,
         requestedCount: payload.count,
         selectableCount: preview.selectableCount,
+        excludedReadyCount: preview.excludedReadyCount,
+        visualProfileKey: payload.visualProfileKey,
       },
     });
   }
@@ -366,9 +371,10 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
       const plan = buildFoodImagePromptPlan({
         foodNameZh: getFoodDisplayName(food),
         foodNameEn: food.nameEn,
-        category: food.category?.nameZh || food.category?.code,
-        cookingMethod: food.defaultCookingMethod,
-        retryReason: locked.data.retry_reason,
+          category: food.category?.nameZh || food.category?.code,
+          cookingMethod: food.defaultCookingMethod,
+          imageSubjectZh: food.imageSubjectZh,
+          retryReason: locked.data.retry_reason,
         visualProfileKey: locked.data.visual_profile_key,
       });
       const job = await jobs.createJob(executionUserId, {

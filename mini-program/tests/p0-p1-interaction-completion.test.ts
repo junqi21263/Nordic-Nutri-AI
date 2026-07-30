@@ -82,8 +82,8 @@ describe("P0 / P1 本地体验补全", () => {
 
     expect(sectionTitle).toContain("onActionClick?: () => void");
     expect(home).toContain("onActionClick={openRecords}");
-    expect(coach).toContain("addSuggestedSnack");
-    expect(coach).toContain('mealType: "snack"');
+    expect(coach).not.toContain("addSuggestedSnack");
+    expect(coach).not.toContain('mealType: "snack"');
     expect(coach).toContain("营养建议仅供日常饮食参考");
     expect(profileEdit).toContain("/pages/goal-adjust/index");
     expect(goalAdjust).toContain('className="page-layout--goal-adjust"');

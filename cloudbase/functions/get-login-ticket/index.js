@@ -9,6 +9,10 @@ const { createDeepseekEvaluationService } = require("./deepseek-evaluation-servi
 const { createDeepseekNutritionPlanService } = require("./deepseek-nutrition-plan-service.cjs");
 const { createMealDataService, PublicMealDataError } = require("./meal-data-service.cjs");
 const { createInsightDataService } = require("./insight-data-service.cjs");
+const { createDailyInsightService } = require("./daily-insight-service.cjs");
+const { createDeepseekWeeklyReviewService } = require("./deepseek-weekly-review-service.cjs");
+const { createFoodInsightService } = require("./food-insight-service.cjs");
+const { createNutritionInsightWorkerClient } = require("./nutrition-insight-worker-client.cjs");
 const { createDeepseekCoachService, createDeepseekCoachStreamService } = require("./deepseek-coach-service.cjs");
 const { createDailyTipService } = require("./daily-tip-service.cjs");
 const { createCoachDataService, PublicCoachDataError } = require("./coach-data-service.cjs");
@@ -503,6 +507,28 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     },
     createTemporaryUrl: getTemporaryUrl,
   });
+  const configuredTextWorkerEndpoint = typeof env.AI_TEXT_WORKER_ENDPOINT === "string" ? env.AI_TEXT_WORKER_ENDPOINT.trim() : "";
+  const textWorkerEndpoint = configuredTextWorkerEndpoint || (workerEndpoint.endsWith("/generate")
+    ? `${workerEndpoint.slice(0, -"/generate".length)}/nutrition-insight`
+    : "");
+  const textWorkerSecret = (typeof env.AI_TEXT_WORKER_SHARED_SECRET === "string" ? env.AI_TEXT_WORKER_SHARED_SECRET.trim() : "")
+    || (typeof env.AI_WORKER_SHARED_SECRET === "string" ? env.AI_WORKER_SHARED_SECRET.trim() : "");
+  const devTextModel = typeof env.HY_TEXT_MODEL === "string" && env.HY_TEXT_MODEL.trim()
+    ? env.HY_TEXT_MODEL.trim()
+    : "hunyuan-2.0-instruct-20251111";
+  const nutritionInsightWorkerClientFactory = dependencies.nutritionInsightWorkerClientFactory ?? createNutritionInsightWorkerClient;
+  let nutritionContentWorker = null;
+  if (textWorkerEndpoint && textWorkerSecret) {
+    try {
+      nutritionContentWorker = nutritionInsightWorkerClientFactory({
+        endpoint: textWorkerEndpoint,
+        sharedSecret: textWorkerSecret,
+        timeoutMs: Number(env.AI_TEXT_WORKER_TIMEOUT_MS) || 30000,
+      });
+    } catch (error) {
+      console.error("[nutrition-content] dev worker configuration failed:", error?.code || error?.message || error);
+    }
+  }
   const meals = createMealDataService({
     db,
     model: deepseekModel,
@@ -514,9 +540,22 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       return temporary?.fileList?.[0]?.tempFileURL || null;
     },
   });
+  const dailyInsightFactory = dependencies.dailyInsightFactory ?? createDailyInsightService;
+  const dailyInsight = dailyInsightFactory({
+    apiKey: env.DEEPSEEK_API_KEY,
+    model: deepseekModel,
+    source: "deepseek",
+  });
+  const weeklyReview = createDeepseekWeeklyReviewService({
+    apiKey: env.DEEPSEEK_API_KEY,
+    model: env.DEEPSEEK_WEEKLY_MODEL || "deepseek-v4-pro",
+  });
   const insights = createInsightDataService({
+    db,
     listMealsRange: meals.listMealsRange,
     getNutritionPlan: data.getNutritionPlan,
+    generateDailyInsight: dailyInsight,
+    generateWeeklyReview: weeklyReview,
   });
   const foodCatalog = typeof env.USDA_FDC_API_KEY === "string" && env.USDA_FDC_API_KEY.trim()
     ? createFoodCatalogService({
@@ -545,6 +584,11 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   const foodRepository = createFoodRepository({
     db,
     imageCdnBaseUrl: env.FOOD_IMAGE_CDN_BASE_URL,
+  });
+  const foodInsight = createFoodInsightService({
+    requestCompletion: nutritionContentWorker ? (context) => nutritionContentWorker.generateInsight(context) : null,
+    model: devTextModel,
+    source: "hunyuan-exp",
   });
   const usdaService = typeof env.USDA_FDC_API_KEY === "string" && env.USDA_FDC_API_KEY.trim()
     ? createUsdaService({ apiKey: env.USDA_FDC_API_KEY, baseUrl: env.USDA_API_BASE_URL || "https://api.nal.usda.gov/fdc/v1" })
@@ -731,13 +775,17 @@ function createRuntimeService(env = process.env, dependencies = {}) {
         ? createDeepseekCoachStreamService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
         : null,
       dailyTip: createDailyTipService({
-        apiKey: typeof env.DEEPSEEK_API_KEY === "string" ? env.DEEPSEEK_API_KEY : "",
-        model: deepseekModel,
+        requestCompletion: nutritionContentWorker ? (input) => input.purpose === "coach_quick_prompt"
+          ? nutritionContentWorker.generateCoachQuickPrompt({ context: input.context })
+          : nutritionContentWorker.generateDailyTip({ type: input.type, context: input.context }) : null,
+        model: devTextModel,
+        source: "hunyuan-exp",
       }),
     }),
     feedback: createFeedbackDataService({ db }),
     foodCatalog,
     foodRepository,
+    foodInsight,
     foodBarcode: foodBarcodeService,
     foodAdmin: foodAdminService,
     foodImage: foodImageService,
@@ -797,7 +845,7 @@ function getMealRoute(pathname) {
 function getInsightRoute(pathname) {
   const path = pathname.replace(/^\/get-login-ticket/, "");
   return ({
-    "/meal-summary": "getDailySummary",
+    "/meal-summary": "getDailySummaryWithInsight",
     "/weekly-review": "getWeeklyReview",
     "/achievements": "getAchievements",
   })[path] ?? null;
@@ -826,6 +874,8 @@ function getFoodRoute(pathname) {
   if (barcodeMatch) return { operation: "barcode", barcode: barcodeMatch[1] };
   const imageSyncMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/images\/sync$/i);
   if (imageSyncMatch) return { operation: "imageSync", foodId: imageSyncMatch[1] };
+  const insightMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/insight$/i);
+  if (insightMatch) return { operation: "insight", foodId: insightMatch[1] };
   const variantsMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/variants$/i);
   if (variantsMatch) return { operation: "variants", foodId: variantsMatch[1] };
   if (path === "/foods") return { operation: "search" };
@@ -967,6 +1017,13 @@ function createHttpServer({ service }) {
           const q = url.searchParams.get("q") ?? url.searchParams.get("query") ?? "";
           const limit = Number(url.searchParams.get("limit") ?? "8");
           return sendJson(res, 200, { items: await service.foodRepository.suggestions(q, limit) });
+        }
+        if (foodRoute.operation === "insight") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.foodInsight?.getInsight) return sendJson(res, 503, { code: "FOOD_INSIGHT_UNAVAILABLE" });
+          const food = await service.foodRepository.getFoodById(foodRoute.foodId);
+          if (!food) return sendJson(res, 404, { code: "FOOD_NOT_FOUND" });
+          return sendJson(res, 200, await service.foodInsight.getInsight(food));
         }
         if (foodRoute.operation === "variants") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });

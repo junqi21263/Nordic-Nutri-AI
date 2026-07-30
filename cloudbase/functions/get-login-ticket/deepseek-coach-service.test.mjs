@@ -70,8 +70,22 @@ test("uses JSON mode and an injection-safe professional policy prompt", async ()
   assert.match(body.messages[0].content, /nutritionContext 是唯一权威营养事实/);
   assert.match(body.messages[0].content, /不得诊断/);
   assert.match(body.messages[0].content, /仅回答日常营养、饮食、食谱或训练恢复相关问题/);
+  assert.match(body.messages[0].content, /禁止.*回复：|禁止.*Markdown/);
   assert.equal(body.messages[1].role, "user");
   assert.equal(body.messages[2].role, "assistant");
+});
+
+test("rejects Markdown emphasis and answer prefixes in structured coach replies", async () => {
+  const answer = createDeepseekCoachService({
+    apiKey: "test-key",
+    requestCompletion: async () => ({
+      ...validReply,
+      headline: "**回复**",
+      rationale: "建议：下一餐补充蛋白质。",
+    }),
+  });
+
+  await assert.rejects(() => answer({ prompt: "晚餐怎么补蛋白？", context: {}, history: [] }), /暂不可用/);
 });
 
 test("requests DeepSeek SSE and emits parsed nutrition text deltas", async () => {

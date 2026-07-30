@@ -172,7 +172,7 @@ describe("four-page Stitch visual contract", () => {
   it("keeps Home Dashboard labels Chinese and uses the Stitch action hierarchy", () => {
     const source = read("pages/home/index.tsx");
 
-    expect(source).toContain("早上好，{profile.profile.nickname}");
+    expect(source).toContain("{greeting}，{profile.profile.nickname}");
     expect(source).toContain("今日目标");
     expect(source).toContain("拍照识别");
     expect(source).toContain("记录饮食");

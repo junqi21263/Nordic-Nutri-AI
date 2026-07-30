@@ -4,6 +4,7 @@ const medicalRiskPattern = /疾病|诊断|治疗|药物|吃药|处方|孕产|怀
 const urgentRiskPattern = /自杀|昏厥|胸痛|呼吸困难|严重过敏|急诊|急救/i;
 const nutritionScopePattern = /营养|饮食|食谱|食物|吃|喝|餐|蛋白|热量|卡路里|碳水|脂肪|纤维|蔬菜|水果|主食|食材|加餐|早餐|午餐|晚餐|增肌|减脂|体重|饱腹|恢复|训练|运动|今日进度/i;
 const unsafeStreamTextPattern = /诊断|治疗|处方|药物|用药|孕期|怀孕|哺乳|厌食|暴食/i;
+const streamPresentationPattern = /```|[`*#]|^\s*(?:回复|答复|回答|建议|说明)\s*[:：]/m;
 
 class PublicCoachDataError extends Error {
   constructor(code, message = "教练消息无效") {
@@ -176,10 +177,19 @@ function addReplyMetadata(reply, source, model) {
 
 function validateStreamedText(value) {
   const content = typeof value === "string" ? value.trim() : "";
-  if (!content || content.length > 500 || unsafeStreamTextPattern.test(content)) {
+  if (!content || content.length > 500 || unsafeStreamTextPattern.test(content) || streamPresentationPattern.test(content)) {
     throw new PublicCoachDataError("COACH_STREAM_INVALID");
   }
   return content;
+}
+
+function stripCoachPresentationMarkup(value) {
+  return String(value ?? "")
+    .replace(/\*\*/g, "")
+    .replace(/`/g, "")
+    .replace(/^\s*#{1,6}\s*/gm, "")
+    .replace(/^\s*(?:回复|答复|回答|建议|说明)\s*[:：]\s*/gm, "")
+    .trim();
 }
 
 function takeCompleteSentences(value) {
@@ -187,7 +197,7 @@ function takeCompleteSentences(value) {
   return match ? { text: match[1], rest: value.slice(match[1].length) } : { text: "", rest: value };
 }
 
-function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccount, answer, streamAnswer, dailyTip, model = "deepseek-v4-flash" }) {
+function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccount, answer, streamAnswer, dailyTip, clock = () => new Date(), model = "deepseek-v4-flash" }) {
   if (!db || typeof db.from !== "function" || typeof getDailySummary !== "function" || typeof getWeeklyReview !== "function" || typeof getAccount !== "function") {
     throw new Error("Coach dependencies are unavailable");
   }
@@ -319,15 +329,17 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
         pending += chunk;
         const sentence = takeCompleteSentences(pending);
         pending = sentence.rest;
-        if (sentence.text) {
-          content += sentence.text;
+        const cleanSentence = stripCoachPresentationMarkup(sentence.text);
+        if (cleanSentence) {
+          content += cleanSentence;
           validateStreamedText(content);
-          yield { type: "delta", text: sentence.text };
+          yield { type: "delta", text: cleanSentence };
         }
       }
-      content += pending;
+      const cleanPending = stripCoachPresentationMarkup(pending);
+      content += cleanPending;
       content = validateStreamedText(content);
-      if (pending) yield { type: "delta", text: pending };
+      if (cleanPending) yield { type: "delta", text: cleanPending };
       const result = await persistResponse({
         userId,
         conversationId,
@@ -348,12 +360,26 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     const safeDate = normalizeDate(date);
     const context = await buildContext(userId, safeDate);
     const priority = priorityForContext(context);
+    const fallbackPrompts = quickPromptsForContext(context);
+    let heroPrompt = fallbackPrompts[0];
+    if (typeof dailyTip?.getQuickPrompt === "function") {
+      try {
+        const generated = await dailyTip.getQuickPrompt({ date: safeDate, context });
+        if (typeof generated?.prompt === "string" && generated.prompt.trim() && generated.prompt.trim().length <= 28) {
+          heroPrompt = generated.prompt.trim();
+        }
+      } catch {
+        // The deterministic record-aware prompt stays available if the optional provider is unavailable.
+      }
+    }
     return {
       date: safeDate,
+      serverTime: clock().toISOString(),
       priority,
       remaining: context.daily.remaining,
       completion: context.daily.completion,
-      quickPrompts: quickPromptsForContext(context),
+      heroPrompt,
+      quickPrompts: fallbackPrompts.slice(0, 4),
     };
   }
 

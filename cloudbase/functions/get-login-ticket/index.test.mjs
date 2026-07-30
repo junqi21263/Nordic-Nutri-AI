@@ -67,6 +67,72 @@ test("uses the existing worker secret only as a first-rollout fallback for dispa
   assert.equal(service.foodImageDispatchSecret, "worker-secret");
 });
 
+test("delegates food insight to dev through the existing signed worker configuration", async () => {
+  const workerOptions = [];
+  const service = createRuntimeService({
+    WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
+    CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret",
+    HY_IMAGE_WORKER_ENDPOINT: "https://dev-d8g3hqv2b0de38046.service.tcloudbase.com/hunyuan-image-worker/generate",
+    AI_WORKER_SHARED_SECRET: "worker-secret",
+  }, {
+    cloudbaseSdk: { init: () => ({ rdb: () => ({ from: () => ({}) }) }) },
+    cloudbaseNodeSdk: { init: () => ({}) },
+    nutritionInsightWorkerClientFactory: (options) => {
+      workerOptions.push(options);
+      return {
+        generateInsight: async () => ({
+          headline: "鸡胸肉的营养参考",
+          content: "每100g约含19.3g蛋白质，可搭配蔬菜和主食。",
+          source: "hunyuan-exp",
+          model: "hunyuan-2.0-instruct-20251111",
+        }),
+      };
+    },
+  });
+
+  const insight = await service.foodInsight.getInsight({
+    nameZh: "鸡胸肉",
+    nutritionPer100g: { calories: 132, protein: 19.3, carbs: 0, fat: 1 },
+  });
+
+  assert.equal(workerOptions.length, 1);
+  assert.equal(workerOptions[0].endpoint, "https://dev-d8g3hqv2b0de38046.service.tcloudbase.com/hunyuan-image-worker/nutrition-insight");
+  assert.equal(workerOptions[0].sharedSecret, "worker-secret");
+  assert.equal(insight.source, "hunyuan-exp");
+});
+
+test("routes homepage daily insight to DeepSeek while auxiliary content stays on the dev worker", () => {
+  const dailyInsightOptions = [];
+  const workerOptions = [];
+  const service = createRuntimeService({
+    WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
+    CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret",
+    DEEPSEEK_API_KEY: "deepseek-key", DEEPSEEK_MODEL: "deepseek-v4-pro",
+    HY_IMAGE_WORKER_ENDPOINT: "https://dev-d8g3hqv2b0de38046.service.tcloudbase.com/hunyuan-image-worker/generate",
+    AI_WORKER_SHARED_SECRET: "worker-secret",
+  }, {
+    cloudbaseSdk: { init: () => ({ rdb: () => ({ from: () => ({}) }) }) },
+    cloudbaseNodeSdk: { init: () => ({}) },
+    dailyInsightFactory: (options) => {
+      dailyInsightOptions.push(options);
+      return async () => ({ focus: "protein", headline: "补蛋白", content: "下一餐补一份蛋白质。", source: "deepseek", model: options.model });
+    },
+    nutritionInsightWorkerClientFactory: (options) => {
+      workerOptions.push(options);
+      return {
+        generateInsight: async () => ({ headline: "食物洞察", content: "搭配蔬菜和主食。", source: "hunyuan-exp", model: "hunyuan-2.0-instruct-20251111" }),
+      };
+    },
+  });
+
+  assert.equal(dailyInsightOptions.length, 1);
+  assert.equal(dailyInsightOptions[0].apiKey, "deepseek-key");
+  assert.equal(dailyInsightOptions[0].model, "deepseek-v4-pro");
+  assert.equal(dailyInsightOptions[0].source, "deepseek");
+  assert.equal(dailyInsightOptions[0].requestCompletion, undefined);
+  assert.equal(workerOptions.length, 1);
+});
+
 test("uses the primary runtime identity for generated-image storage in remote-worker mode", async () => {
   const uploads = [];
   const db = { from: () => ({}) };
@@ -427,7 +493,7 @@ test("serves meal ranges, individual meals, summaries, reviews, and achievements
         getMeal: async (userId, mealId) => { calls.push(["detail", userId, mealId]); return { id: mealId }; },
       },
       insights: {
-        getDailySummary: async (userId, date) => { calls.push(["summary", userId, date]); return { date }; },
+        getDailySummaryWithInsight: async (userId, date) => { calls.push(["summary", userId, date]); return { date, insight: { content: "先记录第一餐" } }; },
         getWeeklyReview: async (userId, date) => { calls.push(["review", userId, date]); return { endDate: date }; },
         getAchievements: async (userId, date) => { calls.push(["achievements", userId, date]); return [{ id: "first" }]; },
       },
@@ -611,6 +677,39 @@ test("serves food categories and tags to authenticated users", async () => {
     const sug = await fetch(`${baseUrl}/get-login-ticket/foods/suggestions?q=chicken`, { headers: { authorization: "Bearer valid-session" } });
     assert.equal((await sug.json()).items[0].nameEn, "Chicken");
   });
+});
+
+test("serves a CloudBase-generated insight for an authenticated food detail request", async () => {
+  const calls = [];
+  const foodId = "11111111-2222-4333-8444-555555555555";
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      foodRepository: {
+        getFoodById: async (id) => {
+          calls.push(["food", id]);
+          return { id, nameZh: "鸡胸肉", nutritionPer100g: { calories: 132, protein: 19.3, carbs: 0, fat: 1 } };
+        },
+      },
+      foodInsight: {
+        getInsight: async (food) => {
+          calls.push(["insight", food.id]);
+          return { headline: "鸡胸肉的蛋白质优势", content: "每100g约含19.3g蛋白质。", source: "cloudbase", model: "hy3" };
+        },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const path = `${baseUrl}/get-login-ticket/foods/${foodId}/insight`;
+    assert.equal((await fetch(path)).status, 401);
+    assert.equal((await fetch(path, { method: "POST", headers: { authorization: "Bearer valid-session" } })).status, 405);
+    const response = await fetch(path, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).source, "cloudbase");
+  });
+
+  assert.deepEqual(calls, [["food", foodId], ["insight", foodId]]);
 });
 
 test("barcode lookup returns 404 when missing", async () => {

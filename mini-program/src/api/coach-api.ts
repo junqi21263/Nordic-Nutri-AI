@@ -23,15 +23,17 @@ export interface ProductCoachReply {
   actions: ProductCoachReplyAction[];
   rationale: string;
   safety: "none" | "professional_consultation" | "urgent_care";
-  source: "deepseek" | "rule_v2";
+  source: "deepseek" | "hunyuan-exp" | "rule_v2";
   model: string | null;
 }
 
 export interface ProductCoachBrief {
   date: string;
+  serverTime: string;
   priority: ProductCoachReply["priority"];
   remaining: Record<string, number>;
   completion: number;
+  heroPrompt: string;
   quickPrompts: string[];
 }
 
@@ -40,7 +42,7 @@ export interface ProductCoachDailyTip {
   headline: string;
   content: string;
   food: { name: string; proteinG: number } | null;
-  source: "deepseek" | "rule_v2";
+  source: "deepseek" | "hunyuan-exp" | "rule_v2";
   model: string | null;
 }
 

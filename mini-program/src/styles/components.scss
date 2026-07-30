@@ -250,6 +250,12 @@
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }
+.ai-insight__headline {
+  color: $color-text-primary;
+  font-size: $font-size-heading;
+  font-weight: $font-weight-semibold;
+  line-height: 1.35;
+}
 .ai-insight__content {
   color: $color-text-primary;
   font-size: $font-size-body;

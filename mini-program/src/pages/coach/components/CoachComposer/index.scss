@@ -1,9 +1,9 @@
 @use "../../../../styles/tokens" as *;
 
-// Frosted glass fixed toolbar — rounded rectangle, NOT pill/capsule.
+// Opaque fixed toolbar — rounded rectangle, NOT pill/capsule.
 .coach-composer {
   align-items: center;
-  background: rgba(250, 250, 247, 0.82);
+  background: $color-warm-white;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-top: 1px solid rgba(20, 50, 35, 0.08);

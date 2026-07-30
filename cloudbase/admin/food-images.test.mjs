@@ -114,6 +114,16 @@ test("category preview exposes a clickable selected-food panel instead of a coun
   assert.match(source, /data-preview-food-id=/);
 });
 
+test("category preview keeps count and selection aligned with the server-filtered candidate pool", async () => {
+  const source = await pageSource();
+  assert.match(source, /previewLoaded/);
+  assert.match(source, /excludedReadyCount/);
+  assert.match(source, /已剔除/);
+  assert.match(source, /batchCountInput"\)\.value = String\(selectedCount\)/);
+  assert.match(source, /state\.previewRequestedCount === batchCount\(\)/);
+  assert.match(source, /\$\("visualProfileKey"\)\.onchange = previewCategory/);
+});
+
 test("rejecting a candidate triggers its server-controlled retry and carries the review reason", async () => {
   const source = await pageSource();
   assert.match(source, /重试任务已提交/);

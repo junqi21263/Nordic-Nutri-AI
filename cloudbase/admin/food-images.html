@@ -189,7 +189,7 @@
       <div class="batch-controller-copy"><p class="eyebrow">Batch composer</p><h2>按分类创建图片批次</h2><p class="muted">营养版本不重复生图。默认按食物判断主视觉；只有外观明显不同才选择额外视觉状态。每次最多 100 条。</p></div>
       <div class="batch-control-fields">
         <label class="batch-control-field" for="batchCategory">食物分类<select id="batchCategory"><option value="">连接后台后加载分类</option></select></label>
-        <label class="batch-control-field" for="visualProfileKey">视觉状态<select id="visualProfileKey"><option value="auto">自动（推荐）</option><option value="raw">生鲜原料</option><option value="cooked_plain">清淡熟制</option><option value="fresh">新鲜食材</option><option value="dry">干制原料</option></select></label>
+        <label class="batch-control-field" for="visualProfileKey">视觉状态<select id="visualProfileKey"><option value="auto">自动（推荐）</option><option value="raw">生鲜原料</option><option value="cooked_plain">清淡熟制</option><option value="cooked_grilled">轻烤熟制</option><option value="fresh">新鲜食材</option><option value="dry">干制原料</option></select></label>
         <label class="batch-control-field" for="batchCountInput">生成数量<input id="batchCountInput" type="number" value="20" min="1" max="100" /></label>
         <button id="previewCategory" class="button secondary">预览选材</button><button id="createCategoryBatch" class="button">创建草稿</button>
         <span id="selectionPreview" class="batch-selection-note">选择分类后可预览可生成食物数量。</span>
@@ -236,7 +236,7 @@
     const $ = (id) => document.getElementById(id);
     const DEFAULT_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
     $("baseUrl").value = DEFAULT_API_BASE;
-    const state = { activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [] };
+    const state = { activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [] };
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", "\"":"&quot;" })[char]);
     const out = (data) => { $("out").textContent = JSON.stringify(data, null, 2); };
     const toast = (message, isError = false) => { const el = $("toast"); el.textContent = message; el.className = `toast visible${isError ? " error" : ""}`; window.setTimeout(() => { el.className = "toast"; }, 3600); };
@@ -244,7 +244,7 @@
     const progress = (batch) => { const total = Number(batch?.totalCount || 0); const terminal = Number(batch?.reviewCount || 0) + Number(batch?.completedCount || 0) + Number(batch?.failedCount || 0) + Number(batch?.skippedCount || 0); return { total, terminal, percent: total ? Math.round((terminal / total) * 100) : 0 }; };
     const statusLabel = (status) => ({ draft: "草稿", running: "运行中", paused: "已暂停", completed: "已通过", completed_with_errors: "完成（有失败）", cancelled: "已取消", needs_review: "待审核", failed: "失败", generating: "生成中", pending: "待生成", needs_retry: "待重试", skipped: "已跳过" }[status] || status || "未知");
     const statusTone = (status) => (status === "failed" || status === "completed_with_errors" ? "danger" : status === "needs_retry" || status === "paused" ? "warning" : "");
-    const visualProfileLabel = (key) => ({ auto: "自动", standard: "默认食材", raw: "生鲜原料", cooked_plain: "清淡熟制", fresh: "新鲜食材", dry: "干制原料" }[key] || "默认食材");
+    const visualProfileLabel = (key) => ({ auto: "自动", standard: "默认食材", raw: "生鲜原料", cooked_plain: "清淡熟制", cooked_grilled: "轻烤熟制", fresh: "新鲜食材", dry: "干制原料" }[key] || "默认食材");
     const preferredUrl = (candidate) => candidate?.detailUrl || candidate?.listUrl || candidate?.mediumUrl || candidate?.thumbnailUrl || "";
     const foodLabel = (itemOrFood) => {
       const food = itemOrFood?.food || itemOrFood || {};
@@ -335,30 +335,45 @@
     }
     function batchCount() { return Math.max(1, Math.min(100, Number($("batchCountInput").value || 20))); }
     function selectedVisualProfileKey() { return $("visualProfileKey").value || "auto"; }
+    function clearCategoryPreview() { state.previewFoods = []; state.previewSelectedFoodIds = new Set(); state.previewCategoryId = ""; state.previewVisualProfileKey = ""; state.previewRequestedCount = 0; state.previewSelectableCount = 0; state.previewExcludedReadyCount = 0; state.previewLoaded = false; }
+    function hasCurrentCategoryPreview(category) {
+      return Boolean(
+        state.previewLoaded &&
+        category &&
+        state.previewCategoryId === category.id &&
+        state.previewVisualProfileKey === selectedVisualProfileKey() &&
+        state.previewRequestedCount === batchCount()
+      );
+    }
     function renderSelectionPreview() {
       const host = $("selectionPreviewPanel"); const foods = state.previewFoods;
       if (!foods.length) { host.classList.remove("visible"); host.innerHTML = ""; return; }
       host.classList.add("visible");
-      host.innerHTML = `<p>已选择 ${state.previewSelectedFoodIds.size}/${foods.length} 条 · 视觉状态：${escapeHtml(visualProfileLabel(selectedVisualProfileKey()))}。点击食材可取消或恢复本批生成范围。</p><div class="preview-foods">${foods.map((food) => `<button class="preview-food ${state.previewSelectedFoodIds.has(food.id) ? "selected" : ""}" type="button" data-preview-food-id="${escapeHtml(food.id)}">${escapeHtml(foodLabel(food))}</button>`).join("")}</div>`;
-      host.querySelectorAll("button[data-preview-food-id]").forEach((button) => { button.onclick = () => { const id = button.dataset.previewFoodId; if (state.previewSelectedFoodIds.has(id)) state.previewSelectedFoodIds.delete(id); else state.previewSelectedFoodIds.add(id); renderSelectionPreview(); }; });
+      const selectedCount = state.previewSelectedFoodIds.size;
+      host.innerHTML = `<p>已选择 ${selectedCount}/${foods.length} 条 · 本分类可生成 ${state.previewSelectableCount} 条${state.previewExcludedReadyCount ? `，已剔除 ${state.previewExcludedReadyCount} 条已有该视觉状态主图的食物` : ""} · 视觉状态：${escapeHtml(visualProfileLabel(selectedVisualProfileKey()))}。点击食材可取消或恢复本批生成范围。</p><div class="preview-foods">${foods.map((food) => `<button class="preview-food ${state.previewSelectedFoodIds.has(food.id) ? "selected" : ""}" type="button" data-preview-food-id="${escapeHtml(food.id)}">${escapeHtml(foodLabel(food))}</button>`).join("")}</div>`;
+      host.querySelectorAll("button[data-preview-food-id]").forEach((button) => { button.onclick = () => { const id = button.dataset.previewFoodId; if (state.previewSelectedFoodIds.has(id)) state.previewSelectedFoodIds.delete(id); else state.previewSelectedFoodIds.add(id); const selectedCount = state.previewSelectedFoodIds.size; state.previewRequestedCount = selectedCount; $("batchCountInput").value = String(selectedCount); renderSelectionPreview(); }; });
     }
     async function previewCategory() {
       const category = selectedCategory();
-      if (!category) { $("selectionPreview").textContent = "请选择一个食物分类。"; state.previewFoods = []; renderSelectionPreview(); return null; }
+      if (!category) { $("selectionPreview").textContent = "请选择一个食物分类。"; clearCategoryPreview(); renderSelectionPreview(); return null; }
       try {
-        const visualProfileKey = selectedVisualProfileKey(); const data = await api("/food-image-batches/preview", { method: "POST", body: { categoryId: category.id, count: batchCount(), visualProfileKey } });
-        state.previewCategoryId = category.id; state.previewFoods = Array.isArray(data.foods) ? data.foods : []; state.previewSelectedFoodIds = new Set(state.previewFoods.map((food) => food.id)); renderSelectionPreview();
-        $("selectionPreview").textContent = `“${category.nameZh || category.name}”可选 ${data.selectableCount || 0} 条，视觉状态为“${visualProfileLabel(visualProfileKey)}”。`;
+        const visualProfileKey = selectedVisualProfileKey(); const requestedCount = batchCount(); clearCategoryPreview(); const data = await api("/food-image-batches/preview", { method: "POST", body: { categoryId: category.id, count: requestedCount, visualProfileKey } });
+        state.previewCategoryId = category.id; state.previewVisualProfileKey = visualProfileKey; state.previewFoods = Array.isArray(data.foods) ? data.foods : []; state.previewSelectedFoodIds = new Set(state.previewFoods.map((food) => food.id)); state.previewSelectableCount = Number(data.selectableCount) || 0; state.previewExcludedReadyCount = Number(data.excludedReadyCount) || 0; const selectedCount = Number(data.selectedCount ?? state.previewFoods.length) || 0; state.previewRequestedCount = selectedCount; state.previewLoaded = true;
+        if (selectedCount > 0 && selectedCount !== requestedCount) $("batchCountInput").value = String(selectedCount);
+        renderSelectionPreview();
+        const exclusion = state.previewExcludedReadyCount ? `，已剔除 ${state.previewExcludedReadyCount} 条已有该视觉状态主图的食物` : "";
+        const synced = selectedCount !== requestedCount && selectedCount > 0 ? `；生成数量已同步为 ${selectedCount} 条` : "";
+        $("selectionPreview").textContent = `“${category.nameZh || category.name}”当前视觉状态可生成 ${state.previewSelectableCount} 条，已选择 ${selectedCount} 条${exclusion}${synced}。`;
         out(data); return data;
-      } catch (error) { out(error.json || { error: error.message }); $("selectionPreview").textContent = "无法预览本分类，请检查连接和数据状态。"; state.previewFoods = []; renderSelectionPreview(); toast(error.message, true); return null; }
+      } catch (error) { out(error.json || { error: error.message }); $("selectionPreview").textContent = "无法预览本分类，请检查连接和数据状态。"; clearCategoryPreview(); renderSelectionPreview(); toast(error.message, true); return null; }
     }
     async function createCategoryBatch() {
       const category = selectedCategory();
       if (!category) return toast("请先选择食物分类", true);
       try {
-        const hasPreview = state.previewCategoryId === category.id && state.previewFoods.length; const foodIds = hasPreview ? [...state.previewSelectedFoodIds] : [];
-        if (hasPreview && !foodIds.length) return toast("请至少保留一条预览食材", true);
-        const count = hasPreview ? foodIds.length : batchCount(); const visualProfileKey = selectedVisualProfileKey(); const profileLabel = visualProfileLabel(visualProfileKey); const body = hasPreview ? { foodIds, name: `${category.nameZh || category.name} · ${profileLabel} · ${count} 条`, concurrency: 2, maxAttempts: 3, visualProfileKey, selectionSource: "category", selectionMeta: { categoryId: category.id, requestedCount: batchCount(), previewSelectedCount: count, visualProfileKey } } : { categoryId: category.id, count, name: `${category.nameZh || category.name} · ${profileLabel} · ${count} 条`, concurrency: 2, maxAttempts: 3, visualProfileKey };
+        const hasPreview = hasCurrentCategoryPreview(category); if (!hasPreview) return toast("请先按当前分类和视觉状态预览选材", true); const foodIds = [...state.previewSelectedFoodIds];
+        if (!foodIds.length) return toast("当前条件下没有可生成食物，请切换分类或视觉状态", true);
+        const count = foodIds.length; const visualProfileKey = selectedVisualProfileKey(); const profileLabel = visualProfileLabel(visualProfileKey); const body = { foodIds, name: `${category.nameZh || category.name} · ${profileLabel} · ${count} 条`, concurrency: 2, maxAttempts: 3, visualProfileKey, selectionSource: "category", selectionMeta: { categoryId: category.id, requestedCount: state.previewRequestedCount, selectableCount: state.previewSelectableCount, previewSelectedCount: count, excludedReadyCount: state.previewExcludedReadyCount, visualProfileKey } };
         const data = await api("/food-image-batches", { method: "POST", body });
         out(data); state.activeBatchId = data.id || data.batch?.id || ""; state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; state.jobs.clear();
         await refreshBatches(); toast("批次草稿已创建，可点击“启动批次”交由云端生成");
@@ -447,7 +462,7 @@
     async function loadStats() { try { const stats = await api("/food-image-jobs/stats"); out(stats); $("stats").innerHTML = [["待审核", stats.pendingReviewImages], ["已有主图", stats.readyFoods], ["失败任务", stats.failedJobs], ["今日生成", `${stats.dailyGenerated}/${stats.dailyLimit}`], ["缺失图片", stats.missingImages], ["待处理", stats.pendingJobs]].map(([name, value]) => `<div class="stat">${name}<b>${escapeHtml(value)}</b></div>`).join(""); } catch (error) { out(error.json || { error: error.message }); toast(error.message, true); } }
     async function connect() { try { await loadCategories(); await refreshBatches(); setConnected(true); await loadStats(); recordOperation({ title: "后台已连接", detail: "分类、批次与生图统计已刷新" }); toast("后台已连接"); } catch (error) { setConnected(false); out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
     $("connect").onclick = connect; $("refreshAll").onclick = connect; $("refreshQueue").onclick = () => loadBatchDetail().catch((error) => toast(apiErrorMessage(error), true)); $("loadStats").onclick = loadStats; $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
-    $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory;
+    $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory; $("visualProfileKey").onchange = previewCategory;
     $("startBatch").onclick = () => mutateBatch("start"); $("pauseBatch").onclick = () => mutateBatch("pause"); $("resumeBatch").onclick = () => mutateBatch("resume"); $("cancelBatch").onclick = () => mutateBatch("cancel");
     $("openTools").onclick = () => { $("utilityDrawer").open = true; $("utilityDrawer").scrollIntoView({ behavior: "smooth", block: "start" }); };
     $("clearOperationFeed").onclick = () => { state.operations = []; renderOperationFeed(); };

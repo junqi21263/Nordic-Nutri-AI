@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createInsightDataService } from "./insight-data-service.cjs";
+import { createDailyInsightHash } from "./daily-insight-service.cjs";
+import { createInsightDataService, dailyInsightContext } from "./insight-data-service.cjs";
 
 const meals = [
   { id: "meal-1", recordedAt: "2026-07-20T08:00:00.000Z", caloriesKcal: 500, proteinG: 40, carbsG: 50, fatG: 15 },
@@ -9,10 +10,65 @@ const meals = [
   { id: "meal-3", recordedAt: "2026-07-18T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
 ];
 
-function createService() {
+function createService({ clock = () => new Date("2026-07-20T09:30:00.000Z") } = {}) {
   return createInsightDataService({
     listMealsRange: async (_userId, from, to) => meals.filter((meal) => meal.recordedAt.slice(0, 10) >= from && meal.recordedAt.slice(0, 10) <= to),
     getNutritionPlan: async () => ({ calories: 2400, proteinG: 180, carbsG: 300, fatG: 70 }),
+    clock,
+  });
+}
+
+function createCachedInsightService({ generateDailyInsight, initialCache = null }) {
+  let cache = initialCache;
+  const db = {
+    from(table) {
+      assert.equal(table, "daily_nutrition_insights");
+      const query = {
+        select() { return query; },
+        eq() { return query; },
+        async maybeSingle() { return { data: cache, error: null }; },
+        async upsert(row, options) {
+          assert.equal(options.onConflict, "user_id,insight_date");
+          cache = { ...row };
+          return { error: null };
+        },
+      };
+      return query;
+    },
+  };
+  return createInsightDataService({
+    db,
+    listMealsRange: async (_userId, from, to) => meals.filter((meal) => meal.recordedAt.slice(0, 10) >= from && meal.recordedAt.slice(0, 10) <= to),
+    getNutritionPlan: async () => ({ calories: 2400, proteinG: 180, carbsG: 300, fatG: 70 }),
+    generateDailyInsight,
+    clock: () => new Date("2026-07-20T09:30:00.000Z"),
+  });
+}
+
+function createWeeklyCacheService({ generateWeeklyReview }) {
+  let cache = null;
+  const db = {
+    from(table) {
+      assert.equal(table, "weekly_nutrition_reviews");
+      const query = {
+        select() { return query; },
+        eq() { return query; },
+        async maybeSingle() { return { data: cache, error: null }; },
+        async upsert(row, options) {
+          assert.equal(options.onConflict, "user_id,end_date");
+          cache = { ...row };
+          return { error: null };
+        },
+      };
+      return query;
+    },
+  };
+  return createInsightDataService({
+    db,
+    listMealsRange: async (_userId, from, to) => meals.filter((meal) => meal.recordedAt.slice(0, 10) >= from && meal.recordedAt.slice(0, 10) <= to),
+    getNutritionPlan: async () => ({ calories: 2400, proteinG: 180, carbsG: 300, fatG: 70 }),
+    generateWeeklyReview,
+    clock: () => new Date("2026-07-20T09:30:00.000Z"),
   });
 }
 
@@ -23,6 +79,7 @@ test("calculates a daily nutrition summary from persisted meals and the active p
   assert.deepEqual(result.consumed, { calories: 1200, protein: 100, carbs: 130, fat: 35 });
   assert.deepEqual(result.remaining, { calories: 1200, protein: 80, carbs: 170, fat: 35 });
   assert.equal(result.completion, 50);
+  assert.equal(result.serverTime, "2026-07-20T09:30:00.000Z");
   assert.equal(result.meals.length, 2);
 });
 
@@ -40,4 +97,121 @@ test("builds a seven-day review and server-derived achievements", async () => {
   assert.equal(achievements.length, 20);
   assert.equal(achievements[0].unlocked, true);
   assert.equal(achievements[3].unlocked, false);
+});
+
+test("persists one record-aware insight per day and reuses it while the nutrition snapshot is unchanged", async () => {
+  let generationCount = 0;
+  const service = createCachedInsightService({
+    generateDailyInsight: async ({ context }) => {
+      generationCount += 1;
+      return {
+        focus: "protein",
+        headline: "晚餐优先补蛋白",
+        content: `已记录 ${context.daily.mealCount} 餐，还差 ${context.daily.remaining.protein}g 蛋白质。`,
+        source: "hunyuan-exp",
+        model: "hunyuan-2.0-instruct-20251111",
+      };
+    },
+  });
+
+  const first = await service.getDailySummaryWithInsight("user-1", "2026-07-20");
+  const second = await service.getDailySummaryWithInsight("user-1", "2026-07-20");
+
+  assert.equal(first.insight.cached, false);
+  assert.equal(first.insight.content, "已记录 2 餐，还差 80g 蛋白质。");
+  assert.equal(second.insight.cached, true);
+  assert.equal(second.insight.content, first.insight.content);
+  assert.equal(generationCount, 1);
+});
+
+test("reuses a current DeepSeek cache for the same nutrition snapshot", async () => {
+  const summary = await createService().getDailySummary("user-1", "2026-07-20");
+  let generationCount = 0;
+  const service = createCachedInsightService({
+    initialCache: {
+      context_hash: createDailyInsightHash(dailyInsightContext(summary)),
+      payload: { focus: "protein", headline: "旧洞察", content: "这是旧的 DeepSeek 洞察。" },
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+    },
+    generateDailyInsight: async () => {
+      generationCount += 1;
+      return { focus: "protein", headline: "新洞察", content: "不应重新生成。", source: "deepseek", model: "deepseek-v4-flash" };
+    },
+  });
+
+  const result = await service.getDailySummaryWithInsight("user-1", "2026-07-20");
+
+  assert.equal(generationCount, 0);
+  assert.equal(result.insight.cached, true);
+  assert.equal(result.insight.source, "deepseek");
+  assert.equal(result.insight.content, "这是旧的 DeepSeek 洞察。");
+});
+
+test("persists dev hunyuan-exp metadata for a generated daily insight", async () => {
+  const service = createCachedInsightService({
+    generateDailyInsight: async () => ({
+      focus: "protein",
+      headline: "晚餐优先补蛋白",
+      content: "还差约20g蛋白质，晚餐可加一份鱼或豆腐。",
+      source: "hunyuan-exp",
+      model: "hunyuan-2.0-instruct-20251111",
+    }),
+  });
+
+  const result = await service.getDailySummaryWithInsight("user-1", "2026-07-20");
+
+  assert.equal(result.insight.source, "hunyuan-exp");
+  assert.equal(result.insight.model, "hunyuan-2.0-instruct-20251111");
+});
+
+test("replaces a same-day main-cloudbase cache after the dev migration", async () => {
+  const summary = await createService().getDailySummary("user-1", "2026-07-20");
+  let generationCount = 0;
+  const service = createCachedInsightService({
+    initialCache: {
+      context_hash: createDailyInsightHash(dailyInsightContext(summary)),
+      payload: { focus: "protein", headline: "旧洞察", content: "这是主环境 hy3 洞察。" },
+      provider: "cloudbase",
+      model: "hy3",
+    },
+    generateDailyInsight: async () => {
+      generationCount += 1;
+      return { focus: "protein", headline: "新洞察", content: "这是 dev 免费 Token 洞察。", source: "hunyuan-exp", model: "hunyuan-2.0-instruct-20251111" };
+    },
+  });
+
+  const result = await service.getDailySummaryWithInsight("user-1", "2026-07-20");
+
+  assert.equal(generationCount, 1);
+  assert.equal(result.insight.cached, false);
+  assert.equal(result.insight.source, "hunyuan-exp");
+});
+
+test("generates and reuses a server-time weekly DeepSeek review cache", async () => {
+  let generationCount = 0;
+  const service = createWeeklyCacheService({
+    generateWeeklyReview: async ({ context }) => {
+      generationCount += 1;
+      assert.equal(context.weekly.recordedDays, 2);
+      return {
+        headline: "记录节奏可继续稳定",
+        summary: "本周记录了两天，下一周继续把蛋白质分配到每餐。",
+        strengths: ["已记录两天饮食"],
+        nextSteps: ["下一周保持每日记录"],
+        source: "deepseek",
+        model: "deepseek-v4-pro",
+      };
+    },
+  });
+
+  const first = await service.getWeeklyReview("user-1", "2026-07-20");
+  const second = await service.getWeeklyReview("user-1", "2026-07-20");
+
+  assert.equal(first.serverTime, "2026-07-20T09:30:00.000Z");
+  assert.equal(first.serverDate, "2026-07-20");
+  assert.equal(first.insight.source, "deepseek");
+  assert.equal(first.insight.cached, false);
+  assert.equal(second.insight.cached, true);
+  assert.equal(generationCount, 1);
 });

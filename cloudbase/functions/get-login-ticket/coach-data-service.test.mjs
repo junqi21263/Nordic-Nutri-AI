@@ -169,6 +169,29 @@ test("streams a bounded nutrition reply and persists only after completion", asy
   assert.match(inserts.at(-1).payload.content, /鸡胸肉和蔬菜/);
 });
 
+test("strips Markdown emphasis and answer prefixes from streamed coach text", async () => {
+  const { db } = createDb();
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    streamAnswer: async function* () {
+      yield "**回复**：";
+      yield "**主选蛋白质**：鸡胸肉。";
+    },
+  });
+
+  const events = [];
+  for await (const event of service.streamMessage("user-1", {
+    ...validRequest,
+    clientRequestId: "66666666-6666-4666-8666-666666666666",
+  })) events.push(event);
+
+  assert.equal(events[0].type, "delta");
+  assert.equal(events[0].text, "主选蛋白质：鸡胸肉。");
+  assert.doesNotMatch(events[0].text, /\*\*|回复：/);
+  assert.doesNotMatch(events[1].messages[1].content, /\*\*|回复：/);
+});
+
 test("does not invoke the stream model for unrelated questions", async () => {
   const { db } = createDb();
   let calls = 0;
@@ -204,6 +227,36 @@ test("returns record-aware coach quick prompts from authoritative context", asyn
     "今天其余营养怎么搭配？",
   ]);
   assert.equal(brief.remaining.protein, 40);
+});
+
+test("brief exposes server time and a DeepSeek-generated hero question", async () => {
+  const { db } = createDb();
+  const dailyTip = async () => ({ source: "rule_v2" });
+  dailyTip.getQuickPrompt = async () => ({
+    prompt: "下午训练后怎么补充蛋白质？",
+    source: "deepseek",
+    model: "deepseek-v4-flash",
+  });
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    answer: null,
+    dailyTip,
+    clock: () => new Date("2026-07-29T08:36:00.000Z"),
+  });
+
+  const brief = await service.getBrief("user-1", "2026-07-20");
+
+  assert.equal(brief.serverTime, "2026-07-29T08:36:00.000Z");
+  assert.equal(brief.heroPrompt, "下午训练后怎么补充蛋白质？");
+  assert.equal(brief.quickPrompts.length, 4);
+  assert.ok(!brief.quickPrompts.includes(brief.heroPrompt));
+  assert.deepEqual(brief.quickPrompts, [
+    "晚餐怎么补40g 蛋白？",
+    "适合的高蛋白加餐？",
+    "外食怎么补足蛋白？",
+    "今天其余营养怎么搭配？",
+  ]);
 });
 
 test("archives the active conversation, creates a new one, and keeps history", async () => {

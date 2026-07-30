@@ -3,6 +3,7 @@ import { NordicIcon } from "../nordic-icon";
 
 export interface AIInsightCardProps {
   label?: string;
+  headline?: string;
   content: string;
   loading?: boolean;
   actionLabel?: string;
@@ -11,6 +12,7 @@ export interface AIInsightCardProps {
 
 export function AIInsightCard({
   label = "NOVA AI 洞察",
+  headline,
   content,
   loading = false,
   actionLabel,
@@ -24,6 +26,7 @@ export function AIInsightCard({
         </View>
         <Text className="ai-insight__label">{label}</Text>
       </View>
+      {headline ? <Text className="ai-insight__headline">{headline}</Text> : null}
       <Text className="ai-insight__content">{loading ? "正在整理今日建议…" : content}</Text>
       {actionLabel ? (
         <View className="ai-insight__action" onClick={onActionClick} ariaLabel={actionLabel}>

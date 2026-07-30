@@ -1,7 +1,7 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
-import { getProductFoodVariants, type ProductFoodCatalogItem } from "../../api/food-catalog-api";
+import { getProductFoodInsight, getProductFoodVariants, type ProductFoodCatalogItem, type ProductFoodInsight } from "../../api/food-catalog-api";
 import { AppButton } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
 import { FoodThumbnail } from "../../components/food-thumbnail";
@@ -17,19 +17,6 @@ const scaleNutrition = (value: number | null, grams: number) => {
   return `${Math.round((value * grams) / 10) / 10}`;
 };
 
-function createFoodInsight(description: string, tags: string[]) {
-  if (tags.includes("高蛋白")) {
-    return "这是优质蛋白来源，适合增肌或恢复训练后补充。可搭配蔬菜与全谷物，让营养更均衡。";
-  }
-  if (tags.includes("低热量")) {
-    return "热量密度较低，适合作为轻食或加餐。注意搭配优质脂肪与蛋白质，避免整体摄入不足。";
-  }
-  if (/(rice|oat|bread|pasta|potato|grain)/i.test(description)) {
-    return "主食类能量补充稳定，训练前后都可以按需选择。建议搭配蛋白质一起摄入。";
-  }
-  return "营养信息来自 USDA 标准数据，适合作为日常饮食估算参考。保存前请确认份量。";
-}
-
 export default function FoodDetailPage() {
   const router = useRouter();
   const food = useFoodSelectionStore((state) => state.detailFood);
@@ -38,6 +25,8 @@ export default function FoodDetailPage() {
   const [portionG, setPortionG] = useState(150);
   const [activeFood, setActiveFood] = useState<ProductFoodCatalogItem | null>(food);
   const [variants, setVariants] = useState<ProductFoodCatalogItem[]>([]);
+  const [insight, setInsight] = useState<ProductFoodInsight | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
   const returnToCatalog = () => navigateBackOrHome("/pages/food-catalog/index");
 
   useEffect(() => {
@@ -64,7 +53,29 @@ export default function FoodDetailPage() {
   const displayedFood = activeFood ?? food;
 
   const tags = useMemo(() => (displayedFood ? getFoodTags(displayedFood) : []), [displayedFood]);
-  const insight = displayedFood ? createFoodInsight(displayedFood.description, tags) : "";
+  useEffect(() => {
+    if (!displayedFood) {
+      setInsight(null);
+      setInsightLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setInsight(null);
+    setInsightLoading(true);
+    void getProductFoodInsight(displayedFood.id)
+      .then((result) => {
+        if (!cancelled) setInsight(result);
+      })
+      .catch(() => {
+        if (!cancelled) setInsight(null);
+      })
+      .finally(() => {
+        if (!cancelled) setInsightLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [displayedFood?.id]);
   const nutrition = useMemo(
     () =>
       displayedFood
@@ -209,8 +220,11 @@ export default function FoodDetailPage() {
             <NordicIcon name="sparkles" size={20} ariaLabel="营养洞察" />
           </View>
           <View>
-            <Text className="food-detail-page__insight-title">Lagom AI · 营养洞察</Text>
-            <Text className="food-detail-page__insight-copy">{insight}</Text>
+            <Text className="food-detail-page__insight-title">NOVA AI · 营养洞察</Text>
+            {insight?.headline ? <Text className="food-detail-page__insight-headline">{insight.headline}</Text> : null}
+            <Text className="food-detail-page__insight-copy">
+              {insightLoading ? "NOVA 正在根据这份食物的真实营养数据生成介绍…" : (insight?.content ?? "云端洞察暂时不可用，请稍后重试。")}
+            </Text>
           </View>
         </View>
       </View>

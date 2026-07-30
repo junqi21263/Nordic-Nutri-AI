@@ -4,9 +4,11 @@
 // leaks third-party raw payloads to callers.
 
 const { createFoodStorageUrlResolver } = require("./food-storage-url-service.cjs");
+const { normalizeVisualProfileKey } = require("./food-image-visual-profile.cjs");
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
+const MAX_BATCH_CANDIDATE_SCAN = 5000;
 
 class FoodRepositoryError extends Error {
   constructor(code) { super(code); this.code = code; }
@@ -324,21 +326,77 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       return (result.data ?? []).map(mapCategoryRow).filter(Boolean);
     },
 
-    async listBatchImageCandidates({ categoryId, count = 20 } = {}) {
+    async listBatchImageCandidates({ categoryId, count = 20, visualProfileKey = "auto" } = {}) {
       const normalizedCategoryId = String(categoryId || "").trim();
       if (!normalizedCategoryId) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
       const size = Math.min(Math.max(Number(count) || 20, 1), 100);
-      const result = await db.from("foods").select("id,name_zh,name_en,category_id", { count: "exact" })
-        .eq("category_id", normalizedCategoryId)
+      const requestedProfileKey = normalizeVisualProfileKey(visualProfileKey);
+      const selectedCategoryResult = await db.from("food_categories").select("code").eq("id", normalizedCategoryId).eq("is_active", true).maybeSingle();
+      if (selectedCategoryResult.error || !selectedCategoryResult.data?.code) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+      const categoryTreeResult = await db.from("food_categories").select("id").eq("is_active", true).ilike("code", `${selectedCategoryResult.data.code}%`);
+      if (categoryTreeResult.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+      const categoryIds = (categoryTreeResult.data ?? []).map((category) => category.id).filter(Boolean);
+      if (!categoryIds.length) return { items: [], total: 0, candidateCount: 0, excludedReadyCount: 0 };
+      const result = await db.from("foods").select("id,name_zh,name_en,category_id,image_owner_food_id,visual_profile_key", { count: "exact" })
+        .in("category_id", categoryIds)
         .eq("is_active", true)
         .eq("publish_status", "published")
         .eq("is_primary_variant", true)
         .order("name_zh", { ascending: true })
         .order("id", { ascending: true })
-        .range(0, size - 1);
+        .range(0, MAX_BATCH_CANDIDATE_SCAN - 1);
       if (result.error) throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED");
-      const items = result.data ?? [];
-      return { items, total: Number(result.count ?? items.length) };
+      const foods = result.data ?? [];
+      const ownerIds = Array.from(new Set(foods.map((food) => food.image_owner_food_id || food.id).filter(Boolean)));
+      if (!ownerIds.length) return { items: [], total: 0, candidateCount: 0, excludedReadyCount: 0 };
+
+      const profilesResult = await db.from("food_image_visual_profiles").select("id,food_id,profile_key,is_default").in("food_id", ownerIds);
+      if (profilesResult.error) throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED");
+      const profiles = profilesResult.data ?? [];
+      const profileIds = profiles.map((profile) => profile.id).filter(Boolean);
+      const profilesByFoodId = new Map();
+      for (const profile of profiles) {
+        if (!profile.food_id) continue;
+        const ownerProfiles = profilesByFoodId.get(profile.food_id) || [];
+        ownerProfiles.push(profile);
+        profilesByFoodId.set(profile.food_id, ownerProfiles);
+      }
+      const readyResult = profileIds.length
+        ? await db.from("food_images").select("food_id,visual_profile_id,review_status").in("visual_profile_id", profileIds).eq("is_primary", true).eq("status", "ready")
+        : { data: [], error: null };
+      if (readyResult.error) throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED");
+      const readyProfileIds = new Set((readyResult.data ?? [])
+        .filter((image) => !image.review_status || image.review_status === "approved")
+        .map((image) => image.visual_profile_id)
+        .filter(Boolean));
+
+      const legacyResult = await db.from("food_images").select("food_id,review_status").in("food_id", ownerIds)
+        .is("visual_profile_id", null).eq("is_primary", true).eq("status", "ready");
+      if (legacyResult.error) throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED");
+      const readyLegacyOwnerIds = new Set((legacyResult.data ?? [])
+        .filter((image) => !image.review_status || image.review_status === "approved")
+        .map((image) => image.food_id)
+        .filter(Boolean));
+
+      const selectable = foods.filter((food) => {
+        const ownerId = food.image_owner_food_id || food.id;
+        const defaultProfileKey = normalizeVisualProfileKey(food.visual_profile_key || "standard");
+        const targetProfileKey = requestedProfileKey === "auto" ? (defaultProfileKey === "auto" ? "standard" : defaultProfileKey) : requestedProfileKey;
+        const ownerProfiles = profilesByFoodId.get(ownerId) || [];
+        const targetProfile = ownerProfiles.find((profile) => profile.profile_key === targetProfileKey)
+          || (requestedProfileKey === "auto" ? ownerProfiles.find((profile) => profile.is_default) : null);
+        if (targetProfile?.id && readyProfileIds.has(targetProfile.id)) return false;
+        // Legacy images have no profile information. Treat them as the current
+        // automatic image only, never as evidence for an explicitly requested
+        // visual state such as 清淡熟制.
+        return !(requestedProfileKey === "auto" && readyLegacyOwnerIds.has(ownerId));
+      });
+      return {
+        items: selectable.slice(0, size),
+        total: selectable.length,
+        candidateCount: foods.length,
+        excludedReadyCount: foods.length - selectable.length,
+      };
     },
 
     async listTags() {

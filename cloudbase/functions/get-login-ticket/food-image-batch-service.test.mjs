@@ -76,14 +76,16 @@ test("normalizeCategoryBatchPayload requires one category and bounds its request
   });
 });
 
-test("previewCategory only exposes image-ready candidates selected by the server", async () => {
+test("previewCategory forwards the visual profile and reports server-side ready exclusions", async () => {
   const repository = {
     isAdmin: async (userId) => userId === "admin-1",
-    listBatchImageCandidates: async ({ categoryId, count }) => {
+    listBatchImageCandidates: async ({ categoryId, count, visualProfileKey }) => {
       assert.equal(categoryId, "category-vegetables");
       assert.equal(count, 20);
+      assert.equal(visualProfileKey, "fresh");
       return {
-        total: 36,
+        total: 34,
+        excludedReadyCount: 2,
         items: [
           { id: "food-1", name_zh: "番茄" },
           { id: "food-2", name_zh: "西兰花" },
@@ -96,14 +98,16 @@ test("previewCategory only exposes image-ready candidates selected by the server
   const preview = await service.previewCategory("admin-1", {
     categoryId: "category-vegetables",
     count: 20,
+    visualProfileKey: "fresh",
   });
 
   assert.deepEqual(preview, {
     categoryId: "category-vegetables",
     requestedCount: 20,
-    selectableCount: 36,
+    selectableCount: 34,
     selectedCount: 2,
-    visualProfileKey: "auto",
+    excludedReadyCount: 2,
+    visualProfileKey: "fresh",
     foods: [
       { id: "food-1", nameZh: "番茄" },
       { id: "food-2", nameZh: "西兰花" },

@@ -184,6 +184,7 @@ function createFoodImageJobService({
       category: food.category?.nameZh || food.category?.code,
       cookingMethod: cookingMethod || (reason?.includes("水煮") ? "水煮" : undefined),
       servingDescription,
+      imageSubjectZh: food.imageSubjectZh,
       extraPrompt: extraPrompt || (jobType === "regenerate" ? reason : undefined),
       visualProfileKey: definition.key,
     });
