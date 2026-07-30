@@ -4,9 +4,16 @@
 // sync-jobs listing. Every method requires an admin userId verified by the
 // repository; callers must also gate at the route layer.
 const { getFoodDisplayName } = require("./food-display-name.cjs");
+const { FoodRepositoryError } = require("./food-repository.cjs");
 
 class FoodAdminError extends Error {
   constructor(code) { super(code); this.code = code; }
+}
+
+function parseNonNegativeNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) throw new FoodAdminError("FOOD_INVALID");
+  return n;
 }
 
 function createFoodAdminService({ repository, usdaService, normalizer, imageService }) {
@@ -130,6 +137,88 @@ function createFoodAdminService({ repository, usdaService, normalizer, imageServ
       if (!["pending","processing","ready","failed","rejected"].includes(status)) throw new FoodAdminError("FOOD_IMAGE_STATUS_INVALID");
       await repository.reviewImage(imageId, { status, isVerified, isPrimary, foodId });
       return { imageId, status };
+    },
+
+    async listFoods(userId, query = {}) {
+      await requireAdmin(userId);
+      return repository.listFoodsForAdmin({
+        q: query.q ?? query.query ?? "",
+        categoryCode: query.categoryCode ?? query.category_code,
+        active: query.active ?? "true",
+        missingImage: query.missingImage ?? query.missing_image,
+        page: query.page,
+        pageSize: query.pageSize ?? query.page_size,
+      });
+    },
+
+    async createFood(userId, body = {}) {
+      await requireAdmin(userId);
+      const nameZh = body.nameZh ?? body.name_zh ?? null;
+      const nameEn = body.nameEn ?? body.name_en ?? null;
+      if (!nameZh && !nameEn) throw new FoodAdminError("FOOD_INVALID");
+      const input = {
+        nameZh,
+        nameEn,
+        calories: parseNonNegativeNumber(body.calories),
+        proteinG: parseNonNegativeNumber(body.proteinG ?? body.protein_g),
+        carbsG: parseNonNegativeNumber(body.carbsG ?? body.carbs_g),
+        fatG: parseNonNegativeNumber(body.fatG ?? body.fat_g),
+        categoryId: body.categoryId ?? body.category_id ?? null,
+        brandName: body.brandName ?? body.brand_name ?? null,
+        description: body.description ?? null,
+        servingSize: body.servingSize ?? body.serving_size ?? null,
+        servingUnit: body.servingUnit ?? body.serving_unit ?? null,
+        fiberG: body.fiberG ?? body.fiber_g ?? null,
+        sugarG: body.sugarG ?? body.sugar_g ?? null,
+        sodiumMg: body.sodiumMg ?? body.sodium_mg ?? null,
+      };
+      if (normalizer?.normalizeFoodRecord) {
+        const normalized = normalizer.normalizeFoodRecord({
+          name_en: nameEn,
+          name_zh: nameZh,
+          brand_name: input.brandName,
+          description: input.description,
+          calories: input.calories,
+          protein_g: input.proteinG,
+          carbs_g: input.carbsG,
+          fat_g: input.fatG,
+          fiber_g: input.fiberG,
+          sugar_g: input.sugarG,
+          sodium_mg: input.sodiumMg,
+        });
+        input.normalizedName = normalized.normalized_name;
+        input.searchKeywords = normalized.search_keywords;
+      }
+      try {
+        return await repository.createManualFood(input);
+      } catch (err) {
+        if (err instanceof FoodRepositoryError) {
+          if (err.code === "FOOD_INVALID") throw new FoodAdminError("FOOD_INVALID");
+          if (err.code === "FOOD_CREATE_FAILED") throw new FoodAdminError("FOOD_CREATE_FAILED");
+        }
+        throw err;
+      }
+    },
+
+    async getFood(userId, foodId) {
+      await requireAdmin(userId);
+      const food = await repository.getFoodByIdAdmin(foodId);
+      if (!food) throw new FoodAdminError("FOOD_NOT_FOUND");
+      return food;
+    },
+
+    async archiveFood(userId, foodId) {
+      await requireAdmin(userId);
+      const food = await repository.archiveFood(foodId);
+      if (!food) throw new FoodAdminError("FOOD_NOT_FOUND");
+      return food;
+    },
+
+    async restoreFood(userId, foodId) {
+      await requireAdmin(userId);
+      const food = await repository.restoreFood(foodId);
+      if (!food) throw new FoodAdminError("FOOD_NOT_FOUND");
+      return food;
     },
 
     async updateFood(userId, foodId, patch) {

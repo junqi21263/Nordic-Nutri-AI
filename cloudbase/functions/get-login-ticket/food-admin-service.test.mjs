@@ -20,6 +20,49 @@ function makeRepo({ isAdmin = true } = {}) {
     async reviewImage() {},
     async updateFood() {},
     async setPrimaryImage() {},
+    async listFoodsForAdmin(query) {
+      const items = Object.values(state.foods).filter((f) => {
+        if (query.active === "true" && !f.isActive) return false;
+        if (query.active === "false" && f.isActive) return false;
+        if (query.missingImage === true || query.missingImage === "true") {
+          if (f.primaryImageId) return false;
+        }
+        return true;
+      });
+      return { items, pagination: { page: 1, pageSize: 20, total: items.length, hasMore: false } };
+    },
+    async createManualFood(input) {
+      const f = {
+        id: `f${Object.keys(state.foods).length + 1}`,
+        source: "manual",
+        sourceId: input.sourceId || `manual-${Object.keys(state.foods).length + 1}`,
+        nameZh: input.nameZh,
+        nameEn: input.nameEn,
+        isActive: true,
+        publishStatus: "published",
+        nutritionPer100g: {
+          calories: input.calories,
+          protein: input.proteinG,
+          carbs: input.carbsG,
+          fat: input.fatG,
+        },
+      };
+      state.foods[f.id] = f;
+      return f;
+    },
+    async getFoodByIdAdmin(id) { return state.foods[id] ?? null; },
+    async archiveFood(id) {
+      const f = state.foods[id];
+      if (!f) return null;
+      f.isActive = false;
+      return f;
+    },
+    async restoreFood(id) {
+      const f = state.foods[id];
+      if (!f) return null;
+      f.isActive = true;
+      return f;
+    },
   };
 }
 
@@ -92,4 +135,56 @@ test("syncImages queues 5 priority tasks", async () => {
 test("syncImages throws FOOD_NOT_FOUND for missing food", async () => {
   const svc = createFoodAdminService({ repository: makeRepo(), usdaService: makeUsda(), normalizer: makeNormalizer(), imageService: {} });
   await assert.rejects(() => svc.syncImages("admin1", "missing"), /FOOD_NOT_FOUND/);
+});
+
+test("listFoods returns paginated admin catalog rows", async () => {
+  const repo = makeRepo();
+  repo._state.foods.f1 = { id: "f1", nameZh: "苹果", isActive: true };
+  repo._state.foods.f2 = { id: "f2", nameZh: "Archived", isActive: false };
+  const svc = createFoodAdminService({ repository: repo, usdaService: makeUsda(), normalizer: makeNormalizer(), imageService: null });
+  const activeOnly = await svc.listFoods("admin1", { active: "true" });
+  assert.equal(activeOnly.items.length, 1);
+  assert.equal(activeOnly.items[0].id, "f1");
+  const all = await svc.listFoods("admin1", { active: "all" });
+  assert.equal(all.items.length, 2);
+});
+
+test("createFood validates required nutrition fields", async () => {
+  const svc = createFoodAdminService({ repository: makeRepo(), usdaService: makeUsda(), normalizer: makeNormalizer(), imageService: null });
+  await assert.rejects(() => svc.createFood("admin1", { nameZh: "测试" }), /FOOD_INVALID/);
+  await assert.rejects(() => svc.createFood("admin1", { nameZh: "测试", calories: 100, proteinG: -1, carbsG: 0, fatG: 0 }), /FOOD_INVALID/);
+});
+
+test("createFood persists a manual food record", async () => {
+  const repo = makeRepo();
+  const svc = createFoodAdminService({ repository: repo, usdaService: makeUsda(), normalizer: makeNormalizer(), imageService: null });
+  const food = await svc.createFood("admin1", {
+    nameZh: "手工录入",
+    calories: 120,
+    proteinG: 10,
+    carbsG: 5,
+    fatG: 3,
+  });
+  assert.equal(food.nameZh, "手工录入");
+  assert.equal(Object.keys(repo._state.foods).length, 1);
+});
+
+test("archiveFood and restoreFood toggle isActive", async () => {
+  const repo = makeRepo();
+  repo._state.foods.f1 = { id: "f1", nameZh: "苹果", isActive: true };
+  const svc = createFoodAdminService({ repository: repo, usdaService: makeUsda(), normalizer: makeNormalizer(), imageService: null });
+  const archived = await svc.archiveFood("admin1", "f1");
+  assert.equal(archived.isActive, false);
+  const restored = await svc.restoreFood("admin1", "f1");
+  assert.equal(restored.isActive, true);
+  await assert.rejects(() => svc.archiveFood("admin1", "missing"), /FOOD_NOT_FOUND/);
+});
+
+test("getFood returns admin detail or FOOD_NOT_FOUND", async () => {
+  const repo = makeRepo();
+  repo._state.foods.f1 = { id: "f1", nameZh: "苹果", isActive: true, publishStatus: "draft" };
+  const svc = createFoodAdminService({ repository: repo, usdaService: makeUsda(), normalizer: makeNormalizer(), imageService: null });
+  const food = await svc.getFood("admin1", "f1");
+  assert.equal(food.publishStatus, "draft");
+  await assert.rejects(() => svc.getFood("admin1", "missing"), /FOOD_NOT_FOUND/);
 });

@@ -8,6 +8,11 @@ const { createDeepseekMealService, PublicMealAnalysisError } = require("./deepse
 const { createDeepseekEvaluationService } = require("./deepseek-evaluation-service.cjs");
 const { createDeepseekNutritionPlanService } = require("./deepseek-nutrition-plan-service.cjs");
 const { createMealDataService, PublicMealDataError } = require("./meal-data-service.cjs");
+const {
+  createDeepseekFoodClassifyService,
+  createDeepseekMealInsightService,
+  createMealFoodLinkService,
+} = require("./meal-food-link-service.cjs");
 const { createInsightDataService } = require("./insight-data-service.cjs");
 const { createDailyInsightService } = require("./daily-insight-service.cjs");
 const { createDeepseekWeeklyReviewService } = require("./deepseek-weekly-review-service.cjs");
@@ -530,12 +535,34 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       console.error("[nutrition-content] dev worker configuration failed:", error?.code || error?.message || error);
     }
   }
+  const deepseekEnabled = typeof env.DEEPSEEK_API_KEY === "string" && Boolean(env.DEEPSEEK_API_KEY);
+  const classifyFoodCategory = deepseekEnabled
+    ? createDeepseekFoodClassifyService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
+    : null;
+  const generateMealInsight = deepseekEnabled
+    ? createDeepseekMealInsightService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
+    : null;
+  const mealFoodLinks = createMealFoodLinkService({
+    db,
+    classifyFoodCategory,
+    enqueueFoodImage: async (foodId, imageEntityKey) => {
+      await db.from("food_image_tasks").insert({
+        food_id: foodId,
+        image_entity_key: imageEntityKey,
+        source_priority: "ai_generated",
+        status: "pending",
+      });
+    },
+  });
   const meals = createMealDataService({
     db,
     model: deepseekModel,
-    analyze: typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
+    analyze: deepseekEnabled
       ? createDeepseekMealService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
       : null,
+    resolveFoodLinks: (items) => mealFoodLinks.resolveItems(items),
+    loadFoodImageUrls: (foodIds) => mealFoodLinks.loadFoodImageUrls(foodIds),
+    generateMealInsight,
     resolveImageUrl: async (fileID) => {
       const temporary = await admin.getTempFileURL({ fileList: [fileID] });
       return temporary?.fileList?.[0]?.tempFileURL || null;
@@ -926,8 +953,13 @@ function getAdminFoodRoute(pathname) {
   if (reviewMatch) return { operation: "reviewImage", imageId: reviewMatch[1] };
   const setPrimaryMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/set-primary-image$/i);
   if (setPrimaryMatch) return { operation: "setPrimaryImage", foodId: setPrimaryMatch[1] };
+  if (path === "/foods") return { operation: "adminFoodsCollection" };
+  const archiveMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/archive$/i);
+  if (archiveMatch) return { operation: "archiveFood", foodId: archiveMatch[1] };
+  const restoreMatch = path.match(/^\/foods\/([0-9a-f-]{36})\/restore$/i);
+  if (restoreMatch) return { operation: "restoreFood", foodId: restoreMatch[1] };
   const foodPatchMatch = path.match(/^\/foods\/([0-9a-f-]{36})$/i);
-  if (foodPatchMatch) return { operation: "patchFood", foodId: foodPatchMatch[1] };
+  if (foodPatchMatch) return { operation: "adminFoodItem", foodId: foodPatchMatch[1] };
   return null;
 }
 
@@ -1328,10 +1360,40 @@ function createHttpServer({ service }) {
           const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
           return sendJson(res, 200, await service.foodAdmin.setPrimaryImage(session.sub, adminFoodRoute.foodId, body?.imageId));
         }
-        if (adminFoodRoute.operation === "patchFood") {
-          if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
-          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
-          return sendJson(res, 200, await service.foodAdmin.updateFood(session.sub, adminFoodRoute.foodId, body || {}));
+        if (adminFoodRoute.operation === "adminFoodsCollection") {
+          if (req.method === "GET") {
+            return sendJson(res, 200, await service.foodAdmin.listFoods(session.sub, {
+              q: url.searchParams.get("q") || url.searchParams.get("query") || "",
+              categoryCode: url.searchParams.get("categoryCode") || url.searchParams.get("category_code") || undefined,
+              active: url.searchParams.get("active") || "true",
+              missingImage: url.searchParams.get("missingImage") || url.searchParams.get("missing_image") || undefined,
+              page: url.searchParams.get("page") || undefined,
+              pageSize: url.searchParams.get("pageSize") || url.searchParams.get("page_size") || undefined,
+            }));
+          }
+          if (req.method === "POST") {
+            const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+            return sendJson(res, 201, await service.foodAdmin.createFood(session.sub, body || {}));
+          }
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "archiveFood") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.foodAdmin.archiveFood(session.sub, adminFoodRoute.foodId));
+        }
+        if (adminFoodRoute.operation === "restoreFood") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.foodAdmin.restoreFood(session.sub, adminFoodRoute.foodId));
+        }
+        if (adminFoodRoute.operation === "adminFoodItem") {
+          if (req.method === "GET") {
+            return sendJson(res, 200, await service.foodAdmin.getFood(session.sub, adminFoodRoute.foodId));
+          }
+          if (req.method === "PATCH") {
+            const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+            return sendJson(res, 200, await service.foodAdmin.updateFood(session.sub, adminFoodRoute.foodId, body || {}));
+          }
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         }
       } catch (error) {
         if (error instanceof AdminConsoleError) {
@@ -1345,7 +1407,10 @@ function createHttpServer({ service }) {
         }
         if (error instanceof FoodAdminError || error instanceof FoodImageJobError || error instanceof FoodImageBatchError || error instanceof HunyuanImageError) {
           const code = error.code;
-          const status = code === "FORBIDDEN" ? 403 : code === "UNAUTHORIZED" ? 401 : 400;
+          const status = code === "FORBIDDEN" ? 403
+            : code === "UNAUTHORIZED" ? 401
+            : code === "FOOD_NOT_FOUND" ? 404
+            : 400;
           return sendJson(res, status, { code });
         }
         if (error instanceof FoodRepositoryError) return sendJson(res, 400, { code: error.code });

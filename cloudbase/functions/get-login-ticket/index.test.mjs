@@ -744,6 +744,8 @@ test("admin food routes reject non-admin users with 403", async () => {
         updateFood: async () => { throw new FoodAdminError("FORBIDDEN"); },
         syncImages: async () => { throw new FoodAdminError("FORBIDDEN"); },
         importUsda: async () => { throw new FoodAdminError("FORBIDDEN"); },
+        listFoods: async () => { throw new FoodAdminError("FORBIDDEN"); },
+        createFood: async () => { throw new FoodAdminError("FORBIDDEN"); },
       },
     },
   });
@@ -754,7 +756,47 @@ test("admin food routes reject non-admin users with 403", async () => {
     assert.equal(r2.status, 403);
     const r3 = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-images/11111111-2222-3333-4444-555555555555/review`, { method: "PATCH", headers: { authorization: "Bearer valid-session", "content-type": "application/json" }, body: JSON.stringify({ status: "ready" }) });
     assert.equal(r3.status, 403);
+    const r4 = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(r4.status, 403);
   });
+});
+
+test("admin foods collection supports GET list and POST create", async () => {
+  const calls = [];
+  const foodId = "11111111-2222-4333-8444-555555555555";
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      foodAdmin: {
+        listFoods: async (userId, query) => {
+          calls.push(["list", userId, query.active]);
+          return { items: [{ id: foodId, nameZh: "苹果", isActive: true }], pagination: { page: 1, pageSize: 20, total: 1, hasMore: false } };
+        },
+        createFood: async (userId, body) => {
+          calls.push(["create", userId, body.nameZh]);
+          return { id: foodId, nameZh: body.nameZh, source: "manual", isActive: true };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods`);
+    assert.equal(denied.status, 401);
+
+    const listed = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods?active=all`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(listed.status, 200);
+    const listBody = await listed.json();
+    assert.equal(listBody.items[0].id, foodId);
+
+    const created = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({ nameZh: "手工录入", calories: 100, proteinG: 10, carbsG: 5, fatG: 2 }),
+    });
+    assert.equal(created.status, 201);
+    assert.equal((await created.json()).nameZh, "手工录入");
+  });
+  assert.deepEqual(calls, [["list", "admin-1", "all"], ["create", "admin-1", "手工录入"]]);
 });
 
 test("food image upload requires authentication and a base64 payload", async () => {

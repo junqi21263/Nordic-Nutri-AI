@@ -186,8 +186,27 @@
     .data-table select { height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: var(--paper); font-size: 12px; }
     .data-table code { font: 11px/1.4 "SFMono-Regular", Consolas, monospace; word-break: break-all; }
     .admin-main .workflow-guide, .admin-main .utility-drawer, .admin-main .batch-controller, .admin-main .ops-workspace { max-width: none; margin-left: 0; margin-right: 0; }
+    .food-admin-bulk { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--mist); }
+    .food-admin-bulk[hidden] { display: none !important; }
+    .food-admin-pagination { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--muted); font-size: 12px; }
+    .food-admin-editor { margin-bottom: 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.82); }
+    .food-admin-editor[hidden] { display: none !important; }
+    .food-admin-editor__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+    .food-admin-editor__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
+    .food-admin-editor__grid label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .food-admin-editor__grid label.span-2 { grid-column: span 2; }
+    .food-admin-editor__grid label.span-3 { grid-column: 1 / -1; }
+    .food-admin-editor__grid input, .food-admin-editor__grid select, .food-admin-editor__grid textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px; background: var(--paper); color: var(--text); }
+    .food-admin-editor__grid textarea { min-height: 72px; resize: vertical; }
+    .food-admin-editor__actions { display: flex; gap: 8px; margin-top: 14px; }
+    .food-thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #dfe5da; display: block; }
+    .food-thumb-placeholder { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 8px; background: #dfe5da; color: var(--green); font: 700 16px Georgia, serif; }
+    .food-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .food-row-actions .button.link { font-size: 12px; }
+    .module-toolbar label.food-admin-toggle { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .module-toolbar label.food-admin-toggle input { accent-color: var(--green); width: auto; min-width: 0; height: auto; }
     @media (max-width: 1160px) { .batch-controller { grid-template-columns: 1fr; } .batch-control-fields, .batch-lifecycle { justify-content: flex-start; } .batch-selection-note { text-align: left; } .ops-workspace { grid-template-columns: 218px minmax(380px, 1fr); } .review-inspector { position: static; max-height: none; grid-column: 1 / -1; border-top: 1px solid var(--line); border-left: 0; } .inspector-content { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(260px, 1fr); gap: 20px; align-items: start; } .inspector-title { margin-top: 0; } }
-    @media (max-width: 760px) { .ops-shell { padding: 12px; } .ops-header { align-items: flex-start; } .header-actions { justify-content: flex-end; } h1 { font-size: 20px; } .admin-layout { grid-template-columns: 1fr; } .admin-nav { position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); } .batch-controller { padding: 15px; } .batch-control-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; } .batch-control-field select, .batch-control-field input { width: 100%; min-width: 0; } .batch-control-fields .button { width: 100%; } .batch-selection-note, .selection-preview-panel { grid-column: 1 / -1; } .workflow-steps { grid-template-columns: 1fr; } .bulk-review-bar { align-items: flex-start; flex-direction: column; } .batch-lifecycle { justify-content: stretch; } .batch-lifecycle .button { flex: 1 1 42%; } .ops-workspace { display: block; min-height: 0; } .batch-rail, .review-inspector { border: 0; } .batch-rail { border-bottom: 1px solid var(--line); } .review-queue { padding: 18px 14px; } .review-grid { grid-template-columns: 1fr; } .inspector-content, .utility-body { display: block; } .utility-panel { margin-top: 12px; } .inspector-actions { position: sticky; bottom: 0; padding: 12px 0; background: rgba(250,248,243,.96); } }
+    @media (max-width: 760px) { .ops-shell { padding: 12px; } .ops-header { align-items: flex-start; } .header-actions { justify-content: flex-end; } h1 { font-size: 20px; } .admin-layout { grid-template-columns: 1fr; } .admin-nav { position: static; grid-template-columns: repeat(5, minmax(0, 1fr)); } .food-admin-editor__grid { grid-template-columns: 1fr; } .food-admin-editor__grid label.span-2, .food-admin-editor__grid label.span-3 { grid-column: auto; } .batch-controller { padding: 15px; } .batch-control-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; } .batch-control-field select, .batch-control-field input { width: 100%; min-width: 0; } .batch-control-fields .button { width: 100%; } .batch-selection-note, .selection-preview-panel { grid-column: 1 / -1; } .workflow-steps { grid-template-columns: 1fr; } .bulk-review-bar { align-items: flex-start; flex-direction: column; } .batch-lifecycle { justify-content: stretch; } .batch-lifecycle .button { flex: 1 1 42%; } .ops-workspace { display: block; min-height: 0; } .batch-rail, .review-inspector { border: 0; } .batch-rail { border-bottom: 1px solid var(--line); } .review-queue { padding: 18px 14px; } .review-grid { grid-template-columns: 1fr; } .inspector-content, .utility-body { display: block; } .utility-panel { margin-top: 12px; } .inspector-actions { position: sticky; bottom: 0; padding: 12px 0; background: rgba(250,248,243,.96); } }
   </style>
 </head>
 <body>
@@ -201,7 +220,9 @@
       <nav class="admin-nav" aria-label="后台模块">
         <button type="button" class="admin-nav__item" data-module="users">用户数据</button>
         <button type="button" class="admin-nav__item" data-module="feedback">问题反馈</button>
-        <button type="button" class="admin-nav__item active" data-module="system">系统配置</button>
+        <button type="button" class="admin-nav__item" data-module="foods">食材管理</button>
+        <button type="button" class="admin-nav__item active" data-module="images">食材生图</button>
+        <button type="button" class="admin-nav__item" data-module="system">系统配置</button>
       </nav>
 
       <div class="admin-main">
@@ -229,19 +250,58 @@
           <div id="feedbackTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
         </section>
 
-        <section id="moduleSystem" class="admin-module">
+        <section id="moduleFoods" class="admin-module" hidden>
+          <div class="module-toolbar">
+            <h2>食材管理</h2>
+            <input id="foodAdminSearch" type="search" placeholder="搜索食材名称" autocomplete="off" />
+            <select id="foodAdminCategory"><option value="">全部分类</option></select>
+            <select id="foodAdminActive">
+              <option value="true">启用中</option>
+              <option value="false">已下架</option>
+              <option value="all">全部</option>
+            </select>
+            <label class="food-admin-toggle"><input id="foodAdminMissingOnly" type="checkbox" /> 仅缺主图</label>
+            <button id="refreshFoodAdmin" class="button secondary" type="button">刷新</button>
+            <button id="createFoodAdmin" class="button" type="button">新建食材</button>
+          </div>
+          <div id="foodAdminBulkBar" class="food-admin-bulk" hidden>
+            <span id="foodAdminBulkLabel">已选择 0 条</span>
+            <button id="foodAdminBulkBatch" class="button" type="button">批量加入生图</button>
+          </div>
+          <section id="foodAdminEditor" class="food-admin-editor" hidden>
+            <div class="food-admin-editor__head">
+              <h3 id="foodAdminEditorTitle">新建食材</h3>
+              <button id="foodAdminEditorClose" class="button link" type="button">关闭</button>
+            </div>
+            <div class="food-admin-editor__grid">
+              <label>中文名称 *<input id="foodEditorNameZh" type="text" autocomplete="off" /></label>
+              <label>英文名称<input id="foodEditorNameEn" type="text" autocomplete="off" /></label>
+              <label>分类<select id="foodEditorCategory"><option value="">未分类</option></select></label>
+              <label>热量 kcal *<input id="foodEditorCalories" type="number" min="0" step="0.1" /></label>
+              <label>蛋白质 g *<input id="foodEditorProteinG" type="number" min="0" step="0.1" /></label>
+              <label>碳水 g *<input id="foodEditorCarbsG" type="number" min="0" step="0.1" /></label>
+              <label>脂肪 g *<input id="foodEditorFatG" type="number" min="0" step="0.1" /></label>
+              <label>纤维 g<input id="foodEditorFiberG" type="number" min="0" step="0.1" /></label>
+              <label class="span-3">生图主体描述<input id="foodEditorImageSubjectZh" type="text" placeholder="可选，用于 AI 生图提示词" autocomplete="off" /></label>
+              <label class="span-3">描述<textarea id="foodEditorDescription" rows="3"></textarea></label>
+            </div>
+            <div class="food-admin-editor__actions">
+              <button id="foodAdminEditorSave" class="button" type="button">保存</button>
+              <button id="foodAdminEditorCancel" class="button secondary" type="button">取消</button>
+            </div>
+          </section>
+          <div id="foodAdminTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+          <div id="foodAdminPagination" class="food-admin-pagination" hidden>
+            <button id="foodAdminPrevPage" class="button secondary" type="button">上一页</button>
+            <span id="foodAdminPageInfo">第 1 页</span>
+            <button id="foodAdminNextPage" class="button secondary" type="button">下一页</button>
+          </div>
+        </section>
+
+        <section id="moduleImages" class="admin-module">
           <details id="workflowGuide" class="workflow-guide">
             <summary>操作流程与状态说明</summary>
-            <div class="workflow-steps"><div class="workflow-step"><b>1. 连接后台</b><span>确认默认 API Base 与管理员 Token。</span></div><div class="workflow-step"><b>2. 选择视觉状态</b><span>默认按食物自动判断；仅外观不同才选生鲜、熟制等。</span></div><div class="workflow-step"><b>3. 预览选材</b><span>点击食材可取消或恢复本批生成范围。</span></div><div class="workflow-step"><b>4. 创建、启动、审核</b><span>候选图可单张或批量通过并设为该视觉状态主图。</span></div><div class="workflow-step"><b>5. 处理异常</b><span>拒绝理由会写入提示词并立即重试。</span></div></div>
-          </details>
-
-          <details id="utilityDrawer" class="utility-drawer">
-            <summary>连接设置与运行诊断</summary>
-            <div class="utility-body">
-              <section class="utility-panel"><h3>连接设置</h3><label for="baseUrl">API Base（含 /get-login-ticket）</label><input id="baseUrl" placeholder="https://xxx.service.tcloudbase.com/get-login-ticket" autocomplete="off" /><label for="token">管理员 Bearer Token</label><input id="token" type="password" placeholder="仅保存在当前页面内存" autocomplete="off" /><div class="action-row" style="margin-top:12px"><button id="connect" class="button">连接后台</button><button id="loadStats" class="button secondary">刷新统计</button><button id="runDiagnose" class="button secondary">诊断生图</button></div><div id="stats" class="stats" style="margin-top:12px"></div></section>
-              <section class="utility-panel"><h3>运行说明</h3><p class="muted">创建草稿后，点击“启动批次”交由云端调度器持续生成。审核拒绝的候选图会携带原因进入下一次重试，最多三次。</p><p class="muted" style="margin-top:12px">本页不再支持手动录入 foodId、jobId 或浏览器端消费任务，避免绕开批次和审核链路。</p></section>
-              <section class="utility-panel"><h3>响应与排障</h3><p class="muted">仅显示最近一次后台操作响应，不保存密钥或任务标识。</p><pre id="out">{}</pre></section>
-            </div>
+            <div class="workflow-steps"><div class="workflow-step"><b>1. 连接后台</b><span>在「系统配置」确认 API Base 与管理员 Token。</span></div><div class="workflow-step"><b>2. 选择视觉状态</b><span>默认按食物自动判断；仅外观不同才选生鲜、熟制等。</span></div><div class="workflow-step"><b>3. 预览选材</b><span>点击食材可取消或恢复本批生成范围。</span></div><div class="workflow-step"><b>4. 创建、启动、审核</b><span>候选图可单张或批量通过并设为该视觉状态主图。</span></div><div class="workflow-step"><b>5. 处理异常</b><span>拒绝理由会写入提示词并立即重试。</span></div></div>
           </details>
 
           <section class="batch-controller" aria-label="创建图片批次">
@@ -280,6 +340,17 @@
             </aside>
           </section>
         </section>
+
+        <section id="moduleSystem" class="admin-module" hidden>
+          <details id="utilityDrawer" class="utility-drawer" open>
+            <summary>连接设置与运行诊断</summary>
+            <div class="utility-body">
+              <section class="utility-panel"><h3>连接设置</h3><label for="baseUrl">API Base（含 /get-login-ticket）</label><input id="baseUrl" placeholder="https://xxx.service.tcloudbase.com/get-login-ticket" autocomplete="off" /><label for="token">管理员 Bearer Token</label><input id="token" type="password" placeholder="连接成功后会保存在本机浏览器，刷新可自动回填" autocomplete="off" /><div class="action-row" style="margin-top:12px"><button id="connect" class="button">连接后台</button><button id="loadStats" class="button secondary">刷新统计</button><button id="runDiagnose" class="button secondary">诊断生图</button><button id="clearCredentials" class="button secondary">清除已存凭证</button></div><p class="muted" style="margin-top:10px">凭证仅保存在当前浏览器 localStorage，不会上传。换机器或清站点数据后需重新粘贴 Token。</p><div id="stats" class="stats" style="margin-top:12px"></div></section>
+              <section class="utility-panel"><h3>运行说明</h3><p class="muted">创建草稿后，在「食材生图」点击“启动批次”交由云端调度器持续生成。审核拒绝的候选图会携带原因进入下一次重试，最多三次。</p><p class="muted" style="margin-top:12px">本页不再支持手动录入 foodId、jobId 或浏览器端消费任务，避免绕开批次和审核链路。</p></section>
+              <section class="utility-panel"><h3>响应与排障</h3><p class="muted">仅显示最近一次后台操作响应，不保存密钥或任务标识。</p><pre id="out">{}</pre></section>
+            </div>
+          </details>
+        </section>
       </div>
     </div>
   </main>
@@ -288,8 +359,37 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const DEFAULT_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
-    $("baseUrl").value = DEFAULT_API_BASE;
-    const state = { activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [] };
+    const CREDENTIAL_KEYS = { baseUrl: "nordic-admin-base-url", token: "nordic-admin-bearer-token" };
+    function readStoredCredentials() {
+      try {
+        return {
+          baseUrl: localStorage.getItem(CREDENTIAL_KEYS.baseUrl) || "",
+          token: localStorage.getItem(CREDENTIAL_KEYS.token) || "",
+        };
+      } catch {
+        return { baseUrl: "", token: "" };
+      }
+    }
+    function saveCredentials() {
+      try {
+        localStorage.setItem(CREDENTIAL_KEYS.baseUrl, $("baseUrl").value.trim());
+        localStorage.setItem(CREDENTIAL_KEYS.token, $("token").value.trim());
+      } catch { /* private mode / blocked storage */ }
+    }
+    function clearStoredCredentials() {
+      try {
+        localStorage.removeItem(CREDENTIAL_KEYS.baseUrl);
+        localStorage.removeItem(CREDENTIAL_KEYS.token);
+      } catch { /* ignore */ }
+      $("token").value = "";
+      $("baseUrl").value = DEFAULT_API_BASE;
+      setConnected(false);
+      toast("已清除本机保存的凭证");
+    }
+    const storedCredentials = readStoredCredentials();
+    $("baseUrl").value = storedCredentials.baseUrl || DEFAULT_API_BASE;
+    if (storedCredentials.token) $("token").value = storedCredentials.token;
+    const state = { activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null };
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", "\"":"&quot;" })[char]);
     const out = (data) => { $("out").textContent = JSON.stringify(data, null, 2); };
     const toast = (message, isError = false) => { const el = $("toast"); el.textContent = message; el.className = `toast visible${isError ? " error" : ""}`; window.setTimeout(() => { el.className = "toast"; }, 3600); };
@@ -382,9 +482,235 @@
     async function loadCategories() {
       const data = await foodApi("/foods/categories");
       state.categories = (data.items || data || []).filter((category) => category.isActive !== false);
+      const options = `<option value="">请选择分类</option>${state.categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.nameZh || category.name || "未命名分类")}</option>`).join("")}`;
       const select = $("batchCategory"); const selectedId = select.value;
-      select.innerHTML = `<option value="">请选择分类</option>${state.categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.nameZh || category.name || "未命名分类")}</option>`).join("")}`;
+      select.innerHTML = options;
       if (state.categories.some((category) => category.id === selectedId)) select.value = selectedId;
+      populateFoodAdminCategorySelects();
+    }
+    function populateFoodAdminCategorySelects() {
+      const filterOptions = `<option value="">全部分类</option>${state.categories.map((category) => `<option value="${escapeHtml(category.code || category.id)}">${escapeHtml(category.nameZh || category.name || "未命名分类")}</option>`).join("")}`;
+      const editorOptions = `<option value="">未分类</option>${state.categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.nameZh || category.name || "未命名分类")}</option>`).join("")}`;
+      const filterSelect = $("foodAdminCategory"); const filterValue = filterSelect?.value || "";
+      const editorSelect = $("foodEditorCategory"); const editorValue = editorSelect?.value || "";
+      if (filterSelect) { filterSelect.innerHTML = filterOptions; if ([...filterSelect.options].some((option) => option.value === filterValue)) filterSelect.value = filterValue; }
+      if (editorSelect) { editorSelect.innerHTML = editorOptions; if ([...editorSelect.options].some((option) => option.value === editorValue)) editorSelect.value = editorValue; }
+    }
+    function foodNutritionSummary(food) {
+      const nutrition = food.nutritionPer100g || {};
+      const calories = nutrition.calories ?? food.calories ?? "—";
+      const protein = nutrition.protein ?? nutrition.proteinG ?? food.proteinG ?? "—";
+      const carbs = nutrition.carbs ?? nutrition.carbsG ?? food.carbsG ?? "—";
+      const fat = nutrition.fat ?? nutrition.fatG ?? food.fatG ?? "—";
+      return `${calories} / ${protein} / ${carbs} / ${fat}`;
+    }
+    function foodImageStatusLabel(food) {
+      if (food.primaryImageId || food.imageStatus === "ready" || food.image?.listUrl) return "已有主图";
+      return "缺主图";
+    }
+    function syncFoodAdminBulkBar() {
+      const count = state.foodAdminSelectedIds.size;
+      const bar = $("foodAdminBulkBar");
+      if (!bar) return;
+      bar.hidden = count === 0;
+      $("foodAdminBulkLabel").textContent = `已选择 ${count} 条`;
+    }
+    function renderFoodAdminTable() {
+      const host = $("foodAdminTable");
+      const items = state.foodAdminItems;
+      if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无匹配食材</p>"; syncFoodAdminBulkBar(); return; }
+      host.innerHTML = `<table><thead><tr><th><input id="foodAdminSelectAll" type="checkbox" aria-label="全选" /></th><th>缩略图</th><th>名称</th><th>分类</th><th>kcal/蛋白/碳/脂</th><th>主图状态</th><th>状态</th><th>操作</th></tr></thead><tbody>${items.map((food) => {
+        const name = foodLabel(food);
+        const category = food.category?.nameZh || food.category?.name || "—";
+        const imageUrl = food.image?.thumbnailUrl || food.image?.listUrl || food.imageUrl || "";
+        const thumb = imageUrl ? `<img class="food-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" />` : `<span class="food-thumb-placeholder">N</span>`;
+        const imageStatus = foodImageStatusLabel(food);
+        const activeLabel = food.isActive === false ? "已下架" : "启用中";
+        const activeTone = food.isActive === false ? "danger" : "";
+        const checked = state.foodAdminSelectedIds.has(food.id) ? "checked" : "";
+        const archiveAction = food.isActive === false
+          ? `<button class="button link" type="button" data-food-restore="${escapeHtml(food.id)}">恢复</button>`
+          : `<button class="button link" type="button" data-food-archive="${escapeHtml(food.id)}">下架</button>`;
+        return `<tr><td><input type="checkbox" data-food-select="${escapeHtml(food.id)}" ${checked} aria-label="选择 ${escapeHtml(name)}" /></td><td>${thumb}</td><td><strong>${escapeHtml(name)}</strong>${food.nameEn ? `<br><span class="muted">${escapeHtml(food.nameEn)}</span>` : ""}</td><td>${escapeHtml(category)}</td><td>${escapeHtml(foodNutritionSummary(food))}</td><td>${escapeHtml(imageStatus)}</td><td><span class="status-badge ${activeTone}">${escapeHtml(activeLabel)}</span></td><td><div class="food-row-actions"><button class="button link" type="button" data-food-edit="${escapeHtml(food.id)}">编辑</button>${archiveAction}<button class="button link" type="button" data-food-generate="${escapeHtml(food.id)}">生图</button></div></td></tr>`;
+      }).join("")}</tbody></table>`;
+      const selectableIds = items.map((food) => food.id);
+      const selectAll = host.querySelector("#foodAdminSelectAll");
+      if (selectAll) {
+        selectAll.checked = selectableIds.length > 0 && selectableIds.every((id) => state.foodAdminSelectedIds.has(id));
+        selectAll.onchange = () => {
+          if (selectAll.checked) selectableIds.forEach((id) => state.foodAdminSelectedIds.add(id));
+          else selectableIds.forEach((id) => state.foodAdminSelectedIds.delete(id));
+          renderFoodAdminTable();
+        };
+      }
+      host.querySelectorAll("input[data-food-select]").forEach((input) => {
+        input.onchange = () => {
+          const id = input.dataset.foodSelect;
+          if (input.checked) state.foodAdminSelectedIds.add(id); else state.foodAdminSelectedIds.delete(id);
+          syncFoodAdminBulkBar();
+          if (selectAll) selectAll.checked = selectableIds.length > 0 && selectableIds.every((entry) => state.foodAdminSelectedIds.has(entry));
+        };
+      });
+      host.querySelectorAll("button[data-food-edit]").forEach((button) => { button.onclick = () => openFoodEditor(button.dataset.foodEdit).catch((error) => toast(apiErrorMessage(error), true)); });
+      host.querySelectorAll("button[data-food-archive]").forEach((button) => { button.onclick = () => archiveFoodAdmin(button.dataset.foodArchive).catch((error) => toast(apiErrorMessage(error), true)); });
+      host.querySelectorAll("button[data-food-restore]").forEach((button) => { button.onclick = () => restoreFoodAdmin(button.dataset.foodRestore).catch((error) => toast(apiErrorMessage(error), true)); });
+      host.querySelectorAll("button[data-food-generate]").forEach((button) => { button.onclick = () => createImageBatchForFoods([button.dataset.foodGenerate]).catch((error) => toast(apiErrorMessage(error), true)); });
+      syncFoodAdminBulkBar();
+    }
+    function renderFoodAdminPagination() {
+      const pagination = state.foodAdminPagination;
+      const host = $("foodAdminPagination");
+      if (!host) return;
+      host.hidden = !state.foodAdminItems.length && pagination.page <= 1;
+      $("foodAdminPageInfo").textContent = `第 ${pagination.page} 页 · 共 ${pagination.total} 条`;
+      $("foodAdminPrevPage").disabled = pagination.page <= 1;
+      $("foodAdminNextPage").disabled = !pagination.hasMore;
+    }
+    async function loadFoodAdminList(page = state.foodAdminPagination.page || 1) {
+      const host = $("foodAdminTable");
+      if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先在系统配置中连接后台</p>"; return; }
+      if (!state.categories.length) await loadCategories();
+      else populateFoodAdminCategorySelects();
+      try {
+        const q = encodeURIComponent(($("foodAdminSearch").value || "").trim());
+        const categoryCode = encodeURIComponent($("foodAdminCategory").value || "");
+        const active = encodeURIComponent($("foodAdminActive").value || "true");
+        const missingImage = $("foodAdminMissingOnly").checked ? "true" : "";
+        const missingQuery = missingImage ? `&missingImage=${missingImage}` : "";
+        const categoryQuery = categoryCode ? `&categoryCode=${categoryCode}` : "";
+        const data = await api(`/foods?q=${q}&active=${active}${categoryQuery}${missingQuery}&page=${page}&pageSize=${state.foodAdminPagination.pageSize}`);
+        state.foodAdminItems = data.items || [];
+        state.foodAdminPagination = { ...state.foodAdminPagination, ...(data.pagination || {}), page };
+        renderFoodAdminTable();
+        renderFoodAdminPagination();
+      } catch (error) {
+        host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`;
+      }
+    }
+    function resetFoodEditorFields(food = null) {
+      $("foodEditorNameZh").value = food?.nameZh || "";
+      $("foodEditorNameEn").value = food?.nameEn || "";
+      $("foodEditorCategory").value = food?.category?.id || food?.categoryId || "";
+      $("foodEditorCalories").value = food?.nutritionPer100g?.calories ?? food?.calories ?? "";
+      $("foodEditorProteinG").value = food?.nutritionPer100g?.protein ?? food?.proteinG ?? "";
+      $("foodEditorCarbsG").value = food?.nutritionPer100g?.carbs ?? food?.carbsG ?? "";
+      $("foodEditorFatG").value = food?.nutritionPer100g?.fat ?? food?.fatG ?? "";
+      $("foodEditorFiberG").value = food?.nutritionPer100g?.fiber ?? food?.fiberG ?? "";
+      $("foodEditorImageSubjectZh").value = food?.imageSubjectZh || "";
+      $("foodEditorDescription").value = food?.description || "";
+    }
+    function hideFoodEditor() {
+      state.foodAdminEditingId = null;
+      $("foodAdminEditor").hidden = true;
+      $("foodAdminEditorTitle").textContent = "新建食材";
+      resetFoodEditorFields();
+    }
+    async function openFoodEditor(foodId = null) {
+      populateFoodAdminCategorySelects();
+      if (!foodId) {
+        state.foodAdminEditingId = null;
+        $("foodAdminEditorTitle").textContent = "新建食材";
+        resetFoodEditorFields();
+        $("foodAdminEditor").hidden = false;
+        return;
+      }
+      const data = await api(`/foods/${foodId}`);
+      state.foodAdminEditingId = foodId;
+      $("foodAdminEditorTitle").textContent = "编辑食材";
+      resetFoodEditorFields(data);
+      $("foodAdminEditor").hidden = false;
+    }
+    function readFoodEditorPayload() {
+      const nameZh = ($("foodEditorNameZh").value || "").trim();
+      const nameEn = ($("foodEditorNameEn").value || "").trim();
+      const categoryId = ($("foodEditorCategory").value || "").trim();
+      const calories = Number($("foodEditorCalories").value);
+      const proteinG = Number($("foodEditorProteinG").value);
+      const carbsG = Number($("foodEditorCarbsG").value);
+      const fatG = Number($("foodEditorFatG").value);
+      const fiberRaw = ($("foodEditorFiberG").value || "").trim();
+      const fiberG = fiberRaw === "" ? undefined : Number(fiberRaw);
+      const imageSubjectZh = ($("foodEditorImageSubjectZh").value || "").trim();
+      const description = ($("foodEditorDescription").value || "").trim();
+      if (!nameZh) throw new Error("请填写中文名称");
+      if (!Number.isFinite(calories) || calories < 0 || !Number.isFinite(proteinG) || proteinG < 0 || !Number.isFinite(carbsG) || carbsG < 0 || !Number.isFinite(fatG) || fatG < 0) throw new Error("请填写有效的营养数值");
+      const payload = { nameZh, nameEn: nameEn || undefined, calories, proteinG, carbsG, fatG, categoryId: categoryId || undefined, imageSubjectZh: imageSubjectZh || undefined, description: description || undefined };
+      if (fiberG !== undefined) payload.fiberG = fiberG;
+      return payload;
+    }
+    function foodPatchPayload(payload) {
+      return {
+        name_zh: payload.nameZh,
+        name_en: payload.nameEn ?? null,
+        category_id: payload.categoryId ?? null,
+        calories: payload.calories,
+        protein_g: payload.proteinG,
+        carbs_g: payload.carbsG,
+        fat_g: payload.fatG,
+        fiber_g: payload.fiberG ?? null,
+        image_subject_zh: payload.imageSubjectZh ?? null,
+        description: payload.description ?? null,
+      };
+    }
+    async function saveFoodAdmin() {
+      try {
+        const payload = readFoodEditorPayload();
+        if (state.foodAdminEditingId) {
+          const data = await api(`/foods/${state.foodAdminEditingId}`, { method: "PATCH", body: foodPatchPayload(payload) });
+          out(data);
+          toast("食材已更新");
+          hideFoodEditor();
+          await loadFoodAdminList(state.foodAdminPagination.page);
+          return null;
+        }
+        const data = await api("/foods", { method: "POST", body: payload });
+        out(data);
+        toast("食材已创建");
+        hideFoodEditor();
+        await loadFoodAdminList(1);
+        const createdId = data.id || data.food?.id;
+        if (createdId && window.confirm("已创建，是否立即生成主图？")) {
+          await createImageBatchForFoods([createdId]);
+        }
+        return data;
+      } catch (error) {
+        out(error.json || { error: error.message });
+        toast(apiErrorMessage(error), true);
+        return null;
+      }
+    }
+    async function archiveFoodAdmin(foodId) {
+      if (!window.confirm("确认下架该食材？")) return;
+      const data = await api(`/foods/${foodId}/archive`, { method: "POST", body: {} });
+      out(data);
+      toast("食材已下架");
+      await loadFoodAdminList(state.foodAdminPagination.page);
+    }
+    async function restoreFoodAdmin(foodId) {
+      const data = await api(`/foods/${foodId}/restore`, { method: "POST", body: {} });
+      out(data);
+      toast("食材已恢复");
+      await loadFoodAdminList(state.foodAdminPagination.page);
+    }
+    async function jumpToImageBatch(batchId) {
+      if (!batchId) return;
+      state.activeBatchId = batchId;
+      setModule("images");
+      if (typeof refreshBatches === "function") await refreshBatches();
+      if (typeof loadBatchDetail === "function" && state.activeBatchId) await loadBatchDetail();
+    }
+    async function createImageBatchForFoods(foodIds) {
+      const ids = [...new Set((foodIds || []).filter(Boolean))];
+      if (!ids.length) return toast("请先选择食材", true);
+      const names = ids.map((id) => foodLabel(state.foodAdminItems.find((food) => food.id === id) || { id })).slice(0, 3);
+      const batchName = ids.length === 1 ? `${names[0]} · 生图` : `食材管理 · ${ids.length} 条 · 生图`;
+      const data = await api("/food-image-batches", { method: "POST", body: { name: batchName, foodIds: ids, visualProfileKey: "auto" } });
+      out(data);
+      const batchId = data.id || data.batch?.id || "";
+      state.foodAdminSelectedIds.clear();
+      syncFoodAdminBulkBar();
+      toast("已创建生图批次");
+      await jumpToImageBatch(batchId);
     }
     function batchCount() { return Math.max(1, Math.min(100, Number($("batchCountInput").value || 20))); }
     function selectedVisualProfileKey() { return $("visualProfileKey").value || "auto"; }
@@ -513,7 +839,7 @@
     async function rejectSelected() { if (!state.selectedImageId) return; const reason = window.prompt("请填写拒绝原因；该原因会自动写入下一次生图提示词。"); if (!reason?.trim()) return; try { const data = await api(`/food-images/${state.selectedImageId}/reject`, { method: "POST", body: { reason: reason.trim() } }); out(data); const retryScheduled = Boolean(data.retry?.retryScheduled); const detail = retryScheduled ? `${state.selectedFoodName} · 拒绝原因已写入提示词，重试任务已提交` : `${state.selectedFoodName} · 已拒绝，但未能立即重试：${data.retry?.reason || data.retry?.errorMessage || "请查看异常"}`; recordOperation({ title: retryScheduled ? "候选图已拒绝并立即重试" : "候选图已拒绝，重试待处理", detail, isError: !retryScheduled }); toast(retryScheduled ? "拒绝原因已写入提示词，重试任务已提交" : detail, !retryScheduled); state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
     async function mutateBatch(action) { if (!state.activeBatchId) return; try { const data = await api(`/food-image-batches/${state.activeBatchId}/${action}`, { method: "POST", body: {} }); const message = { start: "批次已启动，云端将持续处理", pause: "批次已暂停", resume: "批次已继续", cancel: "批次已取消" }[action] || "批次状态已更新"; out(data); recordOperation({ title: "批次状态已变化", detail: message }); toast(message); await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
     async function loadStats() { try { const stats = await api("/food-image-jobs/stats"); out(stats); $("stats").innerHTML = [["待审核", stats.pendingReviewImages], ["已有主图", stats.readyFoods], ["失败任务", stats.failedJobs], ["今日生成", `${stats.dailyGenerated}/${stats.dailyLimit}`], ["缺失图片", stats.missingImages], ["待处理", stats.pendingJobs]].map(([name, value]) => `<div class="stat">${name}<b>${escapeHtml(value)}</b></div>`).join(""); } catch (error) { out(error.json || { error: error.message }); toast(error.message, true); } }
-    async function connect() { try { await loadCategories(); await refreshBatches(); setConnected(true); await loadStats(); recordOperation({ title: "后台已连接", detail: "分类、批次与生图统计已刷新" }); toast("后台已连接"); } catch (error) { setConnected(false); out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function connect() { try { await loadCategories(); await refreshBatches(); setConnected(true); saveCredentials(); await loadStats(); recordOperation({ title: "后台已连接", detail: "分类、批次与生图统计已刷新" }); toast("后台已连接"); } catch (error) { setConnected(false); out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
     function hasToken() { return Boolean($("baseUrl").value.trim() && $("token").value.trim()); }
     const feedbackCategoryLabel = (category) => ({ product: "产品", bug: "缺陷", feature: "功能", support: "支持" }[category] || category || "—");
     async function loadUsers() {
@@ -551,16 +877,31 @@
       document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.classList.toggle("active", btn.dataset.module === name); });
       $("moduleUsers").hidden = name !== "users";
       $("moduleFeedback").hidden = name !== "feedback";
+      $("moduleFoods").hidden = name !== "foods";
+      $("moduleImages").hidden = name !== "images";
       $("moduleSystem").hidden = name !== "system";
       if (name === "users") loadUsers().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "feedback") loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "foods") loadFoodAdminList().catch((error) => toast(apiErrorMessage(error), true));
     }
     document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.onclick = () => setModule(btn.dataset.module); });
     $("refreshUsers").onclick = () => loadUsers().catch((error) => toast(apiErrorMessage(error), true));
     $("userSearch").onkeydown = (event) => { if (event.key === "Enter") loadUsers().catch((error) => toast(apiErrorMessage(error), true)); };
     $("refreshFeedback").onclick = () => loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
     $("feedbackStatusFilter").onchange = () => loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
-    $("connect").onclick = connect; $("refreshAll").onclick = connect; $("refreshQueue").onclick = () => loadBatchDetail().catch((error) => toast(apiErrorMessage(error), true)); $("loadStats").onclick = loadStats; $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
+    $("refreshFoodAdmin").onclick = () => loadFoodAdminList().catch((error) => toast(apiErrorMessage(error), true));
+    $("createFoodAdmin").onclick = () => openFoodEditor().catch((error) => toast(apiErrorMessage(error), true));
+    $("foodAdminSearch").onkeydown = (event) => { if (event.key === "Enter") loadFoodAdminList(1).catch((error) => toast(apiErrorMessage(error), true)); };
+    $("foodAdminCategory").onchange = () => loadFoodAdminList(1).catch((error) => toast(apiErrorMessage(error), true));
+    $("foodAdminActive").onchange = () => loadFoodAdminList(1).catch((error) => toast(apiErrorMessage(error), true));
+    $("foodAdminMissingOnly").onchange = () => loadFoodAdminList(1).catch((error) => toast(apiErrorMessage(error), true));
+    $("foodAdminPrevPage").onclick = () => loadFoodAdminList(Math.max(1, state.foodAdminPagination.page - 1)).catch((error) => toast(apiErrorMessage(error), true));
+    $("foodAdminNextPage").onclick = () => { if (state.foodAdminPagination.hasMore) loadFoodAdminList(state.foodAdminPagination.page + 1).catch((error) => toast(apiErrorMessage(error), true)); };
+    $("foodAdminEditorSave").onclick = () => saveFoodAdmin();
+    $("foodAdminEditorCancel").onclick = hideFoodEditor;
+    $("foodAdminEditorClose").onclick = hideFoodEditor;
+    $("foodAdminBulkBatch").onclick = () => createImageBatchForFoods([...state.foodAdminSelectedIds]).catch((error) => toast(apiErrorMessage(error), true));
+    $("connect").onclick = connect; $("refreshAll").onclick = connect; $("clearCredentials").onclick = clearStoredCredentials; $("refreshQueue").onclick = () => loadBatchDetail().catch((error) => toast(apiErrorMessage(error), true)); $("loadStats").onclick = loadStats; $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
     $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory; $("visualProfileKey").onchange = previewCategory;
     $("startBatch").onclick = () => mutateBatch("start"); $("pauseBatch").onclick = () => mutateBatch("pause"); $("resumeBatch").onclick = () => mutateBatch("resume"); $("cancelBatch").onclick = () => mutateBatch("cancel");
     $("openTools").onclick = () => { setModule("system"); $("utilityDrawer").open = true; $("utilityDrawer").scrollIntoView({ behavior: "smooth", block: "start" }); };
@@ -568,6 +909,7 @@
     $("filterRow").querySelectorAll("button[data-filter]").forEach((button) => { button.onclick = async () => { state.activeFilter = button.dataset.filter; $("filterRow").querySelectorAll(".filter").forEach((item) => item.classList.toggle("active", item === button)); await renderQueue(); }; });
     $("selectAllReview").onchange = () => { const candidateIds = [...document.querySelectorAll("input[data-candidate-select]")].map((input) => input.dataset.candidateSelect); state.selectedImageIds = new Set($("selectAllReview").checked ? candidateIds : []); renderQueue(); };
     $("approveSelected").onclick = approveSelectedImages;
+    if (hasToken()) connect().catch(() => {});
   </script>
 </body>
 </html>

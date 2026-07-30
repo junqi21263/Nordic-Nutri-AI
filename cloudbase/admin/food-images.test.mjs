@@ -162,19 +162,43 @@ test("admin console shell uses left nav modules and renames the page", async () 
   assert.match(source, /Admin Console/);
   assert.match(source, /data-module="users"/);
   assert.match(source, /data-module="feedback"/);
+  assert.match(source, /data-module="foods"/);
+  assert.match(source, /data-module="images"/);
   assert.match(source, /data-module="system"/);
   assert.match(source, /id="moduleUsers"/);
   assert.match(source, /id="moduleFeedback"/);
+  assert.match(source, /id="moduleFoods"/);
+  assert.match(source, /id="moduleImages"/);
   assert.match(source, /id="moduleSystem"/);
+  assert.match(source, /食材管理/);
+  assert.match(source, /食材生图/);
 });
 
-test("connection settings sit below the workflow guide inside system config", async () => {
+test("foods admin module supports CRUD UI and image batch linkage", async () => {
   const source = await pageSource();
+  assert.match(source, /data-module="foods"/);
+  assert.match(source, /id="moduleFoods"/);
+  assert.match(source, /食材管理/);
+  assert.match(source, /id="foodAdminSearch"/);
+  assert.match(source, /id="foodAdminEditor"/);
+  assert.match(source, /\/foods\?/);
+  assert.match(source, /method:\s*"POST"/);
+  assert.match(source, /\/foods\/\$\{[^}]+\}\/archive|\/archive/);
+  assert.match(source, /food-image-batches/);
+  assert.match(source, /批量加入生图|生图/);
+});
+
+test("connection settings sit in system config while image tools live under 食材生图", async () => {
+  const source = await pageSource();
+  const images = source.indexOf('id="moduleImages"');
+  const system = source.indexOf('id="moduleSystem"');
   const guide = source.indexOf('id="workflowGuide"');
   const tools = source.indexOf('id="utilityDrawer"');
   const batch = source.indexOf('class="batch-controller"');
-  assert.ok(guide >= 0 && tools > guide, "tools after guide");
-  assert.ok(batch > tools, "batch composer after connection tools");
+  assert.ok(images >= 0 && system > images, "system module after images module");
+  assert.ok(guide > images && guide < system, "workflow guide inside images");
+  assert.ok(tools > system, "connection tools inside system");
+  assert.ok(batch > images && batch < system, "batch composer inside images");
 });
 
 test("users and feedback modules call admin list endpoints", async () => {
@@ -186,4 +210,13 @@ test("users and feedback modules call admin list endpoints", async () => {
   assert.match(source, /id="feedbackTable"/);
   assert.match(source, /\/feedback/);
   assert.match(source, /method:\s*"PATCH"/);
+});
+
+test("persists admin credentials in localStorage and auto-connects on reload", async () => {
+  const source = await pageSource();
+  assert.match(source, /nordic-admin-bearer-token/);
+  assert.match(source, /localStorage\.setItem/);
+  assert.match(source, /id="clearCredentials"/);
+  assert.match(source, /if \(hasToken\(\)\) connect\(\)/);
+  assert.match(source, /saveCredentials\(\)/);
 });

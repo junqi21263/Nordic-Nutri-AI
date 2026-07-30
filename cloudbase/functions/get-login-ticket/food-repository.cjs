@@ -3,6 +3,8 @@
 // CloudBase RDB client (db.from(...)). Returns plain camelCase rows; never
 // leaks third-party raw payloads to callers.
 
+const crypto = require("node:crypto");
+
 const { createFoodStorageUrlResolver } = require("./food-storage-url-service.cjs");
 const { normalizeVisualProfileKey } = require("./food-image-visual-profile.cjs");
 
@@ -484,14 +486,8 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       };
     },
 
-    async getFoodById(id) {
-      const result = await db.from("foods").select("*")
-        .eq("id", id)
-        .eq("publish_status", "published")
-        .maybeSingle();
-      if (result.error) throw new FoodRepositoryError("FOOD_LOOKUP_FAILED");
-      if (!result.data) return null;
-      const row = result.data;
+    async _mapFoodWithRelations(row) {
+      if (!row?.id) return null;
       const [catMap, tagMap, imageMap] = await Promise.all([
         loadCategoriesByIds(db, row.category_id ? [row.category_id] : []),
         loadTagsForFoods(db, [row.id]),
@@ -502,6 +498,139 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
         tags: tagMap.get(row.id) ?? [],
         image: imageMap.get(row.id) ?? null,
       });
+    },
+
+    async getFoodById(id) {
+      const result = await db.from("foods").select("*")
+        .eq("id", id)
+        .eq("publish_status", "published")
+        .maybeSingle();
+      if (result.error) throw new FoodRepositoryError("FOOD_LOOKUP_FAILED");
+      if (!result.data) return null;
+      return this._mapFoodWithRelations(result.data);
+    },
+
+    async getFoodByIdAdmin(id) {
+      const result = await db.from("foods").select("*").eq("id", id).maybeSingle();
+      if (result.error) throw new FoodRepositoryError("FOOD_LOOKUP_FAILED");
+      if (!result.data) return null;
+      return this._mapFoodWithRelations(result.data);
+    },
+
+    async listFoodsForAdmin({ q, categoryCode, active = "true", missingImage, page, pageSize } = {}) {
+      const p = clampPage(page);
+      const size = clampPageSize(pageSize);
+      const offset = (p - 1) * size;
+      let query = db.from("foods").select("*", { count: "exact" });
+      const activeFilter = String(active ?? "true").toLowerCase();
+      if (activeFilter === "true") query = query.eq("is_active", true);
+      else if (activeFilter === "false") query = query.eq("is_active", false);
+      const filter = buildSearchFilter(q);
+      if (filter) query = query.or(filter.slice(4, -1));
+      if (missingImage === true || missingImage === "true") {
+        query = query.is("primary_image_id", null);
+      }
+      if (categoryCode) {
+        const code = sanitizeCategoryCode(categoryCode);
+        if (!code) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+        const categories = await db.from("food_categories").select("id").ilike("code", `${code}%`);
+        if (categories.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+        const categoryIds = (categories.data ?? []).map((category) => category.id).filter(Boolean);
+        if (!categoryIds.length) {
+          return { items: [], pagination: { page: p, pageSize: size, total: 0, hasMore: false } };
+        }
+        query = query.in("category_id", categoryIds);
+      }
+      query = query
+        .range(offset, offset + size - 1)
+        .order("updated_at", { ascending: false });
+      const result = await query;
+      if (result.error) throw new FoodRepositoryError("FOOD_LIST_FAILED");
+      const rows = result.data ?? [];
+      const foodIds = rows.map((r) => r.id);
+      const catIds = Array.from(new Set(rows.map((r) => r.category_id).filter(Boolean)));
+      const [catMap, tagMap, imageMap] = await Promise.all([
+        loadCategoriesByIds(db, catIds),
+        loadTagsForFoods(db, foodIds),
+        loadPrimaryImagesForFoods(db, rows, imageUrlResolver),
+      ]);
+      const items = rows.map((r) => mapFoodRow(r, {
+        category: r.category_id ? catMap.get(r.category_id) : null,
+        tags: tagMap.get(r.id) ?? [],
+        image: imageMap.get(r.id) ?? null,
+      }));
+      const total = Number(result.count ?? items.length);
+      return {
+        items,
+        pagination: { page: p, pageSize: size, total, hasMore: offset + size < total },
+      };
+    },
+
+    async createManualFood(input) {
+      const nameZh = input.nameZh ?? input.name_zh ?? null;
+      const nameEn = input.nameEn ?? input.name_en ?? null;
+      if (!nameZh && !nameEn) throw new FoodRepositoryError("FOOD_INVALID");
+      const calories = Number(input.calories);
+      const proteinG = Number(input.proteinG ?? input.protein_g);
+      const carbsG = Number(input.carbsG ?? input.carbs_g);
+      const fatG = Number(input.fatG ?? input.fat_g);
+      if (!Number.isFinite(calories) || calories < 0
+        || !Number.isFinite(proteinG) || proteinG < 0
+        || !Number.isFinite(carbsG) || carbsG < 0
+        || !Number.isFinite(fatG) || fatG < 0) {
+        throw new FoodRepositoryError("FOOD_INVALID");
+      }
+      const displayName = String(nameZh || nameEn).trim();
+      const normalizedName = String(input.normalizedName ?? input.normalized_name ?? displayName).trim().toLowerCase();
+      const sourceId = `manual-${crypto.randomUUID()}`;
+      const row = {
+        source: "manual",
+        source_id: sourceId,
+        name_zh: nameZh,
+        name_en: nameEn,
+        normalized_name: normalizedName,
+        brand_name: input.brandName ?? input.brand_name ?? null,
+        description: input.description ?? null,
+        category_id: input.categoryId ?? input.category_id ?? null,
+        serving_size: input.servingSize ?? input.serving_size ?? null,
+        serving_unit: input.servingUnit ?? input.serving_unit ?? null,
+        calories,
+        protein_g: proteinG,
+        carbs_g: carbsG,
+        fat_g: fatG,
+        fiber_g: input.fiberG ?? input.fiber_g ?? null,
+        sugar_g: input.sugarG ?? input.sugar_g ?? null,
+        sodium_mg: input.sodiumMg ?? input.sodium_mg ?? null,
+        nutrition_basis: input.nutritionBasis ?? input.nutrition_basis ?? "per_100g",
+        image_entity_key: sourceId,
+        search_keywords: input.searchKeywords ?? input.search_keywords ?? [],
+        publish_status: "published",
+        is_active: true,
+        is_primary_variant: true,
+        is_verified: false,
+        is_featured: false,
+        quality_score: 0,
+        popularity_score: 0,
+        recommendation_weight: 0,
+      };
+      const result = await db.from("foods").insert(row).select("*").maybeSingle();
+      if (result.error) throw new FoodRepositoryError("FOOD_CREATE_FAILED");
+      if (!result.data?.id) throw new FoodRepositoryError("FOOD_CREATE_FAILED");
+      return this.getFoodByIdAdmin(result.data.id);
+    },
+
+    async archiveFood(id) {
+      const result = await db.from("foods").update({ is_active: false }).eq("id", id).select("id").maybeSingle();
+      if (result.error) throw new FoodRepositoryError("FOOD_UPDATE_FAILED");
+      if (!result.data?.id) return null;
+      return this.getFoodByIdAdmin(id);
+    },
+
+    async restoreFood(id) {
+      const result = await db.from("foods").update({ is_active: true }).eq("id", id).select("id").maybeSingle();
+      if (result.error) throw new FoodRepositoryError("FOOD_UPDATE_FAILED");
+      if (!result.data?.id) return null;
+      return this.getFoodByIdAdmin(id);
     },
 
     async listFoodVariants(id) {
@@ -696,7 +825,12 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
 
     async updateFood(id, patch) {
       const allowed = {};
-      for (const k of ["name_zh","name_en","brand_name","description","category_id","serving_size","serving_unit","calories","protein_g","carbs_g","fat_g","fiber_g","sugar_g","sodium_mg","is_featured","is_verified","is_active"]) {
+      for (const k of [
+        "name_zh", "name_en", "brand_name", "description", "category_id",
+        "serving_size", "serving_unit", "calories", "protein_g", "carbs_g", "fat_g",
+        "fiber_g", "sugar_g", "sodium_mg", "is_featured", "is_verified", "is_active",
+        "publish_status", "image_subject_zh", "default_cooking_method", "normalized_name",
+      ]) {
         if (k in patch) allowed[k] = patch[k];
       }
       if (Object.keys(allowed).length) await db.from("foods").update(allowed).eq("id", id);
