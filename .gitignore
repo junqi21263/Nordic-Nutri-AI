@@ -5,15 +5,12 @@ mini-program/.temp/
 mini-program/.swc/
 .pnpm-store/
 
-# Environment files and Supabase local state
+# Environment files
 .env
 .env*
 .env.*
 !.env.example
 .supabase/
-supabase/.temp/
-supabase/functions/.env
-
 # WeChat developer-tool local files
 mini-program/project.private.config.json
 mini-program/miniprogram_npm/

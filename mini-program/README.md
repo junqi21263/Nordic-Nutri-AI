@@ -16,27 +16,17 @@ pnpm --filter @nordic-nutri-ai/mini-program run test:unit
 ## Directory responsibilities
 
 - `config/`: Taro build configuration for shared, development and production modes.
-- `src/pages/`: route-level layout shells; no API calls or business writes.
+- `src/pages/`: product pages that call authenticated CloudBase HTTPS APIs.
 - `src/components/`: reusable Nordic visual components with typed props.
 - `src/layouts/`: shared app/page shell, safe-area, scroll content and custom bottom navigation composition.
 - `src/styles/`: design tokens and global styles; components should consume these tokens rather than introduce ad-hoc colours or radii.
-- `src/stores/`: local Zustand state boundaries with initial state, setters and reset only.
+- `src/stores/`: Zustand state for local UI and hydrated product data.
 - `src/api/`: QueryClient, error mapping, public configuration and request interfaces.
-- `src/services/`: platform-adapted session storage and future Auth boundaries.
-- `src/hooks/`: future reusable React hooks.
+- `src/services/`: platform-adapted session storage and auth helpers.
+- `src/hooks/`: reusable React hooks.
 - `src/types/`: UI, runtime and product-neutral TypeScript types.
-- `src/utils/`: fixture and pure utility data only.
-- `src/assets/`: static assets, currently empty.
-
-## UI Foundation
-
-The UI Foundation is intentionally presentation-only. It uses `src/styles/tokens.scss` for all colour, typography, radius, shadow, spacing and motion values; `src/styles/layout.scss` for the page shell; and typed components under `src/components/` for the Nordic wellness interface. Route pages use realistic local fixture content only and make no Auth, Supabase, storage, upload or AI request.
-
-Run the static foundation guard with:
-
-```bash
-node scripts/verify-ui-foundation.mjs
-```
+- `src/utils/`: pure utility helpers.
+- `src/assets/`: static images and icons.
 
 ## Public configuration
 
@@ -48,6 +38,6 @@ TARO_APP_ENV=local
 
 Do not put a CloudBase API Key, WeChat AppSecret, AI key or database password in this package. Server-side credentials belong only in CloudBase function configuration.
 
-## WeChat Developer Tools
+## Secrets
 
-Run `build:weapp`, then import this `mini-program/` directory. Taro emits the importable output into `dist/weapp/`; H5 output is isolated in `dist/h5/`. Both are ignored by Git.
+Never commit `.env.local`, API keys, OpenID values, or real user images.
