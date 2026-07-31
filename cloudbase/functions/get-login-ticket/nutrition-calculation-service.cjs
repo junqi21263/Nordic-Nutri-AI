@@ -3,27 +3,55 @@ const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const vegetablePattern = /菜|菠菜|西兰花|芦笋|番茄|西红柿|黄瓜|生菜|白菜|青菜|胡萝卜|蘑菇|菌菇|甜椒|彩椒|玉米|土豆|南瓜|茄子|洋葱|海带|紫菜|芹菜|西葫芦/;
 
 const achievementDefinitions = [
-  { title: "第一餐记录", target: 1, metric: (data) => data.meals.length, available: true },
-  { title: "早餐节奏", target: 3, metric: (data) => data.mealDaysByType.breakfast.size, available: true },
-  { title: "午餐专注", target: 3, metric: (data) => data.mealDaysByType.lunch.size, available: true },
-  { title: "晚餐平衡", target: 3, metric: (data) => data.mealDaysByType.dinner.size, available: true },
-  { title: "加餐有度", target: 3, metric: (data) => data.mealDaysByType.snack.size, available: true },
-  { title: "蛋白达人", target: 3, metric: (data) => data.proteinDays, available: true },
-  { title: "连续七天", target: 7, metric: (data) => data.longestStreak, available: true },
-  { title: "连续十四天", target: 14, metric: (data) => data.longestStreak, available: true },
-  { title: "累计三十餐", target: 30, metric: (data) => data.meals.length, available: true },
-  { title: "累计五十餐", target: 50, metric: (data) => data.meals.length, available: true },
-  { title: "累计一百餐", target: 100, metric: (data) => data.meals.length, available: true },
-  { title: "水分自律", target: 1, metric: () => 0, available: false },
-  { title: "睡眠优先", target: 1, metric: () => 0, available: false },
-  { title: "训练伙伴", target: 1, metric: () => 0, available: false },
-  { title: "恢复达人", target: 1, metric: () => 0, available: false },
-  { title: "蔬菜优先", target: 3, metric: (data) => data.vegetableDays, available: true },
-  { title: "碳水平衡", target: 3, metric: (data) => data.carbBalanceDays, available: true },
-  { title: "低脂选择", target: 3, metric: (data) => data.lowFatDays, available: true },
-  { title: "收藏灵感", target: 1, metric: (data) => data.favoriteMeals, available: true },
-  { title: "连续达标", target: 3, metric: (data) => data.qualifiedDaysStreak, available: true },
+  { title: "第一餐记录", target: 1, metric: (data) => data.meals.length, available: true, requirement: "成功记录任意 1 餐到云端。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 1) },
+  { title: "早餐节奏", target: 3, metric: (data) => data.mealDaysByType.breakfast.size, available: true, requirement: "在 3 个不同日期记录早餐。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.mealDaysByType.breakfast, 3) },
+  { title: "午餐专注", target: 3, metric: (data) => data.mealDaysByType.lunch.size, available: true, requirement: "在 3 个不同日期记录午餐。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.mealDaysByType.lunch, 3) },
+  { title: "晚餐平衡", target: 3, metric: (data) => data.mealDaysByType.dinner.size, available: true, requirement: "在 3 个不同日期记录晚餐。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.mealDaysByType.dinner, 3) },
+  { title: "加餐有度", target: 3, metric: (data) => data.mealDaysByType.snack.size, available: true, requirement: "在 3 个不同日期记录加餐。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.mealDaysByType.snack, 3) },
+  { title: "蛋白达人", target: 3, metric: (data) => data.proteinDays, available: true, requirement: "有 3 天蛋白质完成度达到 90% 及以上。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.proteinDayDates, 3) },
+  { title: "连续七天", target: 7, metric: (data) => data.longestStreak, available: true, requirement: "连续 7 天都有饮食记录。", unit: "天", unlockAt: (data) => unlockAtStreakEnd(data.recordedDates, data.endDate, 7) },
+  { title: "连续十四天", target: 14, metric: (data) => data.longestStreak, available: true, requirement: "连续 14 天都有饮食记录。", unit: "天", unlockAt: (data) => unlockAtStreakEnd(data.recordedDates, data.endDate, 14) },
+  { title: "累计三十餐", target: 30, metric: (data) => data.meals.length, available: true, requirement: "累计记录 30 餐。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 30) },
+  { title: "累计五十餐", target: 50, metric: (data) => data.meals.length, available: true, requirement: "累计记录 50 餐。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 50) },
+  { title: "累计一百餐", target: 100, metric: (data) => data.meals.length, available: true, requirement: "累计记录 100 餐。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 100) },
+  { title: "水分自律", target: 1, metric: () => 0, available: false, requirement: "即将上线：完成每日饮水目标。", unit: "次", unlockAt: () => null },
+  { title: "睡眠优先", target: 1, metric: () => 0, available: false, requirement: "即将上线：连续记录优质睡眠。", unit: "次", unlockAt: () => null },
+  { title: "训练伙伴", target: 1, metric: () => 0, available: false, requirement: "即将上线：完成一次训练打卡。", unit: "次", unlockAt: () => null },
+  { title: "恢复达人", target: 1, metric: () => 0, available: false, requirement: "即将上线：完成恢复日节奏。", unit: "次", unlockAt: () => null },
+  { title: "蔬菜优先", target: 3, metric: (data) => data.vegetableDays, available: true, requirement: "有 3 天的餐食包含蔬菜。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.vegetableDates, 3) },
+  { title: "碳水平衡", target: 3, metric: (data) => data.carbBalanceDays, available: true, requirement: "有 3 天碳水完成度在 60%–120%，且蛋白质不少于 60%。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.carbBalanceDates, 3) },
+  { title: "低脂选择", target: 3, metric: (data) => data.lowFatDays, available: true, requirement: "有 3 天脂肪未超标，且蛋白质完成度不少于 60%。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.lowFatDates, 3) },
+  { title: "收藏灵感", target: 1, metric: (data) => data.favoriteMeals, available: true, requirement: "收藏任意 1 餐作为灵感。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.favoriteMealRows, 1) },
+  { title: "连续达标", target: 3, metric: (data) => data.qualifiedDaysStreak, available: true, requirement: "连续 3 天营养完成度达到 80% 及以上。", unit: "天", unlockAt: (data) => unlockAtStreakEnd(data.qualifiedDates, data.endDate, 3) },
 ];
+
+function unlockAtNthMeal(meals, target) {
+  const sorted = [...(meals || [])]
+    .filter((meal) => meal?.recordedAt)
+    .sort((left, right) => String(left.recordedAt).localeCompare(String(right.recordedAt)));
+  return sorted[target - 1]?.recordedAt ?? null;
+}
+
+function unlockAtNthDate(dates, target) {
+  const sorted = [...(dates || [])].filter(Boolean).sort();
+  const date = sorted[target - 1];
+  return date ? `${date}T12:00:00+08:00` : null;
+}
+
+function unlockAtStreakEnd(dates, endDate, target) {
+  const available = new Set(dates || []);
+  let current = 0;
+  for (let offset = 29; offset >= 0; offset -= 1) {
+    const date = shiftDate(endDate, -offset);
+    if (available.has(date)) {
+      current += 1;
+      if (current >= target) return `${date}T12:00:00+08:00`;
+    } else {
+      current = 0;
+    }
+  }
+  return null;
+}
 
 function finitePositive(value, fallback) {
   const number = Number(value);
@@ -214,35 +242,56 @@ function calculateAchievements(meals = [], plan = {}, endDate) {
     type,
     new Set(stats.safeMeals.filter((meal) => meal.mealType === type).map((meal) => dateKey(meal.recordedAt))),
   ]));
-  const proteinDays = stats.dailySummaries.filter(([, summary]) => summary.progress.protein.percent >= 90).length;
+  const proteinDayDates = stats.dailySummaries
+    .filter(([, summary]) => summary.progress.protein.percent >= 90)
+    .map(([date]) => date)
+    .sort();
   const vegetableDates = new Set(stats.safeMeals.filter(mealContainsVegetable).map((meal) => dateKey(meal.recordedAt)));
-  const vegetableDays = vegetableDates.size;
-  const carbBalanceDays = stats.dailySummaries.filter(([, summary]) => summary.progress.carbs.percent >= 60 && summary.progress.carbs.percent <= 120 && summary.progress.protein.percent >= 60).length;
-  const lowFatDays = stats.dailySummaries.filter(([, summary]) => summary.progress.fat.percent <= 100 && summary.progress.protein.percent >= 60).length;
-  const qualifiedDays = new Set(stats.dailySummaries.filter(([, summary]) => summary.completion >= 80).map(([date]) => date));
-  const qualifiedDaysStreak = longestStreak([...qualifiedDays], safeEndDate);
+  const carbBalanceDates = stats.dailySummaries
+    .filter(([, summary]) => summary.progress.carbs.percent >= 60 && summary.progress.carbs.percent <= 120 && summary.progress.protein.percent >= 60)
+    .map(([date]) => date)
+    .sort();
+  const lowFatDates = stats.dailySummaries
+    .filter(([, summary]) => summary.progress.fat.percent <= 100 && summary.progress.protein.percent >= 60)
+    .map(([date]) => date)
+    .sort();
+  const qualifiedDates = stats.dailySummaries.filter(([, summary]) => summary.completion >= 80).map(([date]) => date);
+  const recordedDates = [...stats.days.keys()];
+  const favoriteMealRows = stats.safeMeals.filter((meal) => Boolean(meal.isFavorite));
   const data = {
     meals: stats.safeMeals,
     mealDaysByType,
-    proteinDays,
-    longestStreak: longestStreak([...stats.days.keys()], safeEndDate),
-    vegetableDays,
-    carbBalanceDays,
-    lowFatDays,
-    favoriteMeals: stats.safeMeals.filter((meal) => Boolean(meal.isFavorite)).length,
-    qualifiedDaysStreak,
+    proteinDays: proteinDayDates.length,
+    proteinDayDates,
+    longestStreak: longestStreak(recordedDates, safeEndDate),
+    vegetableDays: vegetableDates.size,
+    vegetableDates,
+    carbBalanceDays: carbBalanceDates.length,
+    carbBalanceDates,
+    lowFatDays: lowFatDates.length,
+    lowFatDates,
+    favoriteMeals: favoriteMealRows.length,
+    favoriteMealRows,
+    qualifiedDaysStreak: longestStreak(qualifiedDates, safeEndDate),
+    qualifiedDates,
+    recordedDates,
+    endDate: safeEndDate,
   };
   return achievementDefinitions.map((definition, index) => {
     const metric = Math.max(0, Number(definition.metric(data)) || 0);
     const progress = definition.available ? Math.min(100, Math.round((metric / definition.target) * 100)) : 0;
+    const unlocked = definition.available && metric >= definition.target;
     return {
       id: `achievement-${index}`,
       title: definition.title,
       available: definition.available,
-      unlocked: definition.available && metric >= definition.target,
+      unlocked,
       progress,
       metric,
       target: definition.target,
+      unit: definition.unit || "",
+      requirement: definition.requirement || "",
+      unlockedAt: unlocked ? (definition.unlockAt?.(data) || null) : null,
     };
   });
 }

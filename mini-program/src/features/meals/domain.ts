@@ -9,6 +9,8 @@ export interface MealItem {
   protein: number;
   carbs: number;
   fat: number;
+  foodId?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface Meal {
@@ -50,6 +52,16 @@ export function shiftDate(date: string, days: number): string {
   return `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, "0")}-${String(localDate.getDate()).padStart(2, "0")}`;
 }
 
+/** Calendar week containing `date`, Monday → Sunday (local dates). */
+export function getMondayBasedWeekDates(date: string): string[] {
+  const [year, month, day] = date.split("-").map(Number);
+  const selected = new Date(year, month - 1, day);
+  const weekday = selected.getDay();
+  const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+  const monday = shiftDate(date, -daysFromMonday);
+  return Array.from({ length: 7 }, (_, index) => shiftDate(monday, index));
+}
+
 export function getMealNutrition(meal: Meal): DailyTargets {
   return meal.items.reduce(
     (total, item) => ({
@@ -71,8 +83,22 @@ export function clampProgress(value: number, target: number) {
       ? Math.min(100, Math.max(0, Math.round((safeValue / safeTarget) * 100)))
       : 0,
     remaining,
+    excess: Math.max(0, -remaining),
     exceeded: safeTarget > 0 && safeValue > safeTarget,
   };
+}
+
+/** Short status copy for daily targets: remaining room or overflow amount. */
+export function formatTargetStatus(
+  progress: ReturnType<typeof clampProgress>,
+  unit: string,
+  options?: { short?: boolean },
+) {
+  const amount = progress.exceeded ? progress.excess : Math.max(0, progress.remaining);
+  if (options?.short) {
+    return progress.exceeded ? `超 ${amount}${unit}` : `余 ${amount}${unit}`;
+  }
+  return progress.exceeded ? `超出 ${amount}${unit}` : `还可摄入 ${amount}${unit}`;
 }
 
 export function getDailySummary(

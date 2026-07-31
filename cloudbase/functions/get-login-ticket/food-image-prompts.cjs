@@ -1,8 +1,12 @@
 // food-image-prompts.cjs
 // Centralized Hunyuan food-photo prompts. Official API limit: 500 characters.
+// Assembly: identity → class → subject → state → correction → negatives → serving → style
+// Over budget: drop/shorten from the end (style first).
 
 const MAX_PROMPT_CHARS = 500;
 const { resolveVisualProfile } = require("./food-image-visual-profile.cjs");
+
+const STYLE_SLOT = "北欧自然光，浅米白桌面，浅木色餐具，低饱和，主体居中，轻微虚化，4:3";
 
 const COOKING_HINTS = {
   水煮: "水煮熟制，无焦痕无煎烤无酱汁无油脂",
@@ -15,9 +19,34 @@ const COOKING_HINTS = {
   烘焙: "准确呈现烘焙质感，勿混甜面包与全麦",
 };
 
+const REJECT_REASON_CODES = Object.freeze({
+  wrong_identity: { labelZh: "认错食材", fragment: "必须严格符合该食材形态，勿生成其他品类" },
+  wrong_doneness: { labelZh: "生熟错误", fragment: "严格按指定生熟状态，勿混用生鲜与熟制特征" },
+  extra_foods: { labelZh: "多余配菜/拼盘", fragment: "仅单一主体，勿增加配菜拼盘或其他食物" },
+  sauce_or_seasoning: { labelZh: "酱汁/调味过重", fragment: "无浓酱无油炸无多余调味" },
+  style_off: { labelZh: "风格不符", fragment: "保持北欧自然光与浅色桌面，低饱和" },
+  other: { labelZh: "其他", fragment: "" },
+});
+
+/** Broad taxonomy codes → template id (name-specific templates still win first). */
+const CATEGORY_CODE_TEMPLATE = Object.freeze({
+  meat: "meat_poultry",
+  seafood: "seafood",
+  egg: "egg_dairy",
+  dairy: "egg_dairy",
+  soy: "plant_protein",
+  grain: "grain_bakery",
+  vegetable: "vegetable",
+  fruit: "fruit",
+  nut: "nuts_oil",
+  nuts: "nuts_oil",
+  oil: "nuts_oil",
+});
+
 const PHOTO_TEMPLATES = [
   {
     id: "shellfish_gastropod",
+    specific: true,
     match: /海螺|田螺|鲍鱼|螺肉|whelk|conch|abalone|snail/i,
     categoryLabel: "贝类，不是鱼类",
     subject: "单一腹足类贝类主体，螺旋外壳与可食用螺肉的形态准确、清楚可辨",
@@ -28,6 +57,7 @@ const PHOTO_TEMPLATES = [
   },
   {
     id: "shellfish_bivalve",
+    specific: true,
     match: /牡蛎|生蚝|蚝|蛤|扇贝|贻贝|青口|clam|oyster|mussel|scallop/i,
     categoryLabel: "贝类，不是鱼类",
     subject: "单一双壳贝类主体，贝壳和可食用贝肉形态准确、清楚可辨",
@@ -38,6 +68,7 @@ const PHOTO_TEMPLATES = [
   },
   {
     id: "crustacean",
+    specific: true,
     match: /虾|蟹|龙虾|shrimp|prawn|crab|lobster/i,
     categoryLabel: "虾蟹，不是鱼类",
     subject: "单一甲壳类主体，甲壳、足部与可食用形态准确、清楚可辨",
@@ -48,6 +79,7 @@ const PHOTO_TEMPLATES = [
   },
   {
     id: "cephalopod",
+    specific: true,
     match: /鱿鱼|章鱼|墨鱼|乌贼|squid|octopus|cuttlefish/i,
     categoryLabel: "头足类，不是鱼类",
     subject: "单一头足类主体，触腕、身体和可食用形态准确、清楚可辨",
@@ -60,33 +92,41 @@ const PHOTO_TEMPLATES = [
     id: "egg_dairy",
     match: /蛋类|乳制品|鸡蛋|鸭蛋|鹌鹑蛋|牛奶|酸奶|奶酪|黄油|skyr/i,
     subject: "完整鸡蛋、切开鸡蛋或对应乳制品主体，形态准确、无包装",
+    cookedSubject: "水煮或清淡熟制蛋类/乳制品，形态准确，无包装无甜品装饰",
+    rawSubject: "生鲜蛋类或未加工乳制品主体，形态准确、无包装",
     defaultCooking: "按食材本身呈现，保持自然颜色与质地",
     negative: "勿增加肉类、面包、麦片、水果、甜品、文字或包装",
   },
   {
     id: "meat_poultry",
     match: /肉禽|鸡|鸭|鹅|牛肉|猪肉|羊肉|火鸡|鹿肉|兔肉/,
-    subject: "可食用的单一肉类主体，切面与肌理自然可见",
+    subject: "可食用的单一肉类主体，切面与肌理自然可见，白盘居中",
+    cookedSubject: "清淡熟制的单一肉类，切面熟透不透明，无焦黑无浓酱，白盘居中",
+    rawSubject: "生鲜未烹调肉类原料，自然色泽与肌理可见，无熟制焦痕无酱汁",
     defaultCooking: "按食材本身呈现；未指定做法时保持原料或清淡熟制",
     negative: "勿增加米饭、蔬菜、酱汁、烧烤焦痕、拼盘或其他肉类",
   },
   {
     id: "seafood",
     match: /鱼虾海鲜|鱼|虾|蟹|贝|蛤|牡蛎|三文鱼|金枪鱼|鳕|鲑|海鲜/,
-    subject: "可食用的单一鱼类或海鲜主体，新鲜干净，纹理真实",
+    subject: "可食用的单一鱼类或海鲜主体，新鲜干净，纹理真实，白盘居中",
+    cookedSubject: "清淡熟制的单一鱼类或海鲜，肉质不透明，无寿司拼盘无浓酱",
+    rawSubject: "生鲜未烹调鱼类或海鲜原料，自然湿润纹理，无熟制焦痕无酱汁",
     defaultCooking: "按食材本身呈现；未指定做法时保持新鲜或清淡熟制",
     negative: "勿增加寿司、意面、薯条、沙拉、柠檬片、酱汁或其他海鲜",
   },
   {
     id: "plant_protein",
-    match: /豆类|植物蛋白|豆腐|黄豆|鹰嘴豆|扁豆|豆浆|tempeh/i,
+    match: /豆类|植物蛋白|豆腐|黄豆|鹰嘴豆|扁豆|豆浆|tempeh|豆制品/i,
     subject: "单一豆类或植物蛋白主体，形态准确、可清楚辨识",
+    cookedSubject: "清淡熟制的豆制品或植物蛋白，形态清楚，无肉类质感",
+    rawSubject: "生鲜或未烹调豆类/植物蛋白原料，形态准确",
     defaultCooking: "按食材本身呈现，未指定做法时为原料或清淡熟制",
     negative: "勿增加肉类、谷物主食、蔬菜拼盘、酱汁、文字或包装",
   },
   {
     id: "grain_bakery",
-    match: /谷物|烘焙|燕麦|米|麦|面包|意面|藜麦|荞麦|玉米|谷物/i,
+    match: /谷物|烘焙|燕麦|米|麦|面包|意面|藜麦|荞麦|玉米/i,
     subject: "单一谷物、主食或基础烘焙食材，形态与颗粒质感准确",
     defaultCooking: "按食材本身呈现，避免混入其他菜品",
     negative: "勿增加肉类、蔬菜、果酱、黄油、饮料、文字或包装",
@@ -95,6 +135,8 @@ const PHOTO_TEMPLATES = [
     id: "vegetable",
     match: /蔬菜|番茄|西兰花|菠菜|蘑菇|土豆|南瓜|胡萝卜|洋葱|叶菜|根茎/i,
     subject: "单一蔬菜主体，保留真实颜色、表皮和切面特征",
+    cookedSubject: "轻焯或清淡熟制的单一蔬菜，保留本色，不成菜肴拼盘",
+    rawSubject: "新鲜未烹调单一蔬菜，保留真实颜色与表皮",
     defaultCooking: "新鲜食材本色或轻焯，未指定时不要制作成菜肴",
     negative: "勿增加肉类、谷物、沙拉拼盘、浓酱、文字或包装",
   },
@@ -114,23 +156,56 @@ const PHOTO_TEMPLATES = [
   },
 ];
 
+const GENERAL_TEMPLATE = {
+  id: "general_food",
+  subject: "单一可食用食材主体，形态准确、清楚可辨",
+  defaultCooking: "按食材本身呈现，不制作成复杂菜肴",
+  negative: "勿增加其他食物、文字、包装、水印、插画或3D",
+};
+
 function clampText(value, max) {
   const text = String(value ?? "").trim().replace(/\s+/g, " ");
   if (!text) return "";
   return text.length <= max ? text : text.slice(0, max);
 }
 
+function normalizeReasonCode(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return REJECT_REASON_CODES[key] ? key : "";
+}
+
+function formatRejectCorrection(reasonCode, freeText) {
+  const code = normalizeReasonCode(reasonCode);
+  const fragment = code ? (REJECT_REASON_CODES[code].fragment || "") : "";
+  const note = clampText(freeText, 180);
+  return [fragment, note].filter(Boolean).join("；");
+}
+
+function templateById(id) {
+  return PHOTO_TEMPLATES.find((template) => template.id === id) || null;
+}
+
+function resolveCategoryCodeTemplate(categoryCode) {
+  const raw = String(categoryCode || "").trim().toLowerCase();
+  if (!raw) return null;
+  const root = raw.split(".")[0];
+  const templateId = CATEGORY_CODE_TEMPLATE[raw] || CATEGORY_CODE_TEMPLATE[root];
+  return templateId ? templateById(templateId) : null;
+}
+
 /**
- * Build a compact Nordic food-photography prompt under the 500-char API limit.
+ * Name-specific templates win; then category code; then broad name/category regex.
  */
-function resolveFoodPhotoTemplate({ foodNameZh, foodNameEn, category } = {}) {
-  const text = `${foodNameZh || ""} ${foodNameEn || ""} ${category || ""}`;
-  return PHOTO_TEMPLATES.find((template) => template.match.test(text)) || {
-    id: "general_food",
-    subject: "单一可食用食材主体，形态准确、清楚可辨",
-    defaultCooking: "按食材本身呈现，不制作成复杂菜肴",
-    negative: "勿增加其他食物、文字、包装、水印、插画或3D",
-  };
+function resolveFoodPhotoTemplate({ foodNameZh, foodNameEn, category, categoryCode } = {}) {
+  const nameText = `${foodNameZh || ""} ${foodNameEn || ""}`;
+  const specific = PHOTO_TEMPLATES.find((template) => template.specific && template.match.test(nameText));
+  if (specific) return specific;
+
+  const byCode = resolveCategoryCodeTemplate(categoryCode);
+  if (byCode) return byCode;
+
+  const text = `${nameText} ${category || ""}`;
+  return PHOTO_TEMPLATES.find((template) => template.match.test(text)) || GENERAL_TEMPLATE;
 }
 
 function resolveVisualPresentation(template, visualProfile, cookingMethod) {
@@ -143,9 +218,17 @@ function resolveVisualPresentation(template, visualProfile, cookingMethod) {
     };
   }
   if (state === "raw") {
+    // Mutex: never append dry-heat / grilled cooking hints under raw.
+    const rawSafeCook = /烤|煎|香煎|烘焙/.test(cookingMethod || "") ? "" : cookingHint;
     return {
       subject: template.rawSubject || template.subject,
-      cookingHint: [visualProfile.promptHint, cookingHint].filter(Boolean).join("；"),
+      cookingHint: [visualProfile.promptHint, rawSafeCook].filter(Boolean).join("；"),
+    };
+  }
+  if (state === "fresh" || state === "dry") {
+    return {
+      subject: template.rawSubject || template.subject,
+      cookingHint: visualProfile.promptHint || cookingHint || template.defaultCooking,
     };
   }
   return {
@@ -154,96 +237,141 @@ function resolveVisualPresentation(template, visualProfile, cookingMethod) {
   };
 }
 
+function joinSlots(slots) {
+  let prompt = slots.filter(Boolean).join("。").replace(/。+/g, "。");
+  if (prompt && !prompt.endsWith("。")) prompt += "。";
+  return prompt;
+}
+
+/**
+ * Drop or shorten lowest-priority slots until prompt fits MAX_PROMPT_CHARS.
+ * Priority (drop first): style → serving → negatives → correction → subject → state → class
+ * Identity is never dropped.
+ */
+function assemblePromptSlots(slotMap, { forceOverflow = false } = {}) {
+  const order = ["identity", "class", "subject", "state", "correction", "negatives", "serving", "style"];
+  const dropOrder = ["style", "serving", "negatives", "correction", "subject", "state", "class"];
+  const values = { ...slotMap };
+  const trimmedSlots = [];
+
+  const render = () => joinSlots(order.map((key) => values[key]).filter(Boolean));
+  let prompt = render();
+
+  // Test hook: pretend style pushes us over so trim logic is exercised even if under budget.
+  if (forceOverflow && prompt.length <= MAX_PROMPT_CHARS && values.style) {
+    values.style = `${values.style}，${"额外风格约束文字。".repeat(40)}`;
+    prompt = render();
+  }
+
+  while (prompt.length > MAX_PROMPT_CHARS) {
+    let progressed = false;
+    for (const key of dropOrder) {
+      if (!values[key]) continue;
+      if (key === "negatives" || key === "correction" || key === "subject" || key === "state") {
+        const next = clampText(values[key], Math.max(24, Math.floor(values[key].length * 0.6)));
+        if (next !== values[key] && next.length < values[key].length) {
+          values[key] = next;
+          if (!trimmedSlots.includes(key)) trimmedSlots.push(key);
+          progressed = true;
+          break;
+        }
+      }
+      delete values[key];
+      if (!trimmedSlots.includes(key)) trimmedSlots.push(key);
+      progressed = true;
+      break;
+    }
+    prompt = render();
+    if (!progressed) {
+      prompt = `${prompt.slice(0, MAX_PROMPT_CHARS - 1)}。`;
+      break;
+    }
+  }
+
+  return { prompt, trimmedSlots, slots: values };
+}
+
 function buildFoodImagePromptPlan(input = {}) {
   const nameZh = clampText(input.foodNameZh || input.foodNameEn, 40) || "食物";
   const nameEn = clampText(input.foodNameEn, 40);
   const cat = clampText(input.category, 16);
+  const categoryCode = clampText(input.categoryCode, 32);
   const cook = clampText(input.cookingMethod, 12);
   const serving = clampText(input.servingDescription, 24);
   const imageSubjectZh = clampText(input.imageSubjectZh, 180);
+  const reasonCode = normalizeReasonCode(input.reasonCode);
   const retryReason = clampText(input.retryReason, 180);
-  const extra = clampText([
-    input.extraPrompt,
-    retryReason,
-  ].filter(Boolean).join("；"), 180);
-  const template = resolveFoodPhotoTemplate({ foodNameZh: nameZh, foodNameEn: nameEn, category: cat });
+  const correction = formatRejectCorrection(reasonCode, [input.extraPrompt, retryReason].filter(Boolean).join("；"));
+  const template = resolveFoodPhotoTemplate({
+    foodNameZh: nameZh,
+    foodNameEn: nameEn,
+    category: cat,
+    categoryCode,
+  });
   const visualProfile = resolveVisualProfile({
     nameZh,
     nameEn,
-    category: input.category ? { nameZh: input.category } : null,
+    category: input.category ? { nameZh: input.category, code: categoryCode } : (categoryCode ? { code: categoryCode } : null),
     defaultCookingMethod: cook,
     visualProfileKey: input.visualProfileKey,
   }, input.visualProfileKey);
   const presentation = resolveVisualPresentation(template, visualProfile, cook);
-  const plan = {
+  const subject = clampText(input.subject, 180) || imageSubjectZh || presentation.subject;
+  const cookingHint = clampText(input.cookingHint, 150) || presentation.cookingHint;
+  const negative = clampText(input.negativePrompt, 180) || template.negative || GENERAL_TEMPLATE.negative;
+  const categoryLabel = clampText(template.categoryLabel || cat, 32);
+
+  const assembled = assemblePromptSlots({
+    identity: [`真实可食用健康食物摄影，主体：${nameZh}`, nameEn ? `英文：${nameEn}` : ""].filter(Boolean).join("，"),
+    class: categoryLabel ? `视觉分类：${categoryLabel}` : "",
+    subject,
+    state: cookingHint || "",
+    correction: correction ? `根据审核反馈修正：${clampText(correction, 140)}` : "",
+    negatives: `仅此食物，无人手无文字无包装无水印无插画无3D。${negative}`,
+    serving: serving ? `份量：${serving}` : "",
+    style: STYLE_SLOT,
+  }, { forceOverflow: Boolean(input.forceOverflow) });
+
+  return {
     template: template.id,
     foodNameZh: nameZh,
     foodNameEn: nameEn,
     category: cat,
-    subject: imageSubjectZh || presentation.subject,
-    cookingHint: presentation.cookingHint,
+    categoryCode: categoryCode || null,
+    subject,
+    cookingHint,
     imageSubjectZh: imageSubjectZh || null,
     servingDescription: serving,
-    negativePrompt: template.negative,
-    extraPrompt: extra,
+    negativePrompt: negative,
+    extraPrompt: correction || null,
     retryReason: retryReason || null,
+    reasonCode: reasonCode || null,
     visualProfileKey: visualProfile.key,
     visualProfileLabelZh: visualProfile.labelZh,
+    trimmedSlots: assembled.trimmedSlots,
+    prompt: assembled.prompt,
   };
-  plan.prompt = buildFoodImagePrompt(plan);
-  return plan;
 }
 
 function buildFoodImagePrompt(input = {}) {
-  const {
-  foodNameZh,
-  foodNameEn,
-  category,
-  cookingMethod,
-  servingDescription,
-    extraPrompt,
-    imageSubjectZh,
-  } = input;
-  const nameZh = clampText(foodNameZh || foodNameEn, 40) || "食物";
-  const nameEn = clampText(foodNameEn, 40);
-  const cat = clampText(category, 16);
-  const cook = clampText(cookingMethod, 12);
-  const serving = clampText(servingDescription, 24);
-  const inferred = resolveFoodPhotoTemplate({ foodNameZh: nameZh, foodNameEn: nameEn, category: cat });
-  const visualProfile = resolveVisualProfile({ nameZh, nameEn, category: { nameZh: cat }, defaultCookingMethod: cook, visualProfileKey: input.visualProfileKey }, input.visualProfileKey);
-  const presentation = resolveVisualPresentation(inferred, visualProfile, cook);
-  const cookHint = clampText(input.cookingHint, 150) || presentation.cookingHint;
-  const subject = clampText(input.subject || imageSubjectZh, 180) || presentation.subject;
-  const negative = clampText(input.negativePrompt, 180) || inferred.negative;
-  const extra = clampText(extraPrompt, 140);
-  const categoryLabel = clampText(inferred.categoryLabel || cat, 32);
-
-  const parts = [
-    `真实可食用健康食物摄影，主体：${nameZh}`,
-    nameEn ? `英文：${nameEn}` : "",
-    categoryLabel ? `视觉分类：${categoryLabel}` : "",
-    subject,
-    cookHint || "",
-    extra ? `根据审核反馈修正：${extra}` : "",
-    serving ? `份量：${serving}` : "",
-    "北欧自然光，浅米白桌面，浅木色餐具，低饱和，主体居中，轻微虚化，4:3横构图",
-    `仅此食物，无人手无文字无包装无水印无插画无3D。${negative}`,
-  ].filter(Boolean);
-
-  let prompt = parts.join("。").replace(/。+/g, "。");
-  if (!prompt.endsWith("。")) prompt += "。";
-  if (prompt.length > MAX_PROMPT_CHARS) {
-    prompt = `${prompt.slice(0, MAX_PROMPT_CHARS - 1)}。`;
+  if (input && typeof input.prompt === "string" && input.prompt && input.template) {
+    // Re-compose from plan fields so callers can mutate slots; fall through if incomplete.
   }
-  return prompt;
+  const plan = buildFoodImagePromptPlan(input);
+  return plan.prompt;
 }
 
 module.exports = {
   MAX_PROMPT_CHARS,
   COOKING_HINTS,
   PHOTO_TEMPLATES,
+  REJECT_REASON_CODES,
+  STYLE_SLOT,
+  CATEGORY_CODE_TEMPLATE,
   resolveFoodPhotoTemplate,
   buildFoodImagePromptPlan,
   buildFoodImagePrompt,
+  formatRejectCorrection,
+  normalizeReasonCode,
   clampText,
 };

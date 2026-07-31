@@ -11,7 +11,7 @@ active CDN** by the server.
 | Runtime | Existing HTTP cloud function `get-login-ticket` (not CloudRun) |
 | Model group | `ai.createImageModel("hunyuan-image")` (@cloudbase/node-sdk ≥ 3.18.3) |
 | Model ID | Env `HY_IMAGE_MODEL`, default `HY-Image-3.0-Plus-4090-Tob-v1.0` (CloudBase 小程序成长计划二期 docs) |
-| Size | Official `1280x720` then sharp crop to 4:3 (`1024x768` detail / `320x240` list / `160x120` thumb) |
+| Size | Official `1280x720` then sharp crop to 4:3 (`1024x768` detail / `320x240` list / `160x120` thumb). Display WebP variants only — Hunyuan `original` is not persisted. Default `candidateCount` is **1**. Rejected images best-effort delete their Storage variants. |
 | Queue | Table `food_image_jobs` + `POST /api/admin/food-image-jobs/worker` |
 | Trigger | Create-job fire-and-forget `setImmediate` worker **plus** optional CloudBase timer hitting `/worker` |
 
@@ -24,6 +24,42 @@ Confirmed from CloudBase docs (not guessed):
 - https://docs.cloudbase.net/ai/ai-inspire-plan-image-upgrade
 
 Prompt max length is **500 characters** — templates live in `food-image-prompts.cjs`.
+
+### Prompt assembly (P0/P1)
+
+Slots in order: identity → class → subject → state → correction → negatives → serving → style.  
+Over budget, drop from the end (style first). Template resolution: name-specific (shellfish etc.) → `category.code` → name/category regex.
+
+Reject body may include `reasonCode`:
+
+| Code | Meaning |
+|------|---------|
+| `wrong_identity` | Wrong food class |
+| `wrong_doneness` | Raw/cooked mismatch |
+| `extra_foods` | Sides / platter |
+| `sauce_or_seasoning` | Heavy sauce |
+| `style_off` | Style drift |
+| `other` | Free text required |
+
+Coded fragments fold into the next prompt correction slot. Persist `food_images.reject_reason_code` via migration `0029_food_image_reject_reason_code.sql`.
+
+Ops: admin foods filter `missingImageSubject=true`, or `cloudbase/pg/scripts/list-missing-image-subjects.sql`, then fill `foods.image_subject_zh`.
+
+### Category auto patrol
+
+Configure watched categories in admin → **分类自动巡检**. The timer function
+`food-image-batch-dispatcher` calls patrol before dispatching running batches:
+
+1. Skip foods that already have an **approved primary for that visual profile**.
+2. Create + start a category batch when candidates exist and no active batch
+   for the same category/profile.
+3. Cap creations by remaining daily quota (**500**/day, shared with
+   `HY_IMAGE_DAILY_LIMIT` / `food_image_usage_daily`).
+4. Per-rule **interval** (`interval_minutes`, 30–1440, default 60): timer may
+   wake often, but a rule only creates a batch when its interval has elapsed
+   since `last_run_at`. Admin **立即巡检一次** bypasses the interval.
+
+Migrations: `0030_food_image_patrol_rules.sql`, `0031_food_image_patrol_interval.sql`.
 
 ## Admin API (Bearer + `app_users.is_admin`)
 
@@ -44,11 +80,12 @@ Lightweight UI: open `cloudbase/admin/food-images.html` in a browser.
 ## Storage layout
 
 ```
-food-library/{foodId}/{imageId}/original.{ext}
 food-library/{foodId}/{imageId}/thumbnail.webp
 food-library/{foodId}/{imageId}/list.webp
 food-library/{foodId}/{imageId}/detail.webp
 ```
+
+Display WebP variants only. Legacy `original.*` files from older runs are deleted on reject when present.
 
 `storage_path` is the only canonical image address. `thumbnailUrl`, `listUrl`
 and `detailUrl` are derived at read time from `FOOD_IMAGE_CDN_BASE_URL`;

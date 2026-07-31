@@ -88,6 +88,21 @@ describe("getFoodVisualFallback", () => {
   it("keeps Orange chicken on meat instead of matching fruit orange", () => {
     expect(getFoodVisualFallback({ description: "Orange chicken", imageUrl: null }).tone).toBe("meat");
   });
+
+  it("maps common Chinese dish names without catalog photos", () => {
+    expect(getFoodVisualFallback({ description: "番茄炒蛋" })).toEqual({
+      tone: "egg",
+      icon: "food-egg",
+    });
+    expect(getFoodVisualFallback({ description: "西红柿炒蛋" }).icon).toBe("food-egg");
+    expect(getFoodVisualFallback({ description: "鱼香茄子" })).toEqual({
+      tone: "produce",
+      icon: "food-carrot",
+    });
+    expect(getFoodVisualFallback({ description: "鱼香肉丝" }).tone).toBe("meat");
+    expect(getFoodVisualFallback({ description: "麻婆豆腐" }).tone).toBe("soy");
+    expect(getFoodVisualFallback({ description: "蛋炒饭" }).tone).toBe("egg");
+  });
 });
 
 describe("getFoodVisualAspectRatio", () => {

@@ -13,7 +13,12 @@ describe("real visual analysis boundary", () => {
     expect(api).toContain("imageBase64");
     expect(api).toContain("detectImageContentType");
     expect(api).toContain("contentType,");
+    expect(api).toContain("MAX_PICK_IMAGE_BYTES");
+    expect(api).toContain("formatImageTooLargeMessage");
     expect(scanner).toContain("analyzeProductImage");
+    expect(scanner).toContain("assertImageWithinPickLimit");
+    expect(scanner).toContain('sizeType: ["compressed"]');
     expect(scanner).not.toContain("captureRandom");
   });
 });
+

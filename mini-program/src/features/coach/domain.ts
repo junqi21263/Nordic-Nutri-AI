@@ -1,4 +1,5 @@
 import { getDailySummary, type Meal } from "../meals/domain";
+import { getAchievementRequirement } from "./achievement-catalog";
 export interface CoachAdvice {
   id: string;
   title: string;
@@ -12,6 +13,12 @@ export interface Achievement {
   title: string;
   unlocked: boolean;
   progress: number;
+  available?: boolean;
+  metric?: number;
+  target?: number;
+  unit?: string;
+  requirement?: string;
+  unlockedAt?: string | null;
 }
 export function createCoachAdvice(meals: Meal[], date: string): CoachAdvice[] {
   const summary = getDailySummary(meals, date);
@@ -78,10 +85,20 @@ export function createAchievements(meals: Meal[], date: string): Achievement[] {
     "收藏灵感",
     "连续达标",
   ];
-  return names.map((title, index) => ({
-    id: `achievement-${index}`,
-    title,
-    unlocked: count >= index + 1 || index < 3,
-    progress: Math.min(100, Math.round((count / (index + 1)) * 100)),
-  }));
+  return names.map((title, index) => {
+    const target = index + 1;
+    const progress = Math.min(100, Math.round((count / target) * 100));
+    return {
+      id: `achievement-${index}`,
+      title,
+      unlocked: count >= target || index < 3,
+      progress,
+      available: true,
+      metric: Math.min(count, target),
+      target,
+      unit: "餐",
+      requirement: getAchievementRequirement(title),
+      unlockedAt: null,
+    };
+  });
 }

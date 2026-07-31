@@ -27,6 +27,8 @@ import {
 import {
   appendCatalogItems,
   canLoadMoreCatalogItems,
+  pickRandomCatalogPage,
+  shuffleCatalogItems,
   type CatalogPagination,
 } from "../../features/food-catalog/catalog-pagination";
 import { PageLayout } from "../../layouts/page-layout";
@@ -56,7 +58,7 @@ const CATEGORY_ICONS: Record<string, NordicIconName> = {
   basic_processed: "food-bread",
   regional_staples: "food-bowl",
   nordic_staples: "food-fish",
-  north_american_staples: "food-bowl",
+  north_american_staples: "food-bread",
   beverage: "food-cup",
   beverages: "food-cup",
   seasoning: "food-salt",
@@ -70,7 +72,7 @@ const FALLBACK_CATEGORY_CHIPS: Array<{
   code?: string;
   icon: NordicIconName;
 }> = [
-  { label: "全部", category: "全部", code: "all", icon: "sparkles" },
+  { label: "全部", category: "全部", code: "all", icon: "utensils" },
   { label: "肉禽", category: "肉禽", code: "meat_poultry", icon: "protein" },
   { label: "鱼虾海鲜", category: "鱼虾海鲜", code: "seafood", icon: "food-fish" },
   { label: "蛋类与乳制品", category: "蛋类与乳制品", code: "egg_dairy", icon: "food-egg" },
@@ -84,7 +86,7 @@ const FALLBACK_CATEGORY_CHIPS: Array<{
   { label: "烘焙与基础加工食材", category: "烘焙与基础加工食材", code: "basic_processed", icon: "food-bread" },
   { label: "地域特色常用食材", category: "地域特色常用食材", code: "regional_staples", icon: "food-bowl" },
   { label: "北欧常见食材", category: "北欧常见食材", code: "nordic_staples", icon: "food-fish" },
-  { label: "北美常见食材", category: "北美常见食材", code: "north_american_staples", icon: "food-bowl" },
+  { label: "北美常见食材", category: "北美常见食材", code: "north_american_staples", icon: "food-bread" },
 ];
 
 function suggestionLabel(item: ProductFoodSuggestion) {
@@ -112,6 +114,8 @@ export default function FoodCatalogPage() {
   const catalogCategoryRef = useRef<string | undefined>();
   const paginationRef = useRef<CatalogPagination>();
   const loadMoreLockRef = useRef(false);
+  const didBootstrapRef = useRef(false);
+  const taxonomyLoadedRef = useRef(false);
 
   const categoryChips = useMemo(() => {
     const serverChips = serverCategories
@@ -150,13 +154,13 @@ export default function FoodCatalogPage() {
   );
   const popularItems = visibleItems;
 
-  const discover = async (limit = 20, page = 1) => {
-    const replacingPage = page === 1;
+  const discover = async (limit = 20, page = 1, options?: { replace?: boolean }) => {
+    const replacingPage = options?.replace ?? page === 1;
     setIsSearching(true);
     if (replacingPage) setIsPageLoading(true);
     try {
       const result = await discoverProductFoodCatalog(limit, page);
-      setItems((current) => (page === 1 ? result.items : appendCatalogItems(current, result.items)));
+      setItems((current) => (replacingPage ? result.items : appendCatalogItems(current, result.items)));
       setPagination(result.pagination);
       paginationRef.current = result.pagination;
       setHasSearched(false);
@@ -172,6 +176,7 @@ export default function FoodCatalogPage() {
   };
 
   const loadTaxonomy = async () => {
+    if (taxonomyLoadedRef.current) return;
     try {
       const [categories, tags] = await Promise.all([
         getProductFoodCategories(),
@@ -179,14 +184,17 @@ export default function FoodCatalogPage() {
       ]);
       setServerCategories(categories.items ?? []);
       setServerTags(tags.items ?? []);
+      taxonomyLoadedRef.current = true;
     } catch {
       // Keep fallback chips when taxonomy APIs are unavailable.
     }
   };
 
   useDidShow(() => {
-    void discover();
     void loadTaxonomy();
+    if (didBootstrapRef.current) return;
+    didBootstrapRef.current = true;
+    void discover();
   });
 
   const loadCatalogPage = async ({
@@ -322,6 +330,23 @@ export default function FoodCatalogPage() {
     });
   };
 
+  const refreshPopular = async () => {
+    if (hasSearched || isSearching || isPageLoading) return;
+    const page = pickRandomCatalogPage(paginationRef.current);
+    if (!activeCategoryCode || activeCategoryCode === "all") {
+      await discover(20, page, { replace: true });
+      setItems((current) => shuffleCatalogItems(current));
+      return;
+    }
+    await loadCatalogPage({
+      query: catalogQueryRef.current,
+      categoryCode: catalogCategoryRef.current ?? activeCategoryCode,
+      page,
+      replace: true,
+    });
+    setItems((current) => shuffleCatalogItems(current));
+  };
+
   return (
     <PageLayout
       title="食物库"
@@ -331,7 +356,7 @@ export default function FoodCatalogPage() {
     >
       <View className="food-catalog-page">
         <View className="food-catalog-search food-catalog-search--pill">
-          <NordicIcon name="utensils" size={20} ariaLabel="搜索食物" />
+          <NordicIcon name="search" size={20} ariaLabel="搜索食物" />
           <Input
             value={query}
             maxlength={80}
@@ -427,9 +452,21 @@ export default function FoodCatalogPage() {
         <View className="food-catalog-section">
           {isPageLoading ? <LoadingState label="正在加载食物库…" /> : (
             <>
-              <Text className="food-catalog-section__title">
-                {hasSearched ? "搜索结果" : "热门推荐"}
-              </Text>
+              <View className="food-catalog-section__header">
+                <Text className="food-catalog-section__title">
+                  {hasSearched ? "搜索结果" : "热门推荐"}
+                </Text>
+                {!hasSearched ? (
+                  <View
+                    className={`food-catalog-section__refresh ${isSearching ? "food-catalog-section__refresh--loading" : ""}`}
+                    ariaLabel="换一批热门推荐"
+                    onClick={() => void refreshPopular()}
+                  >
+                    <NordicIcon name="refresh-cw" size={16} ariaLabel="换一批" />
+                    <Text>换一批</Text>
+                  </View>
+                ) : null}
+              </View>
               {popularItems.length ? (
                 <View className="food-catalog-popular">
                   {popularItems.map((food) => (
@@ -463,7 +500,7 @@ export default function FoodCatalogPage() {
                 </View>
               ) : (
                 <View className="food-catalog-empty">
-                  <NordicIcon name="sparkles" size={30} ariaLabel="食物库提示" />
+                  <NordicIcon name="food-bowl" size={30} ariaLabel="食物库提示" />
                   <Text className="food-catalog-empty__title">
                     {isSearching ? "正在加载食物库" : "暂未找到匹配食物"}
                   </Text>

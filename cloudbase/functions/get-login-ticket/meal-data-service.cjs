@@ -56,7 +56,6 @@ function normalizeMealInput(input) {
   if (!name || name.length > 100 || !mealTypes.has(input?.mealType)) throw invalid();
   const recordedAt = typeof input.recordedAt === "string" ? new Date(input.recordedAt) : null;
   if (!recordedAt || Number.isNaN(recordedAt.getTime())) throw invalid();
-  // Prefer durable cloud file ID from imagePath; fall back to imageUrl when it fits the column.
   const imageUrl = normalizeStoredImagePath(input.imagePath) || normalizeStoredImagePath(input.imageUrl);
   return {
     clientRequestId: assertUuid(input.clientRequestId, "请求 ID"),
@@ -70,7 +69,7 @@ function normalizeMealInput(input) {
   };
 }
 
-function mapItem(row) {
+function mapItem(row, imageUrl = null) {
   return {
     id: row.id,
     name: row.name,
@@ -80,10 +79,12 @@ function mapItem(row) {
     proteinPer100g: Number(row.protein_g_per_100g),
     carbsPer100g: Number(row.carbs_g_per_100g),
     fatPer100g: Number(row.fat_g_per_100g),
+    foodId: row.food_id ?? null,
+    imageUrl: imageUrl ?? null,
   };
 }
 
-function mapMeal(row, itemRows) {
+function mapMeal(row, itemRows, imageByFoodId = new Map()) {
   return {
     id: row.id,
     userId: row.user_id,
@@ -94,11 +95,12 @@ function mapMeal(row, itemRows) {
     recordedAt: row.recorded_at,
     isFavorite: Boolean(row.is_favorite),
     imageUrl: row.image_path ?? null,
+    insight: typeof row.insight === "string" && row.insight.trim() ? row.insight.trim() : null,
     caloriesKcal: Number(row.calories_kcal ?? 0),
     proteinG: Number(row.protein_g ?? 0),
     carbsG: Number(row.carbs_g ?? 0),
     fatG: Number(row.fat_g ?? 0),
-    items: itemRows.map(mapItem),
+    items: itemRows.map((item) => mapItem(item, imageByFoodId.get(item.food_id) ?? null)),
   };
 }
 
@@ -118,7 +120,13 @@ function assertDateRange(from, to) {
   if (days < 0 || days > 31) throw invalid("日期范围无效");
 }
 
-function createMealDataService({ db, analyze, model = "deepseek-v4-flash", resolveImageUrl }) {
+function createMealDataService({
+  db,
+  analyze,
+  model = "deepseek-v4-flash",
+  resolveImageUrl,
+  generateMealInsight,
+}) {
   if (!db || typeof db.from !== "function") throw new Error("Meal database is unavailable");
 
   async function withResolvedImage(meal) {
@@ -133,13 +141,120 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash", resol
     }
   }
 
-  async function getMeal(userId, mealId) {
+  /** Bound concurrency so range lists do not stampede temp-URL resolution. */
+  async function mapWithConcurrency(items, concurrency, mapper) {
+    if (!items.length) return [];
+    const limit = Math.max(1, Math.min(concurrency, items.length));
+    const results = new Array(items.length);
+    let nextIndex = 0;
+    async function worker() {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await mapper(items[index], index);
+      }
+    }
+    await Promise.all(Array.from({ length: limit }, () => worker()));
+    return results;
+  }
+
+  async function resolveInsight({ analysisId, userId, mealName, items, existingInsight, allowGenerate = true }) {
+    if (typeof existingInsight === "string" && existingInsight.trim()) return existingInsight.trim().slice(0, 1000);
+    if (analysisId) {
+      const analysis = await db.from("ai_analysis").select("advice").eq("id", analysisId).eq("user_id", userId).maybeSingle();
+      if (analysis.error) throw new Error("Meal analysis read failed");
+      const advice = typeof analysis.data?.advice === "string" ? analysis.data.advice.trim() : "";
+      if (advice) return advice.slice(0, 1000);
+    }
+    if (!allowGenerate || typeof generateMealInsight !== "function") return null;
+    try {
+      const generated = await generateMealInsight({
+        mealName,
+        items: items.map((item) => ({
+          name: item.name,
+          quantityG: item.quantityG,
+          caloriesPer100g: item.caloriesPer100g,
+          proteinPer100g: item.proteinPer100g,
+          carbsPer100g: item.carbsPer100g,
+          fatPer100g: item.fatPer100g,
+        })),
+      });
+      if (typeof generated === "string" && generated.trim()) return generated.trim().slice(0, 1000);
+    } catch (error) {
+      console.warn("[meals] insight generation failed:", error?.message || error);
+    }
+    return null;
+  }
+
+  function scheduleBackgroundInsight(userId, mealId, itemRows, record) {
+    void (async () => {
+      try {
+        const existingInsight = typeof record.insight === "string" ? record.insight.trim() : "";
+        if (existingInsight) return;
+        const generated = await resolveInsight({
+          analysisId: record.analysis_id ?? null,
+          userId,
+          mealName: record.name,
+          items: itemRows.map((row) => ({
+            name: row.name,
+            quantityG: Number(row.confirmed_quantity_g),
+            caloriesPer100g: Number(row.calories_per_100g),
+            proteinPer100g: Number(row.protein_g_per_100g),
+            carbsPer100g: Number(row.carbs_g_per_100g),
+            fatPer100g: Number(row.fat_g_per_100g),
+          })),
+          allowGenerate: true,
+        });
+        if (generated) {
+          await db.from("meal_records").update({ insight: generated }).eq("id", mealId).eq("user_id", userId).is("deleted_at", null);
+        }
+      } catch (error) {
+        console.warn("[meals] background insight failed:", error?.message || error);
+      }
+    })();
+  }
+
+  async function getMeal(userId, mealId, options = {}) {
+    const hydrate = Boolean(options?.hydrate);
     const record = await db.from("meal_records").select("*").eq("id", mealId).eq("user_id", userId).is("deleted_at", null).maybeSingle();
     if (record.error) throw new Error("Meal read failed");
     if (!record.data) return null;
-    const items = await db.from("meal_items").select("*").eq("meal_record_id", mealId).order("created_at", { ascending: true });
-    if (items.error) throw new Error("Meal item read failed");
-    return withResolvedImage(mapMeal(record.data, items.data ?? []));
+    const itemsResult = await db.from("meal_items").select("*").eq("meal_record_id", mealId).order("created_at", { ascending: true });
+    if (itemsResult.error) throw new Error("Meal item read failed");
+    const itemRows = itemsResult.data ?? [];
+
+    if (hydrate) {
+      let insight = typeof record.data.insight === "string" ? record.data.insight.trim() : "";
+      if (!insight) {
+        // Fast path: reuse analysis advice from DB only. DeepSeek generation runs in background.
+        const fromAnalysis = await resolveInsight({
+          analysisId: record.data.analysis_id ?? null,
+          userId,
+          mealName: record.data.name,
+          items: itemRows.map((row) => ({
+            name: row.name,
+            quantityG: Number(row.confirmed_quantity_g),
+            caloriesPer100g: Number(row.calories_per_100g),
+            proteinPer100g: Number(row.protein_g_per_100g),
+            carbsPer100g: Number(row.carbs_g_per_100g),
+            fatPer100g: Number(row.fat_g_per_100g),
+          })),
+          allowGenerate: false,
+        });
+        if (fromAnalysis) {
+          insight = fromAnalysis;
+          const saved = await db.from("meal_records").update({ insight }).eq("id", mealId).eq("user_id", userId).is("deleted_at", null).select("*").maybeSingle();
+          if (!saved.error && saved.data) record.data = saved.data;
+          else record.data = { ...record.data, insight };
+        }
+      }
+
+      if (!(typeof record.data.insight === "string" && record.data.insight.trim())) {
+        scheduleBackgroundInsight(userId, mealId, itemRows, record.data);
+      }
+    }
+
+    return withResolvedImage(mapMeal(record.data, itemRows));
   }
 
   return {
@@ -166,22 +281,31 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash", resol
       };
     },
 
-    async listMeals(userId, date) {
-      return this.listMealsRange(userId, date, date);
+    async listMeals(userId, date, options = {}) {
+      return this.listMealsRange(userId, date, date, options);
     },
 
-    async listMealsRange(userId, from, to) {
+    async listMealsRange(userId, from, to, options = {}) {
       assertDateRange(from, to);
+      const resolveImages = options.resolveImages !== false;
       const until = nextDate(to);
       const records = await db.from("meal_records").select("*").eq("user_id", userId).is("deleted_at", null)
         .gte("recorded_at", `${from}T00:00:00+08:00`).lt("recorded_at", until).order("recorded_at", { ascending: true });
       if (records.error) throw new Error("Meal list failed");
-      const result = [];
-      for (const record of records.data ?? []) {
-        const meal = await getMeal(userId, record.id);
-        if (meal) result.push(meal);
+      const rows = records.data ?? [];
+      if (!rows.length) return [];
+      const mealIds = rows.map((row) => row.id);
+      const itemsResult = await db.from("meal_items").select("*").in("meal_record_id", mealIds).order("created_at", { ascending: true });
+      if (itemsResult.error) throw new Error("Meal item read failed");
+      const itemsByMeal = new Map();
+      for (const item of itemsResult.data ?? []) {
+        const list = itemsByMeal.get(item.meal_record_id) ?? [];
+        list.push(item);
+        itemsByMeal.set(item.meal_record_id, list);
       }
-      return result;
+      const meals = rows.map((record) => mapMeal(record, itemsByMeal.get(record.id) ?? []));
+      if (!resolveImages) return meals;
+      return mapWithConcurrency(meals, 4, (meal) => withResolvedImage(meal));
     },
 
     async createMeal(userId, input) {
@@ -195,15 +319,21 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash", resol
       }
       let imagePath = meal.imageUrl;
       if (meal.analysisId) {
-        const analysis = await db.from("ai_analysis").select("id,image_path").eq("id", meal.analysisId).eq("user_id", userId).maybeSingle();
+        const analysis = await db.from("ai_analysis").select("id,image_path,advice").eq("id", meal.analysisId).eq("user_id", userId).maybeSingle();
         if (analysis.error || !analysis.data?.id) throw invalid("分析记录无效");
-        // Prefer durable cloud file ID from vision analysis when the client only has a
-        // temp HTTPS URL (too long for image_path) or a local wxfile path.
         if (!imagePath || !/^cloud:\/\//i.test(imagePath)) {
           const analysisPath = normalizeStoredImagePath(analysis.data.image_path);
           if (analysisPath && /^cloud:\/\//i.test(analysisPath)) imagePath = analysisPath;
         }
       }
+      // Sync path: reuse analysis advice only. DeepSeek meal insight runs in background.
+      const insight = await resolveInsight({
+        analysisId: meal.analysisId,
+        userId,
+        mealName: meal.name,
+        items: meal.items,
+        allowGenerate: false,
+      });
       const created = await db.from("meal_records").insert({
         user_id: userId,
         analysis_id: meal.analysisId,
@@ -213,8 +343,10 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash", resol
         recorded_at: meal.recordedAt,
         is_favorite: meal.isFavorite,
         image_path: imagePath,
+        insight,
       }).select("*").single();
       if (created.error || !created.data?.id) throw new Error("Meal save failed");
+      // Meal items stay on the meal only — do not auto-create/link catalog foods.
       const itemRows = meal.items.map((item) => ({
         meal_record_id: created.data.id,
         name: item.name,
@@ -224,10 +356,15 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash", resol
         protein_g_per_100g: item.proteinPer100g,
         carbs_g_per_100g: item.carbsPer100g,
         fat_g_per_100g: item.fatPer100g,
+        food_id: null,
       }));
       const itemResult = await db.from("meal_items").insert(itemRows).select("*");
       if (itemResult.error) throw new Error("Meal item save failed");
-      return withResolvedImage(mapMeal({ ...created.data, image_path: imagePath }, itemResult.data ?? itemRows));
+      const savedItems = itemResult.data ?? itemRows;
+      if (!insight) {
+        scheduleBackgroundInsight(userId, created.data.id, savedItems, { ...created.data, image_path: imagePath });
+      }
+      return withResolvedImage(mapMeal({ ...created.data, image_path: imagePath, insight }, savedItems));
     },
 
     async updateMeal(userId, mealId, input) {
@@ -250,10 +387,6 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash", resol
       if (input?.isFavorite !== undefined) changes.is_favorite = Boolean(input.isFavorite);
       const current = await getMeal(userId, mealId);
       if (!current) return null;
-      if (Object.keys(changes).length) {
-        const saved = await db.from("meal_records").update(changes).eq("id", mealId).eq("user_id", userId).is("deleted_at", null).select("*").maybeSingle();
-        if (saved.error || !saved.data) throw new Error("Meal update failed");
-      }
       if (input?.items !== undefined) {
         const items = normalizeItems(input.items);
         const deleted = await db.from("meal_items").delete().eq("meal_record_id", mealId);
@@ -262,10 +395,45 @@ function createMealDataService({ db, analyze, model = "deepseek-v4-flash", resol
           meal_record_id: mealId, name: item.name, ai_quantity_g: item.quantityG, confirmed_quantity_g: item.quantityG,
           calories_per_100g: item.caloriesPer100g, protein_g_per_100g: item.proteinPer100g,
           carbs_g_per_100g: item.carbsPer100g, fat_g_per_100g: item.fatPer100g,
+          food_id: null,
         }))).select("*");
         if (savedItems.error) throw new Error("Meal item update failed");
+        if (!current.insight) {
+          const insight = await resolveInsight({
+            analysisId: current.analysisId,
+            userId,
+            mealName: changes.name || current.name,
+            items,
+            allowGenerate: false,
+          });
+          if (insight) changes.insight = insight;
+        }
       }
-      return getMeal(userId, mealId);
+      if (Object.keys(changes).length) {
+        const saved = await db.from("meal_records").update(changes).eq("id", mealId).eq("user_id", userId).is("deleted_at", null).select("*").maybeSingle();
+        if (saved.error || !saved.data) throw new Error("Meal update failed");
+      }
+      const updated = await getMeal(userId, mealId);
+      if (updated && !updated.insight && input?.items !== undefined) {
+        scheduleBackgroundInsight(
+          userId,
+          mealId,
+          (updated.items || []).map((item) => ({
+            name: item.name,
+            confirmed_quantity_g: item.quantityG,
+            calories_per_100g: item.caloriesPer100g,
+            protein_g_per_100g: item.proteinPer100g,
+            carbs_g_per_100g: item.carbsPer100g,
+            fat_g_per_100g: item.fatPer100g,
+          })),
+          {
+            analysis_id: updated.analysisId,
+            name: updated.name,
+            insight: null,
+          },
+        );
+      }
+      return updated;
     },
 
     async deleteMeal(userId, mealId) {

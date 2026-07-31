@@ -1,7 +1,11 @@
 import { Input, Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useState } from "react";
-import { saveProductBodyProfile, saveProductProfile } from "../../api/product-data-api";
+import {
+  getProductAccount,
+  saveProductBodyProfile,
+  saveProductProfile,
+} from "../../api/product-data-api";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomActionLayout } from "../../components/bottom-action-layout";
@@ -15,12 +19,19 @@ import {
   normalizeOneDecimalInput,
   validateBodyProfile,
 } from "../../features/onboarding/domain";
+import {
+  draftPatchFromAccount,
+  isSettingsEditMode,
+  settingsQuery,
+  shouldHydrateFromAccount,
+} from "../../features/onboarding/hydrate-draft-from-account";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { generateNickname } from "../../features/profile/nickname-generator";
+import { nicknameModerationError } from "../../features/profile/nickname-moderation";
 
 const today = getLocalDateString();
 const PLACEHOLDER_NICKNAMES = new Set(["", "Lewis", "微信用户"]);
@@ -32,6 +43,7 @@ function isPlaceholderNickname(value: string | null | undefined) {
 async function syncNicknameEverywhere(nickname: string) {
   const trimmed = nickname.trim();
   if (!trimmed) return;
+  if (nicknameModerationError(trimmed)) return;
   useProfileStore.getState().setProfile({ nickname: trimmed });
   try {
     await saveProductProfile({ nickname: trimmed });
@@ -81,14 +93,32 @@ function FormError({ message }: { message?: string }) {
 }
 
 export default function BodyProfilePage() {
+  const router = useRouter();
+  const fromSettings = isSettingsEditMode(router.params);
+  const hydrateFromAccount = shouldHydrateFromAccount(router.params);
   const { draft, errors, setField, setDraft, setErrors } = useOnboardingDraftStore();
   const feedback = useFeedbackStore();
   const [isSaving, setIsSaving] = useState(false);
   const validation = validateBodyProfile(draft, today);
   const validate = () => setErrors(validation.errors);
 
+  useEffect(() => {
+    if (!hydrateFromAccount) return;
+    let cancelled = false;
+    void getProductAccount()
+      .then((account) => {
+        if (!cancelled) setDraft(draftPatchFromAccount(account));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrateFromAccount, setDraft]);
+
   // Keep onboarding nickname, home greeting, and profile page on the same value.
   useEffect(() => {
+    if (fromSettings) return;
+
     const accountNickname = useProfileStore.getState().profile.nickname;
     const draftNickname = draft.nickname?.trim() ?? "";
 
@@ -107,14 +137,18 @@ export default function BodyProfilePage() {
     const generated = generateNickname();
     setField("nickname", generated);
     void syncNicknameEverywhere(generated);
-    // Only seed / sync on mount.
+    // Only seed / sync on mount for onboarding.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fromSettings]);
 
   const refreshNickname = () => {
     const next = generateNickname(draft.nickname);
     setField("nickname", next);
     void syncNicknameEverywhere(next);
+  };
+
+  const leaveSettings = () => {
+    void Taro.switchTab({ url: "/pages/profile/index" });
   };
 
   const continueToDietPreferences = async () => {
@@ -132,7 +166,10 @@ export default function BodyProfilePage() {
         activityLevel: validation.profile.activityLevel,
         trainingDays: validation.profile.trainingDays,
       });
-      await Taro.navigateTo({ url: "/pages/diet-preferences/index" });
+      useProfileStore.getState().setProfile({ weight: validation.profile.weightKg });
+      await Taro.navigateTo({
+        url: "/pages/diet-preferences/index" + settingsQuery(fromSettings),
+      });
     } catch {
       feedback.show({ message: "身体资料保存失败，请稍后重试", tone: "error" });
     } finally {
@@ -151,16 +188,22 @@ export default function BodyProfilePage() {
       <View className="body-profile-page">
         <OnboardingHeader
           brand="Nordic Nutri AI"
-          step="第 2 步，共 4 步"
-          progress={0.5}
-          progressAriaLabel="当前为第 2 步，共 4 步"
-          backAriaLabel="返回目标选择"
-          onBack={() => navigateBackOrHome("/pages/onboarding/index")}
+          step={fromSettings ? "调整资料" : "第 2 步，共 4 步"}
+          progress={fromSettings ? 1 / 3 : 0.5}
+          progressAriaLabel={fromSettings ? "调整身体资料" : "当前为第 2 步，共 4 步"}
+          backAriaLabel={fromSettings ? "返回个人中心" : "返回目标选择"}
+          onBack={() =>
+            fromSettings ? leaveSettings() : navigateBackOrHome("/pages/onboarding/index")
+          }
         />
         <View className="onboarding-heading body-profile__heading">
-          <Text className="onboarding-heading__title">告诉我们你的身体情况</Text>
+          <Text className="onboarding-heading__title">
+            {fromSettings ? "更新你的身体情况" : "告诉我们你的身体情况"}
+          </Text>
           <Text className="onboarding-heading__copy">
-            这些信息将帮助 AI 为你制定更合适的营养计划。
+            {fromSettings
+              ? "修改后可继续调整饮食偏好，并重新生成营养目标。"
+              : "这些信息将帮助 AI 为你制定更合适的营养计划。"}
           </Text>
         </View>
 
@@ -218,8 +261,8 @@ export default function BodyProfilePage() {
                     onInput={(event) => setField("age", normalizeAgeInput(event.detail.value))}
                     onBlur={validate}
                   />
+                  <Text className="body-profile__metric-unit">岁</Text>
                 </View>
-                <Text className="body-profile__metric-unit">岁</Text>
                 <FormError message={errors.age} />
               </View>
               <View className="body-profile__metric-card">
@@ -239,8 +282,8 @@ export default function BodyProfilePage() {
                     }
                     onBlur={validate}
                   />
+                  <Text className="body-profile__metric-unit">cm</Text>
                 </View>
-                <Text className="body-profile__metric-unit">cm</Text>
                 <FormError message={errors.heightCm} />
               </View>
               <View className="body-profile__metric-card">
@@ -260,8 +303,8 @@ export default function BodyProfilePage() {
                     }
                     onBlur={validate}
                   />
+                  <Text className="body-profile__metric-unit">kg</Text>
                 </View>
-                <Text className="body-profile__metric-unit">kg</Text>
                 <FormError message={errors.weightKg} />
               </View>
             </View>

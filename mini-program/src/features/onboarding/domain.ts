@@ -1,3 +1,5 @@
+import { nicknameModerationError } from "../profile/nickname-moderation";
+
 export type GoalType = "muscle_gain" | "fat_loss" | "maintenance" | "performance";
 export type Gender = "male" | "female";
 export type ActivityLevel = "sedentary" | "light" | "moderate" | "high";
@@ -134,6 +136,10 @@ export function validateBodyProfile(draft: OnboardingDraft, today: string): Body
   const targetWeightKg = draft.targetWeightKg ? numberInRange(draft.targetWeightKg, 30, 300) : null;
 
   if (!nickname) errors.nickname = "请输入昵称";
+  else {
+    const banned = nicknameModerationError(nickname);
+    if (banned) errors.nickname = banned;
+  }
   if (age === undefined) errors.age = "年龄需在 14–80 岁之间";
   if (!draft.gender) errors.gender = "请选择性别";
   if (heightCm === undefined) errors.heightCm = "身高需在 120–230 cm 之间";
@@ -170,7 +176,48 @@ export function validateBodyProfile(draft: OnboardingDraft, today: string): Body
   };
 }
 
-export function calculateNutritionPlan(profile: ValidBodyProfile): NutritionPlanPreview {
+export interface DietPreferenceInput {
+  dietaryPattern?: DietaryPattern | string | null;
+  foodAvoidances?: string[] | null;
+  mealsPerDay?: number | string | null;
+}
+
+function applyDietMacroAdjustments(
+  calories: number,
+  proteinG: number,
+  fatG: number,
+  dietaryPattern: string | null | undefined,
+): { proteinG: number; fatG: number; carbsG: number } {
+  const pattern = dietaryPattern || "none";
+  if (pattern === "keto") {
+    const fat = Math.round((calories * 0.65) / 9);
+    const carbs = Math.max(50, Math.round((calories * 0.1) / 4));
+    const protein = Math.max(40, Math.round((calories - fat * 9 - carbs * 4) / 4));
+    return { proteinG: protein, fatG: fat, carbsG: carbs };
+  }
+  if (pattern === "low_carb") {
+    const fat = Math.round((calories * 0.4) / 9);
+    const carbs = Math.max(50, Math.round((calories * 0.25) / 4));
+    const protein = Math.max(40, Math.round((calories - fat * 9 - carbs * 4) / 4));
+    return { proteinG: protein, fatG: fat, carbsG: carbs };
+  }
+  if (pattern === "vegan" || pattern === "vegetarian" || pattern === "pescatarian") {
+    const protein = Math.round(proteinG * 1.05);
+    const fat = fatG;
+    const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
+    return { proteinG: protein, fatG: fat, carbsG: carbs };
+  }
+  return {
+    proteinG,
+    fatG,
+    carbsG: Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4)),
+  };
+}
+
+export function calculateNutritionPlan(
+  profile: ValidBodyProfile,
+  prefs?: DietPreferenceInput,
+): NutritionPlanPreview {
   const bmr =
     10 * profile.weightKg +
     6.25 * profile.heightCm -
@@ -186,18 +233,23 @@ export function calculateNutritionPlan(profile: ValidBodyProfile): NutritionPlan
           ? tdee * 1.08
           : tdee;
   const calories = Math.round(rawCalories / 10) * 10;
-  const proteinG = Math.round(profile.weightKg * proteinPerKg[profile.goalType]);
-  const fatG = Math.round(profile.weightKg * 0.9);
-  const carbsG = Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
+  const baseProteinG = Math.round(profile.weightKg * proteinPerKg[profile.goalType]);
+  const baseFatG = Math.round(profile.weightKg * 0.9);
+  const macros = applyDietMacroAdjustments(
+    calories,
+    baseProteinG,
+    baseFatG,
+    prefs?.dietaryPattern,
+  );
 
   return {
     goalType: profile.goalType,
     bmr: Math.round(bmr),
     tdee: Math.round(tdee),
     calories,
-    proteinG,
-    carbsG,
-    fatG,
+    proteinG: macros.proteinG,
+    carbsG: macros.carbsG,
+    fatG: macros.fatG,
   };
 }
 

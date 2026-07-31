@@ -146,6 +146,7 @@ function createFoodAdminService({ repository, usdaService, normalizer, imageServ
         categoryCode: query.categoryCode ?? query.category_code,
         active: query.active ?? "true",
         missingImage: query.missingImage ?? query.missing_image,
+        missingImageSubject: query.missingImageSubject ?? query.missing_image_subject,
         page: query.page,
         pageSize: query.pageSize ?? query.page_size,
       });

@@ -1,6 +1,6 @@
 import { Image, Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
-import { useState } from "react";
+import Taro, { useDidShow } from "@tarojs/taro";
+import { useRef, useState } from "react";
 import { analyzeProductImage } from "../../api/vision-api";
 import { AppButton } from "../../components/app-button";
 import { BottomSheet } from "../../components/bottom-sheet";
@@ -8,6 +8,7 @@ import { NordicIcon } from "../../components/nordic-icon";
 import bowlImage from "../../assets/meal-bowl.svg";
 import oatsImage from "../../assets/meal-oats.svg";
 import salmonImage from "../../assets/meal-salmon.svg";
+import { assertImageWithinPickLimit } from "../../features/media/image-upload-limits";
 import { PageLayout } from "../../layouts/page-layout";
 import { useAnalysisStore } from "../../stores/analysis-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
@@ -37,10 +38,25 @@ export default function FoodScannerPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [fallbackOpen, setFallbackOpen] = useState(false);
   const [fallbackMessage, setFallbackMessage] = useState("可检查相机、相册和网络权限；如果视觉服务尚未配置，可以先手动记录。");
+  const isScanningRef = useRef(false);
+  const suppressPreviewResetRef = useRef(false);
   const preview = scanner.capturedMeal ?? scanner.candidates[0] ?? null;
 
+  const clearPreviewDisplay = () => {
+    scanner.setPreviewPath(null);
+    scanner.setGalleryMode(false);
+  };
+
+  useDidShow(() => {
+    // Returning from analysis/result should reset the frame; skip while a pick/analyze
+    // session is active so chooseMedia onShow does not wipe the just-selected image.
+    if (suppressPreviewResetRef.current || isScanningRef.current) return;
+    clearPreviewDisplay();
+  });
+
   const analyzeCurrentPreview = async (previewPath: string) => {
-    if (isScanning) return;
+    if (isScanningRef.current) return;
+    isScanningRef.current = true;
     setIsScanning(true);
     try {
       const meal = await analyzeProductImage(previewPath);
@@ -67,21 +83,25 @@ export default function FoodScannerPage() {
       });
       setFallbackOpen(true);
     } finally {
+      isScanningRef.current = false;
       setIsScanning(false);
     }
   };
 
   const chooseImage = async (source: "camera" | "album") => {
-    if (isScanning) return;
+    if (isScanningRef.current) return;
+    suppressPreviewResetRef.current = true;
     try {
       const result = await Taro.chooseMedia({
         count: 1,
         mediaType: ["image"],
         sourceType: [source],
-        sizeType: ["compressed", "original"],
+        sizeType: ["compressed"],
       });
-      const previewPath = result.tempFiles[0]?.tempFilePath;
+      const picked = result.tempFiles[0];
+      const previewPath = picked?.tempFilePath;
       if (!previewPath) throw new Error("没有获取到图片");
+      assertImageWithinPickLimit(picked?.size);
       scanner.setPreviewPath(previewPath);
       scanner.setGalleryMode(source === "album");
       setFallbackOpen(false);
@@ -89,8 +109,15 @@ export default function FoodScannerPage() {
     } catch (error) {
       // User closed the album/camera without picking — stay on the page quietly.
       if (isUserCancelMediaChoice(error)) return;
-      setFallbackMessage("暂时无法打开图片，请检查相机、相册和网络权限。");
+      const message =
+        error instanceof Error && error.message.includes("图片过大")
+          ? error.message
+          : "暂时无法打开图片，请检查相机、相册和网络权限。";
+      setFallbackMessage(message);
+      feedback.show({ message, tone: "error" });
       setFallbackOpen(true);
+    } finally {
+      suppressPreviewResetRef.current = false;
     }
   };
 
@@ -119,7 +146,7 @@ export default function FoodScannerPage() {
           </View>
           <View className="scanner-ai-status">
             <View className="scanner-ai-status__icon">
-              <NordicIcon name="sparkles" size={22} ariaLabel="AI 识别中" />
+              <NordicIcon name="scan-line" size={22} ariaLabel="识别中" />
             </View>
             <Text>AI 识别中</Text>
           </View>
@@ -146,7 +173,7 @@ export default function FoodScannerPage() {
                 mode="aspectFill"
               />
             ) : (
-              <NordicIcon name="utensils" size={56} ariaLabel="餐盘取景提示" />
+              <NordicIcon name="food-pot" size={56} ariaLabel="餐盘取景提示" />
             )}
           </View>
           {isScanning ? (

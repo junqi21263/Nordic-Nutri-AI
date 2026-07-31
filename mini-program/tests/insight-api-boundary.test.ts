@@ -15,9 +15,11 @@ describe("persisted insight API boundary", () => {
     expect(insightApi).toContain("getProductAchievements");
     expect(insightApi).toContain("serverTime: string");
     expect(insightApi).toContain("/meal-summary?date=");
-    expect(insightApi).toContain("/weekly-review?date=");
+    expect(insightApi).toContain("/weekly-review?");
+    expect(insightApi).toContain('preferFast');
     expect(insightApi).toContain("/achievements?date=");
     expect(mealApi).toContain("getProductMealsRange");
+    expect(mealApi).toContain("light");
     expect(mealApi).toContain("getProductMeal");
   });
 

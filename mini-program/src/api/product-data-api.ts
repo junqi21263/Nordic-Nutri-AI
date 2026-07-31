@@ -147,6 +147,7 @@ export function previewProductNutritionPlan(input: {
   goalType: "muscle_gain" | "fat_loss" | "maintenance" | "maintain" | "performance";
   dietaryPattern?: string;
   foodAvoidances?: string[];
+  mealsPerDay?: number;
 }) {
   return requestProductApi<NutritionPlanPreviewResult>("/nutrition-plan/preview", {
     method: "POST",

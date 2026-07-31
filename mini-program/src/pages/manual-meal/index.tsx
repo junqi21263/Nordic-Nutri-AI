@@ -6,6 +6,7 @@ import { FoodThumbnail } from "../../components/food-thumbnail";
 import { NordicIcon } from "../../components/nordic-icon";
 import { createProductMeal, getProductMeals } from "../../api/meal-data-api";
 import { type MealType } from "../../features/meals/domain";
+import { inferMealTypeFromTime, mealTypeOptions } from "../../features/meals/meal-type";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
@@ -13,13 +14,6 @@ import { useMealStore } from "../../stores/meal-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
 import type { ProductFoodCatalogItem } from "../../api/food-catalog-api";
 import { navigateBackOrHome } from "../../utils/navigation";
-
-const mealTypes: Array<{ value: MealType; label: string }> = [
-  { value: "breakfast", label: "早餐" },
-  { value: "lunch", label: "午餐" },
-  { value: "dinner", label: "晚餐" },
-  { value: "snack", label: "加餐" },
-];
 
 const nowTime = () => {
   const date = new Date();
@@ -47,7 +41,7 @@ export default function ManualMealPage() {
   const feedback = useFeedbackStore();
   const consumeSelectedFood = useFoodSelectionStore((state) => state.consumeSelectedFood);
   const [title, setTitle] = useState("");
-  const [mealType, setMealType] = useState<MealType>("snack");
+  const [mealType, setMealType] = useState<MealType>(() => inferMealTypeFromTime());
   const [calories, setCalories] = useState("");
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
@@ -132,6 +126,11 @@ export default function ManualMealPage() {
         ],
       });
       meals.replaceRemoteMeals(await getProductMeals(date), date);
+      setTimeout(() => {
+        void import("../../features/coach/refresh-achievements")
+          .then(({ refreshProductAchievements }) => refreshProductAchievements(date))
+          .catch(() => undefined);
+      }, 2800);
       feedback.show({ message: "已保存并同步到饮食记录", tone: "success" });
       navigateBackOrHome(`/pages/meal-detail/index?id=${saved.id}`);
     } catch {
@@ -177,7 +176,7 @@ export default function ManualMealPage() {
           <View className="manual-meal__field">
             <Text>餐次类型</Text>
             <View className="manual-meal__types">
-              {mealTypes.map((option) => (
+              {mealTypeOptions.map((option) => (
                 <View
                   className={`manual-meal__type ${mealType === option.value ? "manual-meal__type--active" : ""}`}
                   key={option.value}

@@ -22,7 +22,7 @@
     body { margin: 0; min-width: 320px; background: #eef0ea; color: var(--text); font: 15px/1.5 "PingFang SC", "Noto Sans CJK SC", sans-serif; }
     button, input, textarea { font: inherit; }
     button { cursor: pointer; }
-    button:disabled { cursor: not-allowed; opacity: .45; }
+    button:disabled { cursor: not-allowed; }
     .ops-shell { min-height: 100vh; padding: 28px; }
     .ops-header { max-width: 1540px; margin: 0 auto 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
     .brand { display: flex; align-items: center; gap: 12px; }
@@ -34,30 +34,58 @@
     h2 { color: var(--ink); font-size: 20px; }
     h3 { color: var(--ink); font-size: 15px; }
     .header-actions, .action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .button { border: 1px solid transparent; border-radius: 10px; padding: 10px 13px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 700; }
-    .button:hover:not(:disabled) { background: #0f3020; }
-    .button.secondary { border-color: var(--line); background: var(--paper); color: var(--ink); }
+    .button { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 40px; border: 1px solid var(--ink); border-radius: 10px; padding: 9px 14px; background: transparent; color: var(--ink); font-size: 13px; font-weight: 700; line-height: 1.35; white-space: nowrap; }
+    .button:hover:not(:disabled) { background: var(--mist); }
+    .button:disabled { border-color: #c5cdc3; background: #f1f3ee; color: #8a968e; }
+    .button.secondary { border-color: var(--line); background: transparent; color: var(--ink); }
     .button.secondary:hover:not(:disabled) { background: var(--mist); }
-    .button.danger { background: var(--danger); }
-    .button.link { padding: 0; border: 0; background: transparent; color: var(--green); }
-    .batch-controller { max-width: 1540px; margin: 0 auto 18px; display: grid; grid-template-columns: minmax(280px, 1fr) auto; gap: 20px; align-items: center; padding: 17px 20px; border: 1px solid var(--line); border-radius: 18px; background: rgba(250,248,243,.9); box-shadow: 0 10px 26px rgba(23, 61, 42, .05); }
-    .batch-controller-copy p:last-child { margin-top: 4px; }
-    .batch-control-fields { display: flex; align-items: flex-end; justify-content: flex-end; gap: 9px; flex-wrap: wrap; }
-    .batch-control-field { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
-    .batch-control-field select, .batch-control-field input { height: 40px; min-width: 126px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; background: var(--paper); color: var(--text); }
-    .batch-control-field select { min-width: 190px; }
-    .batch-control-field input { width: 82px; min-width: 82px; }
-    .batch-selection-note { flex: 1 1 100%; min-height: 18px; color: var(--muted); font-size: 12px; text-align: right; }
-    .selection-preview-panel { display: none; grid-column: 1 / -1; padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--linen); }
+    .button.secondary:disabled { border-color: #d7ded5; background: #f5f6f2; color: #8a968e; }
+    .button.danger { border-color: var(--danger); background: transparent; color: var(--danger); }
+    .button.danger:hover:not(:disabled) { background: var(--danger-mist); }
+    .button.link { min-height: 0; padding: 0; border: 0; background: transparent; color: var(--green); }
+    .button.link:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+    .button.link:disabled { background: transparent; border: 0; color: #9aa59e; }
+    .composer-deck { max-width: 1540px; margin: 0 auto 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+    .batch-controller, .composer-card { display: grid; gap: 14px; padding: 18px 18px 16px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(165deg, rgba(255,255,255,.94) 0%, rgba(250,248,243,.92) 100%); box-shadow: 0 10px 26px rgba(23, 61, 42, .05); }
+    .composer-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .composer-card__head .composer-card__copy { min-width: 0; }
+    .composer-card__copy p:last-child { margin-top: 4px; max-width: 42ch; }
+    .composer-quota { flex: 0 0 auto; min-width: 132px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); color: var(--muted); font-size: 11px; line-height: 1.35; text-align: left; }
+    .composer-quota b { display: block; color: var(--ink); font-size: 13px; font-weight: 700; }
+    .composer-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end; }
+    .composer-form--with-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .composer-form--with-actions .composer-actions { grid-column: 1 / -1; justify-content: flex-start; }
+    /* Patrol fields wrap to 2×2 so Chinese select labels are not clipped. */
+    .composer-form--patrol,
+    .composer-form--patrol.composer-form--with-actions {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .composer-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .batch-control-field { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 700; min-width: 0; }
+    .batch-control-field select, .batch-control-field input { height: 40px; width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; background: var(--paper); color: var(--text); line-height: 1.35; }
+    .batch-control-field select { padding-right: 28px; }
+    .batch-selection-note { min-height: 18px; color: var(--muted); font-size: 12px; }
+    .selection-preview-panel { display: none; padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--linen); }
     .selection-preview-panel.visible { display: block; }
-    .selection-preview-panel p { color: var(--muted); font-size: 12px; }
+    .composer-rules { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; overflow-x: auto; }
+    .composer-rules table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .composer-rules th, .composer-rules td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .composer-rules th { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .composer-rules tr:last-child td { border-bottom: 0; }
+    .selection-preview-panel p, .composer-rules p { color: var(--muted); font-size: 12px; }
     .preview-foods { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
     .preview-food { border: 1px solid var(--line); border-radius: 99px; padding: 6px 9px; background: var(--paper); color: var(--ink); font-size: 12px; }
     .preview-food.selected { border-color: var(--green); background: var(--mist); }
-    .batch-lifecycle { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; grid-column: 1 / -1; }
+    .batch-lifecycle { display: grid; grid-template-columns: repeat(4, minmax(72px, 1fr)); gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px dashed var(--line); }
+    .batch-lifecycle .button { width: 100%; min-width: 0; }
     .ops-workspace { max-width: 1540px; min-height: calc(100vh - 226px); margin: 0 auto; display: grid; grid-template-columns: 248px minmax(420px, 1fr) 330px; overflow: visible; border: 1px solid var(--line); border-radius: 22px; background: var(--linen); box-shadow: var(--shadow); }
     .batch-rail, .review-inspector { background: rgba(255,255,255,.54); }
-    .batch-rail { border-right: 1px solid var(--line); padding: 20px 15px; }
+    .batch-rail { border-right: 1px solid var(--line); padding: 20px 15px; transition: padding .16s ease; }
+    .batch-rail.collapsed { padding: 16px 12px; }
+    .rail-heading-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .batch-rail.collapsed .batch-list { display: none; }
+    .batch-list-active { display: none; margin-bottom: 8px; }
+    .batch-rail.collapsed .batch-list-active { display: grid; gap: 8px; }
     .review-queue { min-width: 0; padding: 24px; }
     .review-inspector { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 32px); overflow-y: auto; border-left: 1px solid var(--line); padding: 20px; }
     .rail-heading, .queue-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -86,7 +114,7 @@
     .status-metric.danger b { color: var(--danger); }
     .filter-row { display: flex; gap: 7px; overflow-x: auto; padding: 4px 0 14px; }
     .filter { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 99px; padding: 7px 11px; background: transparent; color: var(--muted); font-size: 12px; }
-    .filter.active { border-color: var(--green); background: var(--ink); color: #fff; }
+    .filter.active { border-color: var(--green); background: transparent; color: var(--green); }
     .bulk-review-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -4px 0 13px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.72); }
     .bulk-review-label, .card-select-label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
     .bulk-review-label input, .card-select-label input { accent-color: var(--green); }
@@ -121,9 +149,9 @@
     .inspector-image .food-card-placeholder { font-size: 44px; }
     .inspector-title { margin-top: 15px; }
     .inspector-title h2 { font-size: 24px; }
-    .category-badge, .status-badge { display: inline-block; margin-top: 8px; border-radius: 99px; padding: 4px 8px; background: var(--mist); color: var(--green); font-size: 11px; font-weight: 700; }
-    .status-badge.failed, .status-badge.danger { background: var(--danger-mist); color: var(--danger); }
-    .status-badge.warning { background: #fbf1dc; color: #855b16; }
+    .category-badge, .status-badge { display: inline-block; margin-top: 8px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 8px; background: transparent; color: var(--green); font-size: 11px; font-weight: 700; }
+    .status-badge.failed, .status-badge.danger { border-color: var(--danger); background: transparent; color: var(--danger); }
+    .status-badge.warning { border-color: #d9b56a; background: transparent; color: #855b16; }
     .candidate-strip { display: flex; gap: 8px; overflow-x: auto; margin: 14px 0; }
     .candidate-thumb { flex: 0 0 56px; height: 56px; overflow: hidden; border: 2px solid transparent; border-radius: 9px; padding: 0; background: #dfe5da; }
     .candidate-thumb.active { border-color: var(--green); }
@@ -173,7 +201,7 @@
     .admin-nav { position: sticky; top: 16px; display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
     .admin-nav__item { border: 1px solid transparent; border-radius: 10px; padding: 10px 12px; background: transparent; color: var(--ink); font-size: 13px; font-weight: 700; text-align: left; }
     .admin-nav__item:hover { background: var(--mist); }
-    .admin-nav__item.active { border-color: var(--green); background: var(--green); color: #fff; }
+    .admin-nav__item.active { border-color: var(--green); background: transparent; color: var(--green); }
     .admin-module[hidden] { display: none !important; }
     .module-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
     .module-toolbar h2 { flex: 1 1 auto; min-width: 120px; }
@@ -185,28 +213,98 @@
     .data-table tr:last-child td { border-bottom: 0; }
     .data-table select { height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: var(--paper); font-size: 12px; }
     .data-table code { font: 11px/1.4 "SFMono-Regular", Consolas, monospace; word-break: break-all; }
-    .admin-main .workflow-guide, .admin-main .utility-drawer, .admin-main .batch-controller, .admin-main .ops-workspace { max-width: none; margin-left: 0; margin-right: 0; }
+    .admin-main .workflow-guide, .admin-main .utility-drawer, .admin-main .composer-deck, .admin-main .batch-controller, .admin-main .ops-workspace { max-width: none; margin-left: 0; margin-right: 0; }
     .food-admin-bulk { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--mist); }
     .food-admin-bulk[hidden] { display: none !important; }
-    .food-admin-pagination { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--muted); font-size: 12px; }
-    .food-admin-editor { margin-bottom: 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.82); }
-    .food-admin-editor[hidden] { display: none !important; }
-    .food-admin-editor__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
-    .food-admin-editor__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
-    .food-admin-editor__grid label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
-    .food-admin-editor__grid label.span-2 { grid-column: span 2; }
-    .food-admin-editor__grid label.span-3 { grid-column: 1 / -1; }
-    .food-admin-editor__grid input, .food-admin-editor__grid select, .food-admin-editor__grid textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px; background: var(--paper); color: var(--text); }
-    .food-admin-editor__grid textarea { min-height: 72px; resize: vertical; }
-    .food-admin-editor__actions { display: flex; gap: 8px; margin-top: 14px; }
+    .food-admin-pagination { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+    .food-admin-pagination__jump { display: flex; align-items: center; gap: 8px; }
+    .food-admin-pagination__jump input { width: 72px; height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: transparent; color: var(--text); text-align: center; }
+    .food-admin-pagination__jump label { display: flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; }
+    .food-admin-modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 18px; }
+    .food-admin-modal[hidden] { display: none !important; }
+    .food-admin-modal__backdrop { position: absolute; inset: 0; border: 0; padding: 0; background: rgba(23, 61, 42, .28); cursor: pointer; }
+    .food-admin-modal__panel { position: relative; z-index: 1; width: min(520px, 100%); max-height: min(86vh, 720px); overflow: auto; padding: 14px 16px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: 0 22px 48px rgba(23, 61, 42, .18); }
+    .food-admin-editor__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .food-admin-editor__head h3 { font-size: 17px; }
+    .food-admin-editor__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }
+    .food-admin-editor__grid label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .food-admin-editor__grid label.span-2 { grid-column: 1 / -1; }
+    .food-admin-editor__grid input, .food-admin-editor__grid select, .food-admin-editor__grid textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; background: var(--paper); color: var(--text); font-size: 13px; }
+    .food-admin-editor__grid textarea { min-height: 56px; resize: vertical; }
+    .food-admin-editor__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
     .food-thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #dfe5da; display: block; }
     .food-thumb-placeholder { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 8px; background: #dfe5da; color: var(--green); font: 700 16px Georgia, serif; }
     .food-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
     .food-row-actions .button.link { font-size: 12px; }
     .module-toolbar label.food-admin-toggle { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
     .module-toolbar label.food-admin-toggle input { accent-color: var(--green); width: auto; min-width: 0; height: auto; }
-    @media (max-width: 1160px) { .batch-controller { grid-template-columns: 1fr; } .batch-control-fields, .batch-lifecycle { justify-content: flex-start; } .batch-selection-note { text-align: left; } .ops-workspace { grid-template-columns: 218px minmax(380px, 1fr); } .review-inspector { position: static; max-height: none; grid-column: 1 / -1; border-top: 1px solid var(--line); border-left: 0; } .inspector-content { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(260px, 1fr); gap: 20px; align-items: start; } .inspector-title { margin-top: 0; } }
-    @media (max-width: 760px) { .ops-shell { padding: 12px; } .ops-header { align-items: flex-start; } .header-actions { justify-content: flex-end; } h1 { font-size: 20px; } .admin-layout { grid-template-columns: 1fr; } .admin-nav { position: static; grid-template-columns: repeat(5, minmax(0, 1fr)); } .food-admin-editor__grid { grid-template-columns: 1fr; } .food-admin-editor__grid label.span-2, .food-admin-editor__grid label.span-3 { grid-column: auto; } .batch-controller { padding: 15px; } .batch-control-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; } .batch-control-field select, .batch-control-field input { width: 100%; min-width: 0; } .batch-control-fields .button { width: 100%; } .batch-selection-note, .selection-preview-panel { grid-column: 1 / -1; } .workflow-steps { grid-template-columns: 1fr; } .bulk-review-bar { align-items: flex-start; flex-direction: column; } .batch-lifecycle { justify-content: stretch; } .batch-lifecycle .button { flex: 1 1 42%; } .ops-workspace { display: block; min-height: 0; } .batch-rail, .review-inspector { border: 0; } .batch-rail { border-bottom: 1px solid var(--line); } .review-queue { padding: 18px 14px; } .review-grid { grid-template-columns: 1fr; } .inspector-content, .utility-body { display: block; } .utility-panel { margin-top: 12px; } .inspector-actions { position: sticky; bottom: 0; padding: 12px 0; background: rgba(250,248,243,.96); } }
+    .reject-modal__panel { width: min(440px, 100%); padding: 0; overflow: hidden; border-radius: 18px; background: var(--linen); border: 1px solid var(--line); box-shadow: 0 28px 56px rgba(23, 61, 42, .2); }
+    .reject-modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 16px; background: linear-gradient(180deg, #f3f6f0 0%, var(--linen) 100%); border-bottom: 1px solid var(--line); }
+    .reject-modal__header-copy { min-width: 0; }
+    .reject-modal__header .eyebrow { margin-bottom: 4px; color: var(--danger); }
+    .reject-modal__header h3 { font-size: 22px; line-height: 1.2; }
+    .reject-modal__food { margin-top: 8px; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reject-modal__food strong { color: var(--ink); font-weight: 700; }
+    .reject-modal__close { flex: 0 0 auto; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--muted); font-size: 18px; line-height: 1; }
+    .reject-modal__close:hover { background: var(--mist); color: var(--ink); }
+    .reject-modal__body { display: grid; gap: 16px; padding: 18px 22px 8px; }
+    .reject-modal__section-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .reject-reason-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .reject-reason-card { display: grid; gap: 3px; width: 100%; padding: 12px 12px 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); text-align: left; transition: border-color .14s ease, background .14s ease, box-shadow .14s ease; }
+    .reject-reason-card:hover { border-color: #9cb1a0; background: #fff; }
+    .reject-reason-card.active { border-color: var(--danger); background: var(--danger-mist); box-shadow: inset 0 0 0 1px rgba(182, 74, 59, .18); }
+    .reject-reason-card strong { font-size: 13px; font-weight: 700; }
+    .reject-reason-card span { color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .reject-reason-card.active strong { color: var(--danger); }
+    .reject-reason-card.active span { color: #8a5348; }
+    .reject-modal__note { display: grid; gap: 7px; }
+    .reject-modal__note label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .reject-modal__note textarea { width: 100%; min-height: 88px; border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; background: var(--paper); color: var(--text); resize: vertical; line-height: 1.55; }
+    .reject-modal__note textarea:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(46, 96, 70, .12); }
+    .reject-modal__hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .reject-modal__footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 16px 22px 20px; border-top: 1px solid var(--line); background: rgba(255,255,255,.55); }
+    .reject-modal__footer .button.danger { min-width: 112px; background: var(--danger); border-color: var(--danger); color: #fff; }
+    .reject-modal__footer .button.danger:hover:not(:disabled) { background: #9f3f32; border-color: #9f3f32; }
+    @media (max-width: 520px) {
+      .reject-reason-grid { grid-template-columns: 1fr; }
+      .reject-modal__footer { flex-direction: column-reverse; align-items: stretch; }
+      .reject-modal__footer .button { width: 100%; }
+    }
+    @media (max-width: 1160px) {
+      .composer-deck { grid-template-columns: 1fr; }
+      .composer-form, .composer-form--with-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .composer-form--patrol, .composer-form--patrol.composer-form--with-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .composer-actions { grid-column: 1 / -1; }
+      .ops-workspace { grid-template-columns: 218px minmax(380px, 1fr); }
+      .review-inspector { position: static; max-height: none; grid-column: 1 / -1; border-top: 1px solid var(--line); border-left: 0; }
+      .inspector-content { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(260px, 1fr); gap: 20px; align-items: start; }
+      .inspector-title { margin-top: 0; }
+    }
+    @media (max-width: 760px) {
+      .ops-shell { padding: 12px; }
+      .ops-header { align-items: flex-start; }
+      .header-actions { justify-content: flex-end; }
+      h1 { font-size: 20px; }
+      .admin-layout { grid-template-columns: 1fr; }
+      .admin-nav { position: static; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .food-admin-editor__grid { grid-template-columns: 1fr; }
+      .food-admin-editor__grid label.span-2 { grid-column: auto; }
+      .composer-card, .batch-controller { padding: 15px; }
+      .composer-form, .composer-form--with-actions { grid-template-columns: 1fr; }
+      .composer-actions .button { flex: 1 1 auto; }
+      .composer-quota { text-align: left; }
+      .workflow-steps { grid-template-columns: 1fr; }
+      .bulk-review-bar { align-items: flex-start; flex-direction: column; }
+      .batch-lifecycle { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ops-workspace { display: block; min-height: 0; }
+      .batch-rail, .review-inspector { border: 0; }
+      .batch-rail { border-bottom: 1px solid var(--line); }
+      .review-queue { padding: 18px 14px; }
+      .review-grid { grid-template-columns: 1fr; }
+      .inspector-content, .utility-body { display: block; }
+      .utility-panel { margin-top: 12px; }
+      .inspector-actions { position: sticky; bottom: 0; padding: 12px 0; background: rgba(250,248,243,.96); }
+    }
   </style>
 </head>
 <body>
@@ -261,6 +359,7 @@
               <option value="all">全部</option>
             </select>
             <label class="food-admin-toggle"><input id="foodAdminMissingOnly" type="checkbox" /> 仅缺主图</label>
+            <label class="food-admin-toggle"><input id="foodAdminMissingSubjectOnly" type="checkbox" /> 缺形态锚点</label>
             <button id="refreshFoodAdmin" class="button secondary" type="button">刷新</button>
             <button id="createFoodAdmin" class="button" type="button">新建食材</button>
           </div>
@@ -268,32 +367,14 @@
             <span id="foodAdminBulkLabel">已选择 0 条</span>
             <button id="foodAdminBulkBatch" class="button" type="button">批量加入生图</button>
           </div>
-          <section id="foodAdminEditor" class="food-admin-editor" hidden>
-            <div class="food-admin-editor__head">
-              <h3 id="foodAdminEditorTitle">新建食材</h3>
-              <button id="foodAdminEditorClose" class="button link" type="button">关闭</button>
-            </div>
-            <div class="food-admin-editor__grid">
-              <label>中文名称 *<input id="foodEditorNameZh" type="text" autocomplete="off" /></label>
-              <label>英文名称<input id="foodEditorNameEn" type="text" autocomplete="off" /></label>
-              <label>分类<select id="foodEditorCategory"><option value="">未分类</option></select></label>
-              <label>热量 kcal *<input id="foodEditorCalories" type="number" min="0" step="0.1" /></label>
-              <label>蛋白质 g *<input id="foodEditorProteinG" type="number" min="0" step="0.1" /></label>
-              <label>碳水 g *<input id="foodEditorCarbsG" type="number" min="0" step="0.1" /></label>
-              <label>脂肪 g *<input id="foodEditorFatG" type="number" min="0" step="0.1" /></label>
-              <label>纤维 g<input id="foodEditorFiberG" type="number" min="0" step="0.1" /></label>
-              <label class="span-3">生图主体描述<input id="foodEditorImageSubjectZh" type="text" placeholder="可选，用于 AI 生图提示词" autocomplete="off" /></label>
-              <label class="span-3">描述<textarea id="foodEditorDescription" rows="3"></textarea></label>
-            </div>
-            <div class="food-admin-editor__actions">
-              <button id="foodAdminEditorSave" class="button" type="button">保存</button>
-              <button id="foodAdminEditorCancel" class="button secondary" type="button">取消</button>
-            </div>
-          </section>
           <div id="foodAdminTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
           <div id="foodAdminPagination" class="food-admin-pagination" hidden>
             <button id="foodAdminPrevPage" class="button secondary" type="button">上一页</button>
-            <span id="foodAdminPageInfo">第 1 页</span>
+            <div class="food-admin-pagination__jump">
+              <span id="foodAdminPageInfo">第 1 页</span>
+              <label>跳至<input id="foodAdminPageInput" type="number" min="1" step="1" inputmode="numeric" aria-label="页码" />页</label>
+              <button id="foodAdminGoPage" class="button secondary" type="button">前往</button>
+            </div>
             <button id="foodAdminNextPage" class="button secondary" type="button">下一页</button>
           </div>
         </section>
@@ -304,22 +385,68 @@
             <div class="workflow-steps"><div class="workflow-step"><b>1. 连接后台</b><span>在「系统配置」确认 API Base 与管理员 Token。</span></div><div class="workflow-step"><b>2. 选择视觉状态</b><span>默认按食物自动判断；仅外观不同才选生鲜、熟制等。</span></div><div class="workflow-step"><b>3. 预览选材</b><span>点击食材可取消或恢复本批生成范围。</span></div><div class="workflow-step"><b>4. 创建、启动、审核</b><span>候选图可单张或批量通过并设为该视觉状态主图。</span></div><div class="workflow-step"><b>5. 处理异常</b><span>拒绝理由会写入提示词并立即重试。</span></div></div>
           </details>
 
-          <section class="batch-controller" aria-label="创建图片批次">
-            <div class="batch-controller-copy"><p class="eyebrow">Batch composer</p><h2>按分类创建图片批次</h2><p class="muted">营养版本不重复生图。默认按食物判断主视觉；只有外观明显不同才选择额外视觉状态。每次最多 100 条。</p></div>
-            <div class="batch-control-fields">
-              <label class="batch-control-field" for="batchCategory">食物分类<select id="batchCategory"><option value="">连接后台后加载分类</option></select></label>
-              <label class="batch-control-field" for="visualProfileKey">视觉状态<select id="visualProfileKey"><option value="auto">自动（推荐）</option><option value="raw">生鲜原料</option><option value="cooked_plain">清淡熟制</option><option value="cooked_grilled">轻烤熟制</option><option value="fresh">新鲜食材</option><option value="dry">干制原料</option></select></label>
-              <label class="batch-control-field" for="batchCountInput">生成数量<input id="batchCountInput" type="number" value="20" min="1" max="100" /></label>
-              <button id="previewCategory" class="button secondary">预览选材</button><button id="createCategoryBatch" class="button">创建草稿</button>
-              <span id="selectionPreview" class="batch-selection-note">选择分类后可预览可生成食物数量。</span>
+          <div class="composer-deck" aria-label="生图批次配置">
+            <section class="batch-controller composer-card" aria-label="自动巡检生图">
+              <div class="composer-card__head">
+                <div class="composer-card__copy">
+                  <p class="eyebrow">Auto patrol</p>
+                  <h2>分类自动巡检</h2>
+                  <p class="muted">设置分类、每批数量与巡检间隔后，云端按间隔自动建批生图；跳过已有通过主图的食物。日上限 500 张，你只需统一审核。</p>
+                </div>
+                <div id="patrolQuotaNote" class="composer-quota" aria-live="polite"><b>今日额度</b>—</div>
+              </div>
+              <div class="composer-form composer-form--with-actions composer-form--patrol">
+                <label class="batch-control-field" for="patrolCategory">关注分类<select id="patrolCategory"><option value="">连接后台后加载分类</option></select></label>
+                <label class="batch-control-field" for="patrolVisualProfile">视觉状态<select id="patrolVisualProfile"><option value="auto">自动（推荐）</option><option value="raw">生鲜原料</option><option value="cooked_plain">清淡熟制</option><option value="cooked_grilled">轻烤熟制</option><option value="fresh">新鲜食材</option><option value="dry">干制原料</option></select></label>
+                <label class="batch-control-field" for="patrolBatchSize">每批数量<input id="patrolBatchSize" type="number" value="20" min="1" max="100" /></label>
+                <label class="batch-control-field" for="patrolInterval">巡检间隔<select id="patrolInterval"><option value="30">每 30 分钟</option><option value="60" selected>每 1 小时</option><option value="120">每 2 小时</option><option value="360">每 6 小时</option><option value="720">每 12 小时</option><option value="1440">每 24 小时</option></select></label>
+                <div class="composer-actions">
+                  <button id="addPatrolRule" class="button" type="button">添加规则</button>
+                  <button id="runPatrolNow" class="button secondary" type="button">立即巡检一次</button>
+                  <button id="refreshPatrol" class="button link" type="button">刷新</button>
+                </div>
+              </div>
+              <div id="patrolRulesPanel" class="composer-rules" aria-live="polite"><p class="muted">连接后台后显示巡检规则。</p></div>
+            </section>
+
+            <section class="batch-controller composer-card" aria-label="创建图片批次">
+              <div class="composer-card__head">
+                <div class="composer-card__copy">
+                  <p class="eyebrow">Batch composer</p>
+                  <h2>按分类创建图片批次</h2>
+                  <p class="muted">营养版本不重复生图。默认按食物判断主视觉；外观明显不同时再选额外视觉状态。每次最多 100 条。</p>
+                </div>
+              </div>
+              <div class="composer-form composer-form--with-actions">
+                <label class="batch-control-field" for="batchCategory">食物分类<select id="batchCategory"><option value="">连接后台后加载分类</option></select></label>
+                <label class="batch-control-field" for="visualProfileKey">视觉状态<select id="visualProfileKey"><option value="auto">自动（推荐）</option><option value="raw">生鲜原料</option><option value="cooked_plain">清淡熟制</option><option value="cooked_grilled">轻烤熟制</option><option value="fresh">新鲜食材</option><option value="dry">干制原料</option></select></label>
+                <label class="batch-control-field" for="batchCountInput">生成数量<input id="batchCountInput" type="number" value="20" min="1" max="100" /></label>
+                <div class="composer-actions">
+                  <button id="previewCategory" class="button secondary" type="button">预览选材</button>
+                  <button id="createCategoryBatch" class="button" type="button">创建草稿</button>
+                </div>
+              </div>
+              <p id="selectionPreview" class="batch-selection-note">选择分类后可预览可生成食物数量。</p>
               <div id="selectionPreviewPanel" class="selection-preview-panel" aria-live="polite"></div>
-            </div>
-            <div class="batch-lifecycle" aria-label="当前批次控制"><button id="startBatch" class="button" disabled>启动批次</button><button id="pauseBatch" class="button secondary" disabled>暂停</button><button id="resumeBatch" class="button secondary" disabled>继续</button><button id="cancelBatch" class="button secondary" disabled>取消</button></div>
-          </section>
+              <div class="batch-lifecycle" aria-label="当前批次控制">
+                <button id="startBatch" class="button" disabled type="button">启动批次</button>
+                <button id="pauseBatch" class="button secondary" disabled type="button">暂停</button>
+                <button id="resumeBatch" class="button secondary" disabled type="button">继续</button>
+                <button id="cancelBatch" class="button secondary" disabled type="button">取消</button>
+              </div>
+            </section>
+          </div>
 
           <section class="ops-workspace" aria-label="食物图片审核工作台">
-            <aside class="batch-rail">
-              <div class="rail-heading"><h2>批次</h2><span id="batchCount" class="rail-note">0 个</span></div>
+            <aside id="batchRail" class="batch-rail">
+              <div class="rail-heading">
+                <h2>批次</h2>
+                <div class="rail-heading-actions">
+                  <span id="batchCount" class="rail-note">0 个</span>
+                  <button id="toggleBatchRail" class="button link" type="button" aria-expanded="true">折叠</button>
+                </div>
+              </div>
+              <div id="batchListActive" class="batch-list-active" aria-live="polite"></div>
               <div id="batchList" class="batch-list"><p class="muted">请先在系统配置中连接后台。</p></div>
             </aside>
 
@@ -354,12 +481,65 @@
       </div>
     </div>
   </main>
+  <div id="rejectReasonModal" class="food-admin-modal" hidden>
+    <button type="button" class="food-admin-modal__backdrop" id="rejectReasonBackdrop" aria-label="关闭拒绝原因"></button>
+    <section class="food-admin-modal__panel reject-modal__panel" role="dialog" aria-modal="true" aria-labelledby="rejectReasonTitle">
+      <header class="reject-modal__header">
+        <div class="reject-modal__header-copy">
+          <p class="eyebrow">Review · Reject</p>
+          <h3 id="rejectReasonTitle">拒绝这张候选图</h3>
+          <p id="rejectReasonFood" class="reject-modal__food">将把原因写入下次生图提示词</p>
+        </div>
+        <button id="rejectReasonClose" class="reject-modal__close" type="button" aria-label="关闭">×</button>
+      </header>
+      <div class="reject-modal__body">
+        <div>
+          <p class="reject-modal__section-label">拒绝原因</p>
+          <div id="rejectReasonChips" class="reject-reason-grid" role="radiogroup" aria-label="拒绝原因"></div>
+        </div>
+        <div class="reject-modal__note">
+          <label for="rejectReasonNote">补充说明</label>
+          <textarea id="rejectReasonNote" rows="3" placeholder="可选，例如：生成了鱼片而不是海螺"></textarea>
+          <p class="reject-modal__hint">原因会注入下一次重试提示词，帮助模型修正同一错误。</p>
+        </div>
+      </div>
+      <footer class="reject-modal__footer">
+        <button id="rejectReasonCancel" class="button secondary" type="button">取消</button>
+        <button id="rejectReasonConfirm" class="button danger" type="button">确认拒绝</button>
+      </footer>
+    </section>
+  </div>
+  <div id="foodAdminEditor" class="food-admin-modal" hidden>
+    <button type="button" class="food-admin-modal__backdrop" id="foodAdminEditorBackdrop" aria-label="关闭编辑弹窗"></button>
+    <section class="food-admin-modal__panel" role="dialog" aria-modal="true" aria-labelledby="foodAdminEditorTitle">
+      <div class="food-admin-editor__head">
+        <h3 id="foodAdminEditorTitle">新建食材</h3>
+        <button id="foodAdminEditorClose" class="button link" type="button">关闭</button>
+      </div>
+      <div class="food-admin-editor__grid">
+        <label>中文名称 *<input id="foodEditorNameZh" type="text" autocomplete="off" /></label>
+        <label>分类<select id="foodEditorCategory"><option value="">未分类</option></select></label>
+        <label class="span-2">英文名称<input id="foodEditorNameEn" type="text" autocomplete="off" /></label>
+        <label>热量 kcal *<input id="foodEditorCalories" type="number" min="0" step="0.1" /></label>
+        <label>蛋白质 g *<input id="foodEditorProteinG" type="number" min="0" step="0.1" /></label>
+        <label>碳水 g *<input id="foodEditorCarbsG" type="number" min="0" step="0.1" /></label>
+        <label>脂肪 g *<input id="foodEditorFatG" type="number" min="0" step="0.1" /></label>
+        <label>纤维 g<input id="foodEditorFiberG" type="number" min="0" step="0.1" /></label>
+        <label class="span-2">生图主体描述<input id="foodEditorImageSubjectZh" type="text" placeholder="可选，用于 AI 生图提示词" autocomplete="off" /></label>
+        <label class="span-2">描述<textarea id="foodEditorDescription" rows="2"></textarea></label>
+      </div>
+      <div class="food-admin-editor__actions">
+        <button id="foodAdminEditorCancel" class="button secondary" type="button">取消</button>
+        <button id="foodAdminEditorSave" class="button" type="button">保存</button>
+      </div>
+    </section>
+  </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
     const $ = (id) => document.getElementById(id);
     const DEFAULT_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
-    const CREDENTIAL_KEYS = { baseUrl: "nordic-admin-base-url", token: "nordic-admin-bearer-token" };
+    const CREDENTIAL_KEYS = { baseUrl: "nordic-admin-base-url", token: "nordic-admin-bearer-token", batchRailCollapsed: "nordic-admin-batch-rail-collapsed" };
     function readStoredCredentials() {
       try {
         return {
@@ -389,7 +569,13 @@
     const storedCredentials = readStoredCredentials();
     $("baseUrl").value = storedCredentials.baseUrl || DEFAULT_API_BASE;
     if (storedCredentials.token) $("token").value = storedCredentials.token;
-    const state = { activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null };
+    const state = { activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, batchRailCollapsed: false };
+    try { state.batchRailCollapsed = localStorage.getItem(CREDENTIAL_KEYS.batchRailCollapsed) === "1"; } catch { /* ignore */ }
+    // Same root taxonomy as mini-program food library chips (STANDARD_FOOD_CATEGORY_ROOT_CODES).
+    const FOOD_LIBRARY_ROOT_CODES = ["meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables", "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples", "nordic_staples", "north_american_staples"];
+    const FOOD_LIBRARY_ROOT_CODE_SET = new Set(FOOD_LIBRARY_ROOT_CODES);
+    const FOOD_LIBRARY_ROOT_LABELS = { meat_poultry: "肉禽", seafood: "鱼虾海鲜", egg_dairy: "蛋类与乳制品", plant_protein: "豆类与植物蛋白", grains_tubers: "谷物与薯类", vegetables: "蔬菜", fruits: "水果", nuts_seeds: "坚果与种子", oils_seasonings: "油脂与调味", beverages: "饮品", basic_processed: "烘焙与基础加工食材", regional_staples: "地域特色常用食材", nordic_staples: "北欧常见食材", north_american_staples: "北美常见食材" };
+    const rootCategoryCode = (code) => String(code || "").split(".")[0];
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", "\"":"&quot;" })[char]);
     const out = (data) => { $("out").textContent = JSON.stringify(data, null, 2); };
     const toast = (message, isError = false) => { const el = $("toast"); el.textContent = message; el.className = `toast visible${isError ? " error" : ""}`; window.setTimeout(() => { el.className = "toast"; }, 3600); };
@@ -405,7 +591,26 @@
     };
     const formatTime = (value) => { if (!value) return "—"; const date = new Date(value); return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("zh-CN", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); };
     const selectedItem = () => (state.batchDetail?.items || []).find((item) => item.id === state.selectedItemId || (state.selectedJobId && item.jobId === state.selectedJobId)) || null;
-    const apiErrorMessage = (error) => error?.json?.message || error?.json?.errorMessage || error?.json?.error || error?.code || error?.message || "接口请求失败";
+    const ADMIN_ERROR_LABELS = {
+      FOOD_CATEGORY_INVALID: "分类无效或不存在，请重新选择分类",
+      FOOD_IMAGE_BATCH_CANDIDATES_FAILED: "预览选材失败：可能尚未执行视觉状态/生图表迁移，或分类查询过重",
+      FOOD_ADMIN_UNAVAILABLE: "管理服务暂时不可用，请稍后重试或检查云函数日志",
+      BAD_GATEWAY: "云函数网关超时或崩溃，请缩小生成数量后重试",
+      HTTP_400: "请求被网关拒绝（Bad Gateway 时常表示云函数超时/崩溃）",
+      FOOD_IMAGE_BATCH_CATEGORY_REQUIRED: "请先选择食物分类",
+      FOOD_IMAGE_BATCH_SELECTION_EMPTY: "当前没有可生成的食材",
+      FORBIDDEN: "当前账号不是管理员",
+      UNAUTHORIZED: "登录已失效，请重新粘贴管理员 Token",
+    };
+    const apiErrorMessage = (error) => {
+      const code = error?.json?.code || error?.code;
+      const raw = error?.json?.message || error?.json?.errorMessage || error?.json?.error || error?.message || "";
+      if (/bad gateway/i.test(String(raw)) || /bad gateway/i.test(String(code))) {
+        return "云函数网关超时或崩溃（BAD_GATEWAY）。已优化预览查询，请刷新页面后缩小数量再试；若仍失败请查看云函数日志。";
+      }
+      if (code && ADMIN_ERROR_LABELS[code]) return ADMIN_ERROR_LABELS[code];
+      return raw || code || "接口请求失败";
+    };
     function createApiError({ endpoint, method, status = 0, json = {}, cause } = {}) {
       const code = json.code || json.errorCode || (status ? `HTTP_${status}` : "NETWORK_ERROR");
       return Object.assign(new Error(json.message || json.errorMessage || json.error || code), { code, endpoint, method, status, json, cause });
@@ -479,14 +684,133 @@
       const metrics = [["pending", "待生成"], ["generating", "生成中"], ["needs_retry", "待重试"], ["needs_review", "待审核"], ["completed", "已通过"], ["failed", "失败"], ["skipped", "跳过"]];
       host.innerHTML = `<div class="status-panel-head"><h3>运行状态</h3><span class="status-badge ${statusTone(batch.status)}">${escapeHtml(statusLabel(batch.status))}</span></div><p id="schedulerHint" class="scheduler-hint ${hint.tone}">${escapeHtml(hint.text)}</p><div class="status-metrics">${metrics.map(([key, label]) => `<span class="status-metric ${statusTone(key)}">${label}<b>${counts[key]}</b></span>`).join("")}</div>`;
     }
+    function foodLibraryRootCategories(categories) {
+      const active = (categories || []).filter((category) => category.isActive !== false && FOOD_LIBRARY_ROOT_CODE_SET.has(category.code));
+      return FOOD_LIBRARY_ROOT_CODES.map((code) => active.find((category) => category.code === code)).filter(Boolean);
+    }
+    function foodLibraryCategoryLabel(food) {
+      const code = rootCategoryCode(food?.category?.code);
+      if (FOOD_LIBRARY_ROOT_LABELS[code]) return FOOD_LIBRARY_ROOT_LABELS[code];
+      const root = state.categories.find((category) => category.code === code);
+      return root?.nameZh || root?.name || food?.category?.nameZh || food?.category?.name || "—";
+    }
+    function foodLibraryRootCategoryId(food) {
+      const code = rootCategoryCode(food?.category?.code);
+      const root = state.categories.find((category) => category.code === code);
+      return root?.id || "";
+    }
     async function loadCategories() {
       const data = await foodApi("/foods/categories");
-      state.categories = (data.items || data || []).filter((category) => category.isActive !== false);
+      state.categories = foodLibraryRootCategories(data.items || data || []);
       const options = `<option value="">请选择分类</option>${state.categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.nameZh || category.name || "未命名分类")}</option>`).join("")}`;
-      const select = $("batchCategory"); const selectedId = select.value;
-      select.innerHTML = options;
-      if (state.categories.some((category) => category.id === selectedId)) select.value = selectedId;
+      ["batchCategory", "patrolCategory"].forEach((id) => {
+        const select = $(id);
+        if (!select) return;
+        const selectedId = select.value;
+        select.innerHTML = options;
+        if (state.categories.some((category) => category.id === selectedId)) select.value = selectedId;
+      });
       populateFoodAdminCategorySelects();
+    }
+    async function loadPatrolRules() {
+      const host = $("patrolRulesPanel");
+      const note = $("patrolQuotaNote");
+      if (!hasToken()) {
+        if (host) host.innerHTML = "<p class=\"muted\">请先连接后台。</p>";
+        return;
+      }
+      try {
+        const [rulesData, quota] = await Promise.all([
+          api("/food-image-patrol/rules"),
+          api("/food-image-patrol/quota"),
+        ]);
+        if (note) note.innerHTML = `<b>今日额度</b>${quota.usage}/${quota.limit}<br>剩余 ${quota.remaining}`;
+        const items = rulesData.items || [];
+        if (!host) return;
+        if (!items.length) {
+          host.innerHTML = "<p class=\"muted\">尚未添加巡检规则。选择分类后点击「添加规则」。</p>";
+          return;
+        }
+        host.innerHTML = `<table><thead><tr><th>分类</th><th>视觉状态</th><th>每批</th><th>间隔</th><th>状态</th><th>上次运行</th><th>操作</th></tr></thead><tbody>${items.map((rule) => {
+          const profile = visualProfileLabel(rule.visualProfileKey);
+          const status = rule.enabled ? "启用" : "暂停";
+          const interval = rule.intervalLabel || `每 ${rule.intervalMinutes || 60} 分钟`;
+          const err = rule.lastError
+            ? `<div class="item-error" title="${escapeHtml(rule.lastError)}">${escapeHtml(rule.lastError)}</div>`
+            : (rule.enabled ? "<div class=\"muted\" style=\"margin-top:4px;font-size:11px\">有缺主图时才会新建批次</div>" : "");
+          return `<tr><td>${escapeHtml(rule.categoryNameZh || rule.categoryCode || rule.categoryId)}</td><td>${escapeHtml(profile)}</td><td>${escapeHtml(rule.batchSize)}</td><td>${escapeHtml(interval)}</td><td>${status}${err}</td><td>${escapeHtml(formatTime(rule.lastRunAt))}</td><td><button type="button" class="button link" data-patrol-toggle="${escapeHtml(rule.id)}" data-enabled="${rule.enabled ? "0" : "1"}">${rule.enabled ? "暂停" : "启用"}</button> <button type="button" class="button link" data-patrol-delete="${escapeHtml(rule.id)}">删除</button></td></tr>`;
+        }).join("")}</tbody></table>`;
+        host.querySelectorAll("[data-patrol-toggle]").forEach((button) => {
+          button.onclick = async () => {
+            try {
+              await api(`/food-image-patrol/rules/${button.dataset.patrolToggle}`, { method: "PATCH", body: { enabled: button.dataset.enabled === "1" } });
+              await loadPatrolRules();
+              toast(button.dataset.enabled === "1" ? "规则已启用" : "规则已暂停");
+            } catch (error) { toast(apiErrorMessage(error), true); }
+          };
+        });
+        host.querySelectorAll("[data-patrol-delete]").forEach((button) => {
+          button.onclick = async () => {
+            if (!window.confirm("确认删除该巡检规则？")) return;
+            try {
+              await api(`/food-image-patrol/rules/${button.dataset.patrolDelete}`, { method: "DELETE" });
+              await loadPatrolRules();
+              toast("规则已删除");
+            } catch (error) { toast(apiErrorMessage(error), true); }
+          };
+        });
+      } catch (error) {
+        if (host) host.innerHTML = `<p class="muted">${escapeHtml(apiErrorMessage(error))}</p>`;
+      }
+    }
+    async function addPatrolRule() {
+      const categoryId = $("patrolCategory")?.value;
+      if (!categoryId) { toast("请先选择关注分类", true); return; }
+      try {
+        await api("/food-image-patrol/rules", {
+          method: "POST",
+          body: {
+            categoryId,
+            visualProfileKey: $("patrolVisualProfile")?.value || "auto",
+            batchSize: Number($("patrolBatchSize")?.value) || 20,
+            intervalMinutes: Number($("patrolInterval")?.value) || 60,
+            enabled: true,
+          },
+        });
+        await loadPatrolRules();
+        toast("巡检规则已保存");
+      } catch (error) { toast(apiErrorMessage(error), true); }
+    }
+    function patrolSkipSummary(skipped) {
+      if (!Array.isArray(skipped) || !skipped.length) return "本次未新建批次";
+      const first = skipped[0] || {};
+      if (first.message) return first.message;
+      const labels = {
+        daily_cap: "今日生图额度已用尽",
+        interval: "未到巡检间隔，请稍后再由定时器执行（立即巡检会跳过间隔）",
+        cooldown: "未到巡检间隔，请稍后再试",
+        active_batch: "该分类已有草稿/运行中/暂停的批次",
+        no_candidates: "暂无缺主图候选（该分类在当前视觉状态下均已有通过主图）",
+        no_rules: "没有启用中的巡检规则，请先添加规则",
+      };
+      return labels[first.reason] || `本次未新建批次（${first.reason || "未知原因"}）`;
+    }
+    async function runPatrolNow() {
+      try {
+        const data = await api("/food-image-patrol/run", { method: "POST", body: {} });
+        const created = data.created?.length || 0;
+        const remaining = data.quota?.remaining;
+        const skipDetail = (data.skipped || []).map((item) => item.message || item.reason).filter(Boolean).join("；");
+        recordOperation({
+          title: "自动巡检已执行",
+          detail: created
+            ? `新建 ${created} 个批次；今日剩余 ${remaining ?? "—"}`
+            : `未新建批次；今日剩余 ${remaining ?? "—"}${skipDetail ? ` · ${skipDetail}` : ""}`,
+        });
+        toast(created ? `已创建 ${created} 个批次，请到审核队列查看` : patrolSkipSummary(data.skipped));
+        await loadPatrolRules();
+        await refreshBatches();
+      } catch (error) { toast(apiErrorMessage(error), true); }
     }
     function populateFoodAdminCategorySelects() {
       const filterOptions = `<option value="">全部分类</option>${state.categories.map((category) => `<option value="${escapeHtml(category.code || category.id)}">${escapeHtml(category.nameZh || category.name || "未命名分类")}</option>`).join("")}`;
@@ -521,7 +845,7 @@
       if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无匹配食材</p>"; syncFoodAdminBulkBar(); return; }
       host.innerHTML = `<table><thead><tr><th><input id="foodAdminSelectAll" type="checkbox" aria-label="全选" /></th><th>缩略图</th><th>名称</th><th>分类</th><th>kcal/蛋白/碳/脂</th><th>主图状态</th><th>状态</th><th>操作</th></tr></thead><tbody>${items.map((food) => {
         const name = foodLabel(food);
-        const category = food.category?.nameZh || food.category?.name || "—";
+        const category = foodLibraryCategoryLabel(food);
         const imageUrl = food.image?.thumbnailUrl || food.image?.listUrl || food.imageUrl || "";
         const thumb = imageUrl ? `<img class="food-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" />` : `<span class="food-thumb-placeholder">N</span>`;
         const imageStatus = foodImageStatusLabel(food);
@@ -529,9 +853,9 @@
         const activeTone = food.isActive === false ? "danger" : "";
         const checked = state.foodAdminSelectedIds.has(food.id) ? "checked" : "";
         const archiveAction = food.isActive === false
-          ? `<button class="button link" type="button" data-food-restore="${escapeHtml(food.id)}">恢复</button>`
-          : `<button class="button link" type="button" data-food-archive="${escapeHtml(food.id)}">下架</button>`;
-        return `<tr><td><input type="checkbox" data-food-select="${escapeHtml(food.id)}" ${checked} aria-label="选择 ${escapeHtml(name)}" /></td><td>${thumb}</td><td><strong>${escapeHtml(name)}</strong>${food.nameEn ? `<br><span class="muted">${escapeHtml(food.nameEn)}</span>` : ""}</td><td>${escapeHtml(category)}</td><td>${escapeHtml(foodNutritionSummary(food))}</td><td>${escapeHtml(imageStatus)}</td><td><span class="status-badge ${activeTone}">${escapeHtml(activeLabel)}</span></td><td><div class="food-row-actions"><button class="button link" type="button" data-food-edit="${escapeHtml(food.id)}">编辑</button>${archiveAction}<button class="button link" type="button" data-food-generate="${escapeHtml(food.id)}">生图</button></div></td></tr>`;
+          ? `<button class="button link" type="button" data-food-action="restore" data-food-id="${escapeHtml(food.id)}">恢复</button>`
+          : `<button class="button link" type="button" data-food-action="archive" data-food-id="${escapeHtml(food.id)}">下架</button>`;
+        return `<tr><td><input type="checkbox" data-food-select="${escapeHtml(food.id)}" ${checked} aria-label="选择 ${escapeHtml(name)}" /></td><td>${thumb}</td><td><strong>${escapeHtml(name)}</strong>${food.nameEn ? `<br><span class="muted">${escapeHtml(food.nameEn)}</span>` : ""}</td><td>${escapeHtml(category)}</td><td>${escapeHtml(foodNutritionSummary(food))}</td><td>${escapeHtml(imageStatus)}</td><td><span class="status-badge ${activeTone}">${escapeHtml(activeLabel)}</span></td><td><div class="food-row-actions"><button class="button link" type="button" data-food-action="edit" data-food-id="${escapeHtml(food.id)}">编辑</button>${archiveAction}<button class="button link" type="button" data-food-action="generate" data-food-id="${escapeHtml(food.id)}">生图</button></div></td></tr>`;
       }).join("")}</tbody></table>`;
       const selectableIds = items.map((food) => food.id);
       const selectAll = host.querySelector("#foodAdminSelectAll");
@@ -545,26 +869,53 @@
       }
       host.querySelectorAll("input[data-food-select]").forEach((input) => {
         input.onchange = () => {
-          const id = input.dataset.foodSelect;
+          const id = input.getAttribute("data-food-select");
           if (input.checked) state.foodAdminSelectedIds.add(id); else state.foodAdminSelectedIds.delete(id);
           syncFoodAdminBulkBar();
           if (selectAll) selectAll.checked = selectableIds.length > 0 && selectableIds.every((entry) => state.foodAdminSelectedIds.has(entry));
         };
       });
-      host.querySelectorAll("button[data-food-edit]").forEach((button) => { button.onclick = () => openFoodEditor(button.dataset.foodEdit).catch((error) => toast(apiErrorMessage(error), true)); });
-      host.querySelectorAll("button[data-food-archive]").forEach((button) => { button.onclick = () => archiveFoodAdmin(button.dataset.foodArchive).catch((error) => toast(apiErrorMessage(error), true)); });
-      host.querySelectorAll("button[data-food-restore]").forEach((button) => { button.onclick = () => restoreFoodAdmin(button.dataset.foodRestore).catch((error) => toast(apiErrorMessage(error), true)); });
-      host.querySelectorAll("button[data-food-generate]").forEach((button) => { button.onclick = () => createImageBatchForFoods([button.dataset.foodGenerate]).catch((error) => toast(apiErrorMessage(error), true)); });
+      host.onclick = (event) => {
+        const button = event.target.closest("button[data-food-action]");
+        if (!button || !host.contains(button)) return;
+        const foodId = button.getAttribute("data-food-id");
+        const action = button.getAttribute("data-food-action");
+        if (!foodId || !action) return;
+        const run = action === "edit" ? openFoodEditor(foodId)
+          : action === "archive" ? archiveFoodAdmin(foodId)
+          : action === "restore" ? restoreFoodAdmin(foodId)
+          : action === "generate" ? createImageBatchForFoods([foodId])
+          : null;
+        if (run) run.catch((error) => toast(apiErrorMessage(error), true));
+      };
       syncFoodAdminBulkBar();
+    }
+    function foodAdminTotalPages() {
+      const pagination = state.foodAdminPagination;
+      const pageSize = Math.max(1, Number(pagination.pageSize) || 20);
+      const total = Math.max(0, Number(pagination.total) || 0);
+      return Math.max(1, Math.ceil(total / pageSize) || 1);
     }
     function renderFoodAdminPagination() {
       const pagination = state.foodAdminPagination;
       const host = $("foodAdminPagination");
       if (!host) return;
+      const totalPages = foodAdminTotalPages();
       host.hidden = !state.foodAdminItems.length && pagination.page <= 1;
-      $("foodAdminPageInfo").textContent = `第 ${pagination.page} 页 · 共 ${pagination.total} 条`;
+      $("foodAdminPageInfo").textContent = `第 ${pagination.page} / ${totalPages} 页 · 共 ${pagination.total || 0} 条`;
+      const pageInput = $("foodAdminPageInput");
+      if (pageInput) {
+        pageInput.max = String(totalPages);
+        pageInput.value = String(pagination.page || 1);
+      }
       $("foodAdminPrevPage").disabled = pagination.page <= 1;
-      $("foodAdminNextPage").disabled = !pagination.hasMore;
+      $("foodAdminNextPage").disabled = pagination.page >= totalPages && !pagination.hasMore;
+    }
+    async function jumpFoodAdminPage() {
+      const totalPages = foodAdminTotalPages();
+      const raw = Number($("foodAdminPageInput")?.value);
+      const page = Number.isFinite(raw) ? Math.min(totalPages, Math.max(1, Math.floor(raw))) : state.foodAdminPagination.page;
+      await loadFoodAdminList(page);
     }
     async function loadFoodAdminList(page = state.foodAdminPagination.page || 1) {
       const host = $("foodAdminTable");
@@ -576,9 +927,11 @@
         const categoryCode = encodeURIComponent($("foodAdminCategory").value || "");
         const active = encodeURIComponent($("foodAdminActive").value || "true");
         const missingImage = $("foodAdminMissingOnly").checked ? "true" : "";
+        const missingSubject = $("foodAdminMissingSubjectOnly")?.checked ? "true" : "";
         const missingQuery = missingImage ? `&missingImage=${missingImage}` : "";
+        const missingSubjectQuery = missingSubject ? `&missingImageSubject=${missingSubject}` : "";
         const categoryQuery = categoryCode ? `&categoryCode=${categoryCode}` : "";
-        const data = await api(`/foods?q=${q}&active=${active}${categoryQuery}${missingQuery}&page=${page}&pageSize=${state.foodAdminPagination.pageSize}`);
+        const data = await api(`/foods?q=${q}&active=${active}${categoryQuery}${missingQuery}${missingSubjectQuery}&page=${page}&pageSize=${state.foodAdminPagination.pageSize}`);
         state.foodAdminItems = data.items || [];
         state.foodAdminPagination = { ...state.foodAdminPagination, ...(data.pagination || {}), page };
         renderFoodAdminTable();
@@ -590,7 +943,7 @@
     function resetFoodEditorFields(food = null) {
       $("foodEditorNameZh").value = food?.nameZh || "";
       $("foodEditorNameEn").value = food?.nameEn || "";
-      $("foodEditorCategory").value = food?.category?.id || food?.categoryId || "";
+      $("foodEditorCategory").value = food ? foodLibraryRootCategoryId(food) : "";
       $("foodEditorCalories").value = food?.nutritionPer100g?.calories ?? food?.calories ?? "";
       $("foodEditorProteinG").value = food?.nutritionPer100g?.protein ?? food?.proteinG ?? "";
       $("foodEditorCarbsG").value = food?.nutritionPer100g?.carbs ?? food?.carbsG ?? "";
@@ -603,22 +956,35 @@
       state.foodAdminEditingId = null;
       $("foodAdminEditor").hidden = true;
       $("foodAdminEditorTitle").textContent = "新建食材";
+      document.body.style.overflow = "";
       resetFoodEditorFields();
     }
     async function openFoodEditor(foodId = null) {
       populateFoodAdminCategorySelects();
+      const editor = $("foodAdminEditor");
       if (!foodId) {
         state.foodAdminEditingId = null;
         $("foodAdminEditorTitle").textContent = "新建食材";
         resetFoodEditorFields();
-        $("foodAdminEditor").hidden = false;
+        editor.hidden = false;
+        document.body.style.overflow = "hidden";
+        $("foodEditorNameZh")?.focus();
         return;
       }
-      const data = await api(`/foods/${foodId}`);
+      const cached = state.foodAdminItems.find((food) => food.id === foodId) || null;
+      let detail = cached;
+      try {
+        detail = await api(`/foods/${encodeURIComponent(foodId)}`);
+      } catch (error) {
+        if (!cached) throw error;
+        toast("详情拉取失败，已用列表数据打开编辑", true);
+      }
       state.foodAdminEditingId = foodId;
       $("foodAdminEditorTitle").textContent = "编辑食材";
-      resetFoodEditorFields(data);
-      $("foodAdminEditor").hidden = false;
+      resetFoodEditorFields(detail);
+      editor.hidden = false;
+      document.body.style.overflow = "hidden";
+      $("foodEditorNameZh")?.focus();
     }
     function readFoodEditorPayload() {
       const nameZh = ($("foodEditorNameZh").value || "").trim();
@@ -758,10 +1124,35 @@
         await refreshBatches(); toast("批次草稿已创建，可点击“启动批次”交由云端生成");
       } catch (error) { out(error.json || { error: error.message }); toast(error.message, true); }
     }
+    function batchItemMarkup(batch) {
+      const p = progress(batch);
+      return `<button class="batch-item ${batch.id === state.activeBatchId ? "active" : ""}" data-batch-id="${escapeHtml(batch.id)}" type="button"><span class="batch-name">${escapeHtml(batch.name)}</span><span class="batch-meta"><span>${p.terminal}/${p.total} 已处理</span><span>${statusLabel(batch.status)}</span></span><span class="mini-progress"><i style="width:${p.percent}%"></i></span></button>`;
+    }
+    function syncBatchRailCollapsed() {
+      const rail = $("batchRail");
+      const toggle = $("toggleBatchRail");
+      if (!rail || !toggle) return;
+      rail.classList.toggle("collapsed", Boolean(state.batchRailCollapsed));
+      toggle.textContent = state.batchRailCollapsed ? "展开" : "折叠";
+      toggle.setAttribute("aria-expanded", state.batchRailCollapsed ? "false" : "true");
+      try { localStorage.setItem(CREDENTIAL_KEYS.batchRailCollapsed, state.batchRailCollapsed ? "1" : "0"); } catch { /* ignore */ }
+    }
     function renderBatches() {
       $("batchCount").textContent = `${state.batches.length} 个`;
-      $("batchList").innerHTML = state.batches.length ? state.batches.map((batch) => { const p = progress(batch); return `<button class="batch-item ${batch.id === state.activeBatchId ? "active" : ""}" data-batch-id="${batch.id}"><span class="batch-name">${escapeHtml(batch.name)}</span><span class="batch-meta"><span>${p.terminal}/${p.total} 已处理</span><span>${statusLabel(batch.status)}</span></span><span class="mini-progress"><i style="width:${p.percent}%"></i></span></button>`; }).join("") : "<p class=\"muted\">暂无可查看批次。</p>";
-      $("batchList").querySelectorAll("button[data-batch-id]").forEach((button) => { button.onclick = () => selectBatch(button.dataset.batchId); });
+      const listHost = $("batchList");
+      const activeHost = $("batchListActive");
+      listHost.innerHTML = state.batches.length
+        ? state.batches.map((batch) => batchItemMarkup(batch)).join("")
+        : "<p class=\"muted\">暂无可查看批次。</p>";
+      const active = state.batches.find((batch) => batch.id === state.activeBatchId) || state.batches[0];
+      if (activeHost) {
+        activeHost.innerHTML = active
+          ? batchItemMarkup(active)
+          : "<p class=\"muted\">暂无当前批次。</p>";
+      }
+      [...listHost.querySelectorAll("button[data-batch-id]"), ...(activeHost ? activeHost.querySelectorAll("button[data-batch-id]") : [])]
+        .forEach((button) => { button.onclick = () => selectBatch(button.dataset.batchId); });
+      syncBatchRailCollapsed();
       renderBatchControls();
     }
     async function refreshBatches() {
@@ -836,10 +1227,60 @@
       state.selectedImageIds.clear(); await refreshBatches();
       if (failures.length) { recordOperation({ title: "批量审核部分失败", detail: failures.join("；"), isError: true }); toast(`${imageIds.length - failures.length}/${imageIds.length} 张已通过，${failures.length} 张失败`, true); } else toast(`已通过并设为主图 ${imageIds.length} 张候选图`);
     }
-    async function rejectSelected() { if (!state.selectedImageId) return; const reason = window.prompt("请填写拒绝原因；该原因会自动写入下一次生图提示词。"); if (!reason?.trim()) return; try { const data = await api(`/food-images/${state.selectedImageId}/reject`, { method: "POST", body: { reason: reason.trim() } }); out(data); const retryScheduled = Boolean(data.retry?.retryScheduled); const detail = retryScheduled ? `${state.selectedFoodName} · 拒绝原因已写入提示词，重试任务已提交` : `${state.selectedFoodName} · 已拒绝，但未能立即重试：${data.retry?.reason || data.retry?.errorMessage || "请查看异常"}`; recordOperation({ title: retryScheduled ? "候选图已拒绝并立即重试" : "候选图已拒绝，重试待处理", detail, isError: !retryScheduled }); toast(retryScheduled ? "拒绝原因已写入提示词，重试任务已提交" : detail, !retryScheduled); state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    const REJECT_REASON_OPTIONS = [
+      { code: "wrong_identity", label: "认错食材", hint: "品类或主体不对" },
+      { code: "wrong_doneness", label: "生熟错误", hint: "生鲜与熟制搞反" },
+      { code: "extra_foods", label: "多余配菜", hint: "拼盘或其他食物" },
+      { code: "sauce_or_seasoning", label: "酱汁过重", hint: "浓酱、油炸、调味" },
+      { code: "style_off", label: "风格不符", hint: "光线、桌面、构图" },
+      { code: "other", label: "其他原因", hint: "需填写补充说明" },
+    ];
+    let rejectReasonCode = "wrong_identity";
+    function hideRejectReasonModal() { $("rejectReasonModal").hidden = true; }
+    function showRejectReasonModal() {
+      rejectReasonCode = "wrong_identity";
+      const foodLabel = state.selectedFoodName || "当前候选图";
+      $("rejectReasonFood").innerHTML = `正在拒绝 <strong>${escapeHtml(foodLabel)}</strong> · 原因会写入下次提示词`;
+      const chips = $("rejectReasonChips");
+      chips.innerHTML = REJECT_REASON_OPTIONS.map((option) => `<button type="button" class="reject-reason-card ${option.code === rejectReasonCode ? "active" : ""}" data-reason-code="${option.code}" role="radio" aria-checked="${option.code === rejectReasonCode ? "true" : "false"}"><strong>${escapeHtml(option.label)}</strong><span>${escapeHtml(option.hint)}</span></button>`).join("");
+      chips.querySelectorAll("button[data-reason-code]").forEach((button) => {
+        button.onclick = () => {
+          rejectReasonCode = button.dataset.reasonCode;
+          chips.querySelectorAll("button").forEach((entry) => {
+            const active = entry === button;
+            entry.classList.toggle("active", active);
+            entry.setAttribute("aria-checked", active ? "true" : "false");
+          });
+          $("rejectReasonNote").placeholder = rejectReasonCode === "other"
+            ? "请说明具体问题，例如：构图裁切不当"
+            : "可选，例如：生成了鱼片而不是海螺";
+        };
+      });
+      $("rejectReasonNote").value = "";
+      $("rejectReasonNote").placeholder = "可选，例如：生成了鱼片而不是海螺";
+      $("rejectReasonModal").hidden = false;
+      $("rejectReasonNote").focus();
+    }
+    async function confirmRejectReason() {
+      if (!state.selectedImageId) return;
+      const note = ($("rejectReasonNote").value || "").trim();
+      if (rejectReasonCode === "other" && !note) { toast("选择「其他」时请填写补充说明", true); return; }
+      hideRejectReasonModal();
+      try {
+        const data = await api(`/food-images/${state.selectedImageId}/reject`, { method: "POST", body: { reasonCode: rejectReasonCode, reason: note } });
+        out(data);
+        const retryScheduled = Boolean(data.retry?.retryScheduled);
+        const detail = retryScheduled ? `${state.selectedFoodName} · 拒绝原因已写入提示词，重试任务已提交` : `${state.selectedFoodName} · 已拒绝，但未能立即重试：${data.retry?.reason || data.retry?.errorMessage || "请查看异常"}`;
+        recordOperation({ title: retryScheduled ? "候选图已拒绝并立即重试" : "候选图已拒绝，重试待处理", detail, isError: !retryScheduled });
+        toast(retryScheduled ? "拒绝原因已写入提示词，重试任务已提交" : detail, !retryScheduled);
+        state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = "";
+        await refreshBatches();
+      } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); }
+    }
+    async function rejectSelected() { if (!state.selectedImageId) return; showRejectReasonModal(); }
     async function mutateBatch(action) { if (!state.activeBatchId) return; try { const data = await api(`/food-image-batches/${state.activeBatchId}/${action}`, { method: "POST", body: {} }); const message = { start: "批次已启动，云端将持续处理", pause: "批次已暂停", resume: "批次已继续", cancel: "批次已取消" }[action] || "批次状态已更新"; out(data); recordOperation({ title: "批次状态已变化", detail: message }); toast(message); await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
     async function loadStats() { try { const stats = await api("/food-image-jobs/stats"); out(stats); $("stats").innerHTML = [["待审核", stats.pendingReviewImages], ["已有主图", stats.readyFoods], ["失败任务", stats.failedJobs], ["今日生成", `${stats.dailyGenerated}/${stats.dailyLimit}`], ["缺失图片", stats.missingImages], ["待处理", stats.pendingJobs]].map(([name, value]) => `<div class="stat">${name}<b>${escapeHtml(value)}</b></div>`).join(""); } catch (error) { out(error.json || { error: error.message }); toast(error.message, true); } }
-    async function connect() { try { await loadCategories(); await refreshBatches(); setConnected(true); saveCredentials(); await loadStats(); recordOperation({ title: "后台已连接", detail: "分类、批次与生图统计已刷新" }); toast("后台已连接"); } catch (error) { setConnected(false); out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function connect() { try { await loadCategories(); await refreshBatches(); await loadPatrolRules(); setConnected(true); saveCredentials(); await loadStats(); recordOperation({ title: "后台已连接", detail: "分类、批次、巡检与生图统计已刷新" }); toast("后台已连接"); } catch (error) { setConnected(false); out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
     function hasToken() { return Boolean($("baseUrl").value.trim() && $("token").value.trim()); }
     const feedbackCategoryLabel = (category) => ({ product: "产品", bug: "缺陷", feature: "功能", support: "支持" }[category] || category || "—");
     async function loadUsers() {
@@ -895,14 +1336,43 @@
     $("foodAdminCategory").onchange = () => loadFoodAdminList(1).catch((error) => toast(apiErrorMessage(error), true));
     $("foodAdminActive").onchange = () => loadFoodAdminList(1).catch((error) => toast(apiErrorMessage(error), true));
     $("foodAdminMissingOnly").onchange = () => loadFoodAdminList(1).catch((error) => toast(apiErrorMessage(error), true));
+    $("foodAdminMissingSubjectOnly").onchange = () => loadFoodAdminList(1).catch((error) => toast(apiErrorMessage(error), true));
+    $("rejectReasonClose").onclick = hideRejectReasonModal;
+    $("rejectReasonCancel").onclick = hideRejectReasonModal;
+    $("rejectReasonBackdrop").onclick = hideRejectReasonModal;
+    $("rejectReasonConfirm").onclick = () => confirmRejectReason().catch((error) => toast(apiErrorMessage(error), true));
     $("foodAdminPrevPage").onclick = () => loadFoodAdminList(Math.max(1, state.foodAdminPagination.page - 1)).catch((error) => toast(apiErrorMessage(error), true));
-    $("foodAdminNextPage").onclick = () => { if (state.foodAdminPagination.hasMore) loadFoodAdminList(state.foodAdminPagination.page + 1).catch((error) => toast(apiErrorMessage(error), true)); };
+    $("foodAdminNextPage").onclick = () => {
+      const totalPages = foodAdminTotalPages();
+      if (state.foodAdminPagination.page < totalPages || state.foodAdminPagination.hasMore) {
+        loadFoodAdminList(state.foodAdminPagination.page + 1).catch((error) => toast(apiErrorMessage(error), true));
+      }
+    };
+    $("foodAdminGoPage").onclick = () => jumpFoodAdminPage().catch((error) => toast(apiErrorMessage(error), true));
+    $("foodAdminPageInput").onkeydown = (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        jumpFoodAdminPage().catch((error) => toast(apiErrorMessage(error), true));
+      }
+    };
     $("foodAdminEditorSave").onclick = () => saveFoodAdmin();
     $("foodAdminEditorCancel").onclick = hideFoodEditor;
     $("foodAdminEditorClose").onclick = hideFoodEditor;
+    $("foodAdminEditorBackdrop").onclick = hideFoodEditor;
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !$("foodAdminEditor").hidden) hideFoodEditor();
+    });
     $("foodAdminBulkBatch").onclick = () => createImageBatchForFoods([...state.foodAdminSelectedIds]).catch((error) => toast(apiErrorMessage(error), true));
     $("connect").onclick = connect; $("refreshAll").onclick = connect; $("clearCredentials").onclick = clearStoredCredentials; $("refreshQueue").onclick = () => loadBatchDetail().catch((error) => toast(apiErrorMessage(error), true)); $("loadStats").onclick = loadStats; $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
     $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory; $("visualProfileKey").onchange = previewCategory;
+    $("addPatrolRule").onclick = () => addPatrolRule().catch((error) => toast(apiErrorMessage(error), true));
+    $("runPatrolNow").onclick = () => runPatrolNow().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshPatrol").onclick = () => loadPatrolRules().catch((error) => toast(apiErrorMessage(error), true));
+    $("toggleBatchRail").onclick = () => {
+      state.batchRailCollapsed = !state.batchRailCollapsed;
+      syncBatchRailCollapsed();
+    };
+    syncBatchRailCollapsed();
     $("startBatch").onclick = () => mutateBatch("start"); $("pauseBatch").onclick = () => mutateBatch("pause"); $("resumeBatch").onclick = () => mutateBatch("resume"); $("cancelBatch").onclick = () => mutateBatch("cancel");
     $("openTools").onclick = () => { setModule("system"); $("utilityDrawer").open = true; $("utilityDrawer").scrollIntoView({ behavior: "smooth", block: "start" }); };
     $("clearOperationFeed").onclick = () => { state.operations = []; renderOperationFeed(); };

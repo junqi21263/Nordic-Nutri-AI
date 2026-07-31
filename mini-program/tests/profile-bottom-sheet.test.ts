@@ -13,16 +13,19 @@ describe("profile information bottom sheets", () => {
     expect(source).toContain("event.stopPropagation()");
   });
 
-  it("uses taller bottom sheets with an explicit close control for every profile information entry", () => {
+  it("uses taller bottom sheets; feedback keeps an explicit close control", () => {
     const source = readSource("../src/pages/profile/index.tsx");
     const styles = readSource("../src/styles/page.scss");
 
     expect(source).toContain('from "../../components/bottom-sheet"');
     expect(source).toContain("onDismiss={() => setActiveModal(null)}");
     expect(source).toContain('className="profile-sheet__close"');
-    expect(source).toContain('name="x"');
+    expect(source).toContain('ariaLabel="关闭反馈与帮助"');
+    expect(source).not.toContain('ariaLabel="关闭隐私与数据"');
+    expect(source).not.toContain('ariaLabel="关闭关于我们"');
     expect(styles).toContain(".profile-sheet {");
     expect(styles).toContain("min-height: 720px");
+    expect(styles).toContain(".profile-sheet--info");
   });
 
   it("keeps the sheet mounted for a downward exit animation and lowers compact actions", () => {

@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   appendCatalogItems,
   canLoadMoreCatalogItems,
+  pickRandomCatalogPage,
+  shuffleCatalogItems,
 } from "../src/features/food-catalog/catalog-pagination";
 import type { ProductFoodCatalogItem } from "../src/api/food-catalog-api";
 
@@ -43,6 +45,21 @@ describe("food catalog pagination and category presentation", () => {
     expect(canLoadMoreCatalogItems({ page: 1, pageSize: 20, total: 40, hasMore: true }, false)).toBe(true);
     expect(canLoadMoreCatalogItems({ page: 2, pageSize: 20, total: 40, hasMore: false }, false)).toBe(false);
     expect(canLoadMoreCatalogItems({ page: 1, pageSize: 20, total: 40, hasMore: true }, true)).toBe(false);
+  });
+
+  it("shuffles catalog items without dropping or duplicating foods", () => {
+    const items = [food("a"), food("b"), food("c"), food("d")];
+    const shuffled = shuffleCatalogItems(items, () => 0);
+    expect(shuffled).toHaveLength(4);
+    expect(new Set(shuffled.map((item) => item.id))).toEqual(new Set(["a", "b", "c", "d"]));
+    expect(shuffled).not.toBe(items);
+  });
+
+  it("picks a random catalog page within the available range", () => {
+    expect(pickRandomCatalogPage(undefined, () => 0.9)).toBe(1);
+    expect(pickRandomCatalogPage({ page: 1, pageSize: 20, total: 20, hasMore: false }, () => 0.9)).toBe(1);
+    expect(pickRandomCatalogPage({ page: 1, pageSize: 20, total: 55, hasMore: true }, () => 0)).toBe(1);
+    expect(pickRandomCatalogPage({ page: 1, pageSize: 20, total: 55, hasMore: true }, () => 0.99)).toBe(3);
   });
 
   it("uses an outline selected state and keeps category labels readable", () => {

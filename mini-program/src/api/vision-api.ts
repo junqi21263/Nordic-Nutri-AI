@@ -1,11 +1,17 @@
 import Taro from "@tarojs/taro";
 import { useAuthStore } from "../auth/auth-store";
+import {
+  formatImageTooLargeMessage,
+  MAX_PICK_IMAGE_BYTES,
+  MAX_UPLOAD_IMAGE_BYTES,
+} from "../features/media/image-upload-limits";
+import { inferMealTypeFromTime } from "../features/meals/meal-type";
 import type { ScannerMealFixture } from "../features/scanner/domain";
 import { createClientRequestId } from "../repositories/client-request-id";
 import { productApiEndpoint } from "./product-api-config";
-const maxImageBytes = 20 * 1024 * 1024;
+const maxImageBytes = MAX_PICK_IMAGE_BYTES;
 /** Network upload target — keep base64 payload small enough for mobile + cloud timeout. */
-const targetUploadBytes = 1.2 * 1024 * 1024;
+const targetUploadBytes = MAX_UPLOAD_IMAGE_BYTES;
 
 interface ProductVisionResult {
   analysisId: string;
@@ -72,7 +78,8 @@ function mapVisionResult(result: ProductVisionResult): ScannerMealFixture {
     imageUrl: result.imageUrl ?? null,
     imagePath: result.imagePath ?? null,
     nutritionSource: result.nutritionSource ?? "ai_estimate",
-    mealType: result.mealType,
+    // Prefer local clock over vision-model guess; user can still change on the result page.
+    mealType: inferMealTypeFromTime(),
     imageKey: "bowl",
     confidence: Math.round(result.confidence * 100),
     insight: result.advice || "营养数值为图片估算，保存前请确认食材和份量。",
@@ -132,7 +139,7 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
     console.error("[vision] getFileInfo failed:", err);
     throw new Error("无法读取图片文件，请重新选择");
   }
-  if (!("size" in info) || info.size > maxImageBytes) throw new Error("图片过大（超过 20MB），请重新拍摄或选择更小的图片");
+  if (!("size" in info) || info.size > maxImageBytes) throw new Error(formatImageTooLargeMessage());
   let imageBase64;
   try {
     imageBase64 = await readBase64(filePath);

@@ -84,6 +84,41 @@ test("review operators can filter retryable items and inspect batch item failure
   assert.match(source, /item\.nextRetryAt/);
 });
 
+test("reject modal exposes structured reason codes and missing image-subject filter", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="rejectReasonModal"/);
+  assert.match(source, /reject-modal__panel/);
+  assert.match(source, /reject-reason-grid/);
+  assert.match(source, /REJECT_REASON_OPTIONS/);
+  assert.match(source, /wrong_identity/);
+  assert.match(source, /reasonCode/);
+  assert.match(source, /button danger/);
+  assert.match(source, /id="foodAdminMissingSubjectOnly"/);
+  assert.match(source, /missingImageSubject/);
+});
+
+test("auto patrol panel configures category watches under a 500 daily cap", async () => {
+  const source = await pageSource();
+  assert.match(source, /分类自动巡检/);
+  assert.match(source, /id="patrolCategory"/);
+  assert.match(source, /id="addPatrolRule"/);
+  assert.match(source, /food-image-patrol\/rules/);
+  assert.match(source, /日上限 500/);
+  assert.match(source, /class="composer-deck"/);
+  assert.match(source, /function patrolSkipSummary\(/);
+  assert.match(source, /id="toggleBatchRail"/);
+  assert.match(source, /batchRailCollapsed/);
+  assert.match(source, /id="patrolInterval"/);
+  assert.match(source, /intervalMinutes/);
+});
+
+test("batch rail can collapse while keeping the active batch visible", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="batchListActive"/);
+  assert.match(source, /function syncBatchRailCollapsed\(/);
+  assert.match(source, /\.batch-rail\.collapsed \.batch-list \{ display: none/);
+});
+
 test("API failures are retained in the visible operation feed with request metadata", async () => {
   const source = await pageSource();
   assert.match(source, /id="operationFeed"/);
@@ -188,13 +223,47 @@ test("foods admin module supports CRUD UI and image batch linkage", async () => 
   assert.match(source, /批量加入生图|生图/);
 });
 
+test("foods admin pagination supports page jump and outline buttons", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="foodAdminPageInput"/);
+  assert.match(source, /id="foodAdminGoPage"/);
+  assert.match(source, /jumpFoodAdminPage/);
+  assert.match(source, /data-food-action="edit"/);
+  assert.match(source, /\.button\s*\{[^}]*background:\s*transparent/s);
+  assert.match(source, /\.admin-nav__item\.active\s*\{[^}]*background:\s*transparent/s);
+});
+
+test("food editor opens as a compact modal dialog", async () => {
+  const source = await pageSource();
+  assert.match(source, /food-admin-modal/);
+  assert.match(source, /food-admin-modal__panel/);
+  assert.match(source, /id="foodAdminEditorBackdrop"/);
+  assert.match(source, /role="dialog"/);
+  assert.match(source, /aria-modal="true"/);
+  assert.match(source, /document\.body\.style\.overflow\s*=\s*"hidden"/);
+  assert.match(source, /width:\s*min\(520px/);
+  assert.match(source, /async function openFoodEditor[\s\S]*?editor\.hidden = false;\s*document\.body\.style\.overflow = "hidden";/);
+});
+
+test("admin food categories match food-library root taxonomy only", async () => {
+  const source = await pageSource();
+  assert.match(source, /FOOD_LIBRARY_ROOT_CODES/);
+  assert.match(source, /foodLibraryRootCategories/);
+  assert.match(source, /FOOD_LIBRARY_ROOT_CODE_SET\.has\(category\.code\)/);
+  assert.match(source, /meat_poultry/);
+  assert.match(source, /seafood/);
+  assert.match(source, /egg_dairy/);
+  assert.match(source, /foodLibraryCategoryLabel/);
+  assert.doesNotMatch(source, /seafood\.marine_fish|海水鱼/);
+});
+
 test("connection settings sit in system config while image tools live under 食材生图", async () => {
   const source = await pageSource();
   const images = source.indexOf('id="moduleImages"');
   const system = source.indexOf('id="moduleSystem"');
   const guide = source.indexOf('id="workflowGuide"');
   const tools = source.indexOf('id="utilityDrawer"');
-  const batch = source.indexOf('class="batch-controller"');
+  const batch = source.indexOf('class="composer-deck"');
   assert.ok(images >= 0 && system > images, "system module after images module");
   assert.ok(guide > images && guide < system, "workflow guide inside images");
   assert.ok(tools > system, "connection tools inside system");

@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   createDeepseekWeeklyReviewService,
+  createFallbackWeeklyReview,
+  shouldGenerateWeeklyAi,
   weeklyReviewContext,
 } from "./deepseek-weekly-review-service.cjs";
 
@@ -50,4 +52,41 @@ test("returns safe local content when DeepSeek fails or violates output constrai
   assert.equal(result.source, "rule_v1");
   assert.equal(result.model, null);
   assert.match(result.summary, /5\s*天/);
+});
+
+test("skips DeepSeek when recorded days are sparse", async () => {
+  let called = 0;
+  const service = createDeepseekWeeklyReviewService({
+    apiKey: "key",
+    requestCompletion: async () => {
+      called += 1;
+      return JSON.stringify({
+        headline: "不应出现",
+        summary: "不应调用模型",
+        strengths: ["x"],
+        nextSteps: ["y"],
+      });
+    },
+  });
+  const sparse = weeklyReviewContext({ ...review, recordedDays: 2, recordedMeals: 2, score: 13 });
+  assert.equal(shouldGenerateWeeklyAi(sparse), false);
+  const result = await service({ date: "2026-07-20", context: sparse });
+  assert.equal(called, 0);
+  assert.equal(result.source, "rule_v1");
+  assert.match(result.headline, /记录天数不足|难评估/);
+  assert.match(result.summary, /2\s*天/);
+});
+
+test("rule fallback encodes completions for sparse weeks", () => {
+  const insight = createFallbackWeeklyReview(weeklyReviewContext({
+    ...review,
+    recordedDays: 2,
+    recordedMeals: 2,
+    calorieCompletion: 4,
+    proteinCompletion: 6,
+    score: 13,
+  }));
+  assert.equal(insight.source, "rule_v1");
+  assert.match(insight.summary, /4%/);
+  assert.match(insight.nextSteps[0], /每天至少记录一餐/);
 });

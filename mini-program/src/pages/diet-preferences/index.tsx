@@ -1,5 +1,7 @@
 import { Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useRouter } from "@tarojs/taro";
+import { useEffect } from "react";
+import { getProductAccount } from "../../api/product-data-api";
 import { AppButton } from "../../components/app-button";
 import { BottomActionLayout } from "../../components/bottom-action-layout";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -10,12 +12,34 @@ import {
   mealCountOptions,
 } from "../../features/onboarding/diet-preferences-config";
 import { type FoodAvoidance } from "../../features/onboarding/domain";
+import {
+  draftPatchFromAccount,
+  isSettingsEditMode,
+  settingsQuery,
+  shouldHydrateFromAccount,
+} from "../../features/onboarding/hydrate-draft-from-account";
 import { PageLayout } from "../../layouts/page-layout";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 export default function DietPreferencesPage() {
-  const { draft, setField } = useOnboardingDraftStore();
+  const router = useRouter();
+  const fromSettings = isSettingsEditMode(router.params);
+  const hydrateFromAccount = shouldHydrateFromAccount(router.params);
+  const { draft, setField, setDraft } = useOnboardingDraftStore();
+
+  useEffect(() => {
+    if (!hydrateFromAccount) return;
+    let cancelled = false;
+    void getProductAccount()
+      .then((account) => {
+        if (!cancelled) setDraft(draftPatchFromAccount(account));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrateFromAccount, setDraft]);
 
   const toggleAvoidance = (value: FoodAvoidance) => {
     const selected = draft.foodAvoidances.includes(value);
@@ -25,6 +49,18 @@ export default function DietPreferencesPage() {
         ? draft.foodAvoidances.filter((item) => item !== value)
         : [...draft.foodAvoidances, value],
     );
+  };
+
+  const leaveBack = () => {
+    if (fromSettings) {
+      void Taro.navigateBack({
+        fail: () => {
+          void Taro.switchTab({ url: "/pages/profile/index" });
+        },
+      });
+      return;
+    }
+    navigateBackOrHome("/pages/body-profile/index");
   };
 
   return (
@@ -38,17 +74,21 @@ export default function DietPreferencesPage() {
       <View className="diet-preferences-page">
         <OnboardingHeader
           brand="Nordic Nutri AI"
-          step="第 3 步，共 4 步"
-          progress={0.75}
-          progressAriaLabel="当前为第 3 步，共 4 步"
-          backAriaLabel="返回身体资料"
-          onBack={() => navigateBackOrHome("/pages/body-profile/index")}
+          step={fromSettings ? "调整偏好" : "第 3 步，共 4 步"}
+          progress={fromSettings ? 2 / 3 : 0.75}
+          progressAriaLabel={fromSettings ? "调整饮食偏好" : "当前为第 3 步，共 4 步"}
+          backAriaLabel={fromSettings ? "返回上一页" : "返回身体资料"}
+          onBack={leaveBack}
         />
 
         <View className="onboarding-heading diet-preferences-page__heading">
-          <Text className="onboarding-heading__title">让计划更适合你</Text>
+          <Text className="onboarding-heading__title">
+            {fromSettings ? "更新饮食偏好" : "让计划更适合你"}
+          </Text>
           <Text className="onboarding-heading__copy">
-            告诉我们你的饮食习惯与限制，AI 会据此调整每日推荐。
+            {fromSettings
+              ? "习惯、忌口与餐次变化后，下一步会按新偏好重算营养目标。"
+              : "告诉我们你的饮食习惯与限制，AI 会据此调整每日推荐。"}
           </Text>
         </View>
 
@@ -56,7 +96,7 @@ export default function DietPreferencesPage() {
           <View className="diet-preferences-page__section">
             <View className="diet-preferences-page__section-heading">
               <View className="diet-preferences-page__icon-ground">
-                <NordicIcon name="utensils" size={20} ariaLabel="饮食偏好" />
+                <NordicIcon name="food-apple" size={20} ariaLabel="饮食偏好" />
               </View>
               <View>
                 <Text className="diet-preferences-page__section-title">饮食偏好</Text>
@@ -142,9 +182,13 @@ export default function DietPreferencesPage() {
         <BottomActionLayout>
           <AppButton
             size="large"
-            onClick={() => Taro.navigateTo({ url: "/pages/nutrition-plan/index" })}
+            onClick={() =>
+              Taro.navigateTo({
+                url: "/pages/nutrition-plan/index" + settingsQuery(fromSettings),
+              })
+            }
           >
-            生成我的计划
+            {fromSettings ? "重新生成计划" : "生成我的计划"}
           </AppButton>
         </BottomActionLayout>
       </View>

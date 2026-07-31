@@ -9,9 +9,7 @@ const { createDeepseekEvaluationService } = require("./deepseek-evaluation-servi
 const { createDeepseekNutritionPlanService } = require("./deepseek-nutrition-plan-service.cjs");
 const { createMealDataService, PublicMealDataError } = require("./meal-data-service.cjs");
 const {
-  createDeepseekFoodClassifyService,
   createDeepseekMealInsightService,
-  createMealFoodLinkService,
 } = require("./meal-food-link-service.cjs");
 const { createInsightDataService } = require("./insight-data-service.cjs");
 const { createDailyInsightService } = require("./daily-insight-service.cjs");
@@ -41,7 +39,9 @@ const { createHunyuanImageService, HunyuanImageError } = require("./hunyuan-imag
 const { createHunyuanWorkerClient } = require("./hunyuan-worker-client.cjs");
 const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
 const { createFoodImageBatchService, FoodImageBatchError } = require("./food-image-batch-service.cjs");
+const { createFoodImagePatrolService, FoodImagePatrolError } = require("./food-image-patrol-service.cjs");
 const { getFoodDisplayName } = require("./food-display-name.cjs");
+const { formulaNutritionPlanFallback } = require("./nutrition-plan-formula.cjs");
 
 // Random 5–6 hanzi Chinese nickname generator for default profile seeding.
 // Mirrors the frontend generator in features/profile/nickname-generator.ts.
@@ -65,37 +65,6 @@ function pickNickname() {
     if (candidate.length >= 5 && candidate.length <= 6) return candidate;
   }
   return "林间慢慢走";
-}
-
-/** Local Mifflin-St Jeor fallback when DeepSeek is unavailable. */
-function formulaNutritionPlanFallback(input) {
-  const weightKg = Number(input?.weightKg);
-  const heightCm = Number(input?.heightCm);
-  const age = Number(input?.age);
-  const sex = input?.sex === "female" ? "female" : "male";
-  const activityLevel = input?.activityLevel || "moderate";
-  const goalType = input?.goalType === "maintain" ? "maintenance" : (input?.goalType || "maintenance");
-  const activityMultiplier = { sedentary: 1.2, light: 1.375, moderate: 1.55, high: 1.725, very_high: 1.9 };
-  const proteinPerKg = { muscle_gain: 2, fat_loss: 2, maintenance: 1.6, performance: 1.8 };
-  const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === "male" ? 5 : -161);
-  const tdee = bmr * (activityMultiplier[activityLevel] || 1.55);
-  const rawCalories =
-    goalType === "muscle_gain" ? tdee + 300
-      : goalType === "fat_loss" ? tdee - 400
-        : goalType === "performance" ? tdee * 1.08
-          : tdee;
-  const calories = Math.round(rawCalories / 10) * 10;
-  const proteinG = Math.round(weightKg * (proteinPerKg[goalType] || 1.6));
-  const fatG = Math.round(weightKg * 0.9);
-  const carbsG = Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
-  return {
-    calories,
-    proteinG,
-    carbsG,
-    fatG,
-    insight: "根据你的身体数据与目标，按标准公式生成了每日营养目标。",
-    source: "formula",
-  };
 }
 
 const MAX_BODY_BYTES = 4096;
@@ -536,32 +505,15 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     }
   }
   const deepseekEnabled = typeof env.DEEPSEEK_API_KEY === "string" && Boolean(env.DEEPSEEK_API_KEY);
-  const classifyFoodCategory = deepseekEnabled
-    ? createDeepseekFoodClassifyService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
-    : null;
   const generateMealInsight = deepseekEnabled
     ? createDeepseekMealInsightService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
     : null;
-  const mealFoodLinks = createMealFoodLinkService({
-    db,
-    classifyFoodCategory,
-    enqueueFoodImage: async (foodId, imageEntityKey) => {
-      await db.from("food_image_tasks").insert({
-        food_id: foodId,
-        image_entity_key: imageEntityKey,
-        source_priority: "ai_generated",
-        status: "pending",
-      });
-    },
-  });
   const meals = createMealDataService({
     db,
     model: deepseekModel,
     analyze: deepseekEnabled
       ? createDeepseekMealService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
       : null,
-    resolveFoodLinks: (items) => mealFoodLinks.resolveItems(items),
-    loadFoodImageUrls: (foodIds) => mealFoodLinks.loadFoodImageUrls(foodIds),
     generateMealInsight,
     resolveImageUrl: async (fileID) => {
       const temporary = await admin.getTempFileURL({ fileList: [fileID] });
@@ -650,6 +602,38 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       void contentType;
       throw lastError || new Error("Food image upload failed");
     },
+    deleter: async ({ cloudPaths }) => {
+      const paths = Array.isArray(cloudPaths) ? cloudPaths.filter(Boolean) : [];
+      if (!paths.length) return { deleted: 0 };
+      const clients = [storageRuntime, admin].filter(Boolean);
+      const envId = String(env.TCB_ENV || env.SCF_NAMESPACE || "").trim();
+      let deleted = 0;
+      let lastError = null;
+      for (const cloudPath of paths) {
+        const candidates = cloudPath.startsWith("cloud://")
+          ? [cloudPath]
+          : [cloudPath, envId ? `cloud://${envId}/${cloudPath}` : null].filter(Boolean);
+        let ok = false;
+        for (const client of clients) {
+          if (typeof client?.deleteFile !== "function") continue;
+          for (const fileId of candidates) {
+            try {
+              await client.deleteFile({ fileList: [fileId] });
+              ok = true;
+              break;
+            } catch (error) {
+              lastError = error;
+            }
+          }
+          if (ok) break;
+        }
+        if (ok) deleted += 1;
+      }
+      if (!deleted && lastError) {
+        console.warn("[food-image] storage delete incomplete:", lastError?.message || lastError);
+      }
+      return { deleted, attempted: paths.length };
+    },
   });
   const foodBarcodeService = createFoodBarcodeService({
     repository: foodRepository,
@@ -691,7 +675,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     hunyuan: hunyuanImageService,
     imageService: foodImageService,
     config: {
-      candidateCount: Number(env.HY_IMAGE_CANDIDATE_COUNT) || 3,
+      candidateCount: Number(env.HY_IMAGE_CANDIDATE_COUNT) || 1,
       concurrency: Number(env.HY_IMAGE_CONCURRENCY) || 2,
       dailyLimit: Number(env.HY_IMAGE_DAILY_LIMIT) || 500,
       maxAttempts: Number(env.HY_IMAGE_MAX_RETRIES) || 3,
@@ -713,6 +697,13 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     repository: foodRepository,
     jobs: foodImageJobs,
+  });
+  const foodImagePatrol = createFoodImagePatrolService({
+    db,
+    repository: foodRepository,
+    batches: foodImageBatches,
+    jobs: foodImageJobs,
+    dailyCap: Math.min(Number(env.HY_IMAGE_DAILY_LIMIT) || 500, 500),
   });
   let vision = null;
   const qwenApiKey = typeof env.QWEN_API_KEY === "string" && env.QWEN_API_KEY.trim()
@@ -797,7 +788,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     insights,
     coach: createCoachDataService({
       db,
-      getDailySummary: insights.getDailySummary,
+      getDailySummary: (userId, date) => insights.getDailySummary(userId, date, { resolveImages: false }),
       getWeeklyReview: insights.getWeeklyReview,
       getAccount: data.getAccount,
       model: deepseekModel,
@@ -825,6 +816,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodImage: foodImageService,
     foodImageJobs,
     foodImageBatches,
+    foodImagePatrol,
     hunyuanImage: hunyuanImageService,
     hunyuanAiAuthMode: aiAuthMode,
     hunyuanAiDiagnostics: {
@@ -930,6 +922,11 @@ function getAdminFoodRoute(pathname) {
   if (path === "/food-image-batches") return { operation: "imageBatches" };
   if (path === "/food-image-batches/preview") return { operation: "imageBatchPreview" };
   if (path === "/food-image-batches/first-sample") return { operation: "imageBatchFirstSample" };
+  if (path === "/food-image-patrol/rules") return { operation: "imagePatrolRules" };
+  const patrolRuleMatch = path.match(/^\/food-image-patrol\/rules\/([0-9a-f-]{36})$/i);
+  if (patrolRuleMatch) return { operation: "imagePatrolRuleItem", ruleId: patrolRuleMatch[1] };
+  if (path === "/food-image-patrol/quota") return { operation: "imagePatrolQuota" };
+  if (path === "/food-image-patrol/run") return { operation: "imagePatrolRun" };
   const batchActionMatch = path.match(/^\/food-image-batches\/([0-9a-f-]{36})\/(start|pause|resume|cancel|worker)$/i);
   if (batchActionMatch) return { operation: "imageBatchAction", batchId: batchActionMatch[1], action: batchActionMatch[2].toLowerCase() };
   const batchMatch = path.match(/^\/food-image-batches\/([0-9a-f-]{36})$/i);
@@ -1028,7 +1025,17 @@ function createHttpServer({ service }) {
           body: payload.raw,
         })) return sendJson(res, 401, { code: "UNAUTHORIZED" });
         if (!service?.foodImageBatches?.dispatchTrusted) return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_UNAVAILABLE" });
-        return sendJson(res, 200, await service.foodImageBatches.dispatchTrusted({ maxItems: payload.body?.maxItems }));
+        let patrol = null;
+        if (typeof service.foodImagePatrol?.runTrusted === "function") {
+          try {
+            patrol = await service.foodImagePatrol.runTrusted();
+          } catch (error) {
+            console.error("[food-image-patrol] failed:", error?.code || error?.message || error);
+            patrol = { error: error?.code || "FOOD_IMAGE_PATROL_FAILED", message: String(error?.message || error).slice(0, 300) };
+          }
+        }
+        const dispatch = await service.foodImageBatches.dispatchTrusted({ maxItems: payload.body?.maxItems });
+        return sendJson(res, 200, { ...dispatch, patrol });
       } catch (error) {
         console.error("[food-image-dispatch] failed:", error?.code || error?.message || error);
         return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_FAILED" });
@@ -1068,7 +1075,7 @@ function createHttpServer({ service }) {
           if (!service.foodInsight?.getInsight) return sendJson(res, 503, { code: "FOOD_INSIGHT_UNAVAILABLE" });
           const food = await service.foodRepository.getFoodById(foodRoute.foodId);
           if (!food) return sendJson(res, 404, { code: "FOOD_NOT_FOUND" });
-          return sendJson(res, 200, await service.foodInsight.getInsight(food));
+          return sendJson(res, 200, await service.foodInsight.getInsight(food, { preferFast: true }));
         }
         if (foodRoute.operation === "variants") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -1210,12 +1217,57 @@ function createHttpServer({ service }) {
         }
         if (adminFoodRoute.operation === "imageBatchPreview") {
           if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
-          const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
-          return sendJson(res, 200, await service.foodImageBatches.previewCategory(session.sub, body || {}));
+          if (!service.foodImageBatches?.previewCategory) {
+            return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE", message: "生图批次服务未就绪" });
+          }
+          // Preview payloads are tiny; avoid the 30MB vision body reader path.
+          const body = await readJsonBody(req, 16 * 1024);
+          try {
+            return sendJson(res, 200, await service.foodImageBatches.previewCategory(session.sub, body || {}));
+          } catch (error) {
+            console.error("[food-image-batches/preview] failed:", error?.code || error?.message || error);
+            throw error;
+          }
         }
         if (adminFoodRoute.operation === "imageBatchFirstSample") {
           if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           return sendJson(res, 200, await service.foodImageBatches.createFirstSample(session.sub));
+        }
+        if (adminFoodRoute.operation === "imagePatrolRules") {
+          if (!service.foodImagePatrol) return sendJson(res, 503, { code: "FOOD_IMAGE_PATROL_UNAVAILABLE" });
+          if (req.method === "GET") return sendJson(res, 200, await service.foodImagePatrol.listRules(session.sub));
+          if (req.method === "POST") {
+            const body = await readJsonBody(req, 16 * 1024);
+            return sendJson(res, 200, await service.foodImagePatrol.upsertRule(session.sub, body || {}));
+          }
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "imagePatrolRuleItem") {
+          if (!service.foodImagePatrol) return sendJson(res, 503, { code: "FOOD_IMAGE_PATROL_UNAVAILABLE" });
+          if (req.method === "DELETE") {
+            return sendJson(res, 200, await service.foodImagePatrol.deleteRule(session.sub, adminFoodRoute.ruleId));
+          }
+          if (req.method === "PATCH") {
+            const body = await readJsonBody(req, 16 * 1024);
+            if (typeof body?.enabled === "boolean") {
+              return sendJson(res, 200, await service.foodImagePatrol.setEnabled(session.sub, adminFoodRoute.ruleId, body.enabled));
+            }
+            return sendJson(res, 200, await service.foodImagePatrol.upsertRule(session.sub, {
+              ...(body || {}),
+              categoryId: body?.categoryId,
+            }));
+          }
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "imagePatrolQuota") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.foodImagePatrol) return sendJson(res, 503, { code: "FOOD_IMAGE_PATROL_UNAVAILABLE" });
+          return sendJson(res, 200, await service.foodImagePatrol.remainingQuota(session.sub));
+        }
+        if (adminFoodRoute.operation === "imagePatrolRun") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.foodImagePatrol) return sendJson(res, 503, { code: "FOOD_IMAGE_PATROL_UNAVAILABLE" });
+          return sendJson(res, 200, await service.foodImagePatrol.runNow(session.sub));
         }
         if (adminFoodRoute.operation === "imageBatchDetail") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -1367,6 +1419,7 @@ function createHttpServer({ service }) {
               categoryCode: url.searchParams.get("categoryCode") || url.searchParams.get("category_code") || undefined,
               active: url.searchParams.get("active") || "true",
               missingImage: url.searchParams.get("missingImage") || url.searchParams.get("missing_image") || undefined,
+              missingImageSubject: url.searchParams.get("missingImageSubject") || url.searchParams.get("missing_image_subject") || undefined,
               page: url.searchParams.get("page") || undefined,
               pageSize: url.searchParams.get("pageSize") || url.searchParams.get("page_size") || undefined,
             }));
@@ -1405,17 +1458,19 @@ function createHttpServer({ service }) {
             : 503;
           return sendJson(res, status, { code });
         }
-        if (error instanceof FoodAdminError || error instanceof FoodImageJobError || error instanceof FoodImageBatchError || error instanceof HunyuanImageError) {
+        if (error instanceof FoodAdminError || error instanceof FoodImageJobError || error instanceof FoodImageBatchError || error instanceof FoodImagePatrolError || error instanceof HunyuanImageError) {
           const code = error.code;
           const status = code === "FORBIDDEN" ? 403
             : code === "UNAUTHORIZED" ? 401
             : code === "FOOD_NOT_FOUND" ? 404
             : 400;
-          return sendJson(res, status, { code });
+          return sendJson(res, status, { code, message: error.message || code });
         }
-        if (error instanceof FoodRepositoryError) return sendJson(res, 400, { code: error.code });
+        if (error instanceof FoodRepositoryError) {
+          return sendJson(res, 400, { code: error.code, message: error.message || error.code });
+        }
         console.error("[food-admin] failed:", error?.message || error);
-        return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });
+        return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE", message: error?.message || "FOOD_ADMIN_UNAVAILABLE" });
       }
     }
     if (mealRoute) {
@@ -1427,11 +1482,18 @@ function createHttpServer({ service }) {
           const from = url.searchParams.get("from");
           const to = url.searchParams.get("to");
           if (date) return sendJson(res, 200, await service.meals.listMeals(session.sub, date));
-          if (from && to) return sendJson(res, 200, await service.meals.listMealsRange(session.sub, from, to));
+          if (from && to) {
+            const light = url.searchParams.get("light") === "1";
+            return sendJson(
+              res,
+              200,
+              await service.meals.listMealsRange(session.sub, from, to, { resolveImages: !light }),
+            );
+          }
           return sendJson(res, 400, { code: "MEAL_DATA_INVALID" });
         }
         if (mealRoute.operation === "meal" && req.method === "GET") {
-          return sendJson(res, 200, await service.meals.getMeal(session.sub, mealRoute.mealId));
+          return sendJson(res, 200, await service.meals.getMeal(session.sub, mealRoute.mealId, { hydrate: true }));
         }
         if (mealRoute.operation === "createAnalysis" && req.method === "POST") {
           return sendJson(res, 200, await service.meals.createAnalysis(session.sub, await readJsonBody(req)));
@@ -1457,6 +1519,14 @@ function createHttpServer({ service }) {
       const date = url.searchParams.get("date");
       if (!date) return sendJson(res, 400, { code: "INSIGHT_DATA_INVALID" });
       try {
+        const preferFast = url.searchParams.get("preferFast") === "1";
+        if (insightOperation === "getDailySummaryWithInsight") {
+          // Home / meal-records: never block the summary on LLM; upgrade cache in background.
+          return sendJson(res, 200, await service.insights.getDailySummaryWithInsight(session.sub, date, { preferFast: true }));
+        }
+        if (insightOperation === "getWeeklyReview") {
+          return sendJson(res, 200, await service.insights.getWeeklyReview(session.sub, date, { preferFast }));
+        }
         return sendJson(res, 200, await service.insights[insightOperation](session.sub, date));
       } catch {
         return sendJson(res, 400, { code: "INSIGHT_DATA_INVALID" });

@@ -56,14 +56,23 @@ describe("local coach and profile", () => {
     );
 
     expect(source).toContain("今日还差");
-    expect(composer).toContain("问问你的营养教练");
+    expect(composer).toContain("问问营养教练");
     expect(source).toContain('className="coach-chat__status-badge"');
     expect(source).not.toContain('className="coach-chat__suggestion-product"');
     expect(source).not.toContain("addSuggestedSnack");
     expect(source).toContain("const defaultQuickPrompts");
     expect(source).toContain("quickPrompts.slice(0, 4).map");
+    expect(source).toContain('className="coach-chat__quick-chip-text"');
     expect(source).not.toContain('className="coach-chat__hero-actions"');
     expect(source).not.toContain("查看今日进度");
+
+    const pageStyles = readFileSync(
+      resolve(import.meta.dirname, "../src/styles/page.scss"),
+      "utf8",
+    );
+    expect(pageStyles).toContain(".coach-chat__quick-actions {\n  display: flex;");
+    expect(pageStyles).toContain("justify-content: center;");
+    expect(pageStyles).toContain("white-space: nowrap;");
   });
 
   it("keeps restart parallel to NOVA and places the dynamic question below the nutrition tip", () => {
@@ -196,7 +205,14 @@ describe("local coach and profile", () => {
     ["profile-edit", "achievements", "weekly-review"].forEach((page) => {
       expect(source).toContain(`/pages/${page}/index`);
     });
-    expect(source).not.toContain("/pages/goal-adjust/index");
+    expect(source).toContain("/pages/body-profile/index?from=settings&entry=1");
+    expect(source).toContain('title="营养档案"');
+    expect(source).not.toContain('title="身体资料"');
+    expect(source).not.toContain('title="饮食偏好"');
+    expect(source).toContain('description="身体数据、饮食偏好与忌口"');
+    expect(source).not.toContain("formatDietPreferencesSummary");
+    expect(source).not.toContain("nutritionProfileSummary");
+    expect(source).toContain("/pages/goal-adjust/index");
     expect(source).toContain('title="隐私与数据"');
     expect(source).toContain('title="反馈与帮助"');
     expect(source).toContain('title="关于我们"');
@@ -213,11 +229,14 @@ describe("local coach and profile", () => {
     );
 
     expect(source).toContain('activeModal === "privacy"');
-    expect(source).toContain("同步到 CloudBase 数据库");
+    expect(source).toContain("写入 CloudBase");
+    expect(source).toContain("如需删除账号相关数据");
     expect(source).toContain('activeModal === "feedback"');
     expect(source).toContain("提交反馈");
     expect(source).toContain('activeModal === "about"');
-    expect(source).toContain("Nordic Nutri AI 是一款支持云端同步的营养记录工具");
+    expect(source).toContain("Nordic Nutri AI 帮助你轻松看见、理解并记录每一餐。");
+    expect(source).toContain("不构成医疗诊断或治疗建议");
+    expect(source).not.toContain(">知道了<");
   });
 
   it("provides local profile and goal forms backed by the profile store", () => {
@@ -240,7 +259,8 @@ describe("local coach and profile", () => {
     expect(profileEdit).not.toContain('eyebrow="我的节奏"');
     expect(profileEdit).not.toContain("保留最重要的信息，让目标更贴合现在的你。");
     expect(goalAdjust).toContain("profile.setProfile");
-    expect(goalAdjust).toContain("保存目标");
+    expect(goalAdjust).toContain("保存今日目标");
+    expect(goalAdjust).toContain("saveProductNutritionPlan");
   });
 
   it("uses coach-aligned headers for achievements and weekly review without the removed lead copy", () => {
@@ -258,12 +278,15 @@ describe("local coach and profile", () => {
     expect(achievements).toContain('className="page-layout--achievements"');
     expect(achievements).toContain('className="profile-subpage__page-title"');
     expect(achievements).not.toContain("继续记录，让每一餐都成为节奏。");
-    expect(weeklyReview).toContain("本周回顾");
+    expect(weeklyReview).toContain('title="本周回顾"');
     expect(weeklyReview).toContain('className="page-layout--weekly-review"');
-    expect(weeklyReview).toContain('className="profile-subpage__page-title"');
+    expect(weeklyReview).not.toContain('className="profile-subpage__page-title"');
+    expect(weeklyReview).toContain('className="weekly-review__hero-aside"');
     expect(weeklyReview).not.toContain("看见已经做到的，再决定下一步。");
     expect(weeklyReview).toContain('className="weekly-review__rhythm"');
     expect(weeklyReview).toContain("本周节奏");
+    expect(weeklyReview).toContain("getMondayBasedWeekDates");
+    expect(weeklyReview).not.toContain("day - (6 - index)");
     expect(weeklyReview).toContain("下周小目标");
     expect(weeklyReview).toContain("基于已同步到云端的饮食记录");
   });

@@ -4,6 +4,11 @@
  * Falls back to null when the model is unavailable so callers can use the local formula.
  */
 
+const {
+  dietaryPatternLabel,
+  foodAvoidanceLabels,
+} = require("./diet-preference-labels.cjs");
+
 class PublicNutritionPlanError extends Error {
   constructor(code, message) {
     super(message);
@@ -80,11 +85,12 @@ function createDeepseekNutritionPlanService({ apiKey, model, fetchImpl = globalT
       const goalLabel = GOAL_LABELS[input.goalType] || input.goalType;
       const activityLabel = ACTIVITY_LABELS[input.activityLevel] || input.activityLevel;
       const sexLabel = input.sex === "female" ? "女" : input.sex === "male" ? "男" : "未说明";
-      const avoidances =
-        Array.isArray(input.foodAvoidances) && input.foodAvoidances.length
-          ? input.foodAvoidances.join("、")
-          : "无";
-      const dietary = input.dietaryPattern && input.dietaryPattern !== "none" ? input.dietaryPattern : "无特殊饮食模式";
+      const avoidanceLabels = foodAvoidanceLabels(input.foodAvoidances);
+      const avoidances = avoidanceLabels.length ? avoidanceLabels.join("、") : "无";
+      const dietary = dietaryPatternLabel(input.dietaryPattern);
+      const mealsRaw = Number(input.mealsPerDay);
+      const mealsPerDay =
+        Number.isFinite(mealsRaw) && mealsRaw >= 2 && mealsRaw <= 5 ? Math.round(mealsRaw) : 3;
 
       const response = await fetchImpl("https://api.deepseek.com/chat/completions", {
         method: "POST",
@@ -98,20 +104,22 @@ function createDeepseekNutritionPlanService({ apiKey, model, fetchImpl = globalT
             {
               role: "system",
               content:
-                "你是注册营养师。根据用户身体数据与目标，给出每日营养目标。" +
+                "你是注册营养师。根据用户身体数据、目标与饮食偏好，给出每日营养目标。" +
                 "必须只返回 JSON，不要 markdown、解释或额外文字。字段：" +
                 '{"calories":number,"proteinG":number,"carbsG":number,"fatG":number,"insight":string}。' +
                 "规则：calories 为整数并尽量为 10 的倍数；proteinG/carbsG/fatG 为整数克；" +
                 "proteinG*4 + carbsG*4 + fatG*9 必须接近 calories（误差≤5%）；" +
                 "增肌略盈余、减脂适度缺口、维持接近 TDEE、运动表现略高碳水；" +
-                "insight 用一句中文（≤40字）说明计划依据，不要恐吓或减肥羞辱。",
+                "必须尊重饮食模式与忌口（如低碳降碳水、生酮高脂低碳、素食/纯素侧重植物蛋白）；" +
+                "insight 用一句中文（≤40字）点明饮食模式、忌口或餐次中的关键依据，不要恐吓或减肥羞辱。",
             },
             {
               role: "user",
               content:
                 `年龄${input.age}岁，生理性别${sexLabel}，身高${input.heightCm}cm，体重${input.weightKg}kg，` +
                 `活动量${activityLabel}，每周训练约${input.trainingDays ?? 0}天，目标「${goalLabel}」，` +
-                `饮食模式${dietary}，忌口${avoidances}。请给出每日热量与三大营养素目标。`,
+                `饮食模式「${dietary}」，忌口「${avoidances}」，每日分 ${mealsPerDay} 餐安排。` +
+                "请给出每日热量与三大营养素目标。",
             },
           ],
         }),

@@ -1,5 +1,5 @@
 import { Image, Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useDidShow } from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import {
   getProductCoachMessages,
@@ -12,11 +12,14 @@ import {
   type ProductCoachMessage,
 } from "../../api/coach-api";
 import { analyzeProductImage } from "../../api/vision-api";
+import { AnimatedProgressBar } from "../../components/animated-progress-bar";
 import { CoachAvatar } from "../../components/coach-avatar";
 import { NordicIcon } from "../../components/nordic-icon";
 import { CoachComposer } from "./components/CoachComposer";
 import { createCoachAdvice } from "../../features/coach/domain";
 import { getCoachGreeting } from "../../features/coach/server-time";
+import { clampProgress, formatTargetStatus } from "../../features/meals/domain";
+import { assertImageWithinPickLimit } from "../../features/media/image-upload-limits";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { createClientRequestId } from "../../repositories/client-request-id";
@@ -109,11 +112,11 @@ export default function CoachPage() {
     }
   };
 
-  const loadDailyTip = async () => {
+  const loadDailyTip = async (refresh = false) => {
     if (dailyTipLoading) return;
     setDailyTipLoading(true);
     try {
-      setDailyTip(await getProductCoachDailyTip(date));
+      setDailyTip(await getProductCoachDailyTip(date, { refresh }));
     } catch {
       setDailyTip((current) => current ?? defaultDailyTip);
     } finally {
@@ -153,6 +156,12 @@ export default function CoachPage() {
     }
   };
 
+  useDidShow(() => {
+    // Tab pages stay mounted; re-fetch brief/tip so diet preference edits show up.
+    void refreshCoachBrief();
+    void loadDailyTip();
+  });
+
   useEffect(() => {
     void getProductCoachMessages()
       .then((history) => {
@@ -166,9 +175,7 @@ export default function CoachPage() {
         );
       })
       .catch(() => undefined);
-     void refreshCoachBrief();
-     void loadDailyTip();
-   }, []);
+  }, []);
 
   const sendMessage = async (value = draft, imagePath = selectedImagePath) => {
     const userPrompt = value.trim();
@@ -257,15 +264,22 @@ export default function CoachPage() {
         count: 1,
         mediaType: ["image"],
         sourceType: ["album", "camera"],
-        sizeType: ["original", "compressed"],
+        sizeType: ["compressed"],
       });
-      const path = result.tempFiles[0]?.tempFilePath;
+      const picked = result.tempFiles[0];
+      const path = picked?.tempFilePath;
       if (!path) throw new Error("没有获取到图片");
+      assertImageWithinPickLimit(picked?.size);
       setSelectedImagePath(path);
     } catch (error) {
-      if (!String(error).includes("cancel")) {
-        feedback.show({ message: "无法选择图片，请检查相册或相机权限", tone: "error" });
-      }
+      if (String(error).includes("cancel") || String(error).includes("取消")) return;
+      feedback.show({
+        message:
+          error instanceof Error && error.message.includes("图片过大")
+            ? error.message
+            : "无法选择图片，请检查相册或相机权限",
+        tone: "error",
+      });
     }
   };
 
@@ -290,9 +304,9 @@ export default function CoachPage() {
                 <Text>重启对话</Text>
               </View>
             </View>
-            <Text className="coach-chat__hero-title">{greeting}，{"\n"}我来帮你补齐今天的蛋白质</Text>
+            <Text className="coach-chat__hero-title">{greeting}，{"\n"}有什么营养建议随时来问我</Text>
             <View className="coach-chat__status-badge">
-              <NordicIcon name="sparkles" size={15} ariaLabel="今日营养状态" />
+              <NordicIcon name="zap" size={15} ariaLabel="今日营养状态" />
               <Text>增肌目标 · 今日还差 {proteinLeft}g 蛋白质</Text>
             </View>
           </View>
@@ -311,7 +325,7 @@ export default function CoachPage() {
             }
           >
             <View className="coach-chat__suggestion-label">
-              <NordicIcon name="sparkles" size={18} ariaLabel="今日营养建议" />
+              <NordicIcon name="milestone" size={18} ariaLabel="今日营养建议" />
               <Text>今日营养建议</Text>
             </View>
             <View className="coach-chat__suggestion-actions">
@@ -320,7 +334,7 @@ export default function CoachPage() {
                 ariaLabel="换一条今日营养建议"
                 onClick={(event) => {
                   event.stopPropagation();
-                  void loadDailyTip();
+                  void loadDailyTip(true);
                 }}
               >
                 <NordicIcon name="refresh-cw" size={15} ariaLabel="换一条" />
@@ -382,29 +396,31 @@ export default function CoachPage() {
             </View>
             {expandedSections.progress
               ? [
-                  ["蛋白质", summary.consumed.protein, summary.protein],
-                  ["碳水", summary.consumed.carbs, summary.carbs],
-                  ["热量", summary.consumed.calories, summary.calories],
-                ].map(([label, consumed, target]) => {
-                  const numericConsumed = Number(consumed);
-                  const numericTarget = Number(target);
-                  const progress = Math.min(
-                    100,
-                    Math.round((numericConsumed / Math.max(1, numericTarget)) * 100),
-                  );
+                  ["蛋白质", summary.consumed.protein, summary.protein, "g"] as const,
+                  ["碳水", summary.consumed.carbs, summary.carbs, "g"] as const,
+                  ["热量", summary.consumed.calories, summary.calories, " kcal"] as const,
+                ].map(([label, consumed, target, unit]) => {
+                  const progress = clampProgress(Number(consumed), Number(target));
                   return (
-                    <View className="coach-chat__progress-row" key={String(label)}>
+                    <View className="coach-chat__progress-row" key={label}>
                       <View className="coach-chat__progress-row-copy">
                         <Text>{label}</Text>
-                        <Text>
-                          {numericConsumed}/{numericTarget}
-                          {label === "热量" ? " kcal" : "g"}
+                        <Text className={progress.exceeded ? "coach-chat__progress-over" : undefined}>
+                          {consumed}/{target}
+                          {unit}
+                          {progress.exceeded
+                            ? ` · ${formatTargetStatus(progress, unit, { short: true })}`
+                            : ""}
                         </Text>
                       </View>
-                      <View className="coach-chat__progress-track">
-                        <View
-                          className="coach-chat__progress-fill"
-                          style={{ width: String(progress) + "%" }}
+                      <View
+                        className={`coach-chat__progress-track ${
+                          progress.exceeded ? "coach-chat__progress-track--exceeded" : ""
+                        }`}
+                      >
+                        <AnimatedProgressBar
+                          className="coach-chat__progress-fill animated-progress-bar"
+                          percent={progress.percent}
                         />
                       </View>
                     </View>
@@ -475,7 +491,7 @@ export default function CoachPage() {
                     className="coach-chat__quick-chip"
                     onClick={() => void sendMessage(prompt)}
                   >
-                    <Text>{prompt}</Text>
+                    <Text className="coach-chat__quick-chip-text">{prompt}</Text>
                   </View>
                 ))}
               </View>

@@ -8,7 +8,11 @@ interface ProductApiRequest {
   method: ProductApiMethod;
   data?: Record<string, unknown>;
   fallbackMessage: string;
+  /** Milliseconds. Defaults keep UI from hanging on cold LLM/DB paths. */
+  timeout?: number;
 }
+
+const DEFAULT_PRODUCT_API_TIMEOUT_MS = 15_000;
 
 export async function requestProductApi<T>(path: string, request: ProductApiRequest): Promise<T> {
   const token = useAuthStore.getState().session?.accessToken;
@@ -21,6 +25,7 @@ export async function requestProductApi<T>(path: string, request: ProductApiRequ
       ...(request.data ? { "content-type": "application/json" } : {}),
     },
     ...(request.data ? { data: request.data } : {}),
+    timeout: request.timeout ?? DEFAULT_PRODUCT_API_TIMEOUT_MS,
   });
   const data = response.data as T & { code?: unknown };
   if (response.statusCode !== 200) {

@@ -98,7 +98,7 @@ export default function FoodDetailPage() {
         className="page-layout--food-detail"
       >
         <View className="food-detail-page food-detail-page--empty">
-          <NordicIcon name="utensils" size={32} ariaLabel="食物详情" />
+          <NordicIcon name="food-bowl" size={32} ariaLabel="食物详情" />
           <Text className="food-detail-page__empty-title">没有可展示的食物</Text>
           <Text className="food-detail-page__empty-copy">请返回食物库重新选择。</Text>
           <AppButton size="large" onClick={returnToCatalog}>
@@ -217,7 +217,7 @@ export default function FoodDetailPage() {
 
         <View className="food-detail-page__insight">
           <View className="food-detail-page__insight-icon">
-            <NordicIcon name="sparkles" size={20} ariaLabel="营养洞察" />
+            <NordicIcon name="nova" size={20} ariaLabel="营养洞察" />
           </View>
           <View>
             <Text className="food-detail-page__insight-title">NOVA AI · 营养洞察</Text>

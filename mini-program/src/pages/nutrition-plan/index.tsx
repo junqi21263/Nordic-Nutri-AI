@@ -1,5 +1,5 @@
 import { Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
@@ -14,11 +14,20 @@ import {
   macroEnergyPercents,
   validateBodyProfile,
 } from "../../features/onboarding/domain";
+import { formulaPlanInsight } from "../../features/onboarding/diet-preference-labels";
+import {
+  isSettingsEditMode,
+  settingsQuery,
+} from "../../features/onboarding/hydrate-draft-from-account";
 import { PageLayout } from "../../layouts/page-layout";
 import { navigateBackOrHome } from "../../utils/navigation";
 import {
   completeProductOnboarding,
   previewProductNutritionPlan,
+  saveProductBodyProfile,
+  saveProductGoal,
+  saveProductNutritionPlan,
+  saveProductSettings,
 } from "../../api/product-data-api";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
@@ -43,6 +52,8 @@ type PlanView = {
 };
 
 export default function NutritionPlanPage() {
+  const router = useRouter();
+  const fromSettings = isSettingsEditMode(router.params);
   const { draft } = useOnboardingDraftStore();
   const feedback = useFeedbackStore();
   const [isSaving, setIsSaving] = useState(false);
@@ -56,14 +67,19 @@ export default function NutritionPlanPage() {
       return;
     }
     const profile = validation.profile;
+    const dietPrefs = {
+      dietaryPattern: draft.dietaryPattern,
+      foodAvoidances: draft.foodAvoidances,
+      mealsPerDay: draft.mealsPerDay,
+    };
     const localFallback = (): PlanView => {
-      const formula = calculateNutritionPlan(profile);
+      const formula = calculateNutritionPlan(profile, dietPrefs);
       return {
         calories: formula.calories,
         proteinG: formula.proteinG,
         carbsG: formula.carbsG,
         fatG: formula.fatG,
-        insight: "根据你的身体数据、目标和活动水平，这份计划将帮助你更稳定地接近目标。",
+        insight: formulaPlanInsight(dietPrefs),
         source: "formula",
       };
     };
@@ -82,6 +98,7 @@ export default function NutritionPlanPage() {
           goalType: profile.goalType,
           dietaryPattern: draft.dietaryPattern,
           foodAvoidances: draft.foodAvoidances,
+          mealsPerDay: Number(draft.mealsPerDay),
         });
         if (cancelled) return;
         setPlan({
@@ -89,9 +106,7 @@ export default function NutritionPlanPage() {
           proteinG: preview.proteinG,
           carbsG: preview.carbsG,
           fatG: preview.fatG,
-          insight:
-            preview.insight?.trim() ||
-            "根据你的身体数据、目标和活动水平，这份计划将帮助你更稳定地接近目标。",
+          insight: preview.insight?.trim() || formulaPlanInsight(dietPrefs),
           source: preview.source || "deepseek",
         });
       } catch {
@@ -120,6 +135,14 @@ export default function NutritionPlanPage() {
     draft.mealsPerDay,
   ]);
 
+  const leaveToBody = () => {
+    navigateBackOrHome("/pages/body-profile/index" + settingsQuery(fromSettings));
+  };
+
+  const leaveToDiet = () => {
+    navigateBackOrHome("/pages/diet-preferences/index" + settingsQuery(fromSettings));
+  };
+
   if (!validation.valid || !validation.profile) {
     return (
       <PageLayout
@@ -128,10 +151,10 @@ export default function NutritionPlanPage() {
         eyebrow="计划预览"
         showTabs={false}
         leading="‹"
-        onLeadingClick={() => navigateBackOrHome("/pages/body-profile/index")}
+        onLeadingClick={leaveToBody}
       >
         <EmptyState title="还差一点资料" description="返回补全身体数据后，就能看到每日营养目标。" />
-        <AppButton size="large" onClick={() => navigateBackOrHome("/pages/body-profile/index")}>
+        <AppButton size="large" onClick={leaveToBody}>
           返回调整资料
         </AppButton>
       </PageLayout>
@@ -148,6 +171,63 @@ export default function NutritionPlanPage() {
     source: "loading",
   };
   const percents = macroEnergyPercents(activePlan);
+
+  const saveSettingsPlan = async () => {
+    if (!plan) return;
+    setIsSaving(true);
+    try {
+      const currentSettings = useProfileStore.getState().settings;
+      const goalType = profile.goalType === "maintenance" ? "maintain" : profile.goalType;
+      await saveProductBodyProfile({
+        age: profile.age,
+        birthDate: null,
+        sex: profile.gender,
+        heightCm: profile.heightCm,
+        weightKg: profile.weightKg,
+        activityLevel: profile.activityLevel,
+        trainingDays: profile.trainingDays,
+      });
+      await saveProductGoal({
+        goalType,
+        targetWeightKg: profile.targetWeightKg,
+        targetCaloriesKcal: plan.calories,
+        targetDate: profile.targetDate,
+      });
+      await saveProductSettings({
+        dietaryPattern: draft.dietaryPattern,
+        foodAvoidances: draft.foodAvoidances,
+        mealsPerDay: Number(draft.mealsPerDay),
+        theme: currentSettings.theme,
+        language: currentSettings.language,
+        notification: currentSettings.notification,
+        unit: currentSettings.unit,
+      });
+      await saveProductNutritionPlan({
+        calories: plan.calories,
+        proteinG: plan.proteinG,
+        carbsG: plan.carbsG,
+        fatG: plan.fatG,
+      });
+      useProfileStore.getState().setProfile({
+        nickname: profile.nickname,
+        weight: profile.weightKg,
+        targetCalories: plan.calories,
+        goalLabel: goalLabels[profile.goalType],
+      });
+      useProfileStore.getState().setSetting("dietaryPattern", draft.dietaryPattern);
+      useProfileStore.getState().setSetting("foodAvoidances", draft.foodAvoidances);
+      useProfileStore.getState().setSetting("mealsPerDay", Number(draft.mealsPerDay));
+      feedback.show({ message: "资料与营养目标已更新", tone: "success" });
+      await Taro.switchTab({ url: "/pages/profile/index" });
+    } catch (error) {
+      feedback.show({
+        message: error instanceof Error ? error.message : "保存失败，请稍后重试",
+        tone: "error",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const completeOnboarding = async () => {
     if (!plan) return;
@@ -213,20 +293,24 @@ export default function NutritionPlanPage() {
       <View className="nutrition-plan-page">
         <OnboardingHeader
           brand="Nordic Nutri AI"
-          step="第 4 步，共 4 步"
+          step={fromSettings ? "更新计划" : "第 4 步，共 4 步"}
           progress={1}
-          progressAriaLabel="当前为第 4 步，共 4 步"
+          progressAriaLabel={fromSettings ? "确认更新后的营养计划" : "当前为第 4 步，共 4 步"}
           backAriaLabel="返回饮食偏好与限制"
-          onBack={() => navigateBackOrHome("/pages/diet-preferences/index")}
+          onBack={leaveToDiet}
         />
 
         <AppCard className="nutrition-plan__plan-ready">
           <View className="nutrition-plan__plan-ready-icon">
             <NordicIcon name="celebration" size={28} ariaLabel="计划已生成" />
           </View>
-          <Text className="nutrition-plan__plan-ready-title">你的计划已准备好</Text>
+          <Text className="nutrition-plan__plan-ready-title">
+            {fromSettings ? "新的计划已准备好" : "你的计划已准备好"}
+          </Text>
           <Text className="nutrition-plan__plan-ready-copy">
-            从今天开始，按自己的节奏稳步前进。
+            {fromSettings
+              ? "确认后将更新你的每日营养目标。"
+              : "从今天开始，按自己的节奏稳步前进。"}
           </Text>
           <View className="nutrition-plan__goal-tag">
             <Text>{goalLabels[profile.goalType]}</Text>
@@ -307,15 +391,11 @@ export default function NutritionPlanPage() {
             size="large"
             loading={isSaving || isLoadingPlan}
             disabled={!plan || isLoadingPlan}
-            onClick={() => void completeOnboarding()}
+            onClick={() => void (fromSettings ? saveSettingsPlan() : completeOnboarding())}
           >
-            开始我的计划
+            {fromSettings ? "保存并更新目标" : "开始我的计划"}
           </AppButton>
-          <AppButton
-            variant="outline"
-            size="large"
-            onClick={() => navigateBackOrHome("/pages/diet-preferences/index")}
-          >
+          <AppButton variant="outline" size="large" onClick={leaveToDiet}>
             调整计划参数
           </AppButton>
         </BottomActionLayout>

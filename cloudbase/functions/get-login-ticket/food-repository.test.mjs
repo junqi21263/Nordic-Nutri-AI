@@ -207,6 +207,27 @@ test("listBatchImageCandidates expands a selected parent category to all descend
   assert.equal(result.candidateCount, 3);
 });
 
+test("listBatchImageCandidates keeps underscore category codes from matching unrelated codes", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-meat", name_zh: "鸡胸肉", category_id: "c-meat", is_active: true, publish_status: "published", is_primary_variant: true },
+      { id: "f-child", name_zh: "鸡翅", category_id: "c-meat-child", is_active: true, publish_status: "published", is_primary_variant: true },
+      { id: "f-wrong", name_zh: "误匹配", category_id: "c-wrong", is_active: true, publish_status: "published", is_primary_variant: true },
+    ],
+    food_categories: [
+      { id: "c-meat", code: "meat_poultry", name_zh: "肉禽", is_active: true },
+      { id: "c-meat-child", code: "meat_poultry.chicken", name_zh: "鸡肉", is_active: true },
+      // Would match SQL LIKE meat_poultry% via `_` wildcards, but must not match dotted-tree matching.
+      { id: "c-wrong", code: "meatXpoultry", name_zh: "错误分类", is_active: true },
+    ],
+    food_image_visual_profiles: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+  const result = await repo.listBatchImageCandidates({ categoryId: "c-meat", count: 20 });
+  assert.deepEqual(result.items.map((item) => item.id).sort(), ["f-child", "f-meat"]);
+});
+
 test("listBatchImageCandidates excludes only foods already ready for the requested visual profile", async () => {
   const db = mockDb({
     foods: [
@@ -233,7 +254,7 @@ test("listBatchImageCandidates excludes only foods already ready for the request
   assert.equal(auto.excludedReadyCount, 2);
 
   const cooked = await repo.listBatchImageCandidates({ categoryId: "c-meat", count: 20, visualProfileKey: "cooked_plain" });
-  assert.deepEqual(cooked.items.map((item) => item.id), ["f-cooked-missing", "f-raw-ready"]);
+  assert.deepEqual(cooked.items.map((item) => item.id).sort(), ["f-cooked-missing", "f-raw-ready"]);
   assert.equal(cooked.total, 2);
   assert.equal(cooked.excludedReadyCount, 1);
 });
@@ -396,4 +417,25 @@ test("isAdmin reads app_users.is_admin", async () => {
 
 test("createFoodRepository rejects missing db", () => {
   assert.throws(() => createFoodRepository({}), /RDB client/);
+});
+
+test("listFoodsForAdmin resolves regional lenses through memberships", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-salmon", name_en: "Salmon", category_id: "c-seafood", is_active: true, publish_status: "published", updated_at: "2026-01-02" },
+      { id: "f-beef", name_en: "Beef", category_id: "c-meat", is_active: true, publish_status: "published", updated_at: "2026-01-01" },
+    ],
+    food_region_memberships: [{ food_id: "f-salmon", region_code: "nordic_staples" }],
+    food_categories: [
+      { id: "c-seafood", code: "seafood", name_zh: "鱼虾海鲜", is_active: true },
+      { id: "c-nordic", code: "nordic_staples", name_zh: "北欧常见食材", is_active: true },
+    ],
+    food_tag_relations: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+  const result = await repo.listFoodsForAdmin({ categoryCode: "nordic_staples", page: 1, pageSize: 20 });
+  assert.deepEqual(result.items.map((item) => item.id), ["f-salmon"]);
+  assert.equal(result.items[0].category.code, "seafood");
+  assert.equal(result.pagination.total, 1);
 });

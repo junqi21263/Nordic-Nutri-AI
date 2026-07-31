@@ -9,6 +9,8 @@ export interface ProductMealItem {
   proteinPer100g: number;
   carbsPer100g: number;
   fatPer100g: number;
+  foodId?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface ProductMeal {
@@ -18,6 +20,7 @@ export interface ProductMeal {
   recordedAt: string;
   isFavorite: boolean;
   imageUrl?: string | null;
+  insight?: string | null;
   items: ProductMealItem[];
 }
 
@@ -42,6 +45,8 @@ function mapProductItem(item: ProductMealItem): MealItem {
     protein: round(item.proteinPer100g * scale),
     carbs: round(item.carbsPer100g * scale),
     fat: round(item.fatPer100g * scale),
+    foodId: item.foodId ?? null,
+    imageUrl: item.imageUrl ?? null,
   };
 }
 
@@ -56,7 +61,9 @@ export function mapProductMeal(meal: ProductMeal): Meal {
     favorite: meal.isFavorite,
     imageKey: null,
     imageUrl: meal.imageUrl ?? null,
-    insight: "已同步到你的饮食记录。",
+    insight: typeof meal.insight === "string" && meal.insight.trim()
+      ? meal.insight.trim()
+      : "正在整理这餐的营养小结…",
     items: meal.items.map(mapProductItem),
   };
 }

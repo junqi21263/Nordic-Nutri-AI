@@ -82,6 +82,7 @@ export interface ProductFoodInsight {
   content: string;
   source: "cloudbase" | "hunyuan-exp" | "rule_v1";
   model: string | null;
+  cached?: boolean;
 }
 
 export function searchProductFoodCatalog(query: string, page = 1, options?: { categoryCode?: string }) {
@@ -142,8 +143,25 @@ export function getProductFoodVariants(foodId: string) {
 }
 
 export function getProductFoodInsight(foodId: string) {
-  return requestProductApi<ProductFoodInsight>(
-    `/foods/${encodeURIComponent(foodId)}/insight`,
-    { method: "GET", fallbackMessage: "营养洞察暂时不可用，请稍后重试" },
+  return coalesceFoodInsightRequest(foodId, () =>
+    requestProductApi<ProductFoodInsight>(
+      `/foods/${encodeURIComponent(foodId)}/insight`,
+      { method: "GET", fallbackMessage: "营养洞察暂时不可用，请稍后重试" },
+    ),
   );
+}
+
+const foodInsightInflight = new Map<string, Promise<ProductFoodInsight>>();
+
+function coalesceFoodInsightRequest(
+  foodId: string,
+  run: () => Promise<ProductFoodInsight>,
+): Promise<ProductFoodInsight> {
+  const existing = foodInsightInflight.get(foodId);
+  if (existing) return existing;
+  const promise = run().finally(() => {
+    if (foodInsightInflight.get(foodId) === promise) foodInsightInflight.delete(foodId);
+  });
+  foodInsightInflight.set(foodId, promise);
+  return promise;
 }

@@ -1,5 +1,5 @@
 import { Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useDidShow } from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { DailyNutritionSummary } from "../../components/daily-nutrition-summary";
@@ -10,13 +10,15 @@ import { SectionTitle } from "../../components/section-title";
 import { Avatar } from "../../components/avatar";
 import { NordicIcon } from "../../components/nordic-icon";
 import { type MealType } from "../../features/meals/domain";
+import { resolveHomeDailySummary } from "../../features/meals/home-daily-summary";
 import { getCoachGreeting } from "../../features/coach/server-time";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
-import { getProductMeals } from "../../api/meal-data-api";
+import { getProductMeals, mapProductMeal } from "../../api/meal-data-api";
 import { getProductDailySummary, type ProductDailySummary } from "../../api/insight-api";
 import { useProfileStore } from "../../stores/profile-store";
+import { useTabBarStore } from "../../stores/tab-bar-store";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -28,23 +30,36 @@ export default function HomePage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const localSummary = store.getDailySummary(today);
-  const summary = remoteSummary
-    ? {
-        ...remoteSummary.targets,
-        consumed: remoteSummary.consumed,
-        completion: remoteSummary.completion,
-      }
-    : localSummary;
+  const summary = resolveHomeDailySummary(
+    remoteSummary
+      ? {
+          ...remoteSummary.targets,
+          consumed: remoteSummary.consumed,
+          completion: remoteSummary.completion,
+        }
+      : null,
+    localSummary,
+  );
   const meals = store.getMealsByDate(today);
   const greeting = getCoachGreeting(remoteSummary?.serverTime ?? null);
-  const remoteInsight = remoteSummary?.insight ?? null;
+  const remoteInsight = summary.staleRemote ? null : (remoteSummary?.insight ?? null);
+  useDidShow(() => {
+    setRefreshVersion((version) => version + 1);
+  });
   useEffect(() => {
-    store.setLoadingState("loading");
+    if (!remoteSummary && store.getMealsByDate(today).length === 0) {
+      store.setLoadingState("loading");
+    }
     setSyncError(null);
-    void Promise.all([getProductMeals(today), getProductDailySummary(today)])
-      .then(([remoteMeals, dailySummary]) => {
-        store.replaceRemoteMeals(remoteMeals, today);
+    void getProductDailySummary(today)
+      .then(async (dailySummary) => {
         setRemoteSummary(dailySummary);
+        if (Array.isArray(dailySummary.meals)) {
+          store.replaceRemoteMeals(dailySummary.meals.map(mapProductMeal), today);
+          return;
+        }
+        const remoteMeals = await getProductMeals(today);
+        store.replaceRemoteMeals(remoteMeals, today);
       })
       .catch(() => {
         setRemoteSummary(null);
@@ -55,9 +70,12 @@ export default function HomePage() {
   const openDetail = (id: string) => Taro.navigateTo({ url: `/pages/meal-detail/index?id=${id}` });
   // Both destinations are native tabBar pages. navigateTo cannot open them.
   const openScanner = () => Taro.navigateTo({ url: "/pages/food-scanner/index" });
-  const openRecords = () => Taro.switchTab({ url: "/pages/meal-records/index" });
+  const openRecords = () => {
+    useTabBarStore.getState().setActiveKey("meal-records");
+    void Taro.switchTab({ url: "/pages/meal-records/index" });
+  };
 
-  if (store.loadingState === "loading")
+  if (store.loadingState === "loading" && !meals.length && !remoteSummary)
     return (
       <PageLayout
         title="今天的营养"
@@ -89,23 +107,31 @@ export default function HomePage() {
           </View>
         ) : null}
         <View className="home-page__target">
-          <View className="home-page__section-head">
+          <View className="home-page__section-head home-page__section-head--row">
             <Text>今日目标</Text>
+            <Text
+              className="home-page__section-action"
+              onClick={() => void Taro.navigateTo({ url: "/pages/goal-adjust/index" })}
+            >
+              调整
+            </Text>
           </View>
-          <DailyNutritionSummary summary={summary} dashboard />
+          <View onClick={() => void Taro.navigateTo({ url: "/pages/goal-adjust/index" })}>
+            <DailyNutritionSummary summary={summary} dashboard />
+          </View>
         </View>
         <View onClick={openRecords}>
           <AIInsightCard
             label="NOVA · 营养洞察"
             headline={remoteInsight?.headline ?? undefined}
             content={remoteInsight?.content ?? "云端洞察暂不可用；记录下一餐后可获得更贴合当天进度的建议。"}
-            loading={!remoteInsight && !syncError}
+            loading={summary.staleRemote || (!remoteInsight && !syncError)}
             actionLabel="查看饮食记录"
           />
         </View>
         <View className="home-page__actions">
           <View className="home-page__action home-page__action--primary" onClick={openScanner}>
-            <NordicIcon name="scan-line" size={20} ariaLabel="拍照识别" />
+            <NordicIcon name="camera" size={20} ariaLabel="拍照识别" />
             <Text>拍照识别</Text>
           </View>
           <View className="home-page__action" onClick={openRecords}>

@@ -3,7 +3,73 @@ import test from "node:test";
 
 import promptModule from "./food-image-prompts.cjs";
 
-const { buildFoodImagePrompt, buildFoodImagePromptPlan } = promptModule;
+const {
+  buildFoodImagePrompt,
+  buildFoodImagePromptPlan,
+  MAX_PROMPT_CHARS,
+  REJECT_REASON_CODES,
+  formatRejectCorrection,
+} = promptModule;
+
+test("budget trim drops style before identity and correction", () => {
+  const plan = buildFoodImagePromptPlan({
+    foodNameZh: "熟海螺",
+    foodNameEn: "whelk cooked moist heat with very long english disambiguation text for identity",
+    category: "贝类",
+    categoryCode: "seafood",
+    cookingMethod: "蒸",
+    visualProfileKey: "cooked_plain",
+    servingDescription: "一份约120克熟海螺肉摆盘用于营养记录展示请保留份量描述",
+    retryReason: "上一张错误生成了完整闭壳生海螺；必须改为壳口打开、熟螺肉露出、不透明且没有活体触须，严禁鱼类形态。",
+    imageSubjectZh: "壳口打开的清蒸熟海螺，熟螺肉完整露出，肉质灰白至米白、不透明且略微收缩，螺旋壳与可食用螺肉清楚可辨，禁止闭合壳",
+    forceOverflow: true,
+  });
+
+  assert.ok(plan.prompt.length <= MAX_PROMPT_CHARS);
+  assert.match(plan.prompt, /主体：熟海螺/);
+  assert.match(plan.prompt, /闭壳生海螺|壳口打开|审核反馈修正/);
+  assert.equal(plan.trimmedSlots?.includes("style"), true);
+  assert.doesNotMatch(plan.prompt, /北欧自然光/);
+});
+
+test("category code selects meat template when the food name is obscure", () => {
+  const plan = buildFoodImagePromptPlan({
+    foodNameZh: "精选部位A",
+    categoryCode: "meat",
+    category: "未分类原料",
+    visualProfileKey: "raw",
+  });
+  assert.equal(plan.template, "meat_poultry");
+  assert.match(plan.prompt, /生鲜未烹调|原料/);
+  assert.doesNotMatch(plan.prompt, /轻烤|微焦/);
+});
+
+test("seafood category code plus whelk name still selects shellfish over generic fish", () => {
+  const plan = buildFoodImagePromptPlan({
+    foodNameZh: "海螺",
+    category: "海水鱼",
+    categoryCode: "seafood",
+    visualProfileKey: "cooked_plain",
+    cookingMethod: "蒸",
+  });
+  assert.equal(plan.template, "shellfish_gastropod");
+  assert.match(plan.prompt, /贝类，不是鱼类/);
+});
+
+test("reasonCode folds a coded correction fragment into the prompt", () => {
+  const plan = buildFoodImagePromptPlan({
+    foodNameZh: "豆腐",
+    categoryCode: "soy",
+    reasonCode: "wrong_identity",
+    retryReason: "上一张生成了肉片",
+  });
+  assert.equal(plan.reasonCode, "wrong_identity");
+  assert.match(plan.prompt, /根据审核反馈修正/);
+  assert.match(plan.prompt, /勿生成其他品类|严格符合该食材/);
+  assert.match(plan.prompt, /肉片/);
+  assert.ok(REJECT_REASON_CODES.wrong_identity);
+  assert.match(formatRejectCorrection("wrong_identity", "补充说明"), /补充说明/);
+});
 
 test("buildFoodImagePromptPlan selects an egg-specific composition and excludes unrelated dishes", () => {
   const plan = buildFoodImagePromptPlan({

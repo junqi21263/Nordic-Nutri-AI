@@ -1,4 +1,5 @@
 import { Image, Text, View } from "@tarojs/components";
+import { getFoodVisualFallback } from "../../features/food-catalog/food-visuals";
 import { getMealNutrition, type Meal, type MealType } from "../../features/meals/domain";
 import { NordicIcon } from "../nordic-icon";
 import bowlImage from "../../assets/meal-bowl.svg";
@@ -41,13 +42,20 @@ export function MealGroup({ mealType, meals, onSelect, onAdd }: MealGroupProps) 
         meals.map((meal) => {
           const nutrition = getMealNutrition(meal);
           const thumb = mealThumbSrc(meal);
+          const fallback = getFoodVisualFallback({ description: meal.title });
           return (
             <View className="meal-group__item" key={meal.id} onClick={() => onSelect(meal)}>
-              <View className={`meal-group__image meal-group__image--${meal.imageKey ?? "empty"}`}>
+              <View
+                className={
+                  thumb
+                    ? `meal-group__image meal-group__image--${meal.imageKey ?? "photo"}`
+                    : `meal-group__image meal-group__image--fallback meal-group__image--${fallback.tone}`
+                }
+              >
                 {thumb ? (
                   <Image className="meal-group__image-asset" src={thumb} mode="aspectFill" />
                 ) : (
-                  <Text>＋</Text>
+                  <NordicIcon name={fallback.icon} size={28} ariaLabel={meal.title} />
                 )}
               </View>
               <View className="meal-group__content">

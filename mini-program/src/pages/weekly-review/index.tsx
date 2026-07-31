@@ -4,18 +4,20 @@ import { useEffect, useState } from "react";
 import { getProductWeeklyReview, type ProductWeeklyReview } from "../../api/insight-api";
 import { AppCard } from "../../components/app-card";
 import { NordicIcon } from "../../components/nordic-icon";
+import { getMondayBasedWeekDates } from "../../features/meals/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
 import { useProfileStore } from "../../stores/profile-store";
 const weekdayLabels = ["日", "一", "二", "三", "四", "五", "六"];
 
-const formatDate = (value: Date) => {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
+function getRhythmHeroAside(score: number, recordedDays: number) {
+  const detail = `${recordedDays}/7 天已记录`;
+  if (recordedDays <= 1) return { title: "节奏刚起步", detail };
+  if (score < 40) return { title: "节奏待建立", detail };
+  if (score < 70) return { title: "节奏在成形", detail };
+  return { title: "节奏较稳定", detail };
+}
 
 export default function WeeklyReviewPage() {
   const meals = useMealStore();
@@ -36,31 +38,31 @@ export default function WeeklyReviewPage() {
   const proteinLeft = remoteReview?.progress?.protein
     ? remoteReview.progress.protein.remaining
     : Math.max(0, summary.protein - summary.consumed.protein);
-  const [year, month, day] = date.split("-").map(Number);
-  const weekRhythm = Array.from({ length: 7 }, (_, index) => {
-    const current = new Date(year, month - 1, day - (6 - index));
-    const dateKey = formatDate(current);
+  const recordedByDate = new Map(
+    (remoteReview?.rhythm ?? []).map((item) => [item.date, item.recorded] as const),
+  );
+  const displayedRhythm = getMondayBasedWeekDates(date).map((dateKey) => {
+    const [itemYear, itemMonth, itemDay] = dateKey.split("-").map(Number);
+    const current = new Date(itemYear, itemMonth - 1, itemDay);
     return {
+      date: dateKey,
       label: weekdayLabels[current.getDay()]!,
-      recorded: meals.getMealsByDate(dateKey).length > 0,
+      recorded: recordedByDate.has(dateKey)
+        ? Boolean(recordedByDate.get(dateKey))
+        : meals.getMealsByDate(dateKey).length > 0,
       today: dateKey === date,
     };
   });
-  const remoteWeekRhythm = remoteReview?.rhythm.map((item) => {
-    const [itemYear, itemMonth, itemDay] = item.date.split("-").map(Number);
-    const current = new Date(itemYear, itemMonth - 1, itemDay);
-    return {
-      label: weekdayLabels[current.getDay()]!,
-      recorded: item.recorded,
-      today: item.date === date,
-    };
-  });
-  const displayedRhythm = remoteWeekRhythm ?? weekRhythm;
-  const recordedDays =
-    remoteReview?.recordedDays ?? weekRhythm.filter((item) => item.recorded).length;
+  const recordedDays = displayedRhythm.filter((item) => item.recorded).length;
   const recordedMeals = remoteReview?.recordedMeals ?? todayMeals.length;
   const targetCalories = remoteReview?.calorieTarget ?? profile.profile.targetCalories;
   const weeklyInsight = remoteReview?.insight;
+  const rhythmAside = getRhythmHeroAside(rhythmScore, recordedDays);
+  const calorieCompletion = remoteReview?.calorieCompletion ?? summary.completion;
+  const nextGoalPrimary = weeklyInsight?.nextSteps?.[0]
+    ?? (recordedDays < 5 ? "连续记录 5 天" : "保持每天至少一餐记录");
+  const nextGoalSecondary = weeklyInsight?.nextSteps?.[1]
+    ?? (proteinLeft ? "安排 3 次蛋白补充" : "保持 3 天蛋白达标");
 
   useEffect(() => {
     void getProductWeeklyReview(date)
@@ -77,16 +79,16 @@ export default function WeeklyReviewPage() {
       onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--weekly-review"
     >
-      <View className="profile-subpage__page-title">
-        <Text>本周回顾</Text>
-      </View>
       <View className="weekly-review">
         <AppCard tone="dark" className="weekly-review__hero">
           <View>
             <Text>营养节奏分</Text>
             <Text>{rhythmScore}</Text>
           </View>
-          <Text>记录保持得越稳定，分数越能反映你的节奏。</Text>
+          <View className="weekly-review__hero-aside">
+            <Text>{rhythmAside.title}</Text>
+            <Text>{rhythmAside.detail}</Text>
+          </View>
         </AppCard>
 
         <View className="weekly-review__metrics">
@@ -124,13 +126,13 @@ export default function WeeklyReviewPage() {
             </View>
             <View>
               <NordicIcon name="zap" size={18} ariaLabel="能量" />
-              <Text>营养节奏分为 {rhythmScore}，本周热量完成度 {remoteReview?.calorieCompletion ?? summary.completion}%。</Text>
+              <Text>营养节奏分为 {rhythmScore}，本周热量完成度 {calorieCompletion}%。</Text>
             </View>
           </View>
         </View>
 
         <View className="weekly-review__advice">
-          <NordicIcon name="sparkles" size={22} ariaLabel="本周建议" />
+          <NordicIcon name="milestone" size={22} ariaLabel="本周建议" />
           <View>
             <Text>{weeklyInsight?.headline ?? "本周建议"}</Text>
             <Text>{weeklyInsight?.nextSteps?.[0] ?? (proteinLeft
@@ -148,7 +150,7 @@ export default function WeeklyReviewPage() {
             {displayedRhythm.map((item) => (
               <View
                 className={`weekly-review__rhythm-day ${item.today ? "weekly-review__rhythm-day--today" : ""}`}
-                key={`${item.label}-${item.today}`}
+                key={item.date}
               >
                 <View
                   className={`weekly-review__rhythm-dot ${item.recorded ? "weekly-review__rhythm-dot--recorded" : ""}`}
@@ -161,23 +163,23 @@ export default function WeeklyReviewPage() {
 
         <View className="weekly-review__next-goals">
           <View className="weekly-review__next-goals-head">
-            <NordicIcon name="sparkles" size={20} ariaLabel="下周小目标" />
+            <NordicIcon name="zap" size={20} ariaLabel="下周小目标" />
             <View>
               <Text>下周小目标</Text>
               <Text>不求完美，先把节奏保持下来。</Text>
             </View>
           </View>
           <View className="weekly-review__next-goal-row">
-            <NordicIcon name="check" size={18} ariaLabel="连续记录" />
+            <NordicIcon name="check" size={18} ariaLabel="下周动作" />
             <View>
-              <Text>连续记录 5 天</Text>
-              <Text>每天先完成一餐记录即可</Text>
+              <Text>{nextGoalPrimary}</Text>
+              <Text>优先完成这一步，节奏会更清楚</Text>
             </View>
           </View>
           <View className="weekly-review__next-goal-row">
             <NordicIcon name="protein" size={18} ariaLabel="蛋白目标" />
             <View>
-              <Text>{proteinLeft ? "安排 3 次蛋白补充" : "保持 3 天蛋白达标"}</Text>
+              <Text>{nextGoalSecondary}</Text>
               <Text>让每日目标更容易完成</Text>
             </View>
           </View>

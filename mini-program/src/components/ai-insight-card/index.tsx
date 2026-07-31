@@ -22,7 +22,7 @@ export function AIInsightCard({
     <View className="ai-insight">
       <View className="ai-insight__top">
         <View className="ai-insight__orb">
-          <NordicIcon name="sparkles" size={18} ariaLabel="NOVA AI" />
+          <NordicIcon name="nova" size={18} ariaLabel="NOVA 营养洞察" />
         </View>
         <Text className="ai-insight__label">{label}</Text>
       </View>

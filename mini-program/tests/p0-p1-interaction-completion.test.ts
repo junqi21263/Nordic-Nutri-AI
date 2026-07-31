@@ -86,8 +86,15 @@ describe("P0 / P1 本地体验补全", () => {
     expect(coach).not.toContain('mealType: "snack"');
     expect(coach).toContain("营养建议仅供日常饮食参考");
     expect(profileEdit).toContain("/pages/goal-adjust/index");
+    expect(home).toContain("/pages/goal-adjust/index");
+    expect(home).toContain("调整");
     expect(goalAdjust).toContain('className="page-layout--goal-adjust"');
     expect(goalAdjust).toContain('className="profile-subpage__page-title"');
+    expect(goalAdjust).toContain("saveProductNutritionPlan");
+    expect(goalAdjust).toContain("proteinG");
+    expect(goalAdjust).toContain("carbsG");
+    expect(goalAdjust).toContain("fatG");
+    expect(goalAdjust).toContain("调整今日目标");
   });
 
   it("保持手动记录页面简洁并保留表单布局", () => {

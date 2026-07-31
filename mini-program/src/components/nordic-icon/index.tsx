@@ -41,9 +41,11 @@ import mars from "../../assets/icons/mars.svg";
 import venus from "../../assets/icons/venus.svg";
 import arrowUp from "../../assets/icons/arrow-up.svg";
 import heart from "../../assets/icons/heart.svg";
+import heartFilled from "../../assets/icons/heart-filled.svg";
 import trash2 from "../../assets/icons/trash-2.svg";
 import chevronRight from "../../assets/icons/chevron-right.svg";
 import refreshCw from "../../assets/icons/refresh-cw.svg";
+import search from "../../assets/icons/search.svg";
 import foodEgg from "../../assets/icons/food-egg.svg";
 import foodMilk from "../../assets/icons/food-milk.svg";
 import foodFish from "../../assets/icons/food-fish.svg";
@@ -101,9 +103,11 @@ export type NordicIconName =
   | "venus"
   | "arrow-up"
   | "heart"
+  | "heart-filled"
   | "trash-2"
   | "chevron-right"
   | "refresh-cw"
+  | "search"
   | "food-egg"
   | "food-milk"
   | "food-fish"
@@ -167,9 +171,11 @@ const iconSources: Record<NordicIconName, string> = {
   venus,
   "arrow-up": arrowUp,
   heart,
+  "heart-filled": heartFilled,
   "trash-2": trash2,
   "chevron-right": chevronRight,
   "refresh-cw": refreshCw,
+  search,
   "food-egg": foodEgg,
   "food-milk": foodMilk,
   "food-fish": foodFish,

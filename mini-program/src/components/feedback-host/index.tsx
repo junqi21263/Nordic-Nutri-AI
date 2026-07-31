@@ -4,6 +4,12 @@ import { useFeedbackStore } from "../../stores/feedback-store";
 
 const feedbackDuration = 2400;
 
+function hasNativeToastBridge() {
+  const bridge = globalThis as { wx?: { showToast?: unknown } };
+  return typeof bridge.wx?.showToast === "function";
+}
+
+/** Custom toast when native wx.showToast is unavailable; WeChat uses the store bridge. */
 export function FeedbackHost() {
   const toast = useFeedbackStore((state) => state.toast);
   const clear = useFeedbackStore((state) => state.clear);
@@ -14,5 +20,6 @@ export function FeedbackHost() {
     return () => clearTimeout(timer);
   }, [toast, clear]);
 
-  return toast ? <Toast message={toast.message} tone={toast.tone} /> : null;
+  if (hasNativeToastBridge() || !toast) return null;
+  return <Toast message={toast.message} tone={toast.tone} />;
 }

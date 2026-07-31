@@ -6,14 +6,15 @@ const sourceRoot = resolve(process.cwd(), "src");
 const read = (path: string) => readFileSync(resolve(sourceRoot, path), "utf8");
 
 describe("餐食详情交互", () => {
-  it("为每个食材提供可用的详情跳转", () => {
+  it("不再展示这餐包含卡片，也不跳转食材详情", () => {
     const detail = read("pages/meal-detail/index.tsx");
     const config = read("app.config.ts");
 
-    expect(detail).toContain("const openIngredient = (itemId: string) => {");
-    expect(detail).toContain("/pages/ingredient-detail/index?mealId=${meal.id}&itemId=${itemId}");
-    expect(detail).toContain("onClick={() => openIngredient(item.id)}");
-    expect(config).toContain('"pages/ingredient-detail/index"');
+    expect(detail).not.toContain("这餐包含");
+    expect(detail).not.toContain("openIngredient");
+    expect(detail).not.toContain("ingredient-detail");
+    expect(detail).not.toContain('className="meal-detail-page__ingredients"');
+    expect(config).not.toContain('"pages/ingredient-detail/index"');
   });
 
   it("将详情页底部操作改为图标与文字横向排列", () => {
@@ -36,8 +37,25 @@ describe("餐食详情交互", () => {
     expect(manual).toContain("createProductMeal");
     expect(manual).toContain("getProductMeals");
     expect(manual).toContain("loading={isSaving}");
+    expect(records).toContain("getProductDailySummary(store.selectedDate)");
     expect(records).toContain("getProductMeals(store.selectedDate)");
+    expect(records).toContain("dailySummary.meals");
     expect(detail).toContain("deleteProductMeal(meal.id)");
     expect(portion).toContain("updateProductMeal(editingId");
   });
+
+  it("更新收藏后同步详情态，并给出可发现的反馈", () => {
+    const detail = read("pages/meal-detail/index.tsx");
+    const styles = read("styles/page.scss");
+
+    expect(detail).toContain("setRemoteMeal(saved)");
+    expect(detail).toContain('name={meal.favorite ? "heart-filled" : "heart"}');
+    expect(detail).toContain("可在「记录」筛选里查看");
+    expect(detail).toContain("meal-detail-page__action--favorite");
+    expect(styles).toContain(".meal-detail-page__action--favorite");
+    expect(styles).not.toContain(
+      ".meal-detail-page__action--favorite {\n  background: $color-forest-green;",
+    );
+  });
 });
+

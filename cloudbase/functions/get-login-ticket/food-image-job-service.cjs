@@ -3,7 +3,7 @@
 // download → Storage persist → review. Never blocks public food search.
 
 const crypto = require("node:crypto");
-const { buildFoodImagePrompt } = require("./food-image-prompts.cjs");
+const { buildFoodImagePrompt, formatRejectCorrection, normalizeReasonCode } = require("./food-image-prompts.cjs");
 const { createFoodStorageUrlResolver } = require("./food-storage-url-service.cjs");
 const { resolveVisualProfile } = require("./food-image-visual-profile.cjs");
 
@@ -60,7 +60,7 @@ function createFoodImageJobService({
 } = {}) {
   if (!db || !repository) throw new Error("Food image job service requires db + repository");
 
-  const candidateDefault = Math.min(Math.max(Number(config.candidateCount) || 3, 1), 6);
+  const candidateDefault = Math.min(Math.max(Number(config.candidateCount) || 1, 1), 6);
   const concurrency = Math.min(Math.max(Number(config.concurrency) || 2, 1), 5);
   const dailyLimit = Math.min(Math.max(Number(config.dailyLimit) || 500, 1), 5000);
   const storagePrefix = config.storagePrefix || "food-library";
@@ -182,6 +182,7 @@ function createFoodImageJobService({
       foodNameZh: food.nameZh,
       foodNameEn: food.nameEn,
       category: food.category?.nameZh || food.category?.code,
+      categoryCode: food.category?.code,
       cookingMethod: cookingMethod || (reason?.includes("水煮") ? "水煮" : undefined),
       servingDescription,
       imageSubjectZh: food.imageSubjectZh,
@@ -521,18 +522,29 @@ function createFoodImageJobService({
     return { imageId, foodId: image.food_id, jobId: image.job_id ?? null, visualProfileId: profileId, approved: true };
   }
 
-  async function rejectImage(userId, imageId, { reason } = {}) {
+  async function rejectImage(userId, imageId, { reason, reasonCode } = {}) {
     await requireAdmin(userId);
     const imageResult = await db.from("food_images").select("*").eq("id", imageId).maybeSingle();
     const image = imageResult.data;
     if (!image) throw new FoodImageJobError("FOOD_IMAGE_NOT_FOUND");
     if (image.is_primary) throw new FoodImageJobError("FOOD_IMAGE_PRIMARY_LOCKED");
-    const reviewReason = String(reason || "审核未通过，请准确还原食材主体、形态与质地").trim().slice(0, 500);
-    await db.from("food_images").update({
+    const code = normalizeReasonCode(reasonCode);
+    const freeText = String(reason || "").trim();
+    const reviewReason = (formatRejectCorrection(code, freeText)
+      || "审核未通过，请准确还原食材主体、形态与质地").slice(0, 500);
+    const imageUpdate = {
       status: "rejected",
       review_status: "rejected",
       reject_reason: reviewReason,
-    }).eq("id", imageId);
+    };
+    if (code) imageUpdate.reject_reason_code = code;
+    let imageWrite = await db.from("food_images").update(imageUpdate).eq("id", imageId);
+    // Migration 0029 may not be applied yet — retry without the structured column.
+    if (imageWrite?.error && code && /reject_reason_code/i.test(String(imageWrite.error.message || imageWrite.error))) {
+      delete imageUpdate.reject_reason_code;
+      imageWrite = await db.from("food_images").update(imageUpdate).eq("id", imageId);
+    }
+    if (imageWrite?.error) throw new FoodImageJobError("FOOD_IMAGE_REJECT_FAILED", imageWrite.error.message);
     if (image.job_id) {
       await db.from("food_image_batch_items").update({
         status: "needs_retry",
@@ -544,6 +556,13 @@ function createFoodImageJobService({
         locked_at: null,
         locked_by: null,
       }).eq("job_id", image.job_id);
+    }
+    if (image.storage_path && typeof imageService?.deleteGeneratedVariants === "function") {
+      try {
+        await imageService.deleteGeneratedVariants(image.storage_path);
+      } catch (error) {
+        console.warn("[food-image-jobs] reject cleanup failed:", error?.message || error);
+      }
     }
     return { imageId, foodId: image.food_id, jobId: image.job_id ?? null, rejected: true };
   }
@@ -594,6 +613,7 @@ function createFoodImageJobService({
     regenerate,
     getStats,
     getDailyUsage,
+    dailyLimit,
     mapJobRow,
   };
 }

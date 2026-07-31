@@ -12,7 +12,7 @@ describe("food catalog discovery and login profile sync", () => {
     expect(config).toContain('{ pagePath: "pages/coach/index", text: "教练" }');
     expect(config).toContain('{ pagePath: "pages/meal-records/index", text: "记录" }');
     expect(config).not.toContain('{ pagePath: "pages/food-scanner/index", text: "扫描" }');
-    expect(tabBar).toContain('{ key: "food-catalog", label: "食物库", icon: "utensils" }');
+    expect(tabBar).toContain('{ key: "food-catalog", label: "食物库", icon: "food-bowl" }');
     expect(tabBar).toContain('if (key === "food-scanner")');
     expect(tabBar).toContain("Taro.navigateTo({ url: route })");
   });
@@ -35,7 +35,8 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("STANDARD_FOOD_CATEGORY_ROOT_CODES");
     expect(page).toContain('await loadCatalogPage({ query: "", categoryCode, page: 1, replace: true });');
     expect(page).toContain("searchProductFoodCatalog");
-    expect(page).toMatch(/useDidShow\(\(\) => \{\s*void discover\(\);\s*void loadTaxonomy\(\);\s*\}\);/);
+    expect(page).toMatch(/didBootstrapRef|hasBootstrappedRef|catalogBootstrappedRef/);
+    expect(page).toContain("void loadTaxonomy()");
     expect(page).toContain("热门推荐");
     expect(page).not.toContain("最近记录");
     expect(manualMeal).toContain("FoodThumbnail");
@@ -43,7 +44,7 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("FoodThumbnail");
     expect(detail).toContain("FoodThumbnail");
     expect(detail).toContain("份量选择");
-    expect(detail).toContain("Lagom AI");
+    expect(detail).toMatch(/NOVA|营养洞察/);
     expect(labels).toContain("高蛋白");
     expect(api).toContain("getProductFoodCategories");
     expect(api).toContain("getProductFoodByBarcode");

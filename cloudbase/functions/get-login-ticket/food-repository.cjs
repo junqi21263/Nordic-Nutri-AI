@@ -10,10 +10,98 @@ const { normalizeVisualProfileKey } = require("./food-image-visual-profile.cjs")
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
-const MAX_BATCH_CANDIDATE_SCAN = 5000;
+/** Keep preview/create scans bounded — large `.in(uuid…)` lists trip CloudBase BAD_GATEWAY. */
+const MAX_BATCH_CANDIDATE_SCAN = 800;
+const IN_QUERY_CHUNK_SIZE = 80;
 
 class FoodRepositoryError extends Error {
-  constructor(code) { super(code); this.code = code; }
+  constructor(code, message) {
+    super(message || code);
+    this.code = code;
+  }
+}
+
+/** Match a root category and dotted descendants without SQL LIKE `_` wildcards. */
+function isCategoryCodeInTree(rowCode, rootCode) {
+  const code = String(rowCode || "");
+  const root = String(rootCode || "");
+  return Boolean(root) && (code === root || code.startsWith(`${root}.`));
+}
+
+async function resolveCategoryTreeIdsByRootCode(db, rootCode) {
+  const categories = await db.from("food_categories").select("id,code").eq("is_active", true);
+  if (categories.error) {
+    throw new FoodRepositoryError("FOOD_CATEGORY_INVALID", categories.error.message || "分类树查询失败");
+  }
+  return (categories.data ?? [])
+    .filter((row) => isCategoryCodeInTree(row.code, rootCode))
+    .map((row) => row.id)
+    .filter(Boolean);
+}
+
+function chunkIds(ids, size = IN_QUERY_CHUNK_SIZE) {
+  const unique = Array.from(new Set((ids || []).filter(Boolean)));
+  const chunks = [];
+  for (let index = 0; index < unique.length; index += size) {
+    chunks.push(unique.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function selectByIdsInChunks(db, table, columns, column, ids, { apply, errorCode = "FOOD_IMAGE_BATCH_CANDIDATES_FAILED", errorMessage } = {}) {
+  const chunks = chunkIds(ids);
+  if (!chunks.length) return [];
+  const rows = [];
+  for (const chunk of chunks) {
+    let query = db.from(table).select(columns).in(column, chunk);
+    if (typeof apply === "function") query = apply(query);
+    const result = await query;
+    if (result.error) {
+      throw new FoodRepositoryError(errorCode, result.error.message || errorMessage || `${table} 查询失败`);
+    }
+    rows.push(...(result.data ?? []));
+  }
+  return rows;
+}
+
+async function listPublishedFoodsForCategories(db, categoryIds, scanLimit) {
+  const limit = Math.max(1, Math.min(Number(scanLimit) || MAX_BATCH_CANDIDATE_SCAN, MAX_BATCH_CANDIDATE_SCAN));
+  const categoryChunks = chunkIds(categoryIds);
+  if (!categoryChunks.length) return [];
+  if (categoryChunks.length === 1) {
+    const result = await db.from("foods")
+      .select("id,name_zh,name_en,category_id,image_owner_food_id,visual_profile_key")
+      .in("category_id", categoryChunks[0])
+      .eq("is_active", true)
+      .eq("publish_status", "published")
+      .eq("is_primary_variant", true)
+      .order("name_zh", { ascending: true })
+      .range(0, limit - 1);
+    if (result.error) {
+      throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED", result.error.message || "候选食材查询失败");
+    }
+    return result.data ?? [];
+  }
+  const merged = [];
+  for (const categoryChunk of categoryChunks) {
+    const result = await db.from("foods")
+      .select("id,name_zh,name_en,category_id,image_owner_food_id,visual_profile_key")
+      .in("category_id", categoryChunk)
+      .eq("is_active", true)
+      .eq("publish_status", "published")
+      .eq("is_primary_variant", true)
+      .order("name_zh", { ascending: true })
+      .range(0, limit - 1);
+    if (result.error) {
+      throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED", result.error.message || "候选食材查询失败");
+    }
+    merged.push(...(result.data ?? []));
+  }
+  merged.sort((left, right) => {
+    const byName = String(left.name_zh || "").localeCompare(String(right.name_zh || ""), "zh");
+    return byName || String(left.id || "").localeCompare(String(right.id || ""));
+  });
+  return merged.slice(0, limit);
 }
 
 function clampPage(page) {
@@ -227,6 +315,23 @@ function sanitizeCategoryCode(raw) {
 
 const REGIONAL_CATEGORY_CODES = new Set(["nordic_staples", "north_american_staples"]);
 
+async function resolveRegionalMembershipPage(db, regionCode, { offset, size }) {
+  const memberships = await db.from("food_region_memberships")
+    .select("food_id", { count: "exact" })
+    .eq("region_code", regionCode)
+    .limit(1);
+  if (memberships.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+  const total = Number(memberships.count ?? 0);
+  const pageMemberships = await db.from("food_region_memberships")
+    .select("food_id")
+    .eq("region_code", regionCode)
+    .order("food_id", { ascending: true })
+    .range(offset, offset + size - 1);
+  if (pageMemberships.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+  const foodIds = (pageMemberships.data ?? []).map((row) => row.food_id).filter(Boolean);
+  return { total, foodIds };
+}
+
 function sortClause(sort) {
   switch (sort) {
     case "popular": return { column: "popularity_score", ascending: false };
@@ -330,31 +435,36 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
 
     async listBatchImageCandidates({ categoryId, count = 20, visualProfileKey = "auto" } = {}) {
       const normalizedCategoryId = String(categoryId || "").trim();
-      if (!normalizedCategoryId) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+      if (!normalizedCategoryId) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID", "请先选择食物分类");
       const size = Math.min(Math.max(Number(count) || 20, 1), 100);
       const requestedProfileKey = normalizeVisualProfileKey(visualProfileKey);
       const selectedCategoryResult = await db.from("food_categories").select("code").eq("id", normalizedCategoryId).eq("is_active", true).maybeSingle();
-      if (selectedCategoryResult.error || !selectedCategoryResult.data?.code) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-      const categoryTreeResult = await db.from("food_categories").select("id").eq("is_active", true).ilike("code", `${selectedCategoryResult.data.code}%`);
-      if (categoryTreeResult.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-      const categoryIds = (categoryTreeResult.data ?? []).map((category) => category.id).filter(Boolean);
+      if (selectedCategoryResult.error || !selectedCategoryResult.data?.code) {
+        throw new FoodRepositoryError("FOOD_CATEGORY_INVALID", selectedCategoryResult.error?.message || "分类不存在或已停用");
+      }
+      const categoryIds = await resolveCategoryTreeIdsByRootCode(db, selectedCategoryResult.data.code);
       if (!categoryIds.length) return { items: [], total: 0, candidateCount: 0, excludedReadyCount: 0 };
-      const result = await db.from("foods").select("id,name_zh,name_en,category_id,image_owner_food_id,visual_profile_key", { count: "exact" })
-        .in("category_id", categoryIds)
-        .eq("is_active", true)
-        .eq("publish_status", "published")
-        .eq("is_primary_variant", true)
-        .order("name_zh", { ascending: true })
-        .order("id", { ascending: true })
-        .range(0, MAX_BATCH_CANDIDATE_SCAN - 1);
-      if (result.error) throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED");
-      const foods = result.data ?? [];
+
+      const scanLimit = Math.min(Math.max(size * 10, 120), MAX_BATCH_CANDIDATE_SCAN);
+      const foods = await listPublishedFoodsForCategories(db, categoryIds, scanLimit);
       const ownerIds = Array.from(new Set(foods.map((food) => food.image_owner_food_id || food.id).filter(Boolean)));
       if (!ownerIds.length) return { items: [], total: 0, candidateCount: 0, excludedReadyCount: 0 };
 
-      const profilesResult = await db.from("food_image_visual_profiles").select("id,food_id,profile_key,is_default").in("food_id", ownerIds);
-      if (profilesResult.error) throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED");
-      const profiles = profilesResult.data ?? [];
+      let profiles = [];
+      try {
+        profiles = await selectByIdsInChunks(
+          db,
+          "food_image_visual_profiles",
+          "id,food_id,profile_key,is_default",
+          "food_id",
+          ownerIds,
+          { errorMessage: "视觉状态表查询失败，请确认已执行 food_image_visual_profiles 相关迁移" },
+        );
+      } catch (error) {
+        if (error instanceof FoodRepositoryError) throw error;
+        throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED", error?.message || "视觉状态表查询失败");
+      }
+
       const profileIds = profiles.map((profile) => profile.id).filter(Boolean);
       const profilesByFoodId = new Map();
       for (const profile of profiles) {
@@ -363,19 +473,37 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
         ownerProfiles.push(profile);
         profilesByFoodId.set(profile.food_id, ownerProfiles);
       }
-      const readyResult = profileIds.length
-        ? await db.from("food_images").select("food_id,visual_profile_id,review_status").in("visual_profile_id", profileIds).eq("is_primary", true).eq("status", "ready")
-        : { data: [], error: null };
-      if (readyResult.error) throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED");
-      const readyProfileIds = new Set((readyResult.data ?? [])
+
+      const readyImages = profileIds.length
+        ? await selectByIdsInChunks(
+          db,
+          "food_images",
+          "food_id,visual_profile_id,review_status",
+          "visual_profile_id",
+          profileIds,
+          {
+            apply: (query) => query.eq("is_primary", true).eq("status", "ready"),
+            errorMessage: "主图状态查询失败",
+          },
+        )
+        : [];
+      const readyProfileIds = new Set(readyImages
         .filter((image) => !image.review_status || image.review_status === "approved")
         .map((image) => image.visual_profile_id)
         .filter(Boolean));
 
-      const legacyResult = await db.from("food_images").select("food_id,review_status").in("food_id", ownerIds)
-        .is("visual_profile_id", null).eq("is_primary", true).eq("status", "ready");
-      if (legacyResult.error) throw new FoodRepositoryError("FOOD_IMAGE_BATCH_CANDIDATES_FAILED");
-      const readyLegacyOwnerIds = new Set((legacyResult.data ?? [])
+      const legacyImages = await selectByIdsInChunks(
+        db,
+        "food_images",
+        "food_id,review_status",
+        "food_id",
+        ownerIds,
+        {
+          apply: (query) => query.is("visual_profile_id", null).eq("is_primary", true).eq("status", "ready"),
+          errorMessage: "主图状态查询失败",
+        },
+      );
+      const readyLegacyOwnerIds = new Set(legacyImages
         .filter((image) => !image.review_status || image.review_status === "approved")
         .map((image) => image.food_id)
         .filter(Boolean));
@@ -426,28 +554,16 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
         const code = sanitizeCategoryCode(categoryCode);
         if (!code) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
         if (REGIONAL_CATEGORY_CODES.has(code)) {
-          const memberships = await db.from("food_region_memberships")
-            .select("food_id", { count: "exact" })
-            .eq("region_code", code)
-            .limit(1);
-          if (memberships.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-          regionalTotal = Number(memberships.count ?? 0);
-          const pageMemberships = await db.from("food_region_memberships")
-            .select("food_id")
-            .eq("region_code", code)
-            .order("food_id", { ascending: true })
-            .range(offset, offset + size - 1);
-          if (pageMemberships.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-          regionalPageIds = (pageMemberships.data ?? []).map((row) => row.food_id).filter(Boolean);
+          const { total, foodIds } = await resolveRegionalMembershipPage(db, code, { offset, size });
+          regionalTotal = total;
+          regionalPageIds = foodIds;
           if (!regionalPageIds.length) return {
             items: [],
             pagination: { page: p, pageSize: size, total: regionalTotal, hasMore: false },
           };
           query = query.in("id", regionalPageIds);
         } else {
-          const categories = await db.from("food_categories").select("id").ilike("code", `${code}%`);
-          if (categories.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-          const categoryIds = (categories.data ?? []).map((category) => category.id).filter(Boolean);
+          const categoryIds = await resolveCategoryTreeIdsByRootCode(db, code);
           if (!categoryIds.length) return {
             items: [],
             pagination: { page: p, pageSize: size, total: 0, hasMore: false },
@@ -517,10 +633,12 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       return this._mapFoodWithRelations(result.data);
     },
 
-    async listFoodsForAdmin({ q, categoryCode, active = "true", missingImage, page, pageSize } = {}) {
+    async listFoodsForAdmin({ q, categoryCode, active = "true", missingImage, missingImageSubject, page, pageSize } = {}) {
       const p = clampPage(page);
       const size = clampPageSize(pageSize);
       const offset = (p - 1) * size;
+      let regionalTotal = null;
+      let regionalPageIds = null;
       let query = db.from("foods").select("*", { count: "exact" });
       const activeFilter = String(active ?? "true").toLowerCase();
       if (activeFilter === "true") query = query.eq("is_active", true);
@@ -530,19 +648,30 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       if (missingImage === true || missingImage === "true") {
         query = query.is("primary_image_id", null);
       }
+      if (missingImageSubject === true || missingImageSubject === "true") {
+        query = query.or("image_subject_zh.is.null,image_subject_zh.eq.");
+      }
       if (categoryCode) {
         const code = sanitizeCategoryCode(categoryCode);
         if (!code) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-        const categories = await db.from("food_categories").select("id").ilike("code", `${code}%`);
-        if (categories.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-        const categoryIds = (categories.data ?? []).map((category) => category.id).filter(Boolean);
-        if (!categoryIds.length) {
-          return { items: [], pagination: { page: p, pageSize: size, total: 0, hasMore: false } };
+        if (REGIONAL_CATEGORY_CODES.has(code)) {
+          const resolved = await resolveRegionalMembershipPage(db, code, { offset, size });
+          regionalTotal = resolved.total;
+          regionalPageIds = resolved.foodIds;
+          if (!regionalPageIds.length) {
+            return { items: [], pagination: { page: p, pageSize: size, total: regionalTotal, hasMore: false } };
+          }
+          query = query.in("id", regionalPageIds);
+        } else {
+          const categoryIds = await resolveCategoryTreeIdsByRootCode(db, code);
+          if (!categoryIds.length) {
+            return { items: [], pagination: { page: p, pageSize: size, total: 0, hasMore: false } };
+          }
+          query = query.in("category_id", categoryIds);
         }
-        query = query.in("category_id", categoryIds);
       }
       query = query
-        .range(offset, offset + size - 1)
+        .range(regionalPageIds ? 0 : offset, regionalPageIds ? size - 1 : offset + size - 1)
         .order("updated_at", { ascending: false });
       const result = await query;
       if (result.error) throw new FoodRepositoryError("FOOD_LIST_FAILED");
@@ -559,7 +688,7 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
         tags: tagMap.get(r.id) ?? [],
         image: imageMap.get(r.id) ?? null,
       }));
-      const total = Number(result.count ?? items.length);
+      const total = regionalTotal ?? Number(result.count ?? items.length);
       return {
         items,
         pagination: { page: p, pageSize: size, total, hasMore: offset + size < total },

@@ -17,7 +17,7 @@ const defaultItems: BottomTabItem[] = [
   { key: "home", label: "首页", icon: "home" },
   { key: "food-scanner", label: "扫描", icon: "scan-line" },
   { key: "meal-records", label: "记录", icon: "list-checks" },
-  { key: "food-catalog", label: "食物库", icon: "utensils" },
+  { key: "food-catalog", label: "食物库", icon: "food-bowl" },
   { key: "coach", label: "教练", icon: "bot" },
   { key: "profile", label: "我的", icon: "user-round" },
 ];

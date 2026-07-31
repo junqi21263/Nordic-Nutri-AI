@@ -5,6 +5,7 @@ import {
   DAILY_INSIGHT_SYSTEM_PROMPT,
   createCloudbaseDailyInsightCompletion,
   createDailyInsightService,
+  createRuleInsight,
   validateDailyInsight,
 } from "./daily-insight-service.cjs";
 
@@ -25,6 +26,28 @@ test("daily insight prompt requires evidence, one priority, and an actionable ne
   assert.match(DAILY_INSIGHT_SYSTEM_PROMPT, /只选择一个最优先方向/);
   assert.match(DAILY_INSIGHT_SYSTEM_PROMPT, /下一步行动/);
   assert.match(DAILY_INSIGHT_SYSTEM_PROMPT, /不得诊断/);
+  assert.match(DAILY_INSIGHT_SYSTEM_PROMPT, /preferences/);
+  assert.match(DAILY_INSIGHT_SYSTEM_PROMPT, /foodAvoidances/);
+});
+
+test("empty-day rule insight mentions diet preferences when present", () => {
+  const insight = createRuleInsight({
+    daily: {
+      targets: { calories: 2450, protein: 150, carbs: 280, fat: 80 },
+      consumed: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+      remaining: { calories: 2450, protein: 150, carbs: 280, fat: 80 },
+      mealCount: 0,
+    },
+    preferences: {
+      dietaryPattern: "none",
+      dietaryPatternLabel: "无特殊",
+      foodAvoidanceLabels: ["辛辣食物"],
+      mealsPerDay: 3,
+    },
+  });
+  assert.equal(insight.focus, "logging");
+  assert.match(insight.headline, /辛辣/);
+  assert.match(insight.content, /忌辛辣食物/);
 });
 
 test("validates bounded daily insight payloads", () => {

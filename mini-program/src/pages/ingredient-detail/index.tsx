@@ -1,37 +1,49 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
+import { useEffect, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { ErrorState } from "../../components/error-state";
 import { NordicIcon } from "../../components/nordic-icon";
+import { getProductFoodInsight } from "../../api/food-catalog-api";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
 import mealBowlImage from "../../assets/meal-bowl.svg";
-import mealOatsImage from "../../assets/meal-oats.svg";
-import mealSalmonImage from "../../assets/meal-salmon.svg";
-
-const imagesByIngredientId: Record<string, string> = {
-  oats: mealOatsImage,
-  berries: mealOatsImage,
-  skyr: mealOatsImage,
-  chicken: mealBowlImage,
-  rice: mealBowlImage,
-  vegetables: mealBowlImage,
-  salmon: mealSalmonImage,
-  potato: mealSalmonImage,
-  greens: mealSalmonImage,
-  banana: mealBowlImage,
-  whey: mealBowlImage,
-  turkey: mealBowlImage,
-  quinoa: mealBowlImage,
-};
 
 export default function IngredientDetailPage() {
   const router = useRouter();
   const store = useMealStore();
   const meal = store.getMealById(router.params.mealId);
   const item = meal?.items.find((entry) => entry.id === router.params.itemId);
+  const [catalogInsight, setCatalogInsight] = useState<string | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+
+  useEffect(() => {
+    if (!item?.foodId) {
+      setCatalogInsight(null);
+      setInsightLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setInsightLoading(true);
+    void getProductFoodInsight(item.foodId)
+      .then((result) => {
+        if (cancelled) return;
+        const content = typeof result?.content === "string" ? result.content.trim() : "";
+        setCatalogInsight(content || null);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogInsight(null);
+      })
+      .finally(() => {
+        if (!cancelled) setInsightLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item?.foodId]);
+
   const returnToMeal = () => {
     if (meal) {
       Taro.redirectTo({ url: `/pages/meal-detail/index?id=${meal.id}` });
@@ -43,7 +55,7 @@ export default function IngredientDetailPage() {
   if (!meal || !item) {
     return (
       <PageLayout
-        title="食材详情"
+        title="食材"
         showTabs={false}
         hideNavigation
         className="page-layout--ingredient-detail"
@@ -64,11 +76,13 @@ export default function IngredientDetailPage() {
     { icon: "carbs" as const, label: "碳水", value: item.carbs },
     { icon: "fat" as const, label: "脂肪", value: item.fat },
   ];
-  const insight = `${item.name}在这餐中提供 ${item.protein}g 蛋白质、${item.carbs}g 碳水和 ${item.fat}g 脂肪，可结合全天目标灵活搭配。`;
+  const fallbackInsight = `${item.name}在这餐中提供 ${item.protein}g 蛋白质、${item.carbs}g 碳水和 ${item.fat}g 脂肪，可结合全天目标灵活搭配。`;
+  const insight = catalogInsight || fallbackInsight;
+  const imageSrc = item.imageUrl || mealBowlImage;
 
   return (
     <PageLayout
-      title="食材详情"
+      title={item.name}
       showTabs={false}
       hideNavigation
       showBack
@@ -76,9 +90,6 @@ export default function IngredientDetailPage() {
       className="page-layout--ingredient-detail"
     >
       <View className="ingredient-detail-page">
-        <View className="ingredient-detail-page__page-title">
-          <Text>食材详情</Text>
-        </View>
         <View className="ingredient-detail-page__heading">
           <Text className="ingredient-detail-page__eyebrow">本餐食材</Text>
           <Text className="ingredient-detail-page__title">{item.name}</Text>
@@ -90,7 +101,7 @@ export default function IngredientDetailPage() {
           <Image
             className="ingredient-detail-page__image"
             mode="aspectFill"
-            src={imagesByIngredientId[item.id] ?? mealBowlImage}
+            src={imageSrc}
           />
           <View className="ingredient-detail-page__hero-copy">
             <Text className="ingredient-detail-page__amount">食用份量 · {item.amount}</Text>
@@ -115,7 +126,7 @@ export default function IngredientDetailPage() {
             ))}
           </View>
         </AppCard>
-        <AIInsightCard label="食材建议" content={insight} />
+        <AIInsightCard label="食材建议" content={insight} loading={insightLoading && !catalogInsight} />
         <AppButton size="large" onClick={returnToMeal}>
           返回餐食详情
         </AppButton>

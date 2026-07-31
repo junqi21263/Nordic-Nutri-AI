@@ -5,7 +5,6 @@ import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { ErrorState } from "../../components/error-state";
 import { MacroProgress } from "../../components/macro-progress";
-import { NordicIcon } from "../../components/nordic-icon";
 import { PageLayout } from "../../layouts/page-layout";
 import { createMealFromAnalysis } from "../../features/scanner/domain";
 import { createProductMeal, getProductMeals, updateProductMeal } from "../../api/meal-data-api";
@@ -79,7 +78,13 @@ export default function PortionAdjustmentPage() {
         id = (await createProductMeal(toProductMealInput(localMeal))).id;
         feedback.show({ message: "已保存并同步到饮食记录", tone: "success" });
       }
-      meals.replaceRemoteMeals(await getProductMeals(getLocalDateString()), getLocalDateString());
+      const mealDate = getLocalDateString();
+      meals.replaceRemoteMeals(await getProductMeals(mealDate), mealDate);
+      setTimeout(() => {
+        void import("../../features/coach/refresh-achievements")
+          .then(({ refreshProductAchievements }) => refreshProductAchievements(mealDate))
+          .catch(() => undefined);
+      }, 2800);
       // Navigate before clearing the draft — resetting first re-renders this page as
       // "份量草稿不存在", and a failed/timed-out redirect leaves the user stuck there.
       await Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });
@@ -100,10 +105,6 @@ export default function PortionAdjustmentPage() {
       className="page-layout--portion-adjustment"
     >
       <View className="portion-adjustment-page">
-        <View className="portion-adjustment-page__page-title">
-          <Text>调整份量</Text>
-        </View>
-        <Text className="portion-adjustment-page__subtitle">每一步都会即时重算本地营养数据。</Text>
         <AppCard tone="beige" className="portion-summary">
           <View className="portion-summary__meal">
             <Text className="portion-summary__label">当前餐食</Text>
@@ -133,7 +134,7 @@ export default function PortionAdjustmentPage() {
               className={`portion-control__button ${canDecrease ? "" : "portion-control__button--disabled"}`}
               onClick={() => canDecrease && portion.adjustBy(-0.25)}
             >
-              <Text>−</Text>
+              <Text>-</Text>
             </View>
             <View className="portion-control__value">
               <Text className="portion-control__copy">{adjustmentCopy}</Text>
@@ -143,7 +144,7 @@ export default function PortionAdjustmentPage() {
               className={`portion-control__button ${canIncrease ? "" : "portion-control__button--disabled"}`}
               onClick={() => canIncrease && portion.adjustBy(0.25)}
             >
-              <NordicIcon name="circle-plus" size={24} ariaLabel="增加份量 25%" />
+              <Text>+</Text>
             </View>
           </View>
           <View className="portion-presets" ariaLabel="快速选择份量比例">

@@ -1,4 +1,5 @@
 import { View } from "@tarojs/components";
+import { useDidShow } from "@tarojs/taro";
 import { useEffect, type PropsWithChildren } from "react";
 import { AppSafeArea } from "../../components/app-safe-area";
 import { AppTopBar } from "../../components/app-top-bar";
@@ -60,6 +61,10 @@ export function PageLayout({
   const tabbarVisible = useTabBarStore((state) => state.visible);
   const layout = useSystemLayout();
 
+  // Tab pages stay mounted under switchTab; sync highlight on show, not only mount.
+  useDidShow(() => {
+    if (showTabs) setActiveKey(activeTab ?? "home");
+  });
   useEffect(() => {
     if (showTabs) setActiveKey(activeTab ?? "home");
   }, [activeTab, setActiveKey, showTabs]);

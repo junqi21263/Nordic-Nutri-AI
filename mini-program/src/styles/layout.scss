@@ -58,6 +58,28 @@
 .page-layout--manual-meal .page-layout__content {
   padding-bottom: calc($safe-area-bottom + 176px);
 }
+.page-layout--food-scanner,
+.page-layout--food-scanner .page-layout__scroll,
+.page-layout--food-scanner .page-layout__content,
+.page-layout--food-scanner .content-stack {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.page-layout--food-scanner {
+  height: 100vh;
+}
+.page-layout--food-scanner .page-layout__content {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc($tabbar-height + $safe-area-bottom + $space-12);
+}
+.page-layout--food-scanner .content-stack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
 .page-layout--food-catalog .page-layout__content {
   padding-bottom: calc($tabbar-height + $safe-area-bottom + $space-32);
 }

@@ -19,6 +19,22 @@ test("writes a profile for the authenticated business user only", async () => {
   assert.deepEqual(calls, [{ table: "profiles", operation: "update", userId: "user-1" }]);
 });
 
+test("rejects banned nicknames before writing profiles", async () => {
+  const service = createProductDataService({
+    db: {
+      from: () => ({
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "user-1" }, error: null }) }) }),
+        update: () => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }) }) }),
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () => service.saveProfile("user-1", { nickname: "官方客服" }),
+    (error) => error instanceof Error && error.message === "昵称包含不当内容，请更换" && error.code === "PRODUCT_DATA_INVALID",
+  );
+});
+
 test("versions a body profile instead of trusting a caller-supplied user ID", async () => {
   const calls = [];
   const db = {

@@ -17,6 +17,7 @@ import { useFeedbackStore } from "../../stores/feedback-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { resolveAvatarUrl } from "../../features/profile/avatar-defaults";
+import { nicknameModerationError } from "../../features/profile/nickname-moderation";
 
 const goalOptions = ["精益增肌", "轻盈减脂", "保持状态"];
 const goalTypeByLabel: Record<string, "muscle_gain" | "fat_loss" | "maintain"> = {
@@ -56,12 +57,21 @@ export default function ProfileEditPage() {
   };
 
   const save = async () => {
+    const nextNickname = nickname.trim();
+    if (!nextNickname) {
+      feedback.show({ message: "请输入昵称", tone: "error" });
+      return;
+    }
+    const nicknameError = nicknameModerationError(nextNickname);
+    if (nicknameError) {
+      feedback.show({ message: nicknameError, tone: "error" });
+      return;
+    }
     const nextWeight = Number(weight);
     if (!Number.isFinite(nextWeight) || nextWeight < 30 || nextWeight > 300) {
       feedback.show({ message: "请输入 30–300 kg 的体重", tone: "error" });
       return;
     }
-    const nextNickname = nickname.trim() || profile.profile.nickname;
     setIsSaving(true);
     try {
       const account = await getProductAccount();
@@ -102,8 +112,11 @@ export default function ProfileEditPage() {
       profile.setProfile({ nickname: savedNickname, weight: nextWeight, goalLabel });
       feedback.show({ message: "个人资料已保存", tone: "success" });
       navigateBackOrHome("/pages/profile/index");
-    } catch {
-      feedback.show({ message: "个人资料保存失败，请稍后重试", tone: "error" });
+    } catch (error) {
+      feedback.show({
+        message: error instanceof Error ? error.message : "个人资料保存失败，请稍后重试",
+        tone: "error",
+      });
     } finally {
       setIsSaving(false);
     }

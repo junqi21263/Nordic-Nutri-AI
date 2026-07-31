@@ -31,9 +31,15 @@ export async function getProductMeals(date: string): Promise<Meal[]> {
   return data.map(mapProductMeal);
 }
 
-export async function getProductMealsRange(from: string, to: string): Promise<Meal[]> {
+export async function getProductMealsRange(
+  from: string,
+  to: string,
+  options: { light?: boolean } = {},
+): Promise<Meal[]> {
+  const params = new URLSearchParams({ from, to });
+  if (options.light) params.set("light", "1");
   const data = await requestProductApi<ProductMeal[]>(
-    `/meals?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    `/meals?${params.toString()}`,
     { method: "GET", fallbackMessage: "餐食同步失败，请稍后重试" },
   );
   return data.map(mapProductMeal);

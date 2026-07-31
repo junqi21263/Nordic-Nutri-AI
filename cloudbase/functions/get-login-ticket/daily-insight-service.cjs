@@ -5,9 +5,9 @@ const insightFocuses = new Set(["protein", "calories", "carbs", "fat", "fiber", 
 const unsafeInsightWording = /诊断|治疗|处方|药物|吃药|用药|孕期|怀孕|哺乳|未成年|厌食|暴食|替代医疗/i;
 const forbiddenPresentationWording = /```|[`*#]|^\s*(?:回复|答复|回答|建议|说明)\s*[:：]/m;
 
-const DAILY_INSIGHT_SYSTEM_PROMPT = `你是 Nordic Nutri 首页的每日营养洞察编辑。nutritionContext 是唯一权威营养事实；不得猜测、补造或改写未提供的健康状况、训练安排、食物克数、营养数值或餐食记录。只面向普通成年人提供日常饮食提示。
+const DAILY_INSIGHT_SYSTEM_PROMPT = `你是 Nordic Nutri 首页的每日营养洞察编辑。nutritionContext 是唯一权威营养事实；不得猜测、补造或改写未提供的健康状况、训练安排、食物克数、营养数值或餐食记录。只面向普通成年人提供日常饮食提示。必须尊重 preferences 中的饮食模式、忌口与每日餐次：推荐食材不得与 foodAvoidances / foodAvoidanceLabels 冲突，并贴合 dietaryPattern 与 mealsPerDay。
 
-请只选择一个最优先方向：蛋白质、总能量、碳水、脂肪、膳食纤维、记录完整度或规律性。洞察必须体现当天的真实状态：有可靠数值时优先引用一个缺口、进度或已记录餐次数；有真实餐次时可以提及下一餐场景，但不要罗列多个问题或重复通用口号。先给一句明确结论，再给一个可执行的下一步行动（食物类别、搭配或记录动作）；避免只说“均衡饮食”“注意营养”。
+请只选择一个最优先方向：蛋白质、总能量、碳水、脂肪、膳食纤维、记录完整度或规律性。洞察必须体现当天的真实状态：有可靠数值时优先引用一个缺口、进度或已记录餐次数；有真实餐次时可以提及下一餐场景，但不要罗列多个问题或重复通用口号。先给一句明确结论，再给一个可执行的下一步行动（食物类别、搭配或记录动作）；避免只说“均衡饮食”“注意营养”。若当天尚未记录，也可结合偏好/忌口给出更具体的开记建议。
 
 不得诊断、治疗、开药、保证减重或增肌效果；不得涉及疾病、药物、孕产、未成年人、进食障碍或替代医疗。不要做品牌广告。输出约束：只输出 JSON，不要 Markdown、代码块、标题符号或额外解释；禁止使用双星号加粗、星号、反引号或以“回复：”“答复：”“回答：”“建议：”“说明：”开头。JSON 字段值也必须是可直接展示的纯文本：{"focus":"protein|calories|carbs|fat|fiber|logging|regularity","headline":"不超过24个字符","content":"不超过140个字符"}。`;
 
@@ -48,6 +48,34 @@ function assertDate(value) {
   return value;
 }
 
+function preferenceHint(context) {
+  const pattern = context?.preferences?.dietaryPattern;
+  const patternLabel = context?.preferences?.dietaryPatternLabel;
+  const avoidLabels = Array.isArray(context?.preferences?.foodAvoidanceLabels)
+    ? context.preferences.foodAvoidanceLabels.filter(Boolean)
+    : [];
+  const mealsPerDay = Number(context?.preferences?.mealsPerDay);
+  const parts = [];
+  if (pattern && pattern !== "none" && patternLabel && patternLabel !== "无特殊") {
+    parts.push(patternLabel);
+  }
+  if (avoidLabels[0]) parts.push(`忌${avoidLabels[0]}`);
+  if (Number.isFinite(mealsPerDay) && mealsPerDay >= 2 && mealsPerDay <= 5 && mealsPerDay !== 3) {
+    parts.push(`每天${mealsPerDay}餐`);
+  }
+  return {
+    avoidLabels,
+    patternLabel: parts[0] && pattern && pattern !== "none" ? patternLabel : null,
+    summary: parts.join(" · "),
+    proteinFoods:
+      avoidLabels.some((label) => /鸡蛋|蛋/.test(label))
+        ? "豆腐、鱼或鸡胸肉"
+        : avoidLabels.some((label) => /海鲜|鱼|虾/.test(label))
+          ? "鸡胸肉、鸡蛋或豆腐"
+          : "鱼、鸡胸肉、鸡蛋或豆腐",
+  };
+}
+
 function createRuleInsight(context) {
   const daily = context?.daily ?? {};
   const targets = daily.targets ?? {};
@@ -59,8 +87,16 @@ function createRuleInsight(context) {
   const carbsRemaining = safeNumber(remaining.carbs);
   const fatConsumed = safeNumber(consumed.fat);
   const fatTarget = safeNumber(targets.fat);
+  const prefs = preferenceHint(context);
 
   if (!mealCount) {
+    if (prefs.summary) {
+      return {
+        focus: "logging",
+        headline: prefs.avoidLabels[0] ? `忌${prefs.avoidLabels[0]}也先记一餐` : "按你的偏好开记",
+        content: `今天还没记录。先记下下一餐大致份量；${prefs.summary}，再按真实进度调整会更贴合你。`.slice(0, 140),
+      };
+    }
     return {
       focus: "logging",
       headline: "先记录第一餐",
@@ -78,7 +114,7 @@ function createRuleInsight(context) {
     return {
       focus: "protein",
       headline: "晚些补一份蛋白",
-      content: `你今天已记录 ${mealCount} 餐，还差约 ${proteinRemaining}g 蛋白质；下一餐先安排鱼、鸡胸肉、鸡蛋或豆腐，再配蔬菜和主食。`,
+      content: `你今天已记录 ${mealCount} 餐，还差约 ${proteinRemaining}g 蛋白质；下一餐先安排${prefs.proteinFoods}，再配蔬菜和主食。`.slice(0, 140),
     };
   }
   if (carbsRemaining >= 60) {

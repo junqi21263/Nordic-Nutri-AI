@@ -3,6 +3,18 @@ import { useAuthStore } from "../auth/auth-store";
 import { productApiEndpoint } from "./product-api-config";
 import { requestProductApi } from "./product-api-client";
 
+const inflightRequests = new Map<string, Promise<unknown>>();
+
+function coalesceRequest<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const existing = inflightRequests.get(key);
+  if (existing) return existing as Promise<T>;
+  const promise = run().finally(() => {
+    if (inflightRequests.get(key) === promise) inflightRequests.delete(key);
+  });
+  inflightRequests.set(key, promise);
+  return promise;
+}
+
 export interface ProductCoachMessage {
   id: string;
   role: "user" | "assistant";
@@ -44,6 +56,7 @@ export interface ProductCoachDailyTip {
   food: { name: string; proteinG: number } | null;
   source: "deepseek" | "hunyuan-exp" | "rule_v2";
   model: string | null;
+  cached?: boolean;
 }
 
 export type ProductCoachStreamEvent =
@@ -159,17 +172,25 @@ export function getProductCoachMessages() {
 }
 
 export function getProductCoachBrief(date: string) {
-  return requestProductApi<ProductCoachBrief>(`/coach/brief?date=${encodeURIComponent(date)}`, {
-    method: "GET",
-    fallbackMessage: "营养教练摘要暂时无法读取，请稍后重试",
-  });
+  return coalesceRequest(`coach-brief:${date}`, () =>
+    requestProductApi<ProductCoachBrief>(`/coach/brief?date=${encodeURIComponent(date)}`, {
+      method: "GET",
+      fallbackMessage: "营养教练摘要暂时无法读取，请稍后重试",
+    }),
+  );
 }
 
-export function getProductCoachDailyTip(date: string) {
-  return requestProductApi<ProductCoachDailyTip>(`/coach/daily-tip?date=${encodeURIComponent(date)}`, {
-    method: "GET",
-    fallbackMessage: "今日营养建议暂时无法读取，请稍后重试",
-  });
+export function getProductCoachDailyTip(date: string, options?: { refresh?: boolean }) {
+  const refresh = Boolean(options?.refresh);
+  const params = new URLSearchParams({ date });
+  if (refresh) params.set("refresh", "1");
+  return coalesceRequest(`coach-daily-tip:${date}:${refresh ? "1" : "0"}`, () =>
+    requestProductApi<ProductCoachDailyTip>(`/coach/daily-tip?${params.toString()}`, {
+      method: "GET",
+      fallbackMessage: "今日营养建议暂时无法读取，请稍后重试",
+      timeout: 20_000,
+    }),
+  );
 }
 
 export function restartProductCoachConversation() {
@@ -193,5 +214,6 @@ export function sendProductCoachMessage(
     method: "POST",
     data: { clientRequestId, prompt, date },
     fallbackMessage: "营养教练暂时无法回答，请稍后重试",
+    timeout: 20_000,
   });
 }

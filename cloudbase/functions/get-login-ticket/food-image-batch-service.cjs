@@ -243,6 +243,7 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
           foodNameZh: food.nameZh,
           foodNameEn: food.nameEn,
           category: food.category?.nameZh || food.category?.code,
+          categoryCode: food.category?.code,
           cookingMethod: food.defaultCookingMethod,
           imageSubjectZh: food.imageSubjectZh,
           visualProfileKey: profile?.key,
@@ -371,10 +372,11 @@ function createFoodImageBatchService({ db, repository, jobs } = {}) {
       const plan = buildFoodImagePromptPlan({
         foodNameZh: getFoodDisplayName(food),
         foodNameEn: food.nameEn,
-          category: food.category?.nameZh || food.category?.code,
-          cookingMethod: food.defaultCookingMethod,
-          imageSubjectZh: food.imageSubjectZh,
-          retryReason: locked.data.retry_reason,
+        category: food.category?.nameZh || food.category?.code,
+        categoryCode: food.category?.code,
+        cookingMethod: food.defaultCookingMethod,
+        imageSubjectZh: food.imageSubjectZh,
+        retryReason: locked.data.retry_reason,
         visualProfileKey: locked.data.visual_profile_key,
       });
       const job = await jobs.createJob(executionUserId, {

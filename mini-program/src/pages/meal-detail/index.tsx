@@ -28,9 +28,6 @@ const mealImages = {
   oats: mealOatsImage,
   salmon: mealSalmonImage,
 };
-
-const ingredientImages = [mealOatsImage, mealBowlImage, mealSalmonImage];
-
 const scoreCopy = {
   A: {
     label: "优秀搭配",
@@ -58,13 +55,34 @@ export default function MealDetailPage() {
   const [detailModal, setDetailModal] = useState<"score" | "insight" | null>(null);
   const [remoteMeal, setRemoteMeal] = useState<ReturnType<typeof store.getMealById>>(undefined);
   const storedMeal = store.getMealById(router.params.id);
-  const meal = storedMeal ?? remoteMeal;
+  const meal = remoteMeal ?? storedMeal;
   useEffect(() => {
-    if (!router.params.id || storedMeal) return;
-    void getProductMeal(router.params.id)
-      .then((result) => setRemoteMeal(result ?? undefined))
-      .catch(() => undefined);
-  }, [router.params.id, storedMeal]);
+    if (!router.params.id) return;
+    let cancelled = false;
+    const refresh = () =>
+      getProductMeal(router.params.id!)
+        .then((result) => {
+          if (cancelled || !result) return;
+          setRemoteMeal(result);
+          if (store.getMealById(result.id)) store.updateMeal(result.id, result);
+          else store.addMeal(result);
+          return result;
+        })
+        .catch(() => undefined);
+
+    void refresh().then((result) => {
+      if (cancelled || !result) return;
+      const pending = !result.insight || result.insight.includes("正在整理");
+      if (!pending) return;
+      // Background insight generation may finish shortly after the fast response.
+      setTimeout(() => {
+        if (!cancelled) void refresh();
+      }, 2500);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [router.params.id, store.addMeal, store.getMealById, store.updateMeal]);
   if (!meal)
     return (
       <PageLayout
@@ -88,23 +106,12 @@ export default function MealDetailPage() {
   const score = getMealScore(meal);
   const scoreDetail = scoreCopy[score];
   const macros = [
-    {
-      icon: "protein" as const,
-      label: "蛋白质",
-      target: 60,
-      tone: undefined,
-      value: nutrition.protein,
-    },
-    {
-      icon: "carbs" as const,
-      label: "碳水",
-      target: 90,
-      tone: "carbs" as const,
-      value: nutrition.carbs,
-    },
-    { icon: "fat" as const, label: "脂肪", target: 25, tone: "fat" as const, value: nutrition.fat },
+    { label: "蛋白质", target: 60, tone: undefined, value: nutrition.protein },
+    { label: "碳水", target: 90, tone: "carbs" as const, value: nutrition.carbs },
+    { label: "脂肪", target: 25, tone: "fat" as const, value: nutrition.fat },
   ];
   const heroImage = meal.imageUrl || (meal.imageKey ? mealImages[meal.imageKey] : mealBowlImage);
+  const previewImage = () => Taro.previewImage({ current: heroImage, urls: [heroImage] });
   const edit = () => {
     store.setEditingMealId(meal.id);
     portion.startMealEdit(meal);
@@ -122,17 +129,21 @@ export default function MealDetailPage() {
     }
   };
   const toggleFavorite = async () => {
+    const nextFavorite = !meal.favorite;
     try {
-      const saved = await updateProductMeal(meal.id, { isFavorite: !meal.favorite });
+      const saved = await updateProductMeal(meal.id, { isFavorite: nextFavorite });
       if (!saved) throw new Error("Meal not found");
-      store.replaceRemoteMeals(await getProductMeals(meal.date), meal.date);
-      feedback.show({ message: meal.favorite ? "已取消收藏" : "已加入收藏", tone: "success" });
+      // Detail UI prefers remoteMeal over the store — keep both in sync.
+      setRemoteMeal(saved);
+      if (store.getMealById(saved.id)) store.updateMeal(saved.id, saved);
+      else store.addMeal(saved);
+      feedback.show({
+        message: nextFavorite ? "已加入收藏，可在「记录」筛选里查看" : "已取消收藏",
+        tone: "success",
+      });
     } catch {
       feedback.show({ message: "收藏状态更新失败，请稍后重试", tone: "error" });
     }
-  };
-  const openIngredient = (itemId: string) => {
-    Taro.navigateTo({ url: `/pages/ingredient-detail/index?mealId=${meal.id}&itemId=${itemId}` });
   };
   return (
     <PageLayout
@@ -151,64 +162,64 @@ export default function MealDetailPage() {
           </Text>
         </View>
         <AppCard tone="beige" className="meal-detail-page__hero">
-          <View
-            className="meal-detail-page__hero-visual"
-            ariaLabel="查看原始餐食照片"
-            onClick={() => Taro.previewImage({ current: heroImage, urls: [heroImage] })}
-          >
-            <Image className="meal-detail-page__hero-image" mode="aspectFill" src={heroImage} />
-            <View className="meal-detail-page__image-preview-hint">
-              <Text>查看原图</Text>
-            </View>
-          </View>
-          <View className="meal-detail-page__hero-copy">
+          <View className="meal-detail-page__hero-visual">
             <View
-              className="meal-detail-page__score-card"
+              className="meal-detail-page__hero-image-hit"
+              ariaLabel="查看原始餐食照片"
+              onClick={previewImage}
+            >
+              <Image className="meal-detail-page__hero-image" mode="aspectFill" src={heroImage} />
+            </View>
+            <View
+              className="meal-detail-page__score-badge"
               ariaLabel="查看本餐评分依据"
               onClick={() => setDetailModal("score")}
             >
-              <View className="meal-detail-page__score-card-head">
-                <View>
-                  <Text className="meal-detail-page__score-card-eyebrow">本餐评分</Text>
-                  <Text className="meal-detail-page__score-card-label">{scoreDetail.label}</Text>
-                </View>
-                <View className="meal-detail-page__score-grade">
-                  <Text>{score}</Text>
-                  <Text>级</Text>
-                </View>
+              <View className="meal-detail-page__score-grade">
+                <Text>{score}</Text>
               </View>
-              <Text className="meal-detail-page__score-card-summary">{scoreDetail.summary}</Text>
-              <View className="meal-detail-page__score-card-action">
-                <Text>查看评分依据</Text>
-                <NordicIcon name="chevron-right" size={16} ariaLabel="查看本餐评分依据" />
-              </View>
+              <Text className="meal-detail-page__score-badge-label">{scoreDetail.label}</Text>
             </View>
+            <View
+              className="meal-detail-page__image-preview-hint"
+              ariaLabel="查看原始餐食照片"
+              onClick={previewImage}
+            >
+              <Text>查看原图</Text>
+            </View>
+          </View>
+          <View className="meal-detail-page__hero-body">
             <Text className="meal-detail-page__calories">
               {nutrition.calories}
-              <Text> kcal</Text>
+              <Text>kcal</Text>
             </Text>
             <View className="meal-detail-page__hero-macros">
-              <View className="meal-detail-page__hero-macro">
-                <View className="meal-detail-page__hero-macro-icon">
-                  <NordicIcon name="protein" size={18} ariaLabel="蛋白质" />
-                </View>
-                <Text>蛋白质</Text>
-                <Text>{nutrition.protein}g</Text>
+              <View className="meal-detail-page__hero-macro-chip">
+                <Text className="meal-detail-page__hero-macro-value">{nutrition.protein}g</Text>
+                <Text className="meal-detail-page__hero-macro-label">蛋白质</Text>
               </View>
-              <View className="meal-detail-page__hero-macro">
-                <View className="meal-detail-page__hero-macro-icon">
-                  <NordicIcon name="carbs" size={18} ariaLabel="碳水" />
-                </View>
-                <Text>碳水</Text>
-                <Text>{nutrition.carbs}g</Text>
+              <View className="meal-detail-page__hero-macro-chip">
+                <Text className="meal-detail-page__hero-macro-value">{nutrition.carbs}g</Text>
+                <Text className="meal-detail-page__hero-macro-label">碳水</Text>
               </View>
-              <View className="meal-detail-page__hero-macro">
-                <View className="meal-detail-page__hero-macro-icon">
-                  <NordicIcon name="fat" size={18} ariaLabel="脂肪" />
-                </View>
-                <Text>脂肪</Text>
-                <Text>{nutrition.fat}g</Text>
+              <View className="meal-detail-page__hero-macro-chip">
+                <Text className="meal-detail-page__hero-macro-value">{nutrition.fat}g</Text>
+                <Text className="meal-detail-page__hero-macro-label">脂肪</Text>
               </View>
+            </View>
+          </View>
+          <View
+            className="meal-detail-page__score-footer"
+            ariaLabel="查看本餐评分依据"
+            onClick={() => setDetailModal("score")}
+          >
+            <View className="meal-detail-page__score-footer-copy">
+              <Text className="meal-detail-page__score-footer-eyebrow">本餐评分</Text>
+              <Text className="meal-detail-page__score-footer-summary">{scoreDetail.summary}</Text>
+            </View>
+            <View className="meal-detail-page__score-footer-action">
+              <Text>依据</Text>
+              <NordicIcon name="chevron-right" size={16} ariaLabel="查看本餐评分依据" />
             </View>
           </View>
         </AppCard>
@@ -231,7 +242,7 @@ export default function MealDetailPage() {
         >
           <View className="meal-detail-page__insight-head">
             <View className="meal-detail-page__insight-orb">
-              <NordicIcon name="sparkles" size={18} ariaLabel="NOVA AI" />
+              <NordicIcon name="nova" size={18} ariaLabel="营养小结" />
             </View>
             <View className="meal-detail-page__insight-title">
               <Text>营养小结</Text>
@@ -244,31 +255,6 @@ export default function MealDetailPage() {
             <Text>查看建议依据</Text>
           </View>
         </View>
-        <AppCard className="meal-detail-page__ingredients">
-          <Text className="meal-detail-page__section-title">这餐包含</Text>
-          {meal.items.map((item, index) => (
-            <View
-              className="meal-detail-page__ingredient-row"
-              key={item.id}
-              ariaLabel={`查看${item.name}详情`}
-              onClick={() => openIngredient(item.id)}
-            >
-              <Image
-                className="meal-detail-page__ingredient-thumb"
-                mode="aspectFill"
-                src={heroImage}
-              />
-              <View className="meal-detail-page__ingredient-copy">
-                <Text>{item.name}</Text>
-                <Text>{item.amount}</Text>
-              </View>
-              <View className="meal-detail-page__ingredient-meta">
-                <Text>{item.calories} kcal</Text>
-                <NordicIcon name="chevron-right" size={18} ariaLabel={`${item.name}详情`} />
-              </View>
-            </View>
-          ))}
-        </AppCard>
       </View>
       <View className="meal-detail-page__actions">
         <View className="meal-detail-page__action" ariaLabel="编辑本餐" onClick={edit}>
@@ -276,11 +262,15 @@ export default function MealDetailPage() {
           <Text>编辑</Text>
         </View>
         <View
-          className="meal-detail-page__action"
+          className={`meal-detail-page__action ${meal.favorite ? "meal-detail-page__action--favorite" : ""}`}
           ariaLabel={meal.favorite ? "取消收藏本餐" : "收藏本餐"}
           onClick={() => void toggleFavorite()}
         >
-          <NordicIcon name="heart" size={22} ariaLabel={meal.favorite ? "取消收藏" : "收藏"} />
+          <NordicIcon
+            name={meal.favorite ? "heart-filled" : "heart"}
+            size={22}
+            ariaLabel={meal.favorite ? "取消收藏" : "收藏"}
+          />
           <Text>{meal.favorite ? "已收藏" : "收藏"}</Text>
         </View>
         <View

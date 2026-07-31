@@ -12,11 +12,12 @@ import { StatisticCard } from "../../components/statistic-card";
 import { submitProductFeedback } from "../../api/feedback-api";
 import { getProductAccount } from "../../api/product-data-api";
 import {
-  getProductAchievements,
   getProductWeeklyReview,
   type ProductWeeklyReview,
 } from "../../api/insight-api";
+import { getAchievementIcon } from "../../features/coach/achievement-icons";
 import { createAchievements } from "../../features/coach/domain";
+import { refreshProductAchievements } from "../../features/coach/refresh-achievements";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { createLogoutFlow } from "../../auth/logout-flow";
 import { signOut } from "../../auth/session-manager";
@@ -63,16 +64,18 @@ export default function ProfilePage() {
   useEffect(() => () => setTabBarVisible(true), [setTabBarVisible]);
 
   useEffect(() => {
-    void Promise.all([getProductAchievements(date), getProductWeeklyReview(date)])
-      .then(([remoteAchievements, review]) => {
-        achievements.setAchievements(remoteAchievements);
+    void Promise.all([
+      refreshProductAchievements(date),
+      getProductWeeklyReview(date, { preferFast: true }),
+    ])
+      .then(([, review]) => {
         setWeeklyReview(review);
       })
       .catch(() => undefined);
-  }, [achievements.setAchievements, date]);
+  }, [date]);
 
   // Silently refresh the user profile from the backend on page show,
-  // so nickname/avatar changes from other pages are reflected immediately.
+  // so nickname/avatar/settings changes from other pages are reflected immediately.
   useEffect(() => {
     void getProductAccount()
       .then((account) => {
@@ -91,6 +94,19 @@ export default function ProfilePage() {
         if (account.goalType) changes.goalLabel = labels[account.goalType] ?? "精益增肌";
         if (Object.keys(changes).length > 0) {
           useProfileStore.getState().setProfile(changes);
+        }
+        const settings = account.settings;
+        if (settings) {
+          const store = useProfileStore.getState();
+          if (settings.dietaryPattern !== undefined) {
+            store.setSetting("dietaryPattern", settings.dietaryPattern);
+          }
+          if (Array.isArray(settings.foodAvoidances)) {
+            store.setSetting("foodAvoidances", settings.foodAvoidances);
+          }
+          if (typeof settings.mealsPerDay === "number") {
+            store.setSetting("mealsPerDay", settings.mealsPerDay);
+          }
         }
       })
       .catch(() => undefined);
@@ -148,7 +164,9 @@ export default function ProfilePage() {
         </View>
 
         <View className="card-grid profile-rhythm__stats">
-          <StatisticCard label="目标热量" value={`${profile.profile.targetCalories}`} hint="kcal" />
+          <View onClick={() => openPage("/pages/goal-adjust/index")}>
+            <StatisticCard label="目标热量" value={`${profile.profile.targetCalories}`} hint="kcal · 可调整" />
+          </View>
           <View onClick={openCoach}>
             <StatisticCard
               label="蛋白完成度"
@@ -184,7 +202,7 @@ export default function ProfilePage() {
               className={`profile-rhythm__achievement ${achievement.unlocked ? "" : "profile-rhythm__achievement--locked"}`}
               key={achievement.id}
             >
-              <NordicIcon name="sparkles" size={22} ariaLabel={achievement.title} />
+              <NordicIcon name={getAchievementIcon(achievement)} size={22} ariaLabel={achievement.title} />
               <Text>{achievement.title}</Text>
             </View>
           ))}
@@ -207,11 +225,18 @@ export default function ProfilePage() {
         </View>
 
         <View className="profile-rhythm__settings-group">
+          <View onClick={() => openPage("/pages/body-profile/index?from=settings&entry=1")}>
+            <ListItem
+              icon={<NordicIcon name="user-round" size={20} ariaLabel="营养档案" />}
+              title="营养档案"
+              description="身体数据、饮食偏好与忌口"
+            />
+          </View>
           <View onClick={() => setActiveModal("privacy")}>
             <ListItem
               icon={<NordicIcon name="check" size={20} ariaLabel="隐私与数据" />}
               title="隐私与数据"
-              description="本地体验说明"
+              description="同步范围与数据说明"
             />
           </View>
           <View onClick={() => setActiveModal("feedback")}>
@@ -225,7 +250,7 @@ export default function ProfilePage() {
             <ListItem
               icon={<NordicIcon name="user-round" size={20} ariaLabel="关于我们" />}
               title="关于我们"
-              description="Nordic Nutri AI 本地体验版"
+              description="产品介绍与使用说明"
             />
           </View>
           <View onClick={logout}>
@@ -240,29 +265,27 @@ export default function ProfilePage() {
 
       <BottomSheet
         open={activeModal === "privacy"}
-        className="profile-sheet"
+        className="profile-sheet profile-sheet--info"
         onDismiss={() => setActiveModal(null)}
       >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">
             <Text className="profile-modal__title">隐私与数据</Text>
-            <View
-              className="profile-sheet__close"
-              ariaLabel="关闭隐私与数据"
-              onClick={() => setActiveModal(null)}
-            >
-              <NordicIcon name="x" size={20} ariaLabel="关闭" />
-            </View>
           </View>
           <Text className="profile-modal__lead">你的记录，应该由你清楚掌握。</Text>
           <View className="profile-modal__notice">
-            <Text>账号资料、目标和饮食记录会通过加密连接同步到 CloudBase 数据库。</Text>
-            <Text>业务接口只接受当前登录会话，不允许小程序直接读写数据库。</Text>
-          </View>
-          <View className="profile-sheet__action">
-            <AppButton size="medium" onClick={() => setActiveModal(null)}>
-              知道了
-            </AppButton>
+            <Text>
+              我们会同步账号资料、身体档案、营养目标、饮食记录，以及你主动提交的反馈内容。
+            </Text>
+            <Text>
+              数据经 HTTPS 加密连接写入 CloudBase；业务接口只接受当前微信登录会话，小程序不能直接读写数据库。
+            </Text>
+            <Text>
+              服务端按登录身份隔离数据，仅你本人可查看与修改自己的记录；其他用户无法访问你的饮食与目标信息。
+            </Text>
+            <Text>
+              你可随时在资料页更新档案与目标，或退出当前设备登录。如需删除账号相关数据，可通过「反馈与帮助」联系我们处理。
+            </Text>
           </View>
         </View>
       </BottomSheet>
@@ -303,33 +326,29 @@ export default function ProfilePage() {
 
       <BottomSheet
         open={activeModal === "about"}
-        className="profile-sheet"
+        className="profile-sheet profile-sheet--info"
         onDismiss={() => setActiveModal(null)}
       >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">
             <Text className="profile-modal__title">关于我们</Text>
-            <View
-              className="profile-sheet__close"
-              ariaLabel="关闭关于我们"
-              onClick={() => setActiveModal(null)}
-            >
-              <NordicIcon name="x" size={20} ariaLabel="关闭" />
-            </View>
           </View>
           <Text className="profile-modal__lead">
-            Nordic Nutri AI 是一款支持云端同步的营养记录工具。
+            Nordic Nutri AI 帮助你轻松看见、理解并记录每一餐。
           </Text>
           <View className="profile-modal__notice">
-            <Text>我们希望把饮食记录、目标进度和每日建议放在一个轻松、可持续的节奏里。</Text>
             <Text>
-              当前版本支持账号、饮食记录和目标同步；营养建议仅供日常参考，不替代医疗意见。
+              面向健身与健康管理用户，把拍照识别、食物库、目标进度、餐次回顾与每日建议放在同一套轻松、可持续的节奏里。
             </Text>
-          </View>
-          <View className="profile-sheet__action">
-            <AppButton size="medium" onClick={() => setActiveModal(null)}>
-              知道了
-            </AppButton>
+            <Text>
+              当前支持微信登录与云端同步、饮食记录与周回顾、目标调整、标准食物库浏览，以及营养教练参考建议。
+            </Text>
+            <Text>
+              营养建议仅供日常参考，不构成医疗诊断或治疗建议；如有健康问题，请咨询专业人士。
+            </Text>
+            <Text>
+              产品持续迭代中，欢迎通过「反馈与帮助」告诉我们哪里不顺手，或你希望下一步看到什么。
+            </Text>
           </View>
         </View>
       </BottomSheet>

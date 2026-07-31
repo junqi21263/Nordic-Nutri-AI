@@ -28,6 +28,8 @@ export interface ProductDailySummary {
   }>;
   completion: number;
   insight: ProductDailyInsight;
+  /** Present when meal-summary embeds the day meal list to avoid a second /meals round-trip. */
+  meals?: import("./meal-data-api").ProductMeal[];
 }
 
 export interface ProductWeeklyReview {
@@ -68,8 +70,10 @@ export function getProductDailySummary(date: string) {
   });
 }
 
-export function getProductWeeklyReview(date: string) {
-  return requestProductApi<ProductWeeklyReview>(`/weekly-review?date=${encodeURIComponent(date)}`, {
+export function getProductWeeklyReview(date: string, options: { preferFast?: boolean } = {}) {
+  const params = new URLSearchParams({ date });
+  if (options.preferFast) params.set("preferFast", "1");
+  return requestProductApi<ProductWeeklyReview>(`/weekly-review?${params.toString()}`, {
     method: "GET",
     fallbackMessage: "营养数据读取失败，请稍后重试",
   });

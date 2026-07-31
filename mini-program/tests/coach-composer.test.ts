@@ -34,6 +34,42 @@ describe("coach composer shape", () => {
     expect(component).toContain(": `calc(${layout.tabBarHeight}px + ${layout.safeBottom}px)`;");
     expect(component).not.toContain("+ ${layout.safeBottom}px + 8px");
   });
+
+  it("uses an auto-height textarea so long input wraps instead of scrolling horizontally", () => {
+    const component = read("src/pages/coach/components/CoachComposer/index.tsx");
+    const componentStyles = read("src/pages/coach/components/CoachComposer/index.scss");
+
+    expect(component).toContain("Textarea");
+    expect(component).toContain("autoHeight");
+    expect(component).not.toContain("<Input");
+    expect(componentStyles).toContain("white-space: pre-wrap");
+    expect(componentStyles).toContain("word-break: break-word");
+  });
+
+  it("keeps the empty-state hint on one line without wrapping", () => {
+    const component = read("src/pages/coach/components/CoachComposer/index.tsx");
+    const componentStyles = read("src/pages/coach/components/CoachComposer/index.scss");
+
+    expect(component).toContain("coach-composer__placeholder");
+    expect(component).toContain("coach-composer__placeholder-text");
+    expect(component).toContain("showPlaceholder");
+    expect(componentStyles).toContain(".coach-composer__placeholder");
+    expect(componentStyles).toContain("justify-content: center;");
+    expect(componentStyles).toContain("white-space: nowrap;");
+    expect(componentStyles).toContain("text-overflow: ellipsis;");
+  });
+
+  it("keeps camera and send buttons enlarged and vertically centered with the input", () => {
+    const component = read("src/pages/coach/components/CoachComposer/index.tsx");
+    const componentStyles = read("src/pages/coach/components/CoachComposer/index.scss");
+
+    expect(componentStyles).toContain("align-items: center;");
+    expect(componentStyles).toContain("align-self: center;");
+    expect(componentStyles).toContain("flex: 0 0 52px;");
+    expect(componentStyles).toContain("height: 52px;");
+    expect(component).toContain('name="camera" size={24}');
+    expect(component).toContain('name="arrow-up" size={24}');
+  });
 });
 
 describe("coach restart action placement", () => {

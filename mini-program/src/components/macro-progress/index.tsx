@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import { AnimatedProgressBar } from "../animated-progress-bar";
 
 export interface MacroProgressProps {
   label: string;
@@ -16,9 +17,12 @@ export function MacroProgress({
   tone = "protein",
 }: MacroProgressProps) {
   const progress = Math.min(100, Math.max(0, Math.round((value / Math.max(target, 1)) * 100)));
+  const exceeded = target > 0 && value > target;
+  const toneClass =
+    tone === "sage" ? "protein" : tone === "warning" ? "carbs" : tone;
   return (
     <View
-      className={`macro-progress macro-progress--${tone === "sage" ? "protein" : tone === "warning" ? "carbs" : tone}`}
+      className={`macro-progress macro-progress--${toneClass} ${exceeded ? "macro-progress--exceeded" : ""}`}
     >
       <View className="macro-progress__row">
         <Text>{label}</Text>
@@ -28,7 +32,7 @@ export function MacroProgress({
         </Text>
       </View>
       <View className="macro-progress__track">
-        <View className="macro-progress__bar" style={{ width: `${progress}%` }} />
+        <AnimatedProgressBar className="macro-progress__bar animated-progress-bar" percent={progress} />
       </View>
     </View>
   );

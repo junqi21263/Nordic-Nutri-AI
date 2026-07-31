@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { clampProgress, createMealFixtures, getDailySummary } from "../src/features/meals/domain";
+import {
+  clampProgress,
+  createMealFixtures,
+  formatTargetStatus,
+  getDailySummary,
+} from "../src/features/meals/domain";
 import { createMealStore } from "../src/stores/meal-store";
 
 const today = "2026-07-13";
@@ -12,8 +17,17 @@ describe("local meal store", () => {
   });
 
   it("clamps visual progress while preserving real overage", () => {
-    expect(clampProgress(140, 100)).toEqual({ percent: 100, remaining: -40, exceeded: true });
-    expect(clampProgress(0, 0)).toEqual({ percent: 0, remaining: 0, exceeded: false });
+    const over = clampProgress(140, 100);
+    expect(over).toEqual({ percent: 100, remaining: -40, excess: 40, exceeded: true });
+    expect(formatTargetStatus(over, " kcal")).toBe("超出 40 kcal");
+    expect(formatTargetStatus(over, "g", { short: true })).toBe("超 40g");
+    expect(clampProgress(0, 0)).toEqual({
+      percent: 0,
+      remaining: 0,
+      excess: 0,
+      exceeded: false,
+    });
+    expect(formatTargetStatus(clampProgress(80, 100), " kcal")).toBe("还可摄入 20 kcal");
   });
 
   it("synchronizes deletion and edits into daily summaries", () => {

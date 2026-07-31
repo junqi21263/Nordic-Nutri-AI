@@ -70,3 +70,18 @@ test("unlocks the first meal and a real seven-day streak from persisted meals", 
   assert.equal(result.find((item) => item.title === "连续七天").unlocked, true);
   assert.equal(result.find((item) => item.title === "连续七天").progress, 100);
 });
+
+test("achievement payloads expose requirement text and unlock timestamps", () => {
+  const meals = [
+    { recordedAt: "2026-07-18T08:00:00.000Z", mealType: "breakfast", caloriesKcal: 500, proteinG: 40, carbsG: 60, fatG: 15 },
+  ];
+  const first = calculateAchievements(meals, {}, "2026-07-20").find((item) => item.title === "第一餐记录");
+  assert.equal(first.unlocked, true);
+  assert.match(first.requirement, /1 餐/);
+  assert.equal(first.unlockedAt, "2026-07-18T08:00:00.000Z");
+
+  const locked = calculateAchievements(meals, {}, "2026-07-20").find((item) => item.title === "早餐节奏");
+  assert.equal(locked.unlocked, false);
+  assert.equal(locked.unlockedAt, null);
+  assert.match(locked.requirement, /早餐/);
+});

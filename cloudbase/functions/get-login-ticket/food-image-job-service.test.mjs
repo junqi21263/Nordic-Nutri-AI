@@ -390,3 +390,152 @@ test("rejecting a batch candidate records the review reason for one retry", asyn
     },
   );
 });
+
+test("rejectImage with reasonCode stores coded fragment for retry prompts", async () => {
+  const writes = [];
+  const image = { id: "image-3", food_id: "food-3", job_id: "job-3", is_primary: false };
+  const db = {
+    from(table) {
+      return {
+        select() {
+          return { eq() { return { maybeSingle: async () => ({ data: table === "food_images" ? image : null, error: null }) }; } };
+        },
+        update(payload) {
+          const write = { table, payload, filters: [] };
+          writes.push(write);
+          const query = { eq(column, value) { write.filters.push([column, value]); return query; } };
+          return query;
+        },
+      };
+    },
+  };
+  const service = createFoodImageJobService({
+    db,
+    repository: { async isAdmin(userId) { return userId === "admin"; } },
+    hunyuan: { modelName: "test" },
+    imageService: {},
+    config: { generationEnabled: true },
+  });
+
+  await service.rejectImage("admin", "image-3", { reasonCode: "wrong_identity", reason: "生成了鱼片" });
+  const imageWrite = writes.find((write) => write.table === "food_images");
+  assert.equal(imageWrite.payload.reject_reason_code, "wrong_identity");
+  assert.match(imageWrite.payload.reject_reason, /勿生成其他品类|严格符合该食材/);
+  assert.match(imageWrite.payload.reject_reason, /鱼片/);
+  const batchWrite = writes.find((write) => write.table === "food_image_batch_items");
+  assert.match(batchWrite.payload.retry_reason, /鱼片/);
+});
+
+test("createJob defaults to a single candidate when config omits candidateCount", async () => {
+  const jobs = [];
+  const profiles = [];
+  const db = {
+    from(table) {
+      if (table === "food_image_usage_daily") {
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { generated_count: 0 }, error: null }) }) }),
+        };
+      }
+      if (table === "food_image_jobs") {
+        return {
+          select: () => {
+            const query = { eq: () => query, in: () => query, order: () => query, limit: () => query, maybeSingle: async () => ({ data: null, error: null }) };
+            return query;
+          },
+          insert: (payload) => ({
+            select: () => ({
+              maybeSingle: async () => {
+                const row = { id: "job-default", ...payload, created_at: new Date().toISOString() };
+                jobs.push(row);
+                return { data: row, error: null };
+              },
+            }),
+          }),
+        };
+      }
+      if (table === "food_image_visual_profiles") {
+        return {
+          select: () => {
+            const query = { eq: () => query, maybeSingle: async () => ({ data: profiles[0] || null, error: null }) };
+            return query;
+          },
+          insert: (payload) => ({ select: () => ({ maybeSingle: async () => { const row = { id: "profile-1", ...payload }; profiles.push(row); return { data: row, error: null }; } }) }),
+          update: () => ({ eq: async () => ({ data: null, error: null }) }),
+        };
+      }
+      if (table === "food_images") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                limit: async () => ({ data: [], error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "foods") {
+        return { update: () => ({ eq: async () => ({ data: null, error: null }) }) };
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+  const service = createFoodImageJobService({
+    db,
+    repository: {
+      async isAdmin() { return true; },
+      async getFoodById(id) {
+        return { id, nameZh: "苹果", nameEn: "Apple", category: { code: "fruits", nameZh: "水果" }, primaryImageId: null };
+      },
+    },
+    hunyuan: { modelName: "test" },
+    imageService: {},
+    config: { generationEnabled: true, dailyLimit: 100 },
+    triggerWorker: async () => {},
+  });
+  const created = await service.createJob("admin", { foodId: "food-apple" });
+  assert.equal(created.candidateCount, 1);
+  assert.equal(jobs[0]?.candidate_count, 1);
+});
+
+test("rejectImage best-effort deletes generated storage variants", async () => {
+  const deleted = [];
+  const writes = [];
+  const image = {
+    id: "image-2",
+    food_id: "food-2",
+    job_id: "job-2",
+    is_primary: false,
+    storage_path: "food-library/food-2/image-2",
+  };
+  const db = {
+    from(table) {
+      return {
+        select() {
+          return { eq() { return { maybeSingle: async () => ({ data: table === "food_images" ? image : null, error: null }) }; } };
+        },
+        update(payload) {
+          const write = { table, payload, filters: [] };
+          writes.push(write);
+          const query = { eq(column, value) { write.filters.push([column, value]); return query; } };
+          return query;
+        },
+      };
+    },
+  };
+  const service = createFoodImageJobService({
+    db,
+    repository: { async isAdmin(userId) { return userId === "admin"; } },
+    hunyuan: { modelName: "test" },
+    imageService: {
+      async deleteGeneratedVariants(storagePath) {
+        deleted.push(storagePath);
+        return { attempted: 7, deleted: 3 };
+      },
+    },
+    config: { generationEnabled: true },
+  });
+  const result = await service.rejectImage("admin", "image-2", { reason: "主体不对" });
+  assert.equal(result.rejected, true);
+  assert.deepEqual(deleted, ["food-library/food-2/image-2"]);
+});

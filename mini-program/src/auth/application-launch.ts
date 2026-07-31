@@ -7,9 +7,11 @@ export interface ApplicationAuthBootstrap {
 
 export interface ApplicationDestinationDependencies {
   isOnboardingCompleted: () => boolean;
+  hasSeenWelcome: () => boolean;
   openHome: () => void | Promise<unknown>;
   openOnboarding: () => void | Promise<unknown>;
   openLogin: () => void | Promise<unknown>;
+  openWelcome: () => void | Promise<unknown>;
 }
 
 export function createApplicationLaunch(
@@ -44,12 +46,20 @@ export function createRuntimeApplicationLaunch(
   auth: ApplicationAuthBootstrap,
   destinations: ApplicationDestinationDependencies,
 ) {
+  const openAuthenticatedDestination = () => {
+    if (destinations.isOnboardingCompleted()) return destinations.openHome();
+    if (!destinations.hasSeenWelcome()) return destinations.openWelcome();
+    return destinations.openOnboarding();
+  };
+
+  const openUnauthenticatedDestination = () => {
+    if (!destinations.hasSeenWelcome()) return destinations.openWelcome();
+    return destinations.openLogin();
+  };
+
   return createApplicationLaunch(
     auth,
-    () =>
-      destinations.isOnboardingCompleted()
-        ? destinations.openHome()
-        : destinations.openOnboarding(),
-    destinations.openLogin,
+    openAuthenticatedDestination,
+    openUnauthenticatedDestination,
   );
 }

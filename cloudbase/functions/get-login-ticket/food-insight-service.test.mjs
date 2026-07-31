@@ -76,3 +76,51 @@ test("preserves the dev worker model metadata for a valid delegated completion",
   assert.equal(insight.source, "hunyuan-exp");
   assert.equal(insight.model, "hunyuan-2.0-instruct-20251111");
 });
+
+test("reuses a cached food insight for the same nutrition context", async () => {
+  const rows = { food_nutrition_insights: [] };
+  const db = {
+    from(table) {
+      assert.equal(table, "food_nutrition_insights");
+      let selected = rows[table];
+      const chain = {
+        eq(column, value) {
+          selected = selected.filter((row) => row[column] === value);
+          return chain;
+        },
+        select() { return chain; },
+        maybeSingle: async () => ({ data: selected[0] ?? null, error: null }),
+      };
+      return {
+        select() { return chain; },
+        async upsert(payload) {
+          const existing = rows[table].find((row) => row.food_id === payload.food_id);
+          if (existing) Object.assign(existing, payload);
+          else rows[table].push({ id: "insight-1", ...payload });
+          return { data: payload, error: null };
+        },
+      };
+    },
+  };
+  let calls = 0;
+  const service = createFoodInsightService({
+    db,
+    requestCompletion: async () => {
+      calls += 1;
+      return JSON.stringify({
+        headline: "鸡胸肉的蛋白质优势",
+        content: "每100g约含19.3g蛋白质，适合搭配蔬菜和主食。",
+      });
+    },
+    source: "hunyuan-exp",
+    model: "hunyuan-2.0-instruct-20251111",
+  });
+
+  const first = await service.getInsight(food);
+  const second = await service.getInsight(food);
+
+  assert.equal(calls, 1);
+  assert.equal(first.cached, false);
+  assert.equal(second.cached, true);
+  assert.equal(second.headline, "鸡胸肉的蛋白质优势");
+});

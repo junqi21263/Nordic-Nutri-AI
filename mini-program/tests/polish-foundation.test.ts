@@ -11,9 +11,13 @@ const read = (path: string) => readFileSync(resolve(source, path), "utf8");
 
 describe("MVP polish foundation", () => {
   it("queues and clears local feedback without a network dependency", () => {
-    const store = createFeedbackStore();
+    const presented: Array<{ message: string; tone: string }> = [];
+    const store = createFeedbackStore((toast) => {
+      presented.push(toast);
+    });
     store.getState().show({ message: "已保存到本地记录", tone: "success" });
     expect(store.getState().toast).toMatchObject({ message: "已保存到本地记录", tone: "success" });
+    expect(presented).toEqual([{ message: "已保存到本地记录", tone: "success" }]);
     store.getState().clear();
     expect(store.getState().toast).toBeNull();
   });

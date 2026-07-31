@@ -36,6 +36,7 @@ describe("persisted coach boundary", () => {
     expect(page).toContain("streamProductCoachMessage");
     expect(page).toContain("getProductCoachBrief");
     expect(page).toContain("refreshCoachBrief");
+    expect(page).toContain("useDidShow");
     expect(page).toContain("getProductCoachDailyTip");
     expect(page).toContain("restartProductCoachConversation");
     expect(page).toContain("今日营养建议");

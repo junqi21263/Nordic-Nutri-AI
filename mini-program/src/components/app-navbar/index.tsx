@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import { useDeferredProgress } from "../../hooks/useAnimatedProgress";
 import { NordicIcon } from "../nordic-icon";
 import { useMenuButtonMetrics } from "../../utils/use-menu-button-metrics";
 
@@ -24,6 +25,9 @@ export function AppNavbar({
   const { navigationBarHeight, rightInset, statusBarHeight, titleMaxWidth, totalHeaderHeight } =
     useMenuButtonMetrics();
   const isOnboarding = variant === "onboarding";
+  const progressPercent = useDeferredProgress(
+    progress === undefined ? 0 : Math.max(0, Math.min(progress, 1)) * 100,
+  );
 
   return (
     <>
@@ -89,8 +93,8 @@ export function AppNavbar({
           className={isOnboarding ? "onboarding-progress" : "app-navbar__progress"}
         >
           <View
-            className={isOnboarding ? "onboarding-progress__value" : "app-navbar__progress-value"}
-            style={{ width: `${Math.max(0, Math.min(progress, 1)) * 100}%` }}
+            className={`animated-progress-bar ${isOnboarding ? "onboarding-progress__value" : "app-navbar__progress-value"}`}
+            style={{ transform: `scaleX(${progressPercent / 100})` }}
           />
         </View>
       )}

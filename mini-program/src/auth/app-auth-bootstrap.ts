@@ -2,6 +2,7 @@ import Taro from "@tarojs/taro";
 import { loginWithWechat } from "../api/auth-api";
 import { getProductAccount } from "../api/product-data-api";
 import { useProfileStore } from "../stores/profile-store";
+import { hasSeenWelcome } from "../features/welcome/welcome-seen";
 import { isOnboardingCompleted } from "../utils/local-experience";
 import { createAuthBootstrap } from "./auth-bootstrap";
 import { createRuntimeApplicationLaunch } from "./application-launch";
@@ -11,6 +12,13 @@ import {
   refreshSession,
   restoreSession,
 } from "./session-manager";
+
+function openWelcomeIfNeeded() {
+  const pages = Taro.getCurrentPages();
+  const route = pages[pages.length - 1]?.route || "";
+  if (route.includes("pages/welcome/index")) return Promise.resolve();
+  return Taro.reLaunch({ url: "/pages/welcome/index" });
+}
 
 async function loadIdentity(user: { id: string }) {
   const account = await getProductAccount();
@@ -56,9 +64,11 @@ const applicationLaunch = createRuntimeApplicationLaunch(
   },
   {
     isOnboardingCompleted,
+    hasSeenWelcome,
     openHome: () => Taro.switchTab({ url: "/pages/home/index" }),
     openOnboarding: () => Taro.reLaunch({ url: "/pages/onboarding/index" }),
     openLogin: () => Taro.reLaunch({ url: "/pages/auth-entry/index" }),
+    openWelcome: () => openWelcomeIfNeeded(),
   },
 );
 

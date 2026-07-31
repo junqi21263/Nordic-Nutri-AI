@@ -94,3 +94,44 @@ test("acquireFromUpload stores variants when sharp unavailable", async () => {
   assert.equal(result.detailUrl, null);
   assert.equal(result.status, "pending");
 });
+
+test("persistGeneratedImage uploads display webp variants only (no original)", async () => {
+  const uploads = [];
+  const svc = createFoodImageService({
+    sharpLoader: () => null,
+    uploader: async ({ cloudPath }) => {
+      uploads.push(cloudPath);
+      return { fileID: `cloud://env/${cloudPath}` };
+    },
+  });
+  const saved = await svc.persistGeneratedImage({
+    buffer: Buffer.from("fake-image-bytes"),
+    mimeType: "image/jpeg",
+    foodId: "food-1",
+    imageId: "image-1",
+  });
+  assert.equal(saved.storagePath, "food-library/food-1/image-1");
+  assert.equal(saved.originalFileId, "cloud://env/food-library/food-1/image-1/detail.webp");
+  assert.deepEqual(uploads.sort(), [
+    "food-library/food-1/image-1/detail.webp",
+    "food-library/food-1/image-1/list.webp",
+    "food-library/food-1/image-1/thumbnail.webp",
+  ].sort());
+  assert.equal(uploads.some((path) => path.includes("/original.")), false);
+});
+
+test("deleteGeneratedVariants removes display files and legacy originals", async () => {
+  const deleted = [];
+  const svc = createFoodImageService({
+    deleter: async ({ cloudPaths }) => {
+      deleted.push(...cloudPaths);
+      return { deleted: cloudPaths.length };
+    },
+  });
+  const result = await svc.deleteGeneratedVariants("food-library/food-1/image-1");
+  assert.equal(result.attempted >= 3, true);
+  assert.ok(deleted.includes("food-library/food-1/image-1/detail.webp"));
+  assert.ok(deleted.includes("food-library/food-1/image-1/list.webp"));
+  assert.ok(deleted.includes("food-library/food-1/image-1/thumbnail.webp"));
+  assert.ok(deleted.some((path) => path.includes("/original.")));
+});

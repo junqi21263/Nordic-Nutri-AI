@@ -162,13 +162,13 @@ export function createMealStore(
     searchMeals: (keyword) => {
       const normalized = keyword.trim().toLocaleLowerCase();
       if (!normalized) return get().getMealsByDate();
-      return get()
-        .getMealsByDate()
-        .filter(
+      return sortMeals(
+        get().meals.filter(
           (meal) =>
             meal.title.toLocaleLowerCase().includes(normalized) ||
             meal.items.some((item) => item.name.toLocaleLowerCase().includes(normalized)),
-        );
+        ),
+      );
     },
     filterMeals: () => {
       const state = get();

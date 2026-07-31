@@ -17,4 +17,21 @@ describe("food catalog detail routing", () => {
     expect(catalogPage).not.toContain("const quickAdd");
     expect(catalogPage).not.toContain("已选中，前往手动记录");
   });
+
+  it("preserves the selected category when returning from food detail", () => {
+    expect(catalogPage).toMatch(/didBootstrapRef|hasBootstrappedRef|catalogBootstrappedRef/);
+    const didShowBlock = catalogPage.match(/useDidShow\(\(\) => \{[\s\S]*?\n  \}\);/)?.[0] ?? "";
+    expect(didShowBlock).toContain("loadTaxonomy");
+    expect(didShowBlock).toMatch(/if \([^)]*(didBootstrap|hasBootstrapped|catalogBootstrapped)/);
+    expect(didShowBlock).not.toMatch(/useDidShow\(\(\) => \{\s*void discover\(\);\s*void loadTaxonomy\(\);/);
+  });
+
+  it("shows a refresh control beside popular recommendations", () => {
+    expect(catalogPage).toContain("food-catalog-section__header");
+    expect(catalogPage).toContain("food-catalog-section__refresh");
+    expect(catalogPage).toContain("refreshPopular");
+    expect(catalogPage).toContain('name="refresh-cw"');
+    expect(catalogPage).toContain("shuffleCatalogItems");
+    expect(catalogPage).toContain("pickRandomCatalogPage");
+  });
 });

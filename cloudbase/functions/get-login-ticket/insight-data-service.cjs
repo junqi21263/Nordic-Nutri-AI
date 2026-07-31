@@ -1,5 +1,9 @@
 const { createDailyInsightHash, createDailyInsightService, createRuleInsight } = require("./daily-insight-service.cjs");
 const {
+  dietaryPatternLabel,
+  foodAvoidanceLabels,
+} = require("./diet-preference-labels.cjs");
+const {
   calculateAchievements,
   calculateDailyNutrition,
   calculateWeeklyNutrition,
@@ -8,6 +12,7 @@ const {
 const {
   createFallbackWeeklyReview,
   createWeeklyReviewHash,
+  shouldGenerateWeeklyAi,
   weeklyReviewContext,
 } = require("./deepseek-weekly-review-service.cjs");
 
@@ -26,11 +31,31 @@ function shiftDate(value, days) {
   return parsed.toISOString().slice(0, 10);
 }
 
-function dailyInsightContext(summary) {
+function normalizeInsightPreferences(settings) {
+  if (!settings || typeof settings !== "object") return null;
+  const dietaryPattern = settings.dietary_pattern ?? settings.dietaryPattern ?? null;
+  const foodAvoidances = Array.isArray(settings.food_avoidances)
+    ? settings.food_avoidances
+    : Array.isArray(settings.foodAvoidances)
+      ? settings.foodAvoidances
+      : [];
+  const mealsRaw = Number(settings.meals_per_day ?? settings.mealsPerDay);
+  const mealsPerDay =
+    Number.isFinite(mealsRaw) && mealsRaw >= 2 && mealsRaw <= 5 ? Math.round(mealsRaw) : 3;
+  return {
+    dietaryPattern,
+    dietaryPatternLabel: dietaryPatternLabel(dietaryPattern),
+    foodAvoidances: foodAvoidances.slice(0, 20),
+    foodAvoidanceLabels: foodAvoidanceLabels(foodAvoidances).slice(0, 20),
+    mealsPerDay,
+  };
+}
+
+function dailyInsightContext(summary, preferences = null) {
   const meals = Array.isArray(summary?.meals) ? summary.meals : [];
   const mealTypes = [...new Set(meals.map((meal) => meal?.mealType).filter((value) => typeof value === "string"))].slice(0, 4);
   const mealNames = [...new Set(meals.map((meal) => typeof meal?.name === "string" ? meal.name.trim() : "").filter(Boolean))].slice(0, 6);
-  return {
+  const context = {
     daily: {
       targets: summary?.targets ?? {},
       consumed: summary?.consumed ?? {},
@@ -43,6 +68,8 @@ function dailyInsightContext(summary) {
       mealNames,
     },
   };
+  if (preferences) context.preferences = preferences;
+  return context;
 }
 
 function cachedInsight(row, contextHash) {
@@ -69,31 +96,32 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
   if (typeof clock !== "function") throw new Error("Insight clock is unavailable");
   const generate = typeof generateDailyInsight === "function" ? generateDailyInsight : createDailyInsightService();
 
-  async function getDailySummary(userId, date) {
+  async function getDailySummary(userId, date, options = {}) {
     assertDate(date);
+    const resolveImages = options.resolveImages !== false;
     const [meals, plan] = await Promise.all([
-      listMealsRange(userId, date, date),
+      listMealsRange(userId, date, date, { resolveImages }),
       getNutritionPlan(userId),
     ]);
     return { date, ...serverMetadata(clock), ...calculateDailyNutrition(meals, plan), meals };
   }
 
-  async function getDailyInsightForSummary(userId, date, summary) {
-    if (!db || typeof db.from !== "function") throw new Error("Daily insight cache is unavailable");
-    const context = dailyInsightContext(summary);
-    const contextHash = createDailyInsightHash(context);
-    const lookup = await db.from("daily_nutrition_insights").select("context_hash,payload,provider,model")
-      .eq("user_id", userId).eq("insight_date", date).maybeSingle();
-    if (lookup.error) throw new Error("Daily insight cache read failed");
-    const cached = cachedInsight(lookup.data, contextHash);
-    if (cached) return cached;
-
-    let generated;
+  async function loadUserPreferences(userId) {
+    if (!db || typeof db.from !== "function") return null;
     try {
-      generated = await generate({ date, context });
+      const lookup = await db
+        .from("user_settings")
+        .select("dietary_pattern,food_avoidances,meals_per_day")
+        .eq("id", userId)
+        .maybeSingle();
+      if (lookup.error || !lookup.data) return null;
+      return normalizeInsightPreferences(lookup.data);
     } catch {
-      generated = { ...createRuleInsight(context), source: "rule_v3", model: null };
+      return null;
     }
+  }
+
+  function insightPayloadFromGenerated(generated) {
     const payload = {
       focus: String(generated?.focus ?? "regularity"),
       headline: String(generated?.headline ?? "今天保持规律进餐").trim().slice(0, 24),
@@ -101,33 +129,83 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
     };
     if (!payload.headline || !payload.content) throw new Error("Daily insight generation failed");
     const provider = ["cloudbase", "deepseek", "hunyuan-exp"].includes(generated?.source) ? generated.source : "rule_v3";
+    return { payload, provider, model: generated?.model ?? null };
+  }
+
+  async function persistDailyInsight(userId, date, contextHash, generated) {
+    const { payload, provider, model } = insightPayloadFromGenerated(generated);
     const persisted = await db.from("daily_nutrition_insights").upsert({
       user_id: userId,
       insight_date: date,
       context_hash: contextHash,
       payload,
       provider,
-      model: generated?.model ?? null,
+      model,
     }, { onConflict: "user_id,insight_date" });
     if (persisted.error) throw new Error("Daily insight cache write failed");
-    return { ...payload, source: provider, model: generated?.model ?? null, cached: false };
+    return { ...payload, source: provider, model, cached: false };
   }
 
-  async function getDailyInsight(userId, date) {
-    const summary = await getDailySummary(userId, date);
-    return getDailyInsightForSummary(userId, date, summary);
+  function scheduleDailyInsightUpgrade(userId, date, context, contextHash) {
+    void (async () => {
+      try {
+        let generated;
+        try {
+          generated = await generate({ date, context });
+        } catch {
+          return;
+        }
+        await persistDailyInsight(userId, date, contextHash, generated);
+      } catch (error) {
+        console.warn("[daily-insight] background generation failed:", error?.message || error);
+      }
+    })();
   }
 
-  async function getDailySummaryWithInsight(userId, date) {
-    const summary = await getDailySummary(userId, date);
-    return { ...summary, insight: await getDailyInsightForSummary(userId, date, summary) };
+  async function getDailyInsightForSummary(userId, date, summary, options = {}) {
+    if (!db || typeof db.from !== "function") throw new Error("Daily insight cache is unavailable");
+    const preferFast = Boolean(options?.preferFast);
+    const preferences = await loadUserPreferences(userId);
+    const context = dailyInsightContext(summary, preferences);
+    const contextHash = createDailyInsightHash(context);
+    const lookup = await db.from("daily_nutrition_insights").select("context_hash,payload,provider,model")
+      .eq("user_id", userId).eq("insight_date", date).maybeSingle();
+    if (lookup.error) throw new Error("Daily insight cache read failed");
+    const cached = cachedInsight(lookup.data, contextHash);
+    if (cached) return cached;
+
+    if (preferFast) {
+      const rule = { ...createRuleInsight(context), source: "rule_v3", model: null };
+      const result = await persistDailyInsight(userId, date, contextHash, rule);
+      scheduleDailyInsightUpgrade(userId, date, context, contextHash);
+      return result;
+    }
+
+    let generated;
+    try {
+      generated = await generate({ date, context });
+    } catch {
+      generated = { ...createRuleInsight(context), source: "rule_v3", model: null };
+    }
+    return persistDailyInsight(userId, date, contextHash, generated);
   }
 
-  async function getWeeklyReview(userId, endDate) {
+  async function getDailyInsight(userId, date, options = {}) {
+    const summary = await getDailySummary(userId, date, { resolveImages: false });
+    return getDailyInsightForSummary(userId, date, summary, options);
+  }
+
+  async function getDailySummaryWithInsight(userId, date, options = {}) {
+    const summary = await getDailySummary(userId, date, { resolveImages: true });
+    return { ...summary, insight: await getDailyInsightForSummary(userId, date, summary, options) };
+  }
+
+  async function getWeeklyReview(userId, endDate, options = {}) {
     assertDate(endDate);
+    const preferFast = Boolean(options?.preferFast);
     const startDate = shiftDate(endDate, -6);
     const [meals, plan] = await Promise.all([
-      listMealsRange(userId, startDate, endDate),
+      listMealsRange(userId, startDate, endDate, { resolveImages: false }),
       getNutritionPlan(userId),
     ]);
     const review = calculateWeeklyNutrition(meals, plan, endDate);
@@ -152,8 +230,25 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
     }
     if (cached) return { ...baseReview, insight: cached };
 
+    // Profile / light reads: stats only — avoid LLM and avoid locking the week to a rule cache.
+    if (preferFast) {
+      const insight = createFallbackWeeklyReview(context);
+      return {
+        ...baseReview,
+        insight: {
+          headline: insight.headline,
+          summary: insight.summary,
+          strengths: insight.strengths,
+          nextSteps: insight.nextSteps,
+          source: insight.source,
+          model: null,
+          cached: false,
+        },
+      };
+    }
+
     let insight = createFallbackWeeklyReview(context);
-    if (typeof generateWeeklyReview === "function") {
+    if (shouldGenerateWeeklyAi(context) && typeof generateWeeklyReview === "function") {
       try { insight = await generateWeeklyReview({ date: endDate, context }); } catch {}
     }
     const provider = insight?.source === "deepseek" ? "deepseek" : "rule_v1";
@@ -185,7 +280,7 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
   async function getAchievements(userId, date) {
     assertDate(date);
     const [meals, plan] = await Promise.all([
-      listMealsRange(userId, shiftDate(date, -29), date),
+      listMealsRange(userId, shiftDate(date, -29), date, { resolveImages: false }),
       getNutritionPlan(userId),
     ]);
     return calculateAchievements(meals, plan, date);

@@ -1,3 +1,5 @@
+const { assertNicknameAllowed } = require("./nickname-moderation.cjs");
+
 function fail(message) {
   const error = new Error(message);
   error.code = "PRODUCT_DATA_INVALID";
@@ -27,6 +29,7 @@ function assertGoal(input) {
 function assertOnboarding(input) {
   const nickname = typeof input.nickname === "string" ? input.nickname.trim() : "";
   if (!nickname || nickname.length > 40) throw fail("昵称无效");
+  assertNicknameAllowed(nickname);
   assertBodyProfile({
     age: input.age,
     sex: input.sex,
@@ -112,6 +115,7 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
     async saveProfile(userId, input) {
       const nickname = typeof input?.nickname === "string" ? input.nickname.trim().slice(0, 40) : "";
       if (!nickname) throw fail("昵称无效");
+      assertNicknameAllowed(nickname);
       const table = db.from("profiles");
       const existing = await table.select("id").eq("id", userId).maybeSingle();
       let result;

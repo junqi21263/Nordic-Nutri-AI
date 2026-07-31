@@ -19,8 +19,13 @@ describe("body and goal real save pages", () => {
     const page = source("goal-adjust");
 
     expect(page).toContain("saveProductGoal");
+    expect(page).toContain("saveProductNutritionPlan");
+    expect(page).toContain("getProductNutritionPlan");
+    expect(page).toContain("proteinG");
+    expect(page).toContain("carbsG");
+    expect(page).toContain("fatG");
     expect(page).not.toContain("getSupabaseClient");
-    expect(page).toContain("loading={isSaving}");
+    expect(page).toContain("loading={isSaving || loadingPlan}");
   });
 
   it("persists the complete onboarding transaction through the authenticated HTTPS service before opening the home page", () => {
@@ -31,5 +36,25 @@ describe("body and goal real save pages", () => {
     expect(page).toContain("nickname: profile.nickname");
     expect(page).not.toContain("getSupabaseClient");
     expect(page).toContain("loading={isSaving || isLoadingPlan}");
+  });
+
+  it("lets settings edits save body, prefs and nutrition plan without re-running onboarding", () => {
+    const page = source("nutrition-plan");
+
+    expect(page).toContain("fromSettings");
+    expect(page).toContain("saveProductBodyProfile");
+    expect(page).toContain("saveProductGoal");
+    expect(page).toContain("saveProductSettings");
+    expect(page).toContain("saveProductNutritionPlan");
+    expect(page).toContain("保存并更新目标");
+    expect(page).toContain('url: "/pages/profile/index"');
+  });
+
+  it("sends mealsPerDay into nutrition plan preview with diet prefs", () => {
+    const page = source("nutrition-plan");
+
+    expect(page).toContain("mealsPerDay: Number(draft.mealsPerDay)");
+    expect(page).toContain("calculateNutritionPlan(profile, dietPrefs)");
+    expect(page).toContain("formulaPlanInsight");
   });
 });

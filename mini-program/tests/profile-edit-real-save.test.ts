@@ -13,6 +13,8 @@ describe("profile edit real save", () => {
     expect(page).toContain("saveProductBodyProfile");
     expect(page).toContain("saveProductGoal");
     expect(page).toContain("getProductAccount");
+    expect(page).toContain("nicknameModerationError");
+    expect(page).toContain("feedback.show({ message: nicknameError");
     expect(page).not.toContain("getSupabaseClient");
     expect(page).toContain("loading={isSaving}");
   });

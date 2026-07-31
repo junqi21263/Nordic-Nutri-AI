@@ -61,10 +61,11 @@ describe("application launch", () => {
     expect(openHome).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps an authenticated first-time user on onboarding instead of opening the login entry", async () => {
+  it("opens welcome before onboarding for an authenticated first-time user", async () => {
     const openHome = vi.fn();
     const openOnboarding = vi.fn();
     const openLogin = vi.fn();
+    const openWelcome = vi.fn();
     const launch = createRuntimeApplicationLaunch(
       {
         start: vi.fn().mockResolvedValue(undefined),
@@ -72,16 +73,71 @@ describe("application launch", () => {
       },
       {
         isOnboardingCompleted: () => false,
+        hasSeenWelcome: () => false,
         openHome,
         openOnboarding,
         openLogin,
+        openWelcome,
+      },
+    );
+
+    await launch.start();
+
+    expect(openWelcome).toHaveBeenCalledTimes(1);
+    expect(openOnboarding).not.toHaveBeenCalled();
+    expect(openHome).not.toHaveBeenCalled();
+    expect(openLogin).not.toHaveBeenCalled();
+  });
+
+  it("opens onboarding after welcome was seen for an authenticated first-time user", async () => {
+    const openHome = vi.fn();
+    const openOnboarding = vi.fn();
+    const openLogin = vi.fn();
+    const openWelcome = vi.fn();
+    const launch = createRuntimeApplicationLaunch(
+      {
+        start: vi.fn().mockResolvedValue(undefined),
+        getStatus: vi.fn().mockReturnValue("authenticated"),
+      },
+      {
+        isOnboardingCompleted: () => false,
+        hasSeenWelcome: () => true,
+        openHome,
+        openOnboarding,
+        openLogin,
+        openWelcome,
       },
     );
 
     await launch.start();
 
     expect(openOnboarding).toHaveBeenCalledTimes(1);
+    expect(openWelcome).not.toHaveBeenCalled();
     expect(openHome).not.toHaveBeenCalled();
+    expect(openLogin).not.toHaveBeenCalled();
+  });
+
+  it("opens welcome before login when the bootstrap cannot authenticate", async () => {
+    const openWelcome = vi.fn();
+    const openLogin = vi.fn();
+    const launch = createRuntimeApplicationLaunch(
+      {
+        start: vi.fn().mockResolvedValue(undefined),
+        getStatus: vi.fn().mockReturnValue("unauthenticated"),
+      },
+      {
+        isOnboardingCompleted: () => false,
+        hasSeenWelcome: () => false,
+        openHome: vi.fn(),
+        openOnboarding: vi.fn(),
+        openLogin,
+        openWelcome,
+      },
+    );
+
+    await launch.start();
+
+    expect(openWelcome).toHaveBeenCalledTimes(1);
     expect(openLogin).not.toHaveBeenCalled();
   });
 });

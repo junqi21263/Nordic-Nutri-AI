@@ -1,4 +1,5 @@
 const pages = [
+  "pages/welcome/index",
   "pages/auth-entry/index",
   "pages/onboarding/index",
   "pages/body-profile/index",
@@ -12,7 +13,6 @@ const pages = [
   "pages/analysis-result/index",
   "pages/portion-adjustment/index",
   "pages/meal-detail/index",
-  "pages/ingredient-detail/index",
   "pages/meal-records/index",
   "pages/coach/index",
   "pages/profile/index",

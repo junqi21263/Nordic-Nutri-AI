@@ -157,6 +157,21 @@ async function transformFoodCardImage(buffer, sharp) {
   };
 }
 
+function generatedVariantCloudPaths(storagePath) {
+  const directory = String(storagePath || "").replace(/^\/+|\/+$/g, "");
+  if (!directory) return [];
+  return [
+    `${directory}/detail.webp`,
+    `${directory}/list.webp`,
+    `${directory}/thumbnail.webp`,
+    // Legacy originals from earlier pipeline versions.
+    `${directory}/original.jpg`,
+    `${directory}/original.jpeg`,
+    `${directory}/original.png`,
+    `${directory}/original.webp`,
+  ];
+}
+
 function createFoodImageService({
   allowedHosts = DEFAULT_ALLOWED_HOSTS,
   maxBytes = DEFAULT_MAX_BYTES,
@@ -165,12 +180,15 @@ function createFoodImageService({
   downloader = downloadWithRedirects,
   sharpLoader = loadSharp,
   uploader,
+  deleter,
 } = {}) {
   return {
     validateImageUrl: (url) => validateImageUrl(url, allowedHosts),
 
     /**
      * Persist a Hunyuan (or other) generated buffer into food-library/...
+     * Stores display WebP variants only — the Hunyuan original is discarded
+     * after transform to keep Cloud Storage growth bounded.
      * Returns permanent Storage paths/fileIDs — never temporary or persisted URLs.
      */
     async persistGeneratedImage({
@@ -187,9 +205,8 @@ function createFoodImageService({
       const transformed = await transformFoodCardImage(buffer, sharp);
       const prefix = String(prefixOverride || storagePrefix || "food-library").replace(/^\/+|\/+$/g, "");
       const basePath = `${prefix}/${foodId}/${imageId}`;
-      const ext = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
+      void mimeType;
       const variants = [
-        { name: "original", buffer: transformed.original, path: `${basePath}/original.${ext}`, contentType: mimeType },
         { name: "detail", buffer: transformed.detail, path: `${basePath}/detail.webp`, contentType: "image/webp" },
         { name: "list", buffer: transformed.list, path: `${basePath}/list.webp`, contentType: "image/webp" },
         { name: "thumb", buffer: transformed.thumb, path: `${basePath}/thumbnail.webp`, contentType: "image/webp" },
@@ -212,20 +229,42 @@ function createFoodImageService({
       if (variants.some((variant) => !fileIds[variant.name])) {
         throw new FoodImageError("FOOD_IMAGE_UPLOAD_FAILED");
       }
+      const detailBytes = Buffer.isBuffer(transformed.detail) ? transformed.detail.length : buffer.length;
       return {
         contentHash: sha256(buffer),
         mimeType: transformed.mime,
         width: transformed.width,
         height: transformed.height,
-        fileSize: buffer.length,
+        fileSize: detailBytes,
         storagePath: basePath,
-        originalFileId: fileIds.original || fileIds.detail || null,
+        originalFileId: fileIds.detail || null,
         originalUrl: null,
         thumbUrl: null,
         mediumUrl: null,
         detailUrl: null,
         transformed: transformed.transformed,
       };
+    },
+
+    /**
+     * Best-effort delete of generated display variants (+ legacy originals).
+     * Missing files are ignored; reject/review flows must not fail on cleanup.
+     */
+    async deleteGeneratedVariants(storagePath) {
+      const cloudPaths = generatedVariantCloudPaths(storagePath);
+      if (!cloudPaths.length) return { attempted: 0, deleted: 0 };
+      if (typeof deleter !== "function") return { attempted: cloudPaths.length, deleted: 0, skipped: true };
+      try {
+        const result = await deleter({ cloudPaths });
+        const deleted = Number(result?.deleted);
+        return {
+          attempted: cloudPaths.length,
+          deleted: Number.isFinite(deleted) ? deleted : cloudPaths.length,
+        };
+      } catch (error) {
+        console.warn("[food-image] deleteGeneratedVariants failed:", error?.message || error);
+        return { attempted: cloudPaths.length, deleted: 0, error: error?.message || String(error) };
+      }
     },
 
     async acquireFromUrl(rawUrl, { imageEntityKey } = {}) {
@@ -321,6 +360,7 @@ module.exports = {
   DEFAULT_MAX_BYTES,
   FoodImageError,
   createFoodImageService,
+  generatedVariantCloudPaths,
   validateImageUrl,
   isAllowedHost,
   isPrivateIp,

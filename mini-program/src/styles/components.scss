@@ -156,6 +156,7 @@
   background: $color-forest-green;
   border-radius: inherit;
   height: 100%;
+  width: 100%;
 }
 .macro-progress--sage .macro-progress__bar {
   background: $color-success;
@@ -442,8 +443,23 @@
   font-weight: $font-weight-semibold;
   margin-top: $space-4;
 }
-.macro-progress__bar {
-  transition: width $duration-slow $ease-emphasized;
+.animated-progress-bar {
+  display: block;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform $duration-progress $ease-progress;
+  width: 100%;
+}
+@keyframes progress-goal-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .macro-progress--protein .macro-progress__bar,
 .macro-progress--sage .macro-progress__bar {
@@ -782,13 +798,43 @@
   min-height: 80px;
   padding: 0 $space-16;
 }
+.search-bar--with-trailing {
+  padding-right: $space-8;
+}
 .search-bar__icon {
   color: $color-forest-green;
-  font-size: $font-h3;
+  font-size: $font-body;
+  line-height: 1;
+}
+.search-bar .nordic-icon {
+  flex: 0 0 auto;
+}
+.search-bar__input {
+  color: $color-text-primary;
+  flex: 1;
+  font-size: $font-body;
+  line-height: $line-body;
+  min-width: 0;
 }
 .search-bar__placeholder {
   color: $color-neutral-gray;
   font-size: $font-body;
+}
+.search-bar__clear {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+.search-bar__trailing {
+  align-items: center;
+  border-left: 1px solid $color-divider;
+  display: flex;
+  flex: 0 0 auto;
+  margin-left: $space-4;
+  padding-left: $space-4;
 }
 .bottom-tab-bar {
   align-items: stretch;
@@ -992,6 +1038,10 @@
 [data-reduced-motion="true"] .app-button,
 [data-reduced-motion="true"] .app-card,
 [data-reduced-motion="true"] .macro-progress__bar,
+[data-reduced-motion="true"] .animated-progress-bar,
+[data-reduced-motion="true"] .circular-progress__content,
+[data-reduced-motion="true"] .weekly-review__rhythm-dot--recorded,
+[data-reduced-motion="true"] .achievement-center__item,
 [data-reduced-motion="true"] .loading__dot,
 [data-reduced-motion="true"] .skeleton,
 [data-reduced-motion="true"] .toast,
@@ -1192,8 +1242,7 @@
   max-width: 190px;
   text-align: right;
 }
-.daily-summary__status--exceeded,
-.daily-summary__macro-over {
+.daily-summary__status--exceeded {
   color: $color-error;
 }
 .daily-summary__macros {
@@ -1210,10 +1259,20 @@
   padding-left: $space-8;
 }
 .daily-summary__macro-label,
-.daily-summary__macro-remaining,
-.daily-summary__macro-over {
+.daily-summary__macro-remaining {
   color: $color-text-secondary;
   font-size: $font-overline;
+}
+.daily-summary__macro-over {
+  color: $color-error;
+  font-size: $font-overline;
+  font-weight: $font-weight-semibold;
+}
+.macro-progress--exceeded .macro-progress__bar {
+  background: $color-error;
+}
+.macro-progress--exceeded .macro-progress__value {
+  color: $color-error;
 }
 .daily-summary__macro-value {
   color: $color-text-primary;
@@ -1264,6 +1323,32 @@
 .meal-group__image--salmon {
   background: $color-dark-forest;
   color: $color-warm-white;
+}
+.meal-group__image--fallback {
+  overflow: hidden;
+}
+.meal-group__image--seafood {
+  background: rgba($color-dark-forest, 0.12);
+}
+.meal-group__image--meat {
+  background: rgba($color-sage, 0.35);
+}
+.meal-group__image--egg,
+.meal-group__image--dairy {
+  background: $color-soft-beige;
+  box-shadow: inset 0 0 0 1px rgba($color-dark-forest, 0.06);
+}
+.meal-group__image--grain {
+  background: rgba($color-sage, 0.22);
+}
+.meal-group__image--produce {
+  background: rgba($color-sage, 0.28);
+}
+.meal-group__image--soy {
+  background: rgba($color-sage, 0.4);
+}
+.meal-group__image--default {
+  background: $color-soft-beige;
 }
 .meal-group__content {
   display: flex;
