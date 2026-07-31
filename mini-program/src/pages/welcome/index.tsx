@@ -32,14 +32,9 @@ export default function WelcomePage() {
       <View className="welcome-page__body">
         <View className="welcome-page__copy">
           <Text className="welcome-page__brand">Nordic Nutri</Text>
-          <View className="welcome-page__rule" />
-          <View className="welcome-page__headline">
-            <Text className="welcome-page__kicker">拍一餐</Text>
-            <Text className="welcome-page__title">看清今天吃得怎么样</Text>
-          </View>
+          <Text className="welcome-page__title">拍一餐，营养心中有数</Text>
           <Text className="welcome-page__subtitle">
-            AI 识别餐食与营养{"\n"}
-            把节奏走轻一点，也能慢慢坚持
+            AI 读懂餐盘里的食材与热量，{"\n"}陪你慢慢养成好习惯
           </Text>
         </View>
         <View className="welcome-page__actions">
