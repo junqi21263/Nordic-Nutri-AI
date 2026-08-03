@@ -1,3 +1,4 @@
+import { createClientRequestId } from "../repositories/client-request-id";
 import { requestProductApi } from "./product-api-client";
 
 export interface ProductSettings {
@@ -39,6 +40,17 @@ export function getProductAccount() {
   return requestProductApi<ProductAccount>("/account", {
     method: "GET",
     fallbackMessage: "账号资料读取失败，请稍后重试",
+  });
+}
+
+export function cancelProductAccount(clientRequestId = createClientRequestId()) {
+  return requestProductApi<{ deleted: boolean }>("/account/cancel", {
+    method: "POST",
+    data: {
+      confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT",
+      clientRequestId,
+    },
+    fallbackMessage: "账号注销失败，请稍后重试",
   });
 }
 

@@ -101,7 +101,6 @@ export default function FoodCatalogPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
-  const [pagination, setPagination] = useState<CatalogPagination>();
   const [categoryFilter, setCategoryFilter] = useState<FoodCategory>("全部");
   const [activeCategoryCode, setActiveCategoryCode] = useState<string | undefined>("all");
   const [tagFilter, setTagFilter] = useState<FoodTag>("全部");
@@ -161,7 +160,6 @@ export default function FoodCatalogPage() {
     try {
       const result = await discoverProductFoodCatalog(limit, page);
       setItems((current) => (replacingPage ? result.items : appendCatalogItems(current, result.items)));
-      setPagination(result.pagination);
       paginationRef.current = result.pagination;
       setHasSearched(false);
       setActiveCategoryCode("all");
@@ -218,7 +216,6 @@ export default function FoodCatalogPage() {
     try {
       const result = await searchProductFoodCatalog(searchQuery, page, { categoryCode });
       setItems((current) => (replace ? result.items : appendCatalogItems(current, result.items)));
-      setPagination(result.pagination);
       paginationRef.current = result.pagination;
       setHasSearched(searchQuery.trim().length > 0);
       setActiveCategoryCode(categoryCode);

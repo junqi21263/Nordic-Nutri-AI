@@ -39,7 +39,7 @@ describe("persisted insight API boundary", () => {
     const achievementsPage = read("src/pages/achievements/index.tsx");
 
     expect(weeklyPage).toContain("getProductWeeklyReview");
-    expect(achievementsPage).toContain("getProductAchievements");
+    expect(achievementsPage).toContain("refreshProductAchievements");
     expect(weeklyPage).not.toContain("基于当前设备中的记录生成");
     expect(achievementsPage).not.toContain("所有成就均根据当前设备中的记录计算");
   });

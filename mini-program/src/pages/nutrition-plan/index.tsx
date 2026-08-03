@@ -119,8 +119,6 @@ export default function NutritionPlanPage() {
     return () => {
       cancelled = true;
     };
-    // Recompute when the validated body profile / diet prefs change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     validation.valid,
     draft.nickname,

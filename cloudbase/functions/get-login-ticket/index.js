@@ -27,6 +27,8 @@ const { createFoodCatalogService, PublicFoodCatalogError } = require("./food-cat
 const { createFoodQueryTranslator } = require("./food-query-translator.cjs");
 const { createNutritionBackfillService } = require("./nutrition-backfill-service.cjs");
 const { createProfileAvatarService, PublicProfileAvatarError } = require("./profile-avatar-service.cjs");
+const { createAccountDeletionService, PublicAccountDeletionError } = require("./account-deletion-service.cjs");
+const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
 const { createFoodRepository, FoodRepositoryError } = require("./food-repository.cjs");
 const { createUsdaService, UsdaServiceError } = require("./usda-service.cjs");
 const { createOpenFoodFactsService, OpenFoodFactsError } = require("./open-food-facts-service.cjs");
@@ -780,6 +782,13 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       },
     });
   }
+  const accountDeletion = createAccountDeletionService({
+    db,
+    operationGuard: typeof db.rpc === "function" ? createOperationGuard({ db }) : null,
+    deleteFiles: async ({ cloudPaths }) => {
+      if (cloudPaths.length) await admin.deleteFile({ fileList: cloudPaths });
+    },
+  });
   return {
     issue: session.issue,
     verifySession: (token) => verifyAccessToken(token, config.sessionSecret),
@@ -834,6 +843,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     // replacing the main function's complete environment-variable set.
     foodImageDispatchSecret: env.FOOD_IMAGE_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
     avatar,
+    accountDeletion,
     vision,
     calculateNutritionPlan: calculateNutritionPlanWithAi,
   };
@@ -854,6 +864,7 @@ function getDataOperation(pathname) {
     "/goal": "saveGoal",
     "/onboarding": "saveOnboarding",
     "/account": "getAccount",
+    "/account/cancel": "cancelAccount",
     "/settings": "saveSettings",
     "/nutrition-plan": "nutritionPlan",
     "/nutrition-plan/preview": "previewNutritionPlan",
@@ -1025,7 +1036,7 @@ function createHttpServer({ service }) {
           body: payload.raw,
         })) return sendJson(res, 401, { code: "UNAUTHORIZED" });
         if (!service?.foodImageBatches?.dispatchTrusted) return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_UNAVAILABLE" });
-        let patrol = null;
+        let patrol;
         if (typeof service.foodImagePatrol?.runTrusted === "function") {
           try {
             patrol = await service.foodImagePatrol.runTrusted();
@@ -1035,7 +1046,7 @@ function createHttpServer({ service }) {
           }
         }
         const dispatch = await service.foodImageBatches.dispatchTrusted({ maxItems: payload.body?.maxItems });
-        return sendJson(res, 200, { ...dispatch, patrol });
+        return sendJson(res, 200, patrol === undefined ? dispatch : { ...dispatch, patrol });
       } catch (error) {
         console.error("[food-image-dispatch] failed:", error?.code || error?.message || error);
         return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_FAILED" });
@@ -1604,13 +1615,27 @@ function createHttpServer({ service }) {
           return sendJson(res, statusCode, { code: error.code, message: error.message });
         }
         console.error("[vision] unexpected error:", error?.message || error, error?.stack || "");
-        return sendJson(res, 503, { code: "VISION_SERVICE_UNAVAILABLE", message: error?.message || "Unknown error" });
+        return sendJson(res, 503, { code: "VISION_SERVICE_UNAVAILABLE", message: "识别服务暂时不可用，请稍后重试" });
       }
     }
     if (dataOperation === "getAccount" && req.method === "GET") {
       const session = service?.verifySession?.(readBearerToken(req));
       if (!session?.sub || !service.data?.getAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try { return sendJson(res, 200, await service.data.getAccount(session.sub)); } catch { return sendJson(res, 503, { code: "ACCOUNT_READ_FAILED" }); }
+    }
+    if (dataOperation === "cancelAccount") {
+      const session = service?.verifySession?.(readBearerToken(req));
+      if (!session?.sub || !service?.accountDeletion?.cancelAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      try {
+        return sendJson(res, 200, await service.accountDeletion.cancelAccount(session.sub, await readJsonBody(req)));
+      } catch (error) {
+        if (error instanceof PublicAccountDeletionError || error instanceof PublicOperationError) {
+          return sendJson(res, error instanceof PublicOperationError ? 409 : 400, { code: error.code });
+        }
+        console.error("[account-cancellation] failed:", error?.code || "UNKNOWN", error?.message || error);
+        return sendJson(res, 503, { code: "ACCOUNT_CANCELLATION_FAILED" });
+      }
     }
     if (dataOperation === "nutritionPlan" && req.method === "GET") {
       const session = service?.verifySession?.(readBearerToken(req));

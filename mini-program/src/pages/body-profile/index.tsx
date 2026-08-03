@@ -137,8 +137,6 @@ export default function BodyProfilePage() {
     const generated = generateNickname();
     setField("nickname", generated);
     void syncNicknameEverywhere(generated);
-    // Only seed / sync on mount for onboarding.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromSettings]);
 
   const refreshNickname = () => {

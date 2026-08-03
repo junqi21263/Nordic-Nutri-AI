@@ -1674,6 +1674,72 @@
   font-size: $font-overline;
   margin-top: -$space-8;
 }
+.profile-modal__link {
+  color: $color-forest-green;
+  font-weight: $font-weight-semibold;
+}
+.account-cancellation {
+  display: flex;
+  flex-direction: column;
+  gap: $space-20;
+  padding-bottom: $space-24;
+}
+.account-cancellation__warning {
+  background: rgba($color-error, 0.08);
+  border: 1px solid rgba($color-error, 0.24);
+  border-radius: $radius-16;
+  color: $color-text-secondary;
+  display: flex;
+  flex-direction: column;
+  font-size: $font-caption;
+  gap: $space-8;
+  line-height: $line-body;
+  padding: $space-16;
+}
+.account-cancellation__warning > Text:first-child {
+  color: $color-text-primary;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+}
+.account-cancellation__steps {
+  display: flex;
+  flex-direction: column;
+  gap: $space-12;
+}
+.account-cancellation__step {
+  align-items: flex-start;
+  background: $color-surface;
+  border: 1px solid $color-divider;
+  border-radius: $radius-12;
+  display: flex;
+  gap: $space-12;
+  padding: $space-16;
+}
+.account-cancellation__step > Text:first-child {
+  align-items: center;
+  background: $color-soft-beige;
+  border-radius: $radius-full;
+  color: $color-forest-green;
+  display: flex;
+  font-weight: $font-weight-semibold;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+.account-cancellation__step > View {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: $space-4;
+}
+.account-cancellation__step Text:last-child {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+  line-height: $line-body;
+}
+.account-cancellation__action {
+  margin-top: auto;
+}
 .profile-flow {
   display: flex;
   flex-direction: column;
