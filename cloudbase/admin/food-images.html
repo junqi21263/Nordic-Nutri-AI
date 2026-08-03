@@ -24,6 +24,22 @@
     button { cursor: pointer; }
     button:disabled { cursor: not-allowed; }
     .ops-shell { min-height: 100vh; padding: 28px; }
+    .login-gate { min-height: 100vh; display: grid; place-items: center; padding: 28px; background:
+      radial-gradient(ellipse 80% 50% at 12% -10%, rgba(45, 106, 79, .14), transparent 55%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(196, 169, 98, .12), transparent 50%),
+      var(--paper); }
+    .login-gate[hidden] { display: none !important; }
+    .admin-shell[hidden] { display: none !important; }
+    .login-card { width: min(420px, 100%); padding: 28px 26px 24px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.86); box-shadow: 0 18px 40px rgba(23, 61, 42, .08); }
+    .login-card h1 { font-size: 24px; margin: 4px 0 6px; }
+    .login-card .eyebrow { margin-bottom: 4px; }
+    .login-card p.lead { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+    .login-card label { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .login-card input { width: 100%; height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; background: var(--paper); color: var(--text); font-size: 14px; }
+    .login-card .action-row { margin-top: 8px; }
+    .login-card details { margin-top: 14px; color: var(--muted); font-size: 12px; }
+    .login-card details summary { cursor: pointer; font-weight: 700; }
+    .login-error { min-height: 18px; margin: 0 0 8px; color: #9b2c2c; font-size: 12px; font-weight: 700; }
     .ops-header { max-width: 1540px; margin: 0 auto 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
     .brand { display: flex; align-items: center; gap: 12px; }
     .brand-mark { width: 38px; height: 38px; border: 1px solid var(--green); border-radius: 50%; display: grid; place-items: center; color: var(--green); font: 700 18px Georgia, serif; }
@@ -308,10 +324,26 @@
   </style>
 </head>
 <body>
-  <main class="ops-shell admin-shell">
+  <section id="loginGate" class="login-gate" aria-label="后台登录">
+    <form id="loginForm" class="login-card" autocomplete="on">
+      <p class="eyebrow">Nordic Nutri · Admin Console</p>
+      <h1>登录管理后台</h1>
+      <p class="lead">请先输入帐号密码，通过后再进入食材管理与生图。</p>
+      <p id="loginError" class="login-error" role="alert" aria-live="polite"></p>
+      <label for="adminUsername">后台帐号<input id="adminUsername" name="username" autocomplete="username" placeholder="输入后台帐号" required /></label>
+      <label for="adminPassword">后台密码<input id="adminPassword" name="password" type="password" autocomplete="current-password" placeholder="输入后台密码" required /></label>
+      <div class="action-row"><button id="connect" class="button" type="submit">登录</button></div>
+      <details>
+        <summary>高级：API Base</summary>
+        <label for="baseUrl" style="margin-top:10px">API Base（含 /get-login-ticket）<input id="baseUrl" placeholder="https://xxx.service.tcloudbase.com/get-login-ticket" autocomplete="off" /></label>
+      </details>
+    </form>
+  </section>
+
+  <main id="adminApp" class="ops-shell admin-shell" hidden>
     <header class="ops-header">
       <div class="brand"><div class="brand-mark" aria-hidden="true">N</div><div><p class="eyebrow">Nordic Nutri · Admin Console</p><h1>管理后台</h1></div></div>
-      <div class="header-actions"><span id="connectionStatus" class="muted">尚未连接</span><button id="refreshAll" class="button secondary">刷新批次</button><button id="openTools" class="button secondary">连接设置</button></div>
+      <div class="header-actions"><span id="connectionStatus" class="muted">尚未登录</span><button id="refreshAll" class="button secondary" type="button">刷新批次</button><button id="logoutBtn" class="button secondary" type="button">退出登录</button><button id="openTools" class="button secondary" type="button">系统配置</button></div>
     </header>
 
     <div class="admin-layout">
@@ -382,7 +414,7 @@
         <section id="moduleImages" class="admin-module">
           <details id="workflowGuide" class="workflow-guide">
             <summary>操作流程与状态说明</summary>
-            <div class="workflow-steps"><div class="workflow-step"><b>1. 连接后台</b><span>在「系统配置」用帐号密码登录。</span></div><div class="workflow-step"><b>2. 选择视觉状态</b><span>默认按食物自动判断；仅外观不同才选生鲜、熟制等。</span></div><div class="workflow-step"><b>3. 预览选材</b><span>点击食材可取消或恢复本批生成范围。</span></div><div class="workflow-step"><b>4. 创建、启动、审核</b><span>候选图可单张或批量通过并设为该视觉状态主图。</span></div><div class="workflow-step"><b>5. 处理异常</b><span>拒绝理由会写入提示词并立即重试。</span></div></div>
+            <div class="workflow-steps"><div class="workflow-step"><b>1. 连接后台</b><span>进入页面前先用帐号密码登录。</span></div><div class="workflow-step"><b>2. 选择视觉状态</b><span>默认按食物自动判断；仅外观不同才选生鲜、熟制等。</span></div><div class="workflow-step"><b>3. 预览选材</b><span>点击食材可取消或恢复本批生成范围。</span></div><div class="workflow-step"><b>4. 创建、启动、审核</b><span>候选图可单张或批量通过并设为该视觉状态主图。</span></div><div class="workflow-step"><b>5. 处理异常</b><span>拒绝理由会写入提示词并立即重试。</span></div></div>
           </details>
 
           <div class="composer-deck" aria-label="生图批次配置">
@@ -447,7 +479,7 @@
                 </div>
               </div>
               <div id="batchListActive" class="batch-list-active" aria-live="polite"></div>
-              <div id="batchList" class="batch-list"><p class="muted">请先在系统配置中连接后台。</p></div>
+              <div id="batchList" class="batch-list"><p class="muted">请先登录后台。</p></div>
             </aside>
 
             <section class="review-queue">
@@ -470,9 +502,9 @@
 
         <section id="moduleSystem" class="admin-module" hidden>
           <details id="utilityDrawer" class="utility-drawer" open>
-            <summary>连接设置与运行诊断</summary>
+            <summary>会话与诊断</summary>
             <div class="utility-body">
-              <section class="utility-panel"><h3>连接设置</h3><label for="baseUrl">API Base（含 /get-login-ticket）</label><input id="baseUrl" placeholder="https://xxx.service.tcloudbase.com/get-login-ticket" autocomplete="off" /><label for="adminUsername">后台帐号</label><input id="adminUsername" autocomplete="username" placeholder="输入后台帐号" /><label for="adminPassword">后台密码</label><input id="adminPassword" type="password" autocomplete="current-password" placeholder="输入后台密码" /><div class="action-row" style="margin-top:12px"><button id="connect" class="button">登录并连接</button><button id="loadStats" class="button secondary">刷新统计</button><button id="runDiagnose" class="button secondary">诊断生图</button><button id="clearCredentials" class="button secondary">退出登录</button></div><p class="muted" style="margin-top:10px">登录成功后会话保存在本机浏览器，无需再粘贴 Token。换机器或清站点数据后需重新登录。</p><div id="stats" class="stats" style="margin-top:12px"></div></section>
+              <section class="utility-panel"><h3>会话与诊断</h3><p class="muted">当前已登录后台。API Base 可在登录页「高级」中修改；退出后需重新登录。</p><p class="muted" id="systemBaseUrlNote" style="margin-top:8px"></p><div class="action-row" style="margin-top:12px"><button id="loadStats" class="button secondary" type="button">刷新统计</button><button id="runDiagnose" class="button secondary" type="button">诊断生图</button><button id="clearCredentials" class="button secondary" type="button">退出登录</button></div><div id="stats" class="stats" style="margin-top:12px"></div></section>
               <section class="utility-panel"><h3>运行说明</h3><p class="muted">创建草稿后，在「食材生图」点击“启动批次”交由云端调度器持续生成。审核拒绝的候选图会携带原因进入下一次重试，最多三次。</p><p class="muted" style="margin-top:12px">本页不再支持手动录入 foodId、jobId 或浏览器端消费任务，避免绕开批次和审核链路。</p></section>
               <section class="utility-panel"><h3>响应与排障</h3><p class="muted">仅显示最近一次后台操作响应，不保存密钥或任务标识。</p><pre id="out">{}</pre></section>
             </div>
@@ -557,6 +589,19 @@
         return { baseUrl: "", token: "", username: "" };
       }
     }
+    function showLoginGate(message = "") {
+      $("loginGate").hidden = false;
+      $("adminApp").hidden = true;
+      $("loginError").textContent = message || "";
+      setConnected(false);
+    }
+    function showAdminApp() {
+      $("loginGate").hidden = true;
+      $("adminApp").hidden = false;
+      const base = $("baseUrl").value.trim() || DEFAULT_API_BASE;
+      if ($("systemBaseUrlNote")) $("systemBaseUrlNote").textContent = `API Base：${base}`;
+      setConnected(true);
+    }
     function saveCredentials() {
       try {
         localStorage.setItem(CREDENTIAL_KEYS.baseUrl, $("baseUrl").value.trim());
@@ -574,8 +619,8 @@
       $("adminUsername").value = "";
       $("adminPassword").value = "";
       $("baseUrl").value = DEFAULT_API_BASE;
-      setConnected(false);
-      toast("已退出登录并清除本机会话");
+      showLoginGate();
+      toast("已退出登录");
     }
     const storedCredentials = readStoredCredentials();
     $("baseUrl").value = storedCredentials.baseUrl || DEFAULT_API_BASE;
@@ -609,10 +654,16 @@
       FOOD_ADMIN_UNAVAILABLE: "管理服务暂时不可用，请稍后重试或检查云函数日志",
       BAD_GATEWAY: "云函数网关超时或崩溃，请缩小生成数量后重试",
       HTTP_400: "请求被网关拒绝（Bad Gateway 时常表示云函数超时/崩溃）",
+      HTTP_410: "云函数暂时不可用（410），请稍后刷新再试",
       FOOD_IMAGE_BATCH_CATEGORY_REQUIRED: "请先选择食物分类",
       FOOD_IMAGE_BATCH_SELECTION_EMPTY: "当前没有可生成的食材",
+      FOOD_IMAGE_BATCH_EXECUTOR_MISSING: "批次缺少执行管理员（创建者账号可能已删除）。请点「立即重试」，系统会用当前后台帐号继续生成。",
+      FOOD_IMAGE_BATCH_ATTEMPTS_EXHAUSTED: "已用尽自动重试次数，请点「立即重试」再试一次",
+      HY_IMAGE_UNAVAILABLE: "混元生图暂时不可用，请稍后重试",
+      HY_IMAGE_DISABLED: "生图功能已关闭，请检查云函数环境变量",
+      HY_IMAGE_DAILY_LIMIT: "今日生图额度已用尽，请明天再试或提高日限额",
       FORBIDDEN: "当前账号不是管理员",
-      UNAUTHORIZED: "登录已失效，请重新粘贴管理员 Token",
+      UNAUTHORIZED: "登录已失效，请重新登录后台",
     };
     const apiErrorMessage = (error) => {
       const code = error?.json?.code || error?.code;
@@ -636,16 +687,16 @@
       state.operations = state.operations.slice(0, 12); renderOperationFeed();
     }
 
-    async function api(path, { method = "GET", body } = {}) {
+    async function api(path, { method = "GET", body, quiet = false } = {}) {
       const base = $("baseUrl").value.trim().replace(/\/$/, "");
       const token = sessionToken.trim();
       if (!base || !token) throw new Error("请先使用帐号密码登录后台");
       const endpoint = `/api/admin${path}`; let response;
       try { response = await fetch(`${base}${endpoint}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
-      catch (cause) { const error = createApiError({ endpoint, method, cause }); recordOperation({ title: "接口连接失败", detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
+      catch (cause) { const error = createApiError({ endpoint, method, cause }); if (!quiet) recordOperation({ title: "接口连接失败", detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
       const json = await response.json().catch(() => ({}));
-      if (!response.ok) { const error = createApiError({ endpoint, method, status: response.status, json }); recordOperation({ title: `接口错误 ${response.status}`, detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
-      if (method !== "GET") recordOperation({ title: "接口操作已完成", detail: `${method} ${endpoint} · HTTP ${response.status}` });
+      if (!response.ok) { const error = createApiError({ endpoint, method, status: response.status, json }); if (!quiet) recordOperation({ title: `接口错误 ${response.status}`, detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
+      if (method !== "GET" && !quiet) recordOperation({ title: "接口操作已完成", detail: `${method} ${endpoint} · HTTP ${response.status}` });
       return json;
     }
     async function foodApi(path, { method = "GET", body } = {}) {
@@ -931,7 +982,7 @@
     }
     async function loadFoodAdminList(page = state.foodAdminPagination.page || 1) {
       const host = $("foodAdminTable");
-      if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先在系统配置中连接后台</p>"; return; }
+      if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
       if (!state.categories.length) await loadCategories();
       else populateFoodAdminCategorySelects();
       try {
@@ -1176,7 +1227,7 @@
     async function selectBatch(batchId) { state.activeBatchId = batchId; state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; state.jobs.clear(); renderBatches(); await loadBatchDetail(); }
     async function loadBatchDetail() { const data = await api(`/food-image-batches/${state.activeBatchId}?page=1&pageSize=100`); state.batchDetail = data; renderBatches(); await renderQueue(); }
     function filteredItems() { const items = state.batchDetail?.items || []; return state.activeFilter === "all" ? items : items.filter((item) => item.status === state.activeFilter); }
-    async function loadJobCandidates(jobId) { if (!jobId) return null; if (state.jobs.has(jobId)) return state.jobs.get(jobId); const data = await api(`/food-image-jobs/${jobId}`); state.jobs.set(jobId, data); return data; }
+    async function loadJobCandidates(jobId) { if (!jobId) return null; if (state.jobs.has(jobId)) return state.jobs.get(jobId); const data = await api(`/food-image-jobs/${jobId}`, { quiet: true }); state.jobs.set(jobId, data); return data; }
     async function hydrateQueue(items) { const result = new Map(); let cursor = 0; const workers = Array.from({ length: Math.min(4, items.length) }, async () => { while (cursor < items.length) { const item = items[cursor++]; if (!item.jobId) continue; try { result.set(item.jobId, await loadJobCandidates(item.jobId)); } catch { result.set(item.jobId, null); } } }); await Promise.all(workers); return result; }
     function syncBulkControls(candidateIds = []) {
       const bar = $("bulkReviewBar"); const selectAll = $("selectAllReview"); const approve = $("approveSelected");
@@ -1195,36 +1246,60 @@
       const selectableIds = queue.filter(({ item, candidate }) => item.status === "needs_review" && candidate?.id).map(({ candidate }) => candidate.id);
       host.className = "review-grid"; host.innerHTML = queue.map(({ item, candidate }) => {
         const name = foodLabel(item); const imageUrl = preferredUrl(candidate); const selected = item.id === state.selectedItemId; const canSelect = item.status === "needs_review" && candidate?.id;
-        const canRetry = Boolean(item.jobId) && (item.status === "needs_retry" || item.status === "failed");
+        const canRetry = item.status === "needs_retry" || item.status === "failed" || item.status === "generating";
         const reason = item.errorMessage || item.retryReason || "";
         const exception = (item.errorCode || reason) ? `<span class="card-exception">${escapeHtml(item.errorCode || "失败")}${reason ? ` · ${escapeHtml(reason)}` : ""}</span>` : "";
+        const retryLabel = item.status === "generating" ? "取消并重试" : "立即重试";
         const toolbarLead = canSelect
           ? `<label class="card-select-label" aria-label="选择候选图"><input type="checkbox" data-candidate-select="${candidate.id}" ${state.selectedImageIds.has(candidate.id) ? "checked" : ""} /></label>`
           : canRetry
-            ? `<button class="button secondary" data-retry-job-id="${escapeHtml(item.jobId)}" data-food-name="${escapeHtml(name)}">立即重试</button>`
+            ? `<button class="button secondary" data-retry-item-id="${escapeHtml(item.id)}" data-retry-job-id="${escapeHtml(item.jobId || "")}" data-food-name="${escapeHtml(name)}">${retryLabel}</button>`
             : "<span></span>";
         return `<article class="food-card ${selected ? "selected" : ""}"><button class="food-card-select" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}"><span class="food-card-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" />` : "<span class=\"food-card-placeholder\">N</span>"}<span class="image-status ${statusTone(item.status)}">${statusLabel(item.status)}</span></span><span class="food-card-body"><span class="food-card-title">${escapeHtml(name)}</span><span class="food-card-meta"><span>${escapeHtml(item.visualProfileLabelZh || visualProfileLabel(item.visualProfileKey))}</span><span>${item.attemptCount || 0} 次尝试</span></span>${exception}</span></button><div class="food-card-toolbar">${toolbarLead}<button class="button secondary" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}">${item.jobId ? "查看详情" : "查看异常"}</button></div></article>`;
       }).join("");
       host.querySelectorAll("button[data-item-id]").forEach((button) => { button.onclick = () => selectItem(button.dataset.itemId, button.dataset.foodName); });
-      host.querySelectorAll("button[data-retry-job-id]").forEach((button) => { button.onclick = (event) => { event.stopPropagation(); retryJobNow(button.dataset.retryJobId, button.dataset.foodName); }; });
+      host.querySelectorAll("button[data-retry-item-id]").forEach((button) => { button.onclick = (event) => { event.stopPropagation(); retryItemNow(button.dataset.retryItemId, button.dataset.foodName, button.dataset.retryJobId); }; });
       host.querySelectorAll("input[data-candidate-select]").forEach((input) => { input.onchange = () => { if (input.checked) state.selectedImageIds.add(input.dataset.candidateSelect); else state.selectedImageIds.delete(input.dataset.candidateSelect); syncBulkControls(selectableIds); }; });
       syncBulkControls(selectableIds); renderInspector();
     }
     async function selectItem(itemId, foodName) { const item = (state.batchDetail?.items || []).find((entry) => entry.id === itemId); if (!item) return; state.selectedItemId = itemId; state.selectedFoodName = foodName || foodLabel(item); state.selectedJobId = item.jobId || ""; state.selectedImageId = ""; if (item.jobId) { const job = await loadJobCandidates(item.jobId); const candidate = job?.candidates?.find((entry) => (entry.reviewStatus || entry.status) === "pending") || job?.candidates?.[0]; state.selectedImageId = candidate?.id || ""; } await renderQueue(); renderInspector(); }
-    async function retryJobNow(jobId, foodName = "食物") {
-      if (!jobId) return;
+    async function retryItemNow(itemId, foodName = "食物", jobId = "") {
+      if (!itemId && !jobId) return;
       try {
-        const data = await api(`/food-image-jobs/${jobId}/retry`, { method: "POST", body: {} });
+        const path = itemId
+          ? `/food-image-batch-items/${itemId}/retry`
+          : `/food-image-jobs/${jobId}/retry`;
+        const data = await api(path, { method: "POST", body: {} });
         out(data);
         const ok = Boolean(data.retryScheduled || data.processed);
-        recordOperation({ title: ok ? "已立即重试" : "立即重试未开始", detail: `${foodName} · ${data.reason || data.errorMessage || (ok ? "云端已接手" : "请查看批次状态")}`, isError: !ok });
-        toast(ok ? `${foodName} 已提交立即重试` : (data.reason || data.errorMessage || "未能立即重试"), !ok);
+        recordOperation({ title: ok ? "已取消卡住并重试" : "立即重试未开始", detail: `${foodName} · ${data.reason || data.errorMessage || (ok ? "云端已接手" : "请查看批次状态")}`, isError: !ok });
+        toast(ok ? `${foodName} 已提交重试` : (data.reason || data.errorMessage || "未能立即重试"), !ok);
         await refreshBatches();
       } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); }
     }
-    function itemHealthMarkup(item, job) { if (!item) return ""; const retry = item.nextRetryAt ? `下次重试：${formatTime(item.nextRetryAt)}` : item.status === "needs_retry" ? "等待云端调度器安排下一次重试。" : ""; const action = item.status === "failed" ? "已达到最大重试次数，需要查看失败原因后重新建批次。" : item.status === "needs_review" ? "候选图已生成，等待人工审核。" : retry; const error = item.errorCode ? `<div class="item-error"><b>${escapeHtml(item.errorCode)}</b>${escapeHtml(item.errorMessage || item.retryReason || "生成任务失败")}</div>` : ""; return `<section class="item-health"><div class="item-health-head"><strong>任务状态</strong><span class="status-badge ${statusTone(item.status)}">${escapeHtml(statusLabel(item.status))}</span></div><p class="item-health-copy">尝试 ${item.attemptCount || 0}/${job?.maxAttempts || 3} 次${item.retryReason ? ` · 重试原因：${escapeHtml(item.retryReason)}` : ""}<br>${escapeHtml(action || "当前状态正常。")}</p>${error}</section>`; }
+    function itemHealthMarkup(item, job) {
+      if (!item) return "";
+      const recoverable = ["FOOD_IMAGE_BATCH_EXECUTOR_MISSING", "FOOD_IMAGE_BATCH_ATTEMPTS_EXHAUSTED", "FOOD_IMAGE_BATCH_GENERATING_UNLOCKED", "UNAUTHORIZED", "HY_IMAGE_UNAVAILABLE", "HY_IMAGE_DISABLED", "HY_IMAGE_DAILY_LIMIT", "BAD_GATEWAY"].includes(item.errorCode);
+      const retry = item.nextRetryAt ? `下次重试：${formatTime(item.nextRetryAt)}` : item.status === "needs_retry" ? "等待云端调度器安排下一次重试，也可点「立即重试」。" : "";
+      const action = item.status === "generating"
+        ? "卡在生成中（常见于接口 410/超时）。可点「取消并重试」解除锁定后重新生成。"
+        : item.status === "failed"
+        ? (recoverable || !item.jobId
+          ? "接口/配置类失败，可直接点「立即重试」；无需重新建批次。"
+          : "已达到最大重试次数，可点「立即重试」再试一次，或查看失败原因后重建批次。")
+        : item.status === "needs_review" ? "候选图已生成，等待人工审核。" : retry;
+      const error = item.errorCode ? `<div class="item-error"><b>${escapeHtml(item.errorCode)}</b>${escapeHtml(item.errorMessage || item.retryReason || "生成任务失败")}</div>` : "";
+      return `<section class="item-health"><div class="item-health-head"><strong>任务状态</strong><span class="status-badge ${statusTone(item.status)}">${escapeHtml(statusLabel(item.status))}</span></div><p class="item-health-copy">尝试 ${item.attemptCount || 0}/${job?.maxAttempts || 3} 次${item.retryReason ? ` · 重试原因：${escapeHtml(item.retryReason)}` : ""}${item.lockedAt ? `<br>锁定于 ${escapeHtml(formatTime(item.lockedAt))}${item.lockedBy ? ` · ${escapeHtml(item.lockedBy)}` : ""}` : ""}<br>${escapeHtml(action || "当前状态正常。")}</p>${error}</section>`;
+    }
     function renderInspector() { const host = $("inspector"); const item = selectedItem(); const job = state.selectedJobId ? state.jobs.get(state.selectedJobId) : null; const candidates = job?.candidates || []; const candidate = candidates.find((entry) => entry.id === state.selectedImageId) || candidates[0]; if (!item) { host.className = "inspector-intro"; host.innerHTML = "<div><h2>选择一张候选图</h2><p>从中央审核队列点击食物，即可查看大图、自动提示词、任务状态和异常原因。</p></div>"; return; }
-      const plan = item.promptPlan?.prompt || "暂无自动提示词。"; const category = item.food?.category || "未分类"; const profile = item.visualProfileLabelZh || visualProfileLabel(item.visualProfileKey); if (!candidate) { host.className = ""; host.innerHTML = `<div class="inspector-content"><div><div class="inspector-title"><h2>${escapeHtml(state.selectedFoodName)}</h2><span class="category-badge">${escapeHtml(category)} · ${escapeHtml(profile)}</span></div>${itemHealthMarkup(item, job)}<details class="detail-block"><summary>查看自动提示词</summary><p>${escapeHtml(plan)}</p></details></div></div>`; return; }
+      const plan = item.promptPlan?.prompt || "暂无自动提示词。"; const category = item.food?.category || "未分类"; const profile = item.visualProfileLabelZh || visualProfileLabel(item.visualProfileKey); if (!candidate) {
+        const canRetryItem = item.status === "needs_retry" || item.status === "failed" || item.status === "generating";
+        const retryLabel = item.status === "generating" ? "取消并重试" : "立即重试";
+        host.className = "";
+        host.innerHTML = `<div class="inspector-content"><div><div class="inspector-title"><h2>${escapeHtml(state.selectedFoodName)}</h2><span class="category-badge">${escapeHtml(category)} · ${escapeHtml(profile)}</span></div>${itemHealthMarkup(item, job)}<details class="detail-block"><summary>查看自动提示词</summary><p>${escapeHtml(plan)}</p></details>${canRetryItem ? `<div class="inspector-actions"><button id="retryItem" class="button">${retryLabel}</button></div>` : ""}</div></div>`;
+        $("retryItem")?.addEventListener("click", () => retryItemNow(item.id, state.selectedFoodName, item.jobId || ""));
+        return;
+      }
       const imageUrl = preferredUrl(candidate);
       host.className = ""; host.innerHTML = `<div class="inspector-content"><div class="inspector-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(state.selectedFoodName)}" />` : "<span class=\"food-card-placeholder\">N</span>"}</div><div><div class="inspector-title"><h2>${escapeHtml(state.selectedFoodName)}</h2><span class="category-badge">${escapeHtml(category)} · ${escapeHtml(profile)}</span></div>${itemHealthMarkup(item, job)}<div class="candidate-strip">${candidates.map((entry) => { const url = preferredUrl(entry); return `<button class="candidate-thumb ${entry.id === candidate.id ? "active" : ""}" data-candidate-id="${entry.id}">${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(state.selectedFoodName)} 候选图" />` : "<span class=\"food-card-placeholder\">N</span>"}</button>`; }).join("")}</div><details class="detail-block"><summary>查看自动提示词</summary><p>${escapeHtml(plan)}</p></details><details class="detail-block"><summary>生成信息</summary><p>视觉状态 ${escapeHtml(profile)}<br>任务 ${escapeHtml(state.selectedJobId)}<br>候选状态 ${escapeHtml(candidate.reviewStatus || candidate.status || "pending")}</p></details><div class="inspector-actions"><button id="approve" class="button">通过并设为该状态主图</button><button id="reject" class="button secondary">拒绝并填写原因</button></div></div></div>`;
       host.querySelectorAll("button[data-candidate-id]").forEach((button) => { button.onclick = () => { state.selectedImageId = button.dataset.candidateId; renderInspector(); }; }); $("approve")?.addEventListener("click", approveSelected); $("reject")?.addEventListener("click", rejectSelected);
@@ -1323,18 +1398,19 @@
       return json;
     }
     async function loadStats() { try { const stats = await api("/food-image-jobs/stats"); out(stats); $("stats").innerHTML = [["待审核", stats.pendingReviewImages], ["已有主图", stats.readyFoods], ["失败任务", stats.failedJobs], ["今日生成", `${stats.dailyGenerated}/${stats.dailyLimit}`], ["缺失图片", stats.missingImages], ["待处理", stats.pendingJobs]].map(([name, value]) => `<div class="stat">${name}<b>${escapeHtml(value)}</b></div>`).join(""); } catch (error) { out(error.json || { error: error.message }); toast(error.message, true); } }
-    async function connect() {
+    async function connect({ requirePassword = false } = {}) {
       try {
-        if (!$("adminPassword").value && sessionToken) {
-          // Reuse saved session when password field is empty.
-        } else {
+        $("loginError").textContent = "";
+        if (requirePassword || $("adminPassword").value || !sessionToken) {
           await loginAdmin();
         }
-        await loadCategories(); await refreshBatches(); await loadPatrolRules(); setConnected(true); saveCredentials(); await loadStats();
+        showAdminApp();
+        await loadCategories(); await refreshBatches(); await loadPatrolRules(); saveCredentials(); await loadStats();
         recordOperation({ title: "后台已登录", detail: "分类、批次、巡检与生图统计已刷新" });
         toast("后台已登录");
       } catch (error) {
-        setConnected(false);
+        sessionToken = "";
+        showLoginGate(apiErrorMessage(error));
         out(error.json || { error: error.message });
         toast(apiErrorMessage(error), true);
       }
@@ -1343,7 +1419,7 @@
     const feedbackCategoryLabel = (category) => ({ product: "产品", bug: "缺陷", feature: "功能", support: "支持" }[category] || category || "—");
     async function loadUsers() {
       const host = $("userTable");
-      if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先在系统配置中连接后台</p>"; return; }
+      if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
       try {
         const q = encodeURIComponent(($("userSearch").value || "").trim());
         const data = await api(`/users?q=${q}&limit=50`);
@@ -1354,7 +1430,7 @@
     }
     async function loadFeedback() {
       const host = $("feedbackTable");
-      if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先在系统配置中连接后台</p>"; return; }
+      if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
       try {
         const status = $("feedbackStatusFilter").value;
         const qs = status ? `?status=${encodeURIComponent(status)}&limit=50` : "?limit=50";
@@ -1421,7 +1497,16 @@
       if (event.key === "Escape" && !$("foodAdminEditor").hidden) hideFoodEditor();
     });
     $("foodAdminBulkBatch").onclick = () => createImageBatchForFoods([...state.foodAdminSelectedIds]).catch((error) => toast(apiErrorMessage(error), true));
-    $("connect").onclick = connect; $("refreshAll").onclick = connect; $("clearCredentials").onclick = clearStoredCredentials; $("refreshQueue").onclick = () => loadBatchDetail().catch((error) => toast(apiErrorMessage(error), true)); $("loadStats").onclick = loadStats; $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
+    $("loginForm").onsubmit = (event) => {
+      event.preventDefault();
+      connect({ requirePassword: true }).catch(() => {});
+    };
+    $("refreshAll").onclick = () => connect().catch(() => {});
+    $("logoutBtn").onclick = clearStoredCredentials;
+    $("clearCredentials").onclick = clearStoredCredentials;
+    $("refreshQueue").onclick = () => loadBatchDetail().catch((error) => toast(apiErrorMessage(error), true));
+    $("loadStats").onclick = loadStats;
+    $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
     $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory; $("visualProfileKey").onchange = previewCategory;
     $("addPatrolRule").onclick = () => addPatrolRule().catch((error) => toast(apiErrorMessage(error), true));
     $("runPatrolNow").onclick = () => runPatrolNow().catch((error) => toast(apiErrorMessage(error), true));
@@ -1437,6 +1522,7 @@
     $("filterRow").querySelectorAll("button[data-filter]").forEach((button) => { button.onclick = async () => { state.activeFilter = button.dataset.filter; $("filterRow").querySelectorAll(".filter").forEach((item) => item.classList.toggle("active", item === button)); await renderQueue(); }; });
     $("selectAllReview").onchange = () => { const candidateIds = [...document.querySelectorAll("input[data-candidate-select]")].map((input) => input.dataset.candidateSelect); state.selectedImageIds = new Set($("selectAllReview").checked ? candidateIds : []); renderQueue(); };
     $("approveSelected").onclick = approveSelectedImages;
+    showLoginGate();
     if (hasToken()) connect().catch(() => {});
   </script>
 </body>

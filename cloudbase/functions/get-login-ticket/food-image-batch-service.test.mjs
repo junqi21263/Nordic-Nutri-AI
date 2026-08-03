@@ -245,6 +245,225 @@ test("retries the exact rejected batch item immediately and reopens a completed 
   assert.match(created[0].input.extraPrompt, /主体偏肥/);
 });
 
+test("trusted dispatch falls back to resolveAdminExecutor when created_by is missing", async () => {
+  const batch = {
+    id: "batch-1",
+    status: "running",
+    created_by: null,
+    concurrency: 1,
+    max_attempts: 3,
+  };
+  const item = {
+    id: "item-1",
+    batch_id: batch.id,
+    food_id: "food-1",
+    status: "pending",
+    attempt_count: 0,
+    retry_reason: null,
+  };
+  const db = {
+    from(table) {
+      if (table === "food_image_batches") {
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: batch, error: null }) }) }),
+          update: (patch) => {
+            Object.assign(batch, patch);
+            return { eq: async () => ({ data: batch, error: null }) };
+          },
+        };
+      }
+      if (table === "food_image_batch_items") {
+        return {
+          select: (columns) => {
+            if (columns === "status") return { eq: async () => ({ data: [{ status: item.status }], error: null }) };
+            const query = {
+              eq: () => query,
+              in: () => query,
+              or: () => query,
+              order: () => query,
+              limit: () => query,
+              maybeSingle: async () => ({ data: item.status === "pending" ? item : null, error: null }),
+            };
+            return query;
+          },
+          update: (patch) => {
+            Object.assign(item, patch);
+            const query = {
+              eq: () => query,
+              select: () => ({ maybeSingle: async () => ({ data: item, error: null }) }),
+            };
+            return query;
+          },
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+  const createdBy = [];
+  const service = createFoodImageBatchService({
+    db,
+    repository: {
+      async getFoodById(id) {
+        return { id, nameZh: "澳大利亚羊腿肉", nameEn: "Australian lamb", category: { nameZh: "肉禽" } };
+      },
+    },
+    jobs: {
+      async createJob(userId) {
+        createdBy.push(userId);
+        return { id: "job-fallback" };
+      },
+      async processQueue() {
+        return { results: [{ generated: 1 }] };
+      },
+    },
+    resolveAdminExecutor: async () => "admin-console-actor",
+  });
+
+  const result = await service.processNextTrusted(batch.id);
+
+  assert.equal(result.processed, 1);
+  assert.deepEqual(createdBy, ["admin-console-actor"]);
+  assert.equal(batch.created_by, "admin-console-actor");
+  assert.equal(item.status, "needs_review");
+});
+
+test("retryFailedItem reopens executor-missing failures without a job id", async () => {
+  const batch = { id: "batch-1", status: "running", created_by: null, concurrency: 1, max_attempts: 3 };
+  const item = {
+    id: "item-1",
+    batch_id: batch.id,
+    food_id: "food-1",
+    job_id: null,
+    status: "failed",
+    attempt_count: 3,
+    error_code: "FOOD_IMAGE_BATCH_EXECUTOR_MISSING",
+    error_message: "batch has no administrator executor",
+  };
+  const db = {
+    from(table) {
+      if (table === "food_image_batches") return {
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: batch, error: null }) }) }),
+        update: (patch) => ({ eq: async () => { Object.assign(batch, patch); return { data: batch, error: null }; } }),
+      };
+      if (table === "food_image_batch_items") return {
+        select: (columns) => {
+          if (columns === "status") return { eq: async () => ({ data: [{ status: item.status }], error: null }) };
+          const query = {
+            eq: () => query, in: () => query, or: () => query, order: () => query, limit: () => query,
+            maybeSingle: async () => ({
+              data: item.status === "needs_retry" || item.status === "generating" || item.status === "failed" ? item : null,
+              error: null,
+            }),
+          };
+          return query;
+        },
+        update: (patch) => {
+          Object.assign(item, patch);
+          const query = { eq: () => query, select: () => ({ maybeSingle: async () => ({ data: item, error: null }) }) };
+          return query;
+        },
+      };
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+  const created = [];
+  const service = createFoodImageBatchService({
+    db,
+    repository: {
+      isAdmin: async (userId) => userId === "admin",
+      getFoodById: async () => ({ id: "food-1", nameZh: "澳大利亚羊腿肉", category: { nameZh: "肉禽" } }),
+    },
+    jobs: {
+      createJob: async (userId) => { created.push(userId); return { id: "new-job" }; },
+      processQueue: async () => ({ results: [{ generated: 1 }] }),
+    },
+    resolveAdminExecutor: async () => "admin-console-actor",
+  });
+
+  const result = await service.retryFailedItem("admin", "item-1");
+
+  assert.equal(result.retryScheduled, true);
+  assert.equal(result.jobId, "new-job");
+  assert.equal(item.status, "needs_review");
+  assert.equal(item.attempt_count, 1);
+  assert.deepEqual(created, ["admin"]);
+});
+
+test("retryFailedItem unlocks a stuck generating item and processes it again", async () => {
+  const batch = { id: "batch-1", status: "running", created_by: "admin", concurrency: 1, max_attempts: 3 };
+  const item = {
+    id: "item-stuck",
+    batch_id: batch.id,
+    food_id: "food-1",
+    job_id: "stale-job",
+    status: "generating",
+    attempt_count: 0,
+    locked_at: "2026-08-03T04:00:00.000Z",
+    locked_by: "cloud-scheduled-worker",
+    error_code: null,
+    error_message: null,
+  };
+  let unlockedFromGenerating = false;
+  const db = {
+    from(table) {
+      if (table === "food_image_batches") return {
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: batch, error: null }) }) }),
+        update: (patch) => ({ eq: async () => { Object.assign(batch, patch); return { data: batch, error: null }; } }),
+      };
+      if (table === "food_image_batch_items") return {
+        select: (columns) => {
+          if (columns === "status") return { eq: async () => ({ data: [{ status: item.status }], error: null }) };
+          let statusFilter = null;
+          const query = {
+            eq: () => query,
+            in: (column, values) => {
+              if (column === "status") statusFilter = values;
+              return query;
+            },
+            or: () => query,
+            order: () => query,
+            limit: () => query,
+            maybeSingle: async () => {
+              if (statusFilter && !statusFilter.includes(item.status)) return { data: null, error: null };
+              return { data: item, error: null };
+            },
+          };
+          return query;
+        },
+        update: (patch) => {
+          if (item.status === "generating" && patch.status === "needs_retry") unlockedFromGenerating = true;
+          Object.assign(item, patch);
+          const query = { eq: () => query, select: () => ({ maybeSingle: async () => ({ data: item, error: null }) }) };
+          return query;
+        },
+      };
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+  const created = [];
+  const service = createFoodImageBatchService({
+    db,
+    repository: {
+      isAdmin: async (userId) => userId === "admin",
+      getFoodById: async () => ({ id: "food-1", nameZh: "混合肉香肠", category: { nameZh: "肉禽" } }),
+    },
+    jobs: {
+      createJob: async (userId) => { created.push(userId); return { id: "fresh-job" }; },
+      processQueue: async () => ({ results: [{ generated: 1 }] }),
+    },
+  });
+
+  const result = await service.retryFailedItem("admin", "item-stuck");
+
+  assert.equal(unlockedFromGenerating, true);
+  assert.equal(result.retryScheduled, true);
+  assert.equal(result.jobId, "fresh-job");
+  assert.equal(item.status, "needs_review");
+  assert.equal(item.locked_at, null);
+  assert.equal(item.locked_by, null);
+  assert.deepEqual(created, ["admin"]);
+});
+
 test("previewCategory falls back to localized English food names when name_zh is missing", async () => {
   const repository = {
     isAdmin: async () => true,

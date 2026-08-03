@@ -713,6 +713,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     repository: foodRepository,
     jobs: foodImageJobs,
+    resolveAdminExecutor: () => adminConsoleAuth.ensureActor(),
   });
   const foodImagePatrol = createFoodImagePatrolService({
     db,
@@ -989,6 +990,8 @@ function getAdminFoodRoute(pathname) {
   if (path === "/food-image-jobs") return { operation: "imageJobs" };
   const jobRetryMatch = path.match(/^\/food-image-jobs\/([0-9a-f-]{36})\/retry$/i);
   if (jobRetryMatch) return { operation: "retryImageJob", jobId: jobRetryMatch[1] };
+  const itemRetryMatch = path.match(/^\/food-image-batch-items\/([0-9a-f-]{36})\/retry$/i);
+  if (itemRetryMatch) return { operation: "retryImageBatchItem", itemId: itemRetryMatch[1] };
   const jobMatch = path.match(/^\/food-image-jobs\/([0-9a-f-]{36})$/i);
   if (jobMatch) return { operation: "imageJobDetail", jobId: jobMatch[1] };
   const approveMatch = path.match(/^\/food-images\/([0-9a-f-]{36})\/approve$/i);
@@ -1435,6 +1438,13 @@ function createHttpServer({ service }) {
             return sendJson(res, 503, { code: "FOOD_IMAGE_BATCH_UNAVAILABLE" });
           }
           return sendJson(res, 200, await service.foodImageBatches.retryRejectedJob(session.sub, adminFoodRoute.jobId));
+        }
+        if (adminFoodRoute.operation === "retryImageBatchItem") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (typeof service.foodImageBatches?.retryFailedItem !== "function") {
+            return sendJson(res, 503, { code: "FOOD_IMAGE_BATCH_UNAVAILABLE" });
+          }
+          return sendJson(res, 200, await service.foodImageBatches.retryFailedItem(session.sub, adminFoodRoute.itemId));
         }
         if (adminFoodRoute.operation === "approveImage") {
           if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });

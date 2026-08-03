@@ -188,7 +188,16 @@ test("candidate cards keep a bare checkbox without repeating batch-select wordin
 test("retryable failed items expose an immediate retry action", async () => {
   const source = await pageSource();
   assert.match(source, /立即重试/);
-  assert.match(source, /food-image-jobs\/\$\{[^}]+\}\/retry|\/food-image-jobs\/.*\/retry|retryRejected|retryItem/);
+  assert.match(source, /data-retry-item-id/);
+  assert.match(source, /food-image-batch-items\/\$\{[^}]+\}\/retry|retryItemNow|retryFailedItem/);
+  assert.match(source, /needs_retry.*failed.*generating|generating.*needs_retry|取消并重试/);
+});
+
+test("stuck generating items expose cancel-and-retry action", async () => {
+  const source = await pageSource();
+  assert.match(source, /取消并重试/);
+  assert.match(source, /status === "generating"/);
+  assert.match(source, /卡在生成|取消卡住|生成中.*重试|stuck|unlock/i);
 });
 
 test("admin console shell uses left nav modules and renames the page", async () => {
@@ -268,6 +277,7 @@ test("connection settings sit in system config while image tools live under 食�
   assert.ok(guide > images && guide < system, "workflow guide inside images");
   assert.ok(tools > system, "connection tools inside system");
   assert.ok(batch > images && batch < system, "batch composer inside images");
+  assert.match(source, /会话与诊断/);
 });
 
 test("users and feedback modules call admin list endpoints", async () => {
@@ -279,6 +289,19 @@ test("users and feedback modules call admin list endpoints", async () => {
   assert.match(source, /id="feedbackTable"/);
   assert.match(source, /\/feedback/);
   assert.match(source, /method:\s*"PATCH"/);
+});
+
+test("shows a login gate before revealing the admin console", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="loginGate"/);
+  assert.match(source, /id="adminApp"/);
+  assert.match(source, /admin-shell" hidden/);
+  assert.match(source, /登录管理后台/);
+  assert.match(source, /function showLoginGate\(/);
+  assert.match(source, /function showAdminApp\(/);
+  assert.match(source, /showLoginGate\(\)/);
+  assert.match(source, /id="logoutBtn"/);
+  assert.match(source, /loginForm"\.onsubmit|id="loginForm"/);
 });
 
 test("persists admin credentials in localStorage and auto-connects on reload", async () => {

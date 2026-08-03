@@ -58,6 +58,9 @@ function createAdminConsoleAuthService({
     isConfigured() {
       return Boolean(configuredUser && configuredPass);
     },
+    // Stable app_users row used as created_by / job executor for console sessions
+    // and as a fallback when older batches lost their creator via ON DELETE SET NULL.
+    ensureActor,
     async login(input) {
       if (!configuredUser || !configuredPass) {
         throw new PublicAdminAuthError("ADMIN_AUTH_NOT_CONFIGURED", "后台帐号密码未配置");
