@@ -36,4 +36,20 @@ describe("product data HTTPS boundary", () => {
     expect(bootstrap).toContain("account.settings");
     expect(bootstrap).toContain("account.nutritionPlan");
   });
+
+  it("cancels a product account through the authenticated HTTPS API after two local confirmations", () => {
+    const api = readFileSync(resolve(sourceRoot, "api/product-data-api.ts"), "utf8");
+    const page = readFileSync(resolve(sourceRoot, "pages/account-cancellation/index.tsx"), "utf8");
+    const profile = readFileSync(resolve(sourceRoot, "pages/profile/index.tsx"), "utf8");
+
+    expect(api).toContain("cancelProductAccount");
+    expect(api).toContain('"/account/cancel"');
+    expect(api).toContain('method: "POST"');
+    expect(api).toContain("clientRequestId");
+    expect(page).toContain("cancelProductAccount");
+    expect(api).toContain("DELETE_MY_NORDIC_NUTRI_ACCOUNT");
+    expect(page).toContain("/pages/auth-entry/index");
+    expect(page).toContain("确认注销并删除数据");
+    expect(profile).toContain("/pages/account-cancellation/index");
+  });
 });

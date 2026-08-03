@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import test from "node:test";
+import { PublicOperationError } from "./operation-guard.cjs";
 
 import {
   createHttpServer,
@@ -330,6 +331,49 @@ test("reads the signed-in account without accepting a client user id", async () 
     });
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { userId: "user-1", nickname: "Lewis" });
+  });
+});
+
+test("cancels only the authenticated product account", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-a" } : null,
+      accountDeletion: {
+        cancelAccount: async (userId, body) => {
+          calls.push({ userId, body });
+          return { deleted: true };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/get-login-ticket/account/cancel`, { method: "POST" });
+    assert.equal(denied.status, 401);
+    const accepted = await fetch(`${baseUrl}/get-login-ticket/account/cancel`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({ confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT", clientRequestId: "11111111-2222-4333-8444-555555555555", userId: "attacker" }),
+    });
+    assert.deepEqual(await accepted.json(), { deleted: true });
+    assert.deepEqual(calls, [{ userId: "user-a", body: { confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT", clientRequestId: "11111111-2222-4333-8444-555555555555", userId: "attacker" } }]);
+  });
+});
+
+test("returns a conflict instead of repeating an in-progress account cancellation", async () => {
+  const server = createHttpServer({
+    service: {
+      verifySession: () => ({ sub: "user-a" }),
+      accountDeletion: { cancelAccount: async () => { throw new PublicOperationError("OPERATION_IN_PROGRESS", "请求正在处理中"); } },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/account/cancel`, {
+      method: "POST", headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({ confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT", clientRequestId: "11111111-2222-4333-8444-555555555555" }),
+    });
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { code: "OPERATION_IN_PROGRESS" });
   });
 });
 

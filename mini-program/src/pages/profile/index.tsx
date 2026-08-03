@@ -284,7 +284,16 @@ export default function ProfilePage() {
               服务端按登录身份隔离数据，仅你本人可查看与修改自己的记录；其他用户无法访问你的饮食与目标信息。
             </Text>
             <Text>
-              你可随时在资料页更新档案与目标，或退出当前设备登录。如需删除账号相关数据，可通过「反馈与帮助」联系我们处理。
+              你可随时在资料页更新档案与目标，或退出当前设备登录。如需删除账号相关数据，可选择注销账号并立即删除相关数据。
+            </Text>
+            <Text
+              className="profile-modal__link"
+              onClick={() => {
+                setActiveModal(null);
+                openPage("/pages/account-cancellation/index");
+              }}
+            >
+              注销 Nordic Nutri AI 产品账号 ›
             </Text>
           </View>
         </View>

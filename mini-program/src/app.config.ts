@@ -16,6 +16,7 @@ const pages = [
   "pages/meal-records/index",
   "pages/coach/index",
   "pages/profile/index",
+  "pages/account-cancellation/index",
   "pages/profile-edit/index",
   "pages/goal-adjust/index",
   "pages/achievements/index",

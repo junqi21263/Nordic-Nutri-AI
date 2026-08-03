@@ -69,6 +69,12 @@ function detectImageContentType(imageBase64: string, filePath?: string): string 
   return "image/jpeg";
 }
 
+function createVisionError(message: string, cause: unknown) {
+  const error = new Error(message) as Error & { cause?: unknown };
+  error.cause = cause;
+  return error;
+}
+
 function mapVisionResult(result: ProductVisionResult): ScannerMealFixture {
   return {
     id: result.analysisId,
@@ -108,7 +114,7 @@ async function fileSizeOf(filePath: string) {
 }
 
 async function prepareImagePath(sourcePath: string) {
-  let path = sourcePath;
+  let path: string;
   try {
     const originalSize = await fileSizeOf(sourcePath);
     // Compress aggressively for scan upload; recognition quality stays fine at ~1MB JPEG.
@@ -137,7 +143,7 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
     info = await Taro.getFileInfo({ filePath });
   } catch (err) {
     console.error("[vision] getFileInfo failed:", err);
-    throw new Error("无法读取图片文件，请重新选择");
+    throw createVisionError("无法读取图片文件，请重新选择", err);
   }
   if (!("size" in info) || info.size > maxImageBytes) throw new Error(formatImageTooLargeMessage());
   let imageBase64;
@@ -145,7 +151,7 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
     imageBase64 = await readBase64(filePath);
   } catch (err) {
     console.error("[vision] readBase64 failed:", err);
-    throw new Error("图片读取失败，请重新选择");
+    throw createVisionError("图片读取失败，请重新选择", err);
   }
   let contentType;
   try {
@@ -179,7 +185,7 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
     });
   } catch (err) {
     console.error("[vision] network request failed:", err);
-    throw new Error("识别超时或网络不稳定，请压缩后重试或换一张更清晰的近景照片");
+    throw createVisionError("识别超时或网络不稳定，请压缩后重试或换一张更清晰的近景照片", err);
   }
   const data = response.data as ProductVisionResult & { code?: unknown; message?: unknown };
   if (response.statusCode !== 200) {
