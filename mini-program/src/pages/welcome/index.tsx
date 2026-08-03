@@ -17,8 +17,8 @@ export default function WelcomePage() {
     try {
       await new Promise((resolve) => setTimeout(resolve, EXIT_MS));
       markWelcomeSeen();
-      // Routes: authenticated → onboarding/home; otherwise → login.
-      await startApplicationAuth();
+      // Force a fresh launch after marking welcome seen (may overlap app useLaunch).
+      await startApplicationAuth({ force: true });
     } finally {
       setBusy(false);
     }

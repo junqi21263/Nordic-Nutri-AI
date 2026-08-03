@@ -4,6 +4,7 @@ import { getPublicRuntimeConfig } from "./environment";
 import type { AppAuthUser } from "../auth/auth-store";
 import { requestWechatHttpsLogin } from "./wechat-https-login-api";
 import { restoreSession, setNativeSession } from "../auth/session-manager";
+import { syncOnboardingCompletedFromServer } from "../utils/local-experience";
 
 let loginInFlight: Promise<AppAuthUser> | null = null;
 
@@ -68,6 +69,7 @@ export async function loginWithWechat(observer?: WechatLoginObserver) {
         const login = await requestWechatHttpsLogin(wxLoginResult.code);
         const user = login.user;
         setNativeSession(user, login.session.accessToken);
+        syncOnboardingCompletedFromServer(login.onboardingRequired);
         observer?.({ stage: "functionInvokeResponse", status: "success" });
         logFunctionEvent("completed");
         observer?.({ stage: "verifyOtp", status: "running" });

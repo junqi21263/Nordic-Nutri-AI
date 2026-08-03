@@ -133,9 +133,23 @@ function isNutritionQuestion(prompt) {
   return nutritionScopePattern.test(prompt);
 }
 
+function isMissingAppUserError(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || "");
+  return code === "DATABASE_23503" || /foreign key constraint .*coach_conversations_user_id_fkey/i.test(message);
+}
+
+function throwConversationCreateError(error) {
+  if (isMissingAppUserError(error)) {
+    throw new PublicCoachDataError("SESSION_USER_MISSING", "登录已失效，请重新登录");
+  }
+  const detail = typeof error?.message === "string" && error.message.trim() ? error.message.trim() : "";
+  throw new Error(detail ? `Coach conversation creation failed: ${detail}` : "Coach conversation creation failed");
+}
+
 function priorityForContext(context) {
-  const remaining = context.daily.remaining;
-  if (!context.daily.mealCount) return "logging";
+  const remaining = context?.daily?.remaining ?? {};
+  if (!context?.daily?.mealCount) return "logging";
   if (safeNumber(remaining.protein) >= 20) return "protein";
   if (safeNumber(remaining.calories) >= 300) return "calories";
   if (safeNumber(remaining.carbs) >= 40) return "carbs";
@@ -193,8 +207,9 @@ function mergeQuickPrompts(preferred, fallback, limit = 4) {
 
 function quickPromptsForContext(context) {
   const priority = priorityForContext(context);
-  const protein = safeNumber(context.daily.remaining.protein);
-  const calories = safeNumber(context.daily.remaining.calories);
+  const remaining = context?.daily?.remaining ?? {};
+  const protein = safeNumber(remaining.protein);
+  const calories = safeNumber(remaining.calories);
   const avoidanceLabels = context.preferences?.foodAvoidanceLabels || [];
   const avoidHint = avoidanceLabels[0] ? `避开${avoidanceLabels[0]}` : null;
   const mealsPerDay = normalizeMealsPerDay(context.preferences?.mealsPerDay);
@@ -255,8 +270,9 @@ function createRuleReply(prompt, context) {
     };
   }
 
-  const protein = safeNumber(context.daily.remaining.protein);
-  const calories = safeNumber(context.daily.remaining.calories);
+  const remaining = context?.daily?.remaining ?? {};
+  const protein = safeNumber(remaining.protein);
+  const calories = safeNumber(remaining.calories);
   const priority = priorityForContext(context);
   const foods = proteinFoodSuggestions(context.preferences);
   const foodList = foods.join("、");
@@ -351,10 +367,10 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
   async function getConversation(userId) {
     const current = await db.from("coach_conversations").select("id").eq("user_id", userId).is("archived_at", null)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (current.error) throw new Error("Coach conversation read failed");
+    if (current.error) throw new Error(current.error.message || "Coach conversation read failed");
     if (current.data?.id) return current.data.id;
     const created = await db.from("coach_conversations").insert({ user_id: userId, title: "营养教练" }).select("id").single();
-    if (created.error || !created.data?.id) throw new Error("Coach conversation creation failed");
+    if (created.error || !created.data?.id) throwConversationCreateError(created.error);
     return created.data.id;
   }
 
@@ -376,7 +392,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       if (archived.error) throw new Error("Coach conversation archive failed");
     }
     const created = await db.from("coach_conversations").insert({ user_id: userId, title: "营养教练" }).select("id").single();
-    if (created.error || !created.data?.id) throw new Error("Coach conversation creation failed");
+    if (created.error || !created.data?.id) throwConversationCreateError(created.error);
     return { conversationId: created.data.id, messages: [] };
   }
 

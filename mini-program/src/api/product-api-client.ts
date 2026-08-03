@@ -1,5 +1,6 @@
 import Taro from "@tarojs/taro";
 import { useAuthStore } from "../auth/auth-store";
+import { clearProductLocalState } from "../features/account-cancellation/clear-local-state";
 import { productApiEndpoint } from "./product-api-config";
 
 export type ProductApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
@@ -23,14 +24,28 @@ export async function requestProductApi<T>(path: string, request: ProductApiRequ
     header: {
       authorization: `Bearer ${token}`,
       ...(request.data ? { "content-type": "application/json" } : {}),
+      // Avoid sticky 410/error responses from DevTools or system proxy disk cache.
+      "cache-control": "no-cache",
     },
     ...(request.data ? { data: request.data } : {}),
     timeout: request.timeout ?? DEFAULT_PRODUCT_API_TIMEOUT_MS,
+    enableCache: false,
   });
-  const data = response.data as T & { code?: unknown };
+  const data = response.data as T & { code?: unknown; message?: unknown };
   if (response.statusCode !== 200) {
-    const error = new Error(request.fallbackMessage);
-    error.name = typeof data.code === "string" ? data.code : "ProductApiRequestError";
+    const code = typeof data?.code === "string" ? data.code : "ProductApiRequestError";
+    if (response.statusCode === 401 || code === "UNAUTHORIZED" || code === "SESSION_USER_MISSING") {
+      useAuthStore.getState().clear();
+      if (code === "SESSION_USER_MISSING") clearProductLocalState();
+    }
+    const message =
+      code === "SESSION_USER_MISSING" || code === "UNAUTHORIZED"
+        ? "登录已失效，请重新登录"
+        : typeof data?.message === "string" && data.message.trim()
+          ? data.message
+          : request.fallbackMessage;
+    const error = new Error(message);
+    error.name = code;
     throw error;
   }
   return data;

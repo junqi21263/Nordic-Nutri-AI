@@ -21,7 +21,8 @@ describe("home remote meal synchronization fallback", () => {
 
   it("refreshes the cloud summary when the home tab becomes visible again", () => {
     expect(homePage).toContain("useDidShow");
-    expect(homePage).toMatch(/useDidShow\(\(\) => \{\s*setRefreshVersion/);
+    expect(homePage).toContain("isOnboardingCompleted");
+    expect(homePage).toMatch(/useDidShow\(\(\) => \{[\s\S]*setRefreshVersion/);
     expect(homePage).toContain("resolveHomeDailySummary");
   });
 

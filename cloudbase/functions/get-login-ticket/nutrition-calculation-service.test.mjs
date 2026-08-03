@@ -24,6 +24,19 @@ test("calculates nutrient progress independently and keeps over-target values ex
   assert.equal(result.completion, 98);
 });
 
+test("falls back to default targets when nutrition plan is null", () => {
+  const daily = calculateDailyNutrition([], null);
+  assert.deepEqual(daily.targets, { calories: 2600, protein: 180, carbs: 300, fat: 70 });
+  assert.deepEqual(daily.remaining, { calories: 2600, protein: 180, carbs: 300, fat: 70 });
+
+  const weekly = calculateWeeklyNutrition([], null, "2026-08-03");
+  assert.equal(weekly.targets.calories, 2600);
+  assert.equal(weekly.calorieCompletion, 0);
+
+  const achievements = calculateAchievements([], null, "2026-08-03");
+  assert.equal(achievements[0].unlocked, false);
+});
+
 test("scores a week against seven daily targets instead of the number of recorded days", () => {
   const meals = [
     { recordedAt: "2026-07-14T08:00:00.000Z", caloriesKcal: 2400, proteinG: 180, carbsG: 300, fatG: 70 },

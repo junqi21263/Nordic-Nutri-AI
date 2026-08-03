@@ -14,7 +14,7 @@ describe("app authentication wiring", () => {
     expect(bootstrap).toContain("createAuthBootstrap");
     expect(bootstrap).toContain("loginWithWechat");
     expect(bootstrap).not.toContain("getSupabaseClient");
-    expect(bootstrap).toContain("authBootstrap.start({ allowSilentLogin: false })");
+    expect(bootstrap).toContain("authBootstrap.start({ allowSilentLogin: false, force: options?.force })");
     expect(bootstrap).toContain('url: "/pages/auth-entry/index"');
   });
 });

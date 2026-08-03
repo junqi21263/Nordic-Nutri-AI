@@ -90,12 +90,13 @@ function dateKey(value) {
   return new Date(parsed.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-function normalizeTargets(plan = {}) {
+function normalizeTargets(plan) {
+  const safePlan = plan && typeof plan === "object" ? plan : {};
   return {
-    calories: finitePositive(plan.calories ?? plan.caloriesKcal, 2600),
-    protein: finitePositive(plan.protein ?? plan.proteinG, 180),
-    carbs: finitePositive(plan.carbs ?? plan.carbsG, 300),
-    fat: finitePositive(plan.fat ?? plan.fatG, 70),
+    calories: finitePositive(safePlan.calories ?? safePlan.caloriesKcal, 2600),
+    protein: finitePositive(safePlan.protein ?? safePlan.proteinG, 180),
+    carbs: finitePositive(safePlan.carbs ?? safePlan.carbsG, 300),
+    fat: finitePositive(safePlan.fat ?? safePlan.fatG, 70),
   };
 }
 

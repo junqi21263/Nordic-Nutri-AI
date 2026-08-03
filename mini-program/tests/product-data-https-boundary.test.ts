@@ -41,15 +41,24 @@ describe("product data HTTPS boundary", () => {
     const api = readFileSync(resolve(sourceRoot, "api/product-data-api.ts"), "utf8");
     const page = readFileSync(resolve(sourceRoot, "pages/account-cancellation/index.tsx"), "utf8");
     const profile = readFileSync(resolve(sourceRoot, "pages/profile/index.tsx"), "utf8");
+    const authApi = readFileSync(resolve(sourceRoot, "api/auth-api.ts"), "utf8");
+    const client = readFileSync(resolve(sourceRoot, "api/product-api-client.ts"), "utf8");
 
     expect(api).toContain("cancelProductAccount");
     expect(api).toContain('"/account/cancel"');
     expect(api).toContain('method: "POST"');
     expect(api).toContain("clientRequestId");
     expect(page).toContain("cancelProductAccount");
+    expect(page).toContain("clearProductLocalState");
     expect(api).toContain("DELETE_MY_NORDIC_NUTRI_ACCOUNT");
     expect(page).toContain("/pages/auth-entry/index");
     expect(page).toContain("确认注销并删除数据");
     expect(profile).toContain("/pages/account-cancellation/index");
+    expect(authApi).toContain("syncOnboardingCompletedFromServer");
+    expect(client).toContain("SESSION_USER_MISSING");
+    expect(client).toContain("clearProductLocalState");
+    const bootstrap = readFileSync(resolve(sourceRoot, "auth/app-auth-bootstrap.ts"), "utf8");
+    expect(bootstrap).toContain("syncOnboardingCompletedFromAccount");
+    expect(page).toContain("clearProductLocalState");
   });
 });

@@ -1,7 +1,7 @@
 import type { AuthBootstrapStatus } from "./auth-bootstrap";
 
 export interface ApplicationAuthBootstrap {
-  start: () => Promise<void>;
+  start: (options?: { force?: boolean }) => Promise<void>;
   getStatus: () => AuthBootstrapStatus;
 }
 
@@ -14,18 +14,26 @@ export interface ApplicationDestinationDependencies {
   openWelcome: () => void | Promise<unknown>;
 }
 
+export interface ApplicationLaunchStartOptions {
+  /** After login, discard a pre-login launch and route from the fresh session. */
+  force?: boolean;
+}
+
 export function createApplicationLaunch(
   auth: ApplicationAuthBootstrap,
   openHome: () => void | Promise<unknown>,
   openLogin: () => void | Promise<unknown>,
 ) {
   let inFlight: Promise<void> | null = null;
+  let launchId = 0;
 
-  const start = () => {
-    if (!inFlight) {
-      inFlight = auth
-        .start()
+  const start = ({ force = false }: ApplicationLaunchStartOptions = {}) => {
+    if (!inFlight || force) {
+      const id = ++launchId;
+      const promise = auth
+        .start({ force })
         .then(async () => {
+          if (id !== launchId) return;
           if (auth.getStatus() === "authenticated") {
             await openHome();
             return;
@@ -33,10 +41,11 @@ export function createApplicationLaunch(
           await openLogin();
         })
         .finally(() => {
-          inFlight = null;
+          if (inFlight === promise) inFlight = null;
         });
+      inFlight = promise;
     }
-    return inFlight;
+    return inFlight as Promise<void>;
   };
 
   return { start };

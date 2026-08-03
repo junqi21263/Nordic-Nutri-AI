@@ -34,6 +34,7 @@ export interface ProductAccount {
   targetCaloriesKcal: number | null;
   settings: ProductSettings | null;
   nutritionPlan: ProductNutritionPlan | null;
+  onboardingCompleted?: boolean;
 }
 
 export function getProductAccount() {

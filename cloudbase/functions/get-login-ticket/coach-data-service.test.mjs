@@ -305,6 +305,47 @@ test("archives the active conversation, creates a new one, and keeps history", a
   assert.equal((await service.getMessages("user-1")).length, 0);
 });
 
+test("maps missing app_users foreign-key failures to SESSION_USER_MISSING", async () => {
+  const db = {
+    from(table) {
+      assert.equal(table, "coach_conversations");
+      const chain = {
+        select() { return chain; },
+        eq() { return chain; },
+        is() { return chain; },
+        order() { return chain; },
+        limit() { return chain; },
+        async maybeSingle() { return { data: null, error: null }; },
+      };
+      return {
+        select() { return chain; },
+        insert() {
+          return {
+            select() {
+              return {
+                async single() {
+                  return {
+                    data: null,
+                    error: {
+                      code: "DATABASE_23503",
+                      message: 'insert or update on table "coach_conversations" violates foreign key constraint "coach_conversations_user_id_fkey"',
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  const service = createCoachDataService({ db, ...dependencies(), answer: null });
+  await assert.rejects(
+    () => service.getMessages("missing-user"),
+    (error) => error.code === "SESSION_USER_MISSING",
+  );
+});
+
 test("returns a daily tip from the server context provider", async () => {
   const { db } = createDb();
   const service = createCoachDataService({

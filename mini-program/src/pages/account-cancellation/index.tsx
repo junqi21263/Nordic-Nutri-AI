@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cancelProductAccount } from "../../api/product-data-api";
 import { signOut } from "../../auth/session-manager";
 import { AppButton } from "../../components/app-button";
+import { clearProductLocalState } from "../../features/account-cancellation/clear-local-state";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { navigateBackOrHome } from "../../utils/navigation";
@@ -21,6 +22,7 @@ export default function AccountCancellationPage() {
     setIsSubmitting(true);
     try {
       await cancelProductAccount();
+      clearProductLocalState();
       await signOut();
       feedback.show({ message: "账号已注销，相关数据已删除", tone: "success" });
       await Taro.reLaunch({ url: "/pages/auth-entry/index" });

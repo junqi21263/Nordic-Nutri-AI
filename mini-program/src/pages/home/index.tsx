@@ -19,6 +19,8 @@ import { getProductMeals, mapProductMeal } from "../../api/meal-data-api";
 import { getProductDailySummary, type ProductDailySummary } from "../../api/insight-api";
 import { useProfileStore } from "../../stores/profile-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
+import { hasSeenWelcome } from "../../features/welcome/welcome-seen";
+import { isOnboardingCompleted } from "../../utils/local-experience";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -44,6 +46,13 @@ export default function HomePage() {
   const greeting = getCoachGreeting(remoteSummary?.serverTime ?? null);
   const remoteInsight = summary.staleRemote ? null : (remoteSummary?.insight ?? null);
   useDidShow(() => {
+    // Belt-and-suspenders: never stay on Home when server/local say onboarding is open.
+    if (!isOnboardingCompleted()) {
+      void Taro.reLaunch({
+        url: hasSeenWelcome() ? "/pages/onboarding/index" : "/pages/welcome/index",
+      });
+      return;
+    }
     setRefreshVersion((version) => version + 1);
   });
   useEffect(() => {

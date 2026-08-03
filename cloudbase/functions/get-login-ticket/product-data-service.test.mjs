@@ -131,7 +131,21 @@ test("reads only the authenticated user's current account records", async () => 
   assert.deepEqual(result.nutritionPlan, {
     id: "plan-1", calories: 2400, proteinG: 160, carbsG: 260, fatG: 70, status: "active",
   });
+  assert.equal(result.onboardingCompleted, false);
   assert.deepEqual(filters, [["profiles", "id", "user-1"], ["user_settings", "id", "user-1"]]);
+});
+
+test("marks onboardingCompleted when the profile has completed onboarding", async () => {
+  const rows = {
+    profiles: { nickname: "Lewis", onboarding_completed_at: "2026-08-01T00:00:00.000Z" },
+    body_profiles: null,
+    user_goals: null,
+    user_settings: null,
+    nutrition_plans: null,
+  };
+  const db = { from: (table) => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: rows[table], error: null }) }), maybeSingle: async () => ({ data: rows[table], error: null }) }) }) }) };
+  const result = await createProductDataService({ db }).getAccount("user-1");
+  assert.equal(result.onboardingCompleted, true);
 });
 
 test("resolves a signed-in user's stored avatar path into a temporary avatar URL", async () => {

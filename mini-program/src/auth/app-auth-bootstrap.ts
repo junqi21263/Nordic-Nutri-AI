@@ -1,9 +1,15 @@
 import Taro from "@tarojs/taro";
 import { loginWithWechat } from "../api/auth-api";
 import { getProductAccount } from "../api/product-data-api";
-import { useProfileStore } from "../stores/profile-store";
+import { getLocalDateString } from "../features/onboarding/domain";
 import { hasSeenWelcome } from "../features/welcome/welcome-seen";
-import { isOnboardingCompleted } from "../utils/local-experience";
+import { useMealStore } from "../stores/meal-store";
+import { useProfileStore } from "../stores/profile-store";
+import {
+  clearOnboardingCompleted,
+  isOnboardingCompleted,
+  syncOnboardingCompletedFromAccount,
+} from "../utils/local-experience";
 import { createAuthBootstrap } from "./auth-bootstrap";
 import { createRuntimeApplicationLaunch } from "./application-launch";
 import {
@@ -21,7 +27,29 @@ function openWelcomeIfNeeded() {
 }
 
 async function loadIdentity(user: { id: string }) {
-  const account = await getProductAccount();
+  let account;
+  try {
+    account = await getProductAccount();
+  } catch (error) {
+    // Fail closed: never inherit a stale local "onboarding completed" when account is unread.
+    clearOnboardingCompleted();
+    throw error;
+  }
+  // Server profile timestamp is the source of truth for Home vs onboarding.
+  syncOnboardingCompletedFromAccount(account.onboardingCompleted === true);
+  if (account.onboardingCompleted !== true) {
+    // Drop previous-account demo meals / cached goals so Home cannot look finished.
+    try {
+      useMealStore.getState().replaceRemoteMeals([], getLocalDateString());
+    } catch {
+      // best-effort
+    }
+    try {
+      useProfileStore.getState().reset();
+    } catch {
+      // best-effort
+    }
+  }
   const labels: Record<string, string> = {
     muscle_gain: "精益增肌",
     fat_loss: "轻盈减脂",
@@ -59,7 +87,8 @@ const authBootstrap = createAuthBootstrap({
 
 const applicationLaunch = createRuntimeApplicationLaunch(
   {
-    start: () => authBootstrap.start({ allowSilentLogin: false }),
+    start: (options) =>
+      authBootstrap.start({ allowSilentLogin: false, force: options?.force }),
     getStatus: () => authBootstrap.getState().status,
   },
   {
@@ -72,6 +101,6 @@ const applicationLaunch = createRuntimeApplicationLaunch(
   },
 );
 
-export function startApplicationAuth() {
-  return applicationLaunch.start();
+export function startApplicationAuth(options?: { force?: boolean }) {
+  return applicationLaunch.start(options);
 }

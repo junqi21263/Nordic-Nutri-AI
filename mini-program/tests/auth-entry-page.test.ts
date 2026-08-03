@@ -14,7 +14,7 @@ describe("manual authentication entry", () => {
     expect(page).toContain("loginWithWechat");
     expect(page).toContain("BottomSheet");
     expect(page).toContain("startApplicationAuth");
-    expect(page).toContain("await startApplicationAuth()");
+    expect(page).toContain("await startApplicationAuth({ force: true })");
     expect(page).not.toContain('Taro.switchTab({ url: "/pages/home/index" })');
     expect(page).not.toContain("auth-entry-page__heading");
     expect(page).not.toContain("请登录以继续保存你的健康数据。");

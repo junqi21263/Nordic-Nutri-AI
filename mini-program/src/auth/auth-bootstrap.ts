@@ -13,6 +13,12 @@ export interface AuthBootstrapDependencies<Session = unknown, User = unknown> {
   clear: () => void | Promise<void>;
 }
 
+export interface AuthBootstrapStartOptions {
+  allowSilentLogin?: boolean;
+  /** Abandon an in-flight bootstrap (e.g. after WeChat login) and re-run. */
+  force?: boolean;
+}
+
 function isUnauthorized(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { status?: number; statusCode?: number; code?: string };
@@ -26,6 +32,7 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
 ) {
   let state: AuthBootstrapState = { status: "initializing" };
   let inFlight: Promise<void> | null = null;
+  let runId = 0;
 
   const setStatus = (status: AuthBootstrapStatus) => {
     state = { status };
@@ -36,7 +43,7 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
     setStatus("unauthenticated");
   };
 
-  const authenticate = async (user: User | null) => {
+  const authenticate = async (user: User | null, id: number) => {
     if (!user) {
       await clear();
       return;
@@ -44,44 +51,57 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
     try {
       await dependencies.loadIdentity(user);
     } catch {
+      // Identity load may clear the session (deleted user). Do not stay authenticated.
+      if (!(await dependencies.getUser())) {
+        if (id === runId) setStatus("unauthenticated");
+        return;
+      }
       // A profile/settings read failure must not invalidate an already verified Auth session.
     }
+    if (id !== runId) return;
     setStatus("authenticated");
   };
 
-  const run = async (allowSilentLogin: boolean) => {
-    setStatus("initializing");
+  const run = async (allowSilentLogin: boolean, id: number) => {
+    if (id === runId) setStatus("initializing");
     try {
       const session = await dependencies.restore();
+      if (id !== runId) return;
       if (!session) {
         if (!allowSilentLogin) {
           setStatus("unauthenticated");
           return;
         }
-        await authenticate(await dependencies.login());
+        await authenticate(await dependencies.login(), id);
         return;
       }
 
       try {
-        await authenticate(await dependencies.getUser());
+        await authenticate(await dependencies.getUser(), id);
       } catch (error) {
+        if (id !== runId) return;
         if (!isUnauthorized(error) || !(await dependencies.refresh())) {
           await clear();
           return;
         }
-        await authenticate(await dependencies.getUser());
+        if (id !== runId) return;
+        await authenticate(await dependencies.getUser(), id);
       }
     } catch {
+      if (id !== runId) return;
       await clear();
     }
   };
 
-  const start = ({ allowSilentLogin = true }: { allowSilentLogin?: boolean } = {}) => {
-    if (!inFlight)
-      inFlight = run(allowSilentLogin).finally(() => {
-        inFlight = null;
+  const start = ({ allowSilentLogin = true, force = false }: AuthBootstrapStartOptions = {}) => {
+    if (!inFlight || force) {
+      const id = ++runId;
+      const promise = run(allowSilentLogin, id).finally(() => {
+        if (inFlight === promise) inFlight = null;
       });
-    return inFlight;
+      inFlight = promise;
+    }
+    return inFlight as Promise<void>;
   };
 
   return {

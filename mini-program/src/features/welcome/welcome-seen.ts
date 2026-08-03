@@ -26,3 +26,13 @@ export function markWelcomeSeen(): void {
     // First-use flow must remain available even if device storage is unavailable.
   }
 }
+
+export function clearWelcomeSeen(): void {
+  try {
+    const next = { ...readState() };
+    delete next.welcomeSeen;
+    Taro.setStorageSync(storageKey, next);
+  } catch {
+    // Best-effort; missing storage must not block cancellation or re-login.
+  }
+}

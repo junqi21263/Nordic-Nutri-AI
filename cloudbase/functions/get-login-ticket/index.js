@@ -28,6 +28,7 @@ const { createFoodQueryTranslator } = require("./food-query-translator.cjs");
 const { createNutritionBackfillService } = require("./nutrition-backfill-service.cjs");
 const { createProfileAvatarService, PublicProfileAvatarError } = require("./profile-avatar-service.cjs");
 const { createAccountDeletionService, PublicAccountDeletionError } = require("./account-deletion-service.cjs");
+const { createProductUserExists, resolveProductSession } = require("./product-session-auth.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
 const { createAdminConsoleAuthService, PublicAdminAuthError } = require("./admin-console-auth-service.cjs");
 const { createFoodRepository, FoodRepositoryError } = require("./food-repository.cjs");
@@ -822,9 +823,12 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       }
     },
   });
+  const productUserExists = createProductUserExists(db);
+
   return {
     issue: session.issue,
     verifySession: (token) => verifyAccessToken(token, config.sessionSecret),
+    productUserExists,
     data,
     meals,
     insights,
@@ -894,6 +898,15 @@ function requireAdminConsoleSession(service, req) {
   const session = service?.verifySession?.(readBearerToken(req));
   if (!session?.sub || session.role !== "admin_console") return null;
   return session;
+}
+
+async function authorizeProductRequest(service, req, res) {
+  const resolved = await resolveProductSession(service, readBearerToken(req));
+  if (resolved.error) {
+    sendJson(res, resolved.error.status, resolved.error.body);
+    return null;
+  }
+  return resolved.session;
 }
 
 function getDataOperation(pathname) {
@@ -1097,8 +1110,9 @@ function createHttpServer({ service }) {
       }
     }
     if (avatarRoute) {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.avatar?.upload) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.avatar?.upload) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       try {
         return sendJson(res, 200, await service.avatar.upload(session.sub, await readJsonBody(req, MAX_VISION_BODY_BYTES)));
@@ -1109,8 +1123,8 @@ function createHttpServer({ service }) {
       }
     }
     if (foodRoute) {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
       try {
         // New unified-model endpoints (food_repository). These do not require
         // USDA_FDC_API_KEY; they read from the local foods/categories/tags tables.
@@ -1547,8 +1561,9 @@ function createHttpServer({ service }) {
       }
     }
     if (mealRoute) {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.meals) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.meals) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try {
         if (mealRoute.operation === "meals" && req.method === "GET") {
           const date = url.searchParams.get("date");
@@ -1587,8 +1602,9 @@ function createHttpServer({ service }) {
       }
     }
     if (insightOperation && req.method === "GET") {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.insights?.[insightOperation]) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.insights?.[insightOperation]) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       const date = url.searchParams.get("date");
       if (!date) return sendJson(res, 400, { code: "INSIGHT_DATA_INVALID", message: "缺少日期参数" });
       try {
@@ -1609,8 +1625,9 @@ function createHttpServer({ service }) {
       }
     }
     if (coachOperation) {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.coach?.[coachOperation]) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.coach?.[coachOperation]) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try {
         if (coachOperation === "getMessages" && req.method === "GET") {
           return sendJson(res, 200, await service.coach.getMessages(session.sub));
@@ -1651,13 +1668,18 @@ function createHttpServer({ service }) {
         }
         return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       } catch (error) {
-        if (error instanceof PublicCoachDataError) return sendJson(res, 400, { code: error.code });
-        return sendJson(res, 503, { code: "COACH_SERVICE_UNAVAILABLE" });
+        if (error instanceof PublicCoachDataError) {
+          const status = error.code === "SESSION_USER_MISSING" ? 401 : 400;
+          return sendJson(res, status, { code: error.code, message: error.message });
+        }
+        console.error("[coach] failed:", error?.message || error);
+        return sendJson(res, 503, { code: "COACH_SERVICE_UNAVAILABLE", message: error?.message || "COACH_SERVICE_UNAVAILABLE" });
       }
     }
     if (feedbackRoute) {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.feedback?.submitFeedback) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.feedback?.submitFeedback) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       try {
         return sendJson(res, 200, await service.feedback.submitFeedback(session.sub, await readJsonBody(req)));
@@ -1667,8 +1689,8 @@ function createHttpServer({ service }) {
       }
     }
     if (visionRoute) {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
       if (!service.vision?.analyzeImage) return sendJson(res, 503, { code: "VISION_SERVICE_NOT_CONFIGURED" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       try {
@@ -1684,13 +1706,15 @@ function createHttpServer({ service }) {
       }
     }
     if (dataOperation === "getAccount" && req.method === "GET") {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.data?.getAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.data?.getAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try { return sendJson(res, 200, await service.data.getAccount(session.sub)); } catch { return sendJson(res, 503, { code: "ACCOUNT_READ_FAILED" }); }
     }
     if (dataOperation === "cancelAccount") {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service?.accountDeletion?.cancelAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service?.accountDeletion?.cancelAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       try {
         return sendJson(res, 200, await service.accountDeletion.cancelAccount(session.sub, await readJsonBody(req)));
@@ -1703,23 +1727,26 @@ function createHttpServer({ service }) {
       }
     }
     if (dataOperation === "nutritionPlan" && req.method === "GET") {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.data?.getNutritionPlan) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.data?.getNutritionPlan) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try { return sendJson(res, 200, await service.data.getNutritionPlan(session.sub)); } catch { return sendJson(res, 503, { code: "NUTRITION_PLAN_READ_FAILED" }); }
     }
     if (dataOperation === "saveSettings" && req.method === "PATCH") {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.data?.saveSettings) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.data?.saveSettings) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try { return sendJson(res, 200, await service.data.saveSettings(session.sub, await readJsonBody(req))); } catch { return sendJson(res, 400, { code: "SETTINGS_SAVE_FAILED" }); }
     }
     if (dataOperation === "nutritionPlan" && req.method === "PATCH") {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub || !service.data?.saveNutritionPlan) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.data?.saveNutritionPlan) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try { return sendJson(res, 200, await service.data.saveNutritionPlan(session.sub, await readJsonBody(req))); } catch { return sendJson(res, 400, { code: "NUTRITION_PLAN_SAVE_FAILED" }); }
     }
     if (dataOperation === "previewNutritionPlan" && req.method === "POST") {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
       try {
         const body = await readJsonBody(req);
         let plan = null;
@@ -1745,8 +1772,9 @@ function createHttpServer({ service }) {
     try {
       const body = await readJsonBody(req);
       if (dataOperation) {
-        const session = service.verifySession?.(readBearerToken(req));
-        if (!session?.sub || !service.data?.[dataOperation]) {
+        const session = await authorizeProductRequest(service, req, res);
+        if (!session) return;
+        if (!service.data?.[dataOperation]) {
           sendJson(res, 401, { code: "UNAUTHORIZED" });
           return;
         }

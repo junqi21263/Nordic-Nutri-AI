@@ -46,7 +46,8 @@ export default function AuthEntryPage() {
       } catch {
         // Non-fatal: defaults from bootstrap remain.
       }
-      await startApplicationAuth();
+      // Force a fresh launch so we do not join a pre-login in-flight route to Home.
+      await startApplicationAuth({ force: true });
       if (syncedNickname) {
         useProfileStore.getState().setProfile({ nickname: syncedNickname });
       }

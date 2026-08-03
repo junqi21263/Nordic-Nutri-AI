@@ -162,6 +162,32 @@ test("preferFast still returns a daily summary when insight cache write fails", 
   assert.equal(summary.consumed.calories, 0);
 });
 
+test("returns daily summary with defaults when nutrition plan read fails", async () => {
+  const service = createInsightDataService({
+    db: {
+      from() {
+        const query = {
+          select() { return query; },
+          eq() { return query; },
+          async maybeSingle() { return { data: null, error: null }; },
+          async upsert() { return { error: null }; },
+        };
+        return query;
+      },
+    },
+    listMealsRange: async () => [],
+    getNutritionPlan: async () => {
+      throw new Error("nutrition plan unavailable");
+    },
+    clock: () => new Date("2026-08-03T04:00:00.000Z"),
+  });
+
+  const summary = await service.getDailySummaryWithInsight("user-1", "2026-08-03", { preferFast: true });
+  assert.equal(summary.targets.calories, 2600);
+  assert.equal(summary.remaining.calories, 2600);
+  assert.equal(summary.insight.source, "rule_v3");
+});
+
 test("preferFast returns rule insight immediately and upgrades cache in the background", async () => {
   let generationCount = 0;
   let release;

@@ -334,6 +334,26 @@ test("reads the signed-in account without accepting a client user id", async () 
   });
 });
 
+test("rejects cancelled-account sessions with SESSION_USER_MISSING", async () => {
+  const server = createHttpServer({
+    service: {
+      verifySession: () => ({ sub: "gone-user" }),
+      productUserExists: async () => false,
+      data: { getAccount: async () => ({ nickname: "should-not-run" }) },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/account`, {
+      headers: { authorization: "Bearer stale-session" },
+    });
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), {
+      code: "SESSION_USER_MISSING",
+      message: "登录已失效，请重新登录",
+    });
+  });
+});
+
 test("cancels only the authenticated product account", async () => {
   const calls = [];
   const server = createHttpServer({

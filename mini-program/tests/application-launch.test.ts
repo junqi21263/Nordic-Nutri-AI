@@ -61,6 +61,35 @@ describe("application launch", () => {
     expect(openHome).toHaveBeenCalledTimes(1);
   });
 
+  it("force restart routes from the latest auth status after login", async () => {
+    let resolveFirst: (() => void) | undefined;
+    let status: "authenticated" | "unauthenticated" = "unauthenticated";
+    const getStatus = vi.fn(() => status);
+    const start = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(undefined);
+    const openHome = vi.fn();
+    const openLogin = vi.fn();
+    const launch = createApplicationLaunch({ start, getStatus }, openHome, openLogin);
+
+    const first = launch.start();
+    status = "authenticated";
+    const second = launch.start({ force: true });
+    resolveFirst?.();
+    await Promise.all([first, second]);
+
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(start).toHaveBeenLastCalledWith({ force: true });
+    expect(openLogin).not.toHaveBeenCalled();
+    expect(openHome).toHaveBeenCalledTimes(1);
+  });
+
   it("opens welcome before onboarding for an authenticated first-time user", async () => {
     const openHome = vi.fn();
     const openOnboarding = vi.fn();

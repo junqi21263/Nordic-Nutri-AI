@@ -34,6 +34,8 @@ export async function requestWechatHttpsLogin(code: string): Promise<WechatHttps
   return {
     user: { id: data.user.id },
     session: { accessToken: data.session.accessToken },
-    onboardingRequired: Boolean(data.onboardingRequired),
+    // Only trust an explicit boolean. Missing/invalid → treat as required so
+    // cancelled re-logins never inherit a stale local "onboarding completed".
+    onboardingRequired: data.onboardingRequired === false ? false : true,
   };
 }

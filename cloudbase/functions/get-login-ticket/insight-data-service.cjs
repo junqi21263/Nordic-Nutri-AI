@@ -111,7 +111,7 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
       plan = await getNutritionPlan(userId);
     } catch (error) {
       console.warn("[daily-summary] nutrition plan read failed:", error?.message || error);
-      plan = null;
+      plan = {};
     }
     return { date, ...serverMetadata(clock), ...calculateDailyNutrition(meals, plan), meals };
   }
