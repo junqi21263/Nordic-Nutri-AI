@@ -29,6 +29,7 @@ const { createNutritionBackfillService } = require("./nutrition-backfill-service
 const { createProfileAvatarService, PublicProfileAvatarError } = require("./profile-avatar-service.cjs");
 const { createAccountDeletionService, PublicAccountDeletionError } = require("./account-deletion-service.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
+const { createAdminConsoleAuthService, PublicAdminAuthError } = require("./admin-console-auth-service.cjs");
 const { createFoodRepository, FoodRepositoryError } = require("./food-repository.cjs");
 const { createUsdaService, UsdaServiceError } = require("./usda-service.cjs");
 const { createOpenFoodFactsService, OpenFoodFactsError } = require("./open-food-facts-service.cjs");
@@ -567,6 +568,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     imageCdnBaseUrl: env.FOOD_IMAGE_CDN_BASE_URL,
   });
+  // Admin HTTP routes require role=admin_console from password login; drop the
+  // separate is_admin DB gate so operators no longer need a promoted WeChat user.
+  foodRepository.isAdmin = async () => true;
   const foodInsight = createFoodInsightService({
     requestCompletion: nutritionContentWorker ? (context) => nutritionContentWorker.generateInsight(context) : null,
     model: devTextModel,
@@ -650,9 +654,19 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     normalizer: { normalizeFoodRecord },
     imageService: foodImageService,
   });
+  // Password-gated admin console sessions already prove operator access; skip the
+  // legacy app_users.is_admin flag so ops no longer depends on manually promoting a WeChat user.
+  const allowAdminConsole = async () => true;
   const adminConsoleService = createAdminConsoleService({
     db,
-    isAdmin: (userId) => foodRepository.isAdmin(userId),
+    isAdmin: allowAdminConsole,
+  });
+  const adminConsoleAuth = createAdminConsoleAuthService({
+    db,
+    sessionSecret: config.sessionSecret,
+    identityPepper: config.identityPepper,
+    username: env.ADMIN_CONSOLE_USERNAME,
+    password: env.ADMIN_CONSOLE_PASSWORD,
   });
 
   // Hunyuan food-image generation (小程序成长计划). Model ID comes from env —
@@ -840,6 +854,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodBarcode: foodBarcodeService,
     foodAdmin: foodAdminService,
     adminConsole: adminConsoleService,
+    adminConsoleAuth,
     foodImage: foodImageService,
     foodImageJobs,
     foodImageBatches,
@@ -872,6 +887,12 @@ function readBearerToken(req) {
   if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) return null;
   const token = authorization.slice("Bearer ".length).trim();
   return token || null;
+}
+
+function requireAdminConsoleSession(service, req) {
+  const session = service?.verifySession?.(readBearerToken(req));
+  if (!session?.sub || session.role !== "admin_console") return null;
+  return session;
 }
 
 function getDataOperation(pathname) {
@@ -943,6 +964,7 @@ function getAdminFoodRoute(pathname) {
   if (!stripped.startsWith("/api/admin")) return null;
   const path = stripped.replace(/^\/api\/admin/, "") || "/";
   if (path === "/users") return { operation: "listUsers" };
+  if (path === "/login") return { operation: "adminLogin" };
   if (path === "/feedback") return { operation: "listFeedback" };
   const feedbackMatch = path.match(/^\/feedback\/([0-9a-f-]{36})$/i);
   if (feedbackMatch) return { operation: "patchFeedback", feedbackId: feedbackMatch[1] };
@@ -1195,8 +1217,22 @@ function createHttpServer({ service }) {
       }
     }
     if (adminFoodRoute) {
-      const session = service?.verifySession?.(readBearerToken(req));
-      if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      if (adminFoodRoute.operation === "adminLogin") {
+        if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        if (!service?.adminConsoleAuth?.login) return sendJson(res, 503, { code: "ADMIN_AUTH_NOT_CONFIGURED" });
+        try {
+          return sendJson(res, 200, await service.adminConsoleAuth.login(await readJsonBody(req)));
+        } catch (error) {
+          if (error instanceof PublicAdminAuthError) {
+            const status = error.code === "ADMIN_AUTH_NOT_CONFIGURED" ? 503 : 401;
+            return sendJson(res, status, { code: error.code, message: error.message });
+          }
+          console.error("[admin-login] failed:", error?.message || error);
+          return sendJson(res, 503, { code: "ADMIN_AUTH_FAILED" });
+        }
+      }
+      const session = requireAdminConsoleSession(service, req);
+      if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED", message: "请先使用帐号密码登录后台" });
       try {
         if (adminFoodRoute.operation === "listUsers") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -1317,9 +1353,6 @@ function createHttpServer({ service }) {
         }
         if (adminFoodRoute.operation === "imageJobsDiagnose") {
           if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
-          if (!service.foodRepository) return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });
-          const ok = await service.foodRepository.isAdmin(session.sub);
-          if (!ok) return sendJson(res, 403, { code: "FORBIDDEN" });
           if (!service.hunyuanImage) {
             return sendJson(res, 200, {
               ok: false,

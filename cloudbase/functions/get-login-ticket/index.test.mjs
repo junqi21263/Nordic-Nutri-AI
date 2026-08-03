@@ -775,33 +775,47 @@ test("barcode lookup returns 404 when missing", async () => {
   });
 });
 
-test("admin food routes reject non-admin users with 403", async () => {
-  const { FoodAdminError } = await import("./food-admin-service.cjs");
+test("admin food routes reject product sessions without admin_console role", async () => {
   const server = createHttpServer({
     service: {
       verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
       foodAdmin: {
-        listMissingImages: async () => { throw new FoodAdminError("FORBIDDEN"); },
-        listSyncJobs: async () => { throw new FoodAdminError("FORBIDDEN"); },
-        reviewImage: async () => { throw new FoodAdminError("FORBIDDEN"); },
-        setPrimaryImage: async () => { throw new FoodAdminError("FORBIDDEN"); },
-        updateFood: async () => { throw new FoodAdminError("FORBIDDEN"); },
-        syncImages: async () => { throw new FoodAdminError("FORBIDDEN"); },
-        importUsda: async () => { throw new FoodAdminError("FORBIDDEN"); },
-        listFoods: async () => { throw new FoodAdminError("FORBIDDEN"); },
-        createFood: async () => { throw new FoodAdminError("FORBIDDEN"); },
+        listMissingImages: async () => ({ items: [] }),
+        listSyncJobs: async () => ({ items: [] }),
+        listFoods: async () => ({ items: [], pagination: { page: 1, pageSize: 20, total: 0, hasMore: false } }),
       },
     },
   });
   await withServer(server, async (baseUrl) => {
     const r1 = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods/missing-images`, { headers: { authorization: "Bearer valid-session" } });
-    assert.equal(r1.status, 403);
+    assert.equal(r1.status, 401);
     const r2 = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods/sync-jobs`, { headers: { authorization: "Bearer valid-session" } });
-    assert.equal(r2.status, 403);
-    const r3 = await fetch(`${baseUrl}/get-login-ticket/api/admin/food-images/11111111-2222-3333-4444-555555555555/review`, { method: "PATCH", headers: { authorization: "Bearer valid-session", "content-type": "application/json" }, body: JSON.stringify({ status: "ready" }) });
-    assert.equal(r3.status, 403);
-    const r4 = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods`, { headers: { authorization: "Bearer valid-session" } });
-    assert.equal(r4.status, 403);
+    assert.equal(r2.status, 401);
+    const r3 = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(r3.status, 401);
+  });
+});
+
+test("admin login issues an admin_console session token", async () => {
+  const server = createHttpServer({
+    service: {
+      adminConsoleAuth: {
+        login: async ({ username, password }) => {
+          assert.equal(username, "ops");
+          assert.equal(password, "secret");
+          return { user: { id: "admin-1" }, session: { accessToken: "admin-token" } };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/get-login-ticket/api/admin/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: "ops", password: "secret" }),
+    });
+    assert.equal(denied.status, 200);
+    assert.deepEqual(await denied.json(), { user: { id: "admin-1" }, session: { accessToken: "admin-token" } });
   });
 });
 
@@ -810,7 +824,7 @@ test("admin foods collection supports GET list and POST create", async () => {
   const foodId = "11111111-2222-4333-8444-555555555555";
   const server = createHttpServer({
     service: {
-      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null,
       foodAdmin: {
         listFoods: async (userId, query) => {
           calls.push(["list", userId, query.active]);
@@ -868,7 +882,7 @@ test("batch image routes are admin-session protected and expose live batch state
   const calls = [];
   const server = createHttpServer({
     service: {
-      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null,
       foodImageBatches: {
         list: async (userId) => ({ items: [{ id: "11111111-2222-4333-8444-555555555555", status: "running", pendingCount: 19 }], userId }),
         createFirstSample: async (userId) => { calls.push(userId); return { id: "11111111-2222-4333-8444-555555555555", status: "draft" }; },
@@ -932,7 +946,7 @@ test("admin creates and previews a batch from one category without posting food 
   const calls = [];
   const server = createHttpServer({
     service: {
-      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null,
       foodImageBatches: {
         previewCategory: async (userId, body) => {
           calls.push({ op: "preview", userId, body });
@@ -966,7 +980,7 @@ test("rejecting a batch candidate immediately starts its server-controlled retry
   const calls = [];
   const server = createHttpServer({
     service: {
-      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null,
       foodImageJobs: {
         rejectImage: async (userId, imageId, body) => {
           calls.push({ op: "reject", userId, imageId, body });
@@ -1005,7 +1019,7 @@ test("admin can immediately retry a rejected or failed image job", async () => {
   const calls = [];
   const server = createHttpServer({
     service: {
-      verifySession: (token) => token === "valid-session" ? { sub: "admin-1" } : null,
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null,
       foodImageBatches: {
         retryRejectedJob: async (userId, jobId) => {
           calls.push({ userId, jobId });
@@ -1030,7 +1044,7 @@ test("admin users and feedback routes require session and accept admin", async (
   const calls = [];
   const server = createHttpServer({
     service: {
-      verifySession: (token) => (token === "valid-session" ? { sub: "admin-1" } : null),
+      verifySession: (token) => (token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null),
       adminConsole: {
         listUsers: async (userId, query) => {
           calls.push(["users", userId, query]);

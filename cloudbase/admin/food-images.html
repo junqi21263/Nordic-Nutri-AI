@@ -382,7 +382,7 @@
         <section id="moduleImages" class="admin-module">
           <details id="workflowGuide" class="workflow-guide">
             <summary>操作流程与状态说明</summary>
-            <div class="workflow-steps"><div class="workflow-step"><b>1. 连接后台</b><span>在「系统配置」确认 API Base 与管理员 Token。</span></div><div class="workflow-step"><b>2. 选择视觉状态</b><span>默认按食物自动判断；仅外观不同才选生鲜、熟制等。</span></div><div class="workflow-step"><b>3. 预览选材</b><span>点击食材可取消或恢复本批生成范围。</span></div><div class="workflow-step"><b>4. 创建、启动、审核</b><span>候选图可单张或批量通过并设为该视觉状态主图。</span></div><div class="workflow-step"><b>5. 处理异常</b><span>拒绝理由会写入提示词并立即重试。</span></div></div>
+            <div class="workflow-steps"><div class="workflow-step"><b>1. 连接后台</b><span>在「系统配置」用帐号密码登录。</span></div><div class="workflow-step"><b>2. 选择视觉状态</b><span>默认按食物自动判断；仅外观不同才选生鲜、熟制等。</span></div><div class="workflow-step"><b>3. 预览选材</b><span>点击食材可取消或恢复本批生成范围。</span></div><div class="workflow-step"><b>4. 创建、启动、审核</b><span>候选图可单张或批量通过并设为该视觉状态主图。</span></div><div class="workflow-step"><b>5. 处理异常</b><span>拒绝理由会写入提示词并立即重试。</span></div></div>
           </details>
 
           <div class="composer-deck" aria-label="生图批次配置">
@@ -472,7 +472,7 @@
           <details id="utilityDrawer" class="utility-drawer" open>
             <summary>连接设置与运行诊断</summary>
             <div class="utility-body">
-              <section class="utility-panel"><h3>连接设置</h3><label for="baseUrl">API Base（含 /get-login-ticket）</label><input id="baseUrl" placeholder="https://xxx.service.tcloudbase.com/get-login-ticket" autocomplete="off" /><label for="token">管理员 Bearer Token</label><input id="token" type="password" placeholder="连接成功后会保存在本机浏览器，刷新可自动回填" autocomplete="off" /><div class="action-row" style="margin-top:12px"><button id="connect" class="button">连接后台</button><button id="loadStats" class="button secondary">刷新统计</button><button id="runDiagnose" class="button secondary">诊断生图</button><button id="clearCredentials" class="button secondary">清除已存凭证</button></div><p class="muted" style="margin-top:10px">凭证仅保存在当前浏览器 localStorage，不会上传。换机器或清站点数据后需重新粘贴 Token。</p><div id="stats" class="stats" style="margin-top:12px"></div></section>
+              <section class="utility-panel"><h3>连接设置</h3><label for="baseUrl">API Base（含 /get-login-ticket）</label><input id="baseUrl" placeholder="https://xxx.service.tcloudbase.com/get-login-ticket" autocomplete="off" /><label for="adminUsername">后台帐号</label><input id="adminUsername" autocomplete="username" placeholder="输入后台帐号" /><label for="adminPassword">后台密码</label><input id="adminPassword" type="password" autocomplete="current-password" placeholder="输入后台密码" /><div class="action-row" style="margin-top:12px"><button id="connect" class="button">登录并连接</button><button id="loadStats" class="button secondary">刷新统计</button><button id="runDiagnose" class="button secondary">诊断生图</button><button id="clearCredentials" class="button secondary">退出登录</button></div><p class="muted" style="margin-top:10px">登录成功后会话保存在本机浏览器，无需再粘贴 Token。换机器或清站点数据后需重新登录。</p><div id="stats" class="stats" style="margin-top:12px"></div></section>
               <section class="utility-panel"><h3>运行说明</h3><p class="muted">创建草稿后，在「食材生图」点击“启动批次”交由云端调度器持续生成。审核拒绝的候选图会携带原因进入下一次重试，最多三次。</p><p class="muted" style="margin-top:12px">本页不再支持手动录入 foodId、jobId 或浏览器端消费任务，避免绕开批次和审核链路。</p></section>
               <section class="utility-panel"><h3>响应与排障</h3><p class="muted">仅显示最近一次后台操作响应，不保存密钥或任务标识。</p><pre id="out">{}</pre></section>
             </div>
@@ -539,36 +539,48 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const DEFAULT_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
-    const CREDENTIAL_KEYS = { baseUrl: "nordic-admin-base-url", token: "nordic-admin-bearer-token", batchRailCollapsed: "nordic-admin-batch-rail-collapsed" };
+    const CREDENTIAL_KEYS = {
+      baseUrl: "nordic-admin-base-url",
+      token: "nordic-admin-session-token",
+      username: "nordic-admin-username",
+      batchRailCollapsed: "nordic-admin-batch-rail-collapsed",
+    };
+    let sessionToken = "";
     function readStoredCredentials() {
       try {
         return {
           baseUrl: localStorage.getItem(CREDENTIAL_KEYS.baseUrl) || "",
           token: localStorage.getItem(CREDENTIAL_KEYS.token) || "",
+          username: localStorage.getItem(CREDENTIAL_KEYS.username) || "",
         };
       } catch {
-        return { baseUrl: "", token: "" };
+        return { baseUrl: "", token: "", username: "" };
       }
     }
     function saveCredentials() {
       try {
         localStorage.setItem(CREDENTIAL_KEYS.baseUrl, $("baseUrl").value.trim());
-        localStorage.setItem(CREDENTIAL_KEYS.token, $("token").value.trim());
+        localStorage.setItem(CREDENTIAL_KEYS.username, $("adminUsername").value.trim());
+        if (sessionToken) localStorage.setItem(CREDENTIAL_KEYS.token, sessionToken);
       } catch { /* private mode / blocked storage */ }
     }
     function clearStoredCredentials() {
       try {
         localStorage.removeItem(CREDENTIAL_KEYS.baseUrl);
         localStorage.removeItem(CREDENTIAL_KEYS.token);
+        localStorage.removeItem(CREDENTIAL_KEYS.username);
       } catch { /* ignore */ }
-      $("token").value = "";
+      sessionToken = "";
+      $("adminUsername").value = "";
+      $("adminPassword").value = "";
       $("baseUrl").value = DEFAULT_API_BASE;
       setConnected(false);
-      toast("已清除本机保存的凭证");
+      toast("已退出登录并清除本机会话");
     }
     const storedCredentials = readStoredCredentials();
     $("baseUrl").value = storedCredentials.baseUrl || DEFAULT_API_BASE;
-    if (storedCredentials.token) $("token").value = storedCredentials.token;
+    if (storedCredentials.username) $("adminUsername").value = storedCredentials.username;
+    sessionToken = storedCredentials.token || "";
     const state = { activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, batchRailCollapsed: false };
     try { state.batchRailCollapsed = localStorage.getItem(CREDENTIAL_KEYS.batchRailCollapsed) === "1"; } catch { /* ignore */ }
     // Same root taxonomy as mini-program food library chips (STANDARD_FOOD_CATEGORY_ROOT_CODES).
@@ -626,8 +638,8 @@
 
     async function api(path, { method = "GET", body } = {}) {
       const base = $("baseUrl").value.trim().replace(/\/$/, "");
-      const token = $("token").value.trim();
-      if (!base || !token) throw new Error("请先填写 API Base 和管理员 Bearer Token");
+      const token = sessionToken.trim();
+      if (!base || !token) throw new Error("请先使用帐号密码登录后台");
       const endpoint = `/api/admin${path}`; let response;
       try { response = await fetch(`${base}${endpoint}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
       catch (cause) { const error = createApiError({ endpoint, method, cause }); recordOperation({ title: "接口连接失败", detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
@@ -638,8 +650,8 @@
     }
     async function foodApi(path, { method = "GET", body } = {}) {
       const base = $("baseUrl").value.trim().replace(/\/$/, "");
-      const token = $("token").value.trim();
-      if (!base || !token) throw new Error("请先填写 API Base 和管理员 Bearer Token");
+      const token = sessionToken.trim();
+      if (!base || !token) throw new Error("请先使用帐号密码登录后台");
       const endpoint = path; let response;
       try { response = await fetch(`${base}${endpoint}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
       catch (cause) { const error = createApiError({ endpoint, method, cause }); recordOperation({ title: "接口连接失败", detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
@@ -649,7 +661,7 @@
       return json;
     }
 
-    function setConnected(connected) { $("connectionStatus").textContent = connected ? "管理员会话已连接" : "尚未连接"; }
+    function setConnected(connected) { $("connectionStatus").textContent = connected ? "已登录后台" : "尚未登录"; }
     function selectedCategory() { return state.categories.find((category) => category.id === $("batchCategory").value) || null; }
     function renderBatchControls() {
       const batch = selectedBatch();
@@ -1279,9 +1291,55 @@
     }
     async function rejectSelected() { if (!state.selectedImageId) return; showRejectReasonModal(); }
     async function mutateBatch(action) { if (!state.activeBatchId) return; try { const data = await api(`/food-image-batches/${state.activeBatchId}/${action}`, { method: "POST", body: {} }); const message = { start: "批次已启动，云端将持续处理", pause: "批次已暂停", resume: "批次已继续", cancel: "批次已取消" }[action] || "批次状态已更新"; out(data); recordOperation({ title: "批次状态已变化", detail: message }); toast(message); await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function loginAdmin() {
+      const base = $("baseUrl").value.trim().replace(/\/$/, "");
+      const username = $("adminUsername").value.trim();
+      const password = $("adminPassword").value;
+      if (!base) throw new Error("请填写 API Base");
+      if (!username || !password) throw new Error("请输入后台帐号和密码");
+      const endpoint = "/api/admin/login";
+      let response;
+      try {
+        response = await fetch(`${base}${endpoint}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+      } catch (cause) {
+        const error = createApiError({ endpoint, method: "POST", cause });
+        recordOperation({ title: "登录失败", detail: apiErrorMessage(error), isError: true });
+        throw error;
+      }
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = createApiError({ endpoint, method: "POST", status: response.status, json });
+        recordOperation({ title: `登录错误 ${response.status}`, detail: apiErrorMessage(error), isError: true });
+        throw error;
+      }
+      const accessToken = json?.session?.accessToken;
+      if (!accessToken) throw new Error("登录成功但未返回会话");
+      sessionToken = accessToken;
+      $("adminPassword").value = "";
+      return json;
+    }
     async function loadStats() { try { const stats = await api("/food-image-jobs/stats"); out(stats); $("stats").innerHTML = [["待审核", stats.pendingReviewImages], ["已有主图", stats.readyFoods], ["失败任务", stats.failedJobs], ["今日生成", `${stats.dailyGenerated}/${stats.dailyLimit}`], ["缺失图片", stats.missingImages], ["待处理", stats.pendingJobs]].map(([name, value]) => `<div class="stat">${name}<b>${escapeHtml(value)}</b></div>`).join(""); } catch (error) { out(error.json || { error: error.message }); toast(error.message, true); } }
-    async function connect() { try { await loadCategories(); await refreshBatches(); await loadPatrolRules(); setConnected(true); saveCredentials(); await loadStats(); recordOperation({ title: "后台已连接", detail: "分类、批次、巡检与生图统计已刷新" }); toast("后台已连接"); } catch (error) { setConnected(false); out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
-    function hasToken() { return Boolean($("baseUrl").value.trim() && $("token").value.trim()); }
+    async function connect() {
+      try {
+        if (!$("adminPassword").value && sessionToken) {
+          // Reuse saved session when password field is empty.
+        } else {
+          await loginAdmin();
+        }
+        await loadCategories(); await refreshBatches(); await loadPatrolRules(); setConnected(true); saveCredentials(); await loadStats();
+        recordOperation({ title: "后台已登录", detail: "分类、批次、巡检与生图统计已刷新" });
+        toast("后台已登录");
+      } catch (error) {
+        setConnected(false);
+        out(error.json || { error: error.message });
+        toast(apiErrorMessage(error), true);
+      }
+    }
+    function hasToken() { return Boolean($("baseUrl").value.trim() && sessionToken.trim()); }
     const feedbackCategoryLabel = (category) => ({ product: "产品", bug: "缺陷", feature: "功能", support: "支持" }[category] || category || "—");
     async function loadUsers() {
       const host = $("userTable");

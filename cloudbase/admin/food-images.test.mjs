@@ -283,9 +283,14 @@ test("users and feedback modules call admin list endpoints", async () => {
 
 test("persists admin credentials in localStorage and auto-connects on reload", async () => {
   const source = await pageSource();
-  assert.match(source, /nordic-admin-bearer-token/);
+  assert.match(source, /nordic-admin-session-token/);
+  assert.match(source, /nordic-admin-username/);
+  assert.match(source, /id="adminUsername"/);
+  assert.match(source, /id="adminPassword"/);
+  assert.match(source, /\/api\/admin\/login/);
   assert.match(source, /localStorage\.setItem/);
   assert.match(source, /id="clearCredentials"/);
   assert.match(source, /if \(hasToken\(\)\) connect\(\)/);
   assert.match(source, /saveCredentials\(\)/);
+  assert.doesNotMatch(source, /管理员 Bearer Token/);
 });
