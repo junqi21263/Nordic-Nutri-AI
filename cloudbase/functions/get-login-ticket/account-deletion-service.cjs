@@ -7,11 +7,33 @@ class PublicAccountDeletionError extends Error {
 
 const CONFIRMATION = "DELETE_MY_NORDIC_NUTRI_ACCOUNT";
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const GUARD_TIMEOUT_MS = 2_500;
+const LOOKUP_TIMEOUT_MS = 4_000;
+const STORAGE_TIMEOUT_MS = 8_000;
+
+function withTimeout(promise, ms, onTimeout) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(onTimeout instanceof Error ? onTimeout : new Error(onTimeout || "timeout")), ms);
+    }),
+  ]);
+}
+
+function isDeletableStoragePath(value) {
+  if (typeof value !== "string") return false;
+  const path = value.trim();
+  if (!path) return false;
+  // Virtual / remote display refs are never CloudBase file IDs.
+  if (path.startsWith("data:") || path.startsWith("default:") || /^https?:\/\//i.test(path)) return false;
+  return true;
+}
 
 function appendPaths(target, rows, key) {
   for (const row of rows || []) {
     const value = row?.[key];
-    if (typeof value === "string" && value && !value.startsWith("data:")) target.add(value);
+    if (isDeletableStoragePath(value)) target.add(value.trim());
   }
 }
 
@@ -21,15 +43,24 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null }
   }
 
   async function rows(table, column, userColumn, userId) {
-    const result = await db.from(table).select(column).eq(userColumn, userId);
-    // Image/asset tables were introduced incrementally. A missing optional table
-    // must not prevent the product account itself from being physically deleted.
-    if (result?.error) {
-      const message = result.error?.message || result.error?.code || "unknown";
-      console.warn(`[account-cancellation] optional ${table} lookup skipped:`, message);
+    try {
+      const result = await withTimeout(
+        db.from(table).select(column).eq(userColumn, userId),
+        LOOKUP_TIMEOUT_MS,
+        `optional ${table} lookup timed out`,
+      );
+      // Image/asset tables were introduced incrementally. A missing optional table
+      // must not prevent the product account itself from being physically deleted.
+      if (result?.error) {
+        const message = result.error?.message || result.error?.code || "unknown";
+        console.warn(`[account-cancellation] optional ${table} lookup skipped:`, message);
+        return [];
+      }
+      return result?.data || [];
+    } catch (error) {
+      console.warn(`[account-cancellation] optional ${table} lookup skipped:`, error?.message || error);
       return [];
     }
-    return result?.data || [];
   }
 
   return {
@@ -44,7 +75,11 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null }
 
       if (operationGuard) {
         try {
-          const prior = await operationGuard.claim(userId, "account_cancel", input.clientRequestId);
+          const prior = await withTimeout(
+            operationGuard.claim(userId, "account_cancel", input.clientRequestId),
+            GUARD_TIMEOUT_MS,
+            "operation guard claim timed out",
+          );
           if (prior.reused) return prior.response;
         } catch (error) {
           if (error?.code === "OPERATION_IN_PROGRESS") throw error;
@@ -53,26 +88,42 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null }
       }
 
       try {
-      const [assets, profiles, analyses, meals] = await Promise.all([
-        rows("uploaded_assets", "object_path", "user_id", userId),
-        rows("profiles", "avatar_path", "id", userId),
-        rows("ai_analysis", "image_path", "user_id", userId),
-        rows("meal_records", "image_path", "user_id", userId),
-      ]);
-      const paths = new Set();
-      appendPaths(paths, assets, "object_path");
-      appendPaths(paths, profiles, "avatar_path");
-      appendPaths(paths, analyses, "image_path");
-      appendPaths(paths, meals, "image_path");
-      if (paths.size) await deleteFiles({ cloudPaths: [...paths] });
+        const [assets, profiles, analyses, meals] = await Promise.all([
+          rows("uploaded_assets", "object_path", "user_id", userId),
+          rows("profiles", "avatar_path", "id", userId),
+          rows("ai_analysis", "image_path", "user_id", userId),
+          rows("meal_records", "image_path", "user_id", userId),
+        ]);
+        const paths = new Set();
+        appendPaths(paths, assets, "object_path");
+        appendPaths(paths, profiles, "avatar_path");
+        appendPaths(paths, analyses, "image_path");
+        appendPaths(paths, meals, "image_path");
+        if (paths.size) {
+          try {
+            await withTimeout(
+              deleteFiles({ cloudPaths: [...paths] }),
+              STORAGE_TIMEOUT_MS,
+              "storage cleanup timed out",
+            );
+          } catch (error) {
+            // Prefer completing product-account deletion over failing closed on
+            // orphaned private objects; cascade deletes already remove PG rows.
+            console.error("[account-cancellation] storage cleanup skipped:", error?.message || error);
+          }
+        }
 
-      const deleted = await db.from("app_users").delete().eq("id", userId);
-      if (deleted?.error) throw new Error("Account deletion database removal failed");
-      return { deleted: true };
+        const deleted = await db.from("app_users").delete().eq("id", userId);
+        if (deleted?.error) throw new Error("Account deletion database removal failed");
+        return { deleted: true };
       } catch (error) {
         if (operationGuard) {
           try {
-            await operationGuard.fail(userId, "account_cancel", input.clientRequestId, error?.code || "ACCOUNT_CANCELLATION_FAILED");
+            await withTimeout(
+              operationGuard.fail(userId, "account_cancel", input.clientRequestId, error?.code || "ACCOUNT_CANCELLATION_FAILED"),
+              GUARD_TIMEOUT_MS,
+              "operation guard fail timed out",
+            );
           } catch (guardError) {
             console.error("[account-cancellation] unable to mark failed operation:", guardError?.message || guardError);
           }
@@ -83,4 +134,9 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null }
   };
 }
 
-module.exports = { CONFIRMATION, PublicAccountDeletionError, createAccountDeletionService };
+module.exports = {
+  CONFIRMATION,
+  PublicAccountDeletionError,
+  createAccountDeletionService,
+  isDeletableStoragePath,
+};

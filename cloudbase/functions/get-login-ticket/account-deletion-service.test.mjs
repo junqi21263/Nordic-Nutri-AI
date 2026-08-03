@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createAccountDeletionService, PublicAccountDeletionError } from "./account-deletion-service.cjs";
+import {
+  createAccountDeletionService,
+  isDeletableStoragePath,
+  PublicAccountDeletionError,
+} from "./account-deletion-service.cjs";
 
 test("cancels only the authenticated product account after deleting its private files", async () => {
   const events = [];
@@ -29,6 +33,63 @@ test("cancels only the authenticated product account after deleting its private 
     ["storage", ["food-images/user-a/scan.jpg", "avatars/user-a/avatar.jpg", "food-images/user-a/meal.jpg"]],
     ["db", "id", "user-a"],
   ]);
+});
+
+test("skips default robot avatars and other non-storage display refs", () => {
+  assert.equal(isDeletableStoragePath("default:robot-2"), false);
+  assert.equal(isDeletableStoragePath("data:image/png;base64,abc"), false);
+  assert.equal(isDeletableStoragePath("https://cdn.example/a.jpg"), false);
+  assert.equal(isDeletableStoragePath("cloud://env/avatars/a.jpg"), true);
+  assert.equal(isDeletableStoragePath("avatars/user-a/avatar.jpg"), true);
+});
+
+test("still deletes the product account when only a default avatar exists", async () => {
+  const events = [];
+  const service = createAccountDeletionService({
+    db: {
+      from(table) {
+        if (table === "uploaded_assets") return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+        if (table === "profiles") return { select: () => ({ eq: async () => ({ data: [{ avatar_path: "default:robot-1" }], error: null }) }) };
+        if (table === "ai_analysis") return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+        if (table === "meal_records") return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+        if (table === "app_users") return { delete: () => ({ eq: async (column, value) => { events.push(["db", column, value]); return { error: null }; } }) };
+        throw new Error(`unexpected table ${table}`);
+      },
+    },
+    deleteFiles: async () => { throw new Error("must not delete storage"); },
+  });
+
+  assert.deepEqual(await service.cancelAccount("user-a", {
+    confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT",
+    clientRequestId: "11111111-1111-4111-8111-111111111111",
+  }), { deleted: true });
+  assert.deepEqual(events, [["db", "id", "user-a"]]);
+});
+
+test("continues when the operation guard hangs instead of timing out the whole cancellation", async () => {
+  const events = [];
+  const service = createAccountDeletionService({
+    db: {
+      from(table) {
+        if (["uploaded_assets", "profiles", "ai_analysis", "meal_records"].includes(table)) {
+          return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+        }
+        if (table === "app_users") return { delete: () => ({ eq: async () => { events.push("deleted"); return { error: null }; } }) };
+        throw new Error(`unexpected table ${table}`);
+      },
+    },
+    deleteFiles: async () => {},
+    operationGuard: {
+      claim: () => new Promise(() => {}),
+      fail: async () => {},
+    },
+  });
+
+  assert.deepEqual(await service.cancelAccount("user-a", {
+    confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT",
+    clientRequestId: "11111111-1111-4111-8111-111111111111",
+  }), { deleted: true });
+  assert.deepEqual(events, ["deleted"]);
 });
 
 test("requires the fixed cancellation confirmation", async () => {

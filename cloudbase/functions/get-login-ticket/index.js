@@ -786,7 +786,25 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     operationGuard: typeof db.rpc === "function" ? createOperationGuard({ db }) : null,
     deleteFiles: async ({ cloudPaths }) => {
-      if (cloudPaths.length) await admin.deleteFile({ fileList: cloudPaths });
+      const paths = Array.isArray(cloudPaths) ? cloudPaths.filter(Boolean) : [];
+      if (!paths.length) return;
+      const envId = String(env.TCB_ENV || env.SCF_NAMESPACE || "").trim();
+      for (const cloudPath of paths) {
+        const candidates = cloudPath.startsWith("cloud://")
+          ? [cloudPath]
+          : [cloudPath, envId ? `cloud://${envId}/${cloudPath}` : null].filter(Boolean);
+        let deleted = false;
+        for (const fileId of candidates) {
+          try {
+            await admin.deleteFile({ fileList: [fileId] });
+            deleted = true;
+            break;
+          } catch (error) {
+            console.warn("[account-cancellation] storage delete retry:", fileId, error?.message || error);
+          }
+        }
+        if (!deleted) console.warn("[account-cancellation] storage object left in place:", cloudPath);
+      }
     },
   });
   return {

@@ -1,0 +1,15 @@
+{
+  "envId": "lewis-healthy-d4glgqqzv73a5bc10",
+  "functionRoot": "cloudbase/functions",
+  "functions": [
+    {
+      "name": "get-login-ticket",
+      "type": "HTTP",
+      "timeout": 900,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": true,
+      "ignore": ["*.test.mjs", "node_modules/**", ".git/**"]
+    }
+  ]
+}
