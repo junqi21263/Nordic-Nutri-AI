@@ -99,10 +99,20 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
   async function getDailySummary(userId, date, options = {}) {
     assertDate(date);
     const resolveImages = options.resolveImages !== false;
-    const [meals, plan] = await Promise.all([
-      listMealsRange(userId, date, date, { resolveImages }),
-      getNutritionPlan(userId),
-    ]);
+    let meals = [];
+    let plan = null;
+    try {
+      meals = await listMealsRange(userId, date, date, { resolveImages });
+    } catch (error) {
+      error.code = error.code || "MEAL_SERVICE_UNAVAILABLE";
+      throw error;
+    }
+    try {
+      plan = await getNutritionPlan(userId);
+    } catch (error) {
+      console.warn("[daily-summary] nutrition plan read failed:", error?.message || error);
+      plan = null;
+    }
     return { date, ...serverMetadata(clock), ...calculateDailyNutrition(meals, plan), meals };
   }
 
@@ -134,15 +144,25 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
 
   async function persistDailyInsight(userId, date, contextHash, generated) {
     const { payload, provider, model } = insightPayloadFromGenerated(generated);
-    const persisted = await db.from("daily_nutrition_insights").upsert({
-      user_id: userId,
-      insight_date: date,
-      context_hash: contextHash,
-      payload,
-      provider,
-      model,
-    }, { onConflict: "user_id,insight_date" });
-    if (persisted.error) throw new Error("Daily insight cache write failed");
+    if (db && typeof db.from === "function") {
+      try {
+        const persisted = await db.from("daily_nutrition_insights").upsert({
+          user_id: userId,
+          insight_date: date,
+          context_hash: contextHash,
+          payload,
+          provider,
+          model,
+        }, { onConflict: "user_id,insight_date" });
+        if (persisted.error) {
+          console.warn("[daily-insight] cache write unavailable:", persisted.error.message || persisted.error);
+          return { ...payload, source: provider, model, cached: false };
+        }
+      } catch (error) {
+        console.warn("[daily-insight] cache write unavailable:", error?.message || error);
+        return { ...payload, source: provider, model, cached: false };
+      }
+    }
     return { ...payload, source: provider, model, cached: false };
   }
 
@@ -163,15 +183,24 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
   }
 
   async function getDailyInsightForSummary(userId, date, summary, options = {}) {
-    if (!db || typeof db.from !== "function") throw new Error("Daily insight cache is unavailable");
     const preferFast = Boolean(options?.preferFast);
     const preferences = await loadUserPreferences(userId);
     const context = dailyInsightContext(summary, preferences);
     const contextHash = createDailyInsightHash(context);
-    const lookup = await db.from("daily_nutrition_insights").select("context_hash,payload,provider,model")
-      .eq("user_id", userId).eq("insight_date", date).maybeSingle();
-    if (lookup.error) throw new Error("Daily insight cache read failed");
-    const cached = cachedInsight(lookup.data, contextHash);
+    let cached = null;
+    if (db && typeof db.from === "function") {
+      try {
+        const lookup = await db.from("daily_nutrition_insights").select("context_hash,payload,provider,model")
+          .eq("user_id", userId).eq("insight_date", date).maybeSingle();
+        if (lookup.error) {
+          console.warn("[daily-insight] cache read unavailable:", lookup.error.message || lookup.error);
+        } else {
+          cached = cachedInsight(lookup.data, contextHash);
+        }
+      } catch (error) {
+        console.warn("[daily-insight] cache read unavailable:", error?.message || error);
+      }
+    }
     if (cached) return cached;
 
     if (preferFast) {
@@ -204,10 +233,20 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
     assertDate(endDate);
     const preferFast = Boolean(options?.preferFast);
     const startDate = shiftDate(endDate, -6);
-    const [meals, plan] = await Promise.all([
-      listMealsRange(userId, startDate, endDate, { resolveImages: false }),
-      getNutritionPlan(userId),
-    ]);
+    let meals = [];
+    let plan = null;
+    try {
+      meals = await listMealsRange(userId, startDate, endDate, { resolveImages: false });
+    } catch (error) {
+      error.code = error.code || "MEAL_SERVICE_UNAVAILABLE";
+      throw error;
+    }
+    try {
+      plan = await getNutritionPlan(userId);
+    } catch (error) {
+      console.warn("[weekly-review] nutrition plan read failed:", error?.message || error);
+      plan = null;
+    }
     const review = calculateWeeklyNutrition(meals, plan, endDate);
     const baseReview = {
       ...review,
@@ -279,10 +318,20 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
 
   async function getAchievements(userId, date) {
     assertDate(date);
-    const [meals, plan] = await Promise.all([
-      listMealsRange(userId, shiftDate(date, -29), date, { resolveImages: false }),
-      getNutritionPlan(userId),
-    ]);
+    let meals = [];
+    let plan = null;
+    try {
+      meals = await listMealsRange(userId, shiftDate(date, -29), date, { resolveImages: false });
+    } catch (error) {
+      error.code = error.code || "MEAL_SERVICE_UNAVAILABLE";
+      throw error;
+    }
+    try {
+      plan = await getNutritionPlan(userId);
+    } catch (error) {
+      console.warn("[achievements] nutrition plan read failed:", error?.message || error);
+      plan = null;
+    }
     return calculateAchievements(meals, plan, date);
   }
 

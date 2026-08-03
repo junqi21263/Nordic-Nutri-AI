@@ -136,6 +136,32 @@ test("persists one record-aware insight per day and reuses it while the nutritio
   assert.equal(generationCount, 1);
 });
 
+test("preferFast still returns a daily summary when insight cache write fails", async () => {
+  const service = createInsightDataService({
+    db: {
+      from(table) {
+        assert.equal(table, "daily_nutrition_insights");
+        const query = {
+          select() { return query; },
+          eq() { return query; },
+          async maybeSingle() { return { data: null, error: null }; },
+          async upsert() { return { error: { message: "relation does not exist" } }; },
+        };
+        return query;
+      },
+    },
+    listMealsRange: async () => [],
+    getNutritionPlan: async () => ({ calories: 2600, proteinG: 150, carbsG: 280, fatG: 80 }),
+    clock: () => new Date("2026-08-03T04:00:00.000Z"),
+  });
+
+  const summary = await service.getDailySummaryWithInsight("user-1", "2026-08-03", { preferFast: true });
+  assert.equal(summary.date, "2026-08-03");
+  assert.equal(summary.insight.source, "rule_v3");
+  assert.equal(summary.targets.calories, 2600);
+  assert.equal(summary.consumed.calories, 0);
+});
+
 test("preferFast returns rule insight immediately and upgrades cache in the background", async () => {
   let generationCount = 0;
   let release;

@@ -1038,10 +1038,11 @@ function isAvatarRoute(pathname) {
 function sendMealError(res, error) {
   if (error instanceof PublicMealDataError || error instanceof PublicMealAnalysisError) {
     const statusCode = error.code === "MEAL_DATA_INVALID" ? 400 : 503;
-    sendJson(res, statusCode, { code: error.code });
+    sendJson(res, statusCode, { code: error.code, message: error.message || error.code });
     return;
   }
-  sendJson(res, 503, { code: "MEAL_SERVICE_UNAVAILABLE" });
+  console.error("[meals] failed:", error?.code || error?.message || error);
+  sendJson(res, 503, { code: error?.code || "MEAL_SERVICE_UNAVAILABLE", message: error?.message || "MEAL_SERVICE_UNAVAILABLE" });
 }
 
 function createHttpServer({ service }) {
@@ -1589,7 +1590,7 @@ function createHttpServer({ service }) {
       const session = service?.verifySession?.(readBearerToken(req));
       if (!session?.sub || !service.insights?.[insightOperation]) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       const date = url.searchParams.get("date");
-      if (!date) return sendJson(res, 400, { code: "INSIGHT_DATA_INVALID" });
+      if (!date) return sendJson(res, 400, { code: "INSIGHT_DATA_INVALID", message: "缺少日期参数" });
       try {
         const preferFast = url.searchParams.get("preferFast") === "1";
         if (insightOperation === "getDailySummaryWithInsight") {
@@ -1600,8 +1601,11 @@ function createHttpServer({ service }) {
           return sendJson(res, 200, await service.insights.getWeeklyReview(session.sub, date, { preferFast }));
         }
         return sendJson(res, 200, await service.insights[insightOperation](session.sub, date));
-      } catch {
-        return sendJson(res, 400, { code: "INSIGHT_DATA_INVALID" });
+      } catch (error) {
+        const code = error?.code || (String(error?.message || "").includes("Invalid date") ? "INSIGHT_DATA_INVALID" : "INSIGHT_SERVICE_UNAVAILABLE");
+        const status = code === "INSIGHT_DATA_INVALID" || code === "MEAL_DATA_INVALID" ? 400 : 503;
+        console.error("[insights] failed:", code, error?.message || error);
+        return sendJson(res, status, { code, message: error?.message || code });
       }
     }
     if (coachOperation) {
