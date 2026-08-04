@@ -6469,3 +6469,75 @@
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+
+.page-layout--recommend-friends {
+  background: #f3f1ec;
+}
+.recommend-friends {
+  display: flex;
+  flex-direction: column;
+  gap: $space-20;
+  min-height: calc(100vh - var(--app-header-height, 88px));
+  padding: $space-16 $space-20 calc(#{$space-24} + env(safe-area-inset-bottom));
+}
+.recommend-friends__preview {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+}
+.recommend-friends__poster {
+  border-radius: $radius-16;
+  box-shadow: 0 12px 32px rgba(21, 63, 43, 0.12);
+  display: block;
+  max-width: 620px;
+  overflow: hidden;
+  width: 100%;
+}
+.recommend-friends__actions {
+  align-items: flex-start;
+  display: flex;
+  gap: $space-48;
+  justify-content: center;
+  padding: $space-8 0 $space-12;
+}
+.recommend-friends__action {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
+  width: 112px;
+}
+.recommend-friends__action--busy {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.recommend-friends__action-icon {
+  align-items: center;
+  border-radius: 999px;
+  display: flex;
+  height: 96px;
+  justify-content: center;
+  width: 96px;
+}
+.recommend-friends__action-icon--wechat {
+  background: #07c160;
+}
+.recommend-friends__action-icon--save {
+  background: #e8a05c;
+}
+.recommend-friends__action-glyph {
+  color: #ffffff;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+}
+.recommend-friends__wechat-logo {
+  height: 48px;
+  width: 48px;
+}
+.recommend-friends__action-label {
+  color: $color-text-secondary;
+  font-size: $font-overline;
+  font-weight: $font-weight-medium;
+}

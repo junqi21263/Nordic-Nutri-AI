@@ -16,6 +16,7 @@ const pages = [
   "pages/meal-records/index",
   "pages/coach/index",
   "pages/profile/index",
+  "pages/recommend-friends/index",
   "pages/account-cancellation/index",
   "pages/profile-edit/index",
   "pages/goal-adjust/index",
@@ -26,6 +27,11 @@ const pages = [
 export default defineAppConfig({
   pages,
   lazyCodeLoading: "requiredComponents",
+  permission: {
+    "scope.writePhotosAlbum": {
+      desc: "用于将推荐好友海报保存到相册",
+    },
+  },
   window: {
     navigationStyle: "custom",
     navigationBarBackgroundColor: "#faf9f6",

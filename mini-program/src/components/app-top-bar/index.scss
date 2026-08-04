@@ -69,30 +69,25 @@
 .app-top-bar__brand {
   align-items: center;
   display: flex;
-  gap: 8px;
   justify-content: center;
   left: 50%;
   min-height: 28px;
   overflow: hidden;
   pointer-events: none;
   position: absolute;
+  text-align: center;
   top: 50%;
   transform: translate(-50%, -50%);
   white-space: nowrap;
-}
-.app-top-bar__logo {
-  border-radius: 10px;
-  flex-shrink: 0;
-  height: 40px;
-  width: 40px;
 }
 .app-top-bar__brand .nordic-icon {
   flex-shrink: 0;
 }
 .app-top-bar__brand-text {
   color: $color-forest-green;
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 700;
   letter-spacing: 0.2px;
   line-height: 1.2;
+  text-align: center;
 }

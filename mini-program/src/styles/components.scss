@@ -394,22 +394,20 @@
 .brand-header__content {
   align-items: center;
   display: flex;
-  gap: $space-8;
+  flex: 1;
+  justify-content: center;
   padding-bottom: $space-8;
-}
-.brand-header__logo {
-  border-radius: 8px;
-  height: 36px;
-  width: 36px;
+  width: 100%;
 }
 .brand-header__content .nordic-icon {
   filter: brightness(0) saturate(100%) hue-rotate(80deg);
 }
 .brand-header__name {
   color: $color-forest-green;
-  font-size: $font-body;
+  font-size: 30px;
   font-weight: $font-weight-semibold;
   letter-spacing: 0.3px;
+  text-align: center;
 }
 .section-title {
   align-items: flex-end;

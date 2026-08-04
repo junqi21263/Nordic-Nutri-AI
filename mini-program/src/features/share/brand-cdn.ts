@@ -4,3 +4,4 @@ export const BRAND_CDN_BASE =
 
 export const WELCOME_HERO_IMAGE = `${BRAND_CDN_BASE}/welcome-hero.jpg`;
 export const NOVA_COACH_HERO_IMAGE = `${BRAND_CDN_BASE}/nova-coach-hero.jpg`;
+export const RECOMMEND_POSTER_IMAGE = `${BRAND_CDN_BASE}/recommend-poster.jpg?v=20260804b`;

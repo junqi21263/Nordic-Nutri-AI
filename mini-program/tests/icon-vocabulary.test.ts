@@ -9,9 +9,10 @@ function read(relativePath: string) {
 }
 
 describe("icon vocabulary variety", () => {
-  it("uses the brand logo mark and keeps distinct icons elsewhere", () => {
-    expect(read("components/app-top-bar/index.tsx")).toContain("app-icon-ui");
-    expect(read("components/brand-header/index.tsx")).toContain("app-icon-ui");
+  it("keeps the top bar text-only and uses distinct icons elsewhere", () => {
+    expect(read("components/app-top-bar/index.tsx")).not.toContain("app-icon-ui");
+    expect(read("components/brand-header/index.tsx")).not.toContain("app-icon-ui");
+    expect(read("components/app-top-bar/index.tsx")).toContain("Nordic Nutri AI");
 
     expect(read("components/ai-insight-card/index.tsx")).toContain('name="nova"');
     expect(read("pages/coach/index.tsx")).toContain('name="zap"');

@@ -255,6 +255,13 @@ export default function ProfilePage() {
               description="产品介绍与使用说明"
             />
           </View>
+          <View onClick={() => openPage("/pages/recommend-friends/index")}>
+            <ListItem
+              icon={<NordicIcon name="wechat" size={20} ariaLabel="推荐好友" />}
+              title="推荐好友"
+              description="分享海报，邀请朋友一起开始"
+            />
+          </View>
           <View onClick={logout}>
             <ListItem
               icon={<NordicIcon name="x" size={20} ariaLabel="退出登录" />}

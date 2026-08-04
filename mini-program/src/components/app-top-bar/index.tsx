@@ -1,6 +1,5 @@
-import { Image, Text, View } from "@tarojs/components";
+import { Text, View } from "@tarojs/components";
 import type { PropsWithChildren } from "react";
-import appIcon from "../../assets/brand/app-icon-ui.jpg";
 import { NordicIcon } from "../nordic-icon";
 import { useSystemLayout } from "../../hooks/useSystemLayout";
 
@@ -67,12 +66,7 @@ export function AppTopBar({
           className="app-top-bar__brand"
           style={{ maxWidth: `${layout.titleMaxWidth}px` }}
         >
-          {children ?? (
-            <>
-              <Image className="app-top-bar__logo" src={appIcon} mode="aspectFill" ariaLabel="Nordic Nutri AI" />
-              <Text className="app-top-bar__brand-text">Nordic Nutri AI</Text>
-            </>
-          )}
+          {children ?? <Text className="app-top-bar__brand-text">Nordic Nutri AI</Text>}
         </View>
         <View
           className="app-top-bar__side app-top-bar__side--right"

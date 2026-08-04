@@ -59,6 +59,7 @@ import foodNuts from "../../assets/icons/food-nuts.svg";
 import foodOil from "../../assets/icons/food-oil.svg";
 import foodBread from "../../assets/icons/food-bread.svg";
 import foodBowl from "../../assets/icons/food-bowl.svg";
+import wechat from "../../assets/icons/wechat-mark.svg";
 
 export type NordicIconName =
   | "back"
@@ -120,7 +121,8 @@ export type NordicIconName =
   | "food-nuts"
   | "food-oil"
   | "food-bread"
-  | "food-bowl";
+  | "food-bowl"
+  | "wechat";
 
 export interface NordicIconProps {
   name: NordicIconName;
@@ -189,6 +191,7 @@ const iconSources: Record<NordicIconName, string> = {
   "food-oil": foodOil,
   "food-bread": foodBread,
   "food-bowl": foodBowl,
+  wechat,
 };
 
 /** Renderable local SVG asset for WeChat targets that do not expose Svg/Path components. */

@@ -22,7 +22,8 @@ describe("app share card", () => {
     const layout = readFileSync(resolve(import.meta.dirname, "../src/layouts/page-layout/index.tsx"), "utf8");
     expect(home).toContain("useAppShare");
     expect(welcome).toContain("useAppShare");
-    expect(topBar).toContain("app-icon-ui");
+    expect(topBar).not.toContain("app-icon-ui");
+    expect(topBar).toContain("Nordic Nutri AI");
     expect(layout).not.toContain("useAppShare");
   });
 });
