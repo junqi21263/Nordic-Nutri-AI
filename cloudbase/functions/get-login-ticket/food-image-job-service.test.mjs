@@ -539,3 +539,113 @@ test("rejectImage best-effort deletes generated storage variants", async () => {
   assert.equal(result.rejected, true);
   assert.deepEqual(deleted, ["food-library/food-2/image-2"]);
 });
+
+test("createJob with supersedeActive cancels a stuck pending job", async () => {
+  const jobs = [
+    {
+      id: "stuck-job",
+      food_id: "food-1",
+      visual_profile_id: "profile-1",
+      status: "pending",
+      created_at: "2026-08-03T00:00:00.000Z",
+    },
+  ];
+  let cancelled = false;
+  const db = {
+    from(table) {
+      if (table === "food_image_usage_daily") {
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { generated_count: 0 }, error: null }) }) }),
+          insert: async () => ({ data: null, error: null }),
+          update: () => ({ eq: async () => ({ data: null, error: null }) }),
+        };
+      }
+      if (table === "food_image_visual_profiles") {
+        return {
+          select: () => {
+            const query = {
+              eq: () => query,
+              maybeSingle: async () => ({
+                data: { id: "profile-1", food_id: "food-1", profile_key: "standard", is_default: true },
+                error: null,
+              }),
+            };
+            return query;
+          },
+          update: () => ({ eq: async () => ({ data: null, error: null }) }),
+        };
+      }
+      if (table === "food_images") {
+        return {
+          select: () => {
+            const query = { eq: () => query, limit: async () => ({ data: [], error: null }) };
+            return query;
+          },
+        };
+      }
+      if (table === "foods") {
+        return { update: () => ({ eq: async () => ({ data: null, error: null }) }) };
+      }
+      if (table === "food_image_jobs") {
+        return {
+          select: () => {
+            const query = {
+              eq: () => query,
+              in: () => query,
+              order: () => query,
+              limit: () => query,
+              maybeSingle: async () => ({ data: jobs.find((job) => job.status === "pending") || null, error: null }),
+            };
+            return query;
+          },
+          update: (patch) => {
+            const query = {
+              eq: () => query,
+              in: () => {
+                if (patch.status === "failed") {
+                  cancelled = true;
+                  for (const job of jobs) {
+                    if (job.status === "pending" || job.status === "processing") Object.assign(job, patch);
+                  }
+                }
+                return query;
+              },
+            };
+            return query;
+          },
+          insert: (payload) => ({
+            select: () => ({
+              maybeSingle: async () => ({ data: { id: "fresh-job", ...payload, created_at: "2026-08-03T01:00:00.000Z" }, error: null }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+  const service = createFoodImageJobService({
+    db,
+    repository: {
+      isAdmin: async () => true,
+      getFoodById: async () => ({
+        id: "food-1",
+        nameZh: "混合肉香肠",
+        visualProfileKey: "standard",
+        category: { nameZh: "肉禽", code: "meat" },
+      }),
+    },
+    hunyuan: { modelName: "HY-Image-3.0-Plus-4090-Tob-v1.0" },
+    imageService: {},
+    config: { generationEnabled: true, dailyLimit: 100 },
+  });
+
+  const created = await service.createJob("admin", {
+    foodId: "food-1",
+    candidateCount: 1,
+    supersedeActive: true,
+  });
+  assert.equal(cancelled, true);
+  assert.equal(created.id, "fresh-job");
+  assert.equal(jobs[0].status, "failed");
+  assert.equal(jobs[0].error_code, "FOOD_IMAGE_JOB_SUPERSEDED");
+});

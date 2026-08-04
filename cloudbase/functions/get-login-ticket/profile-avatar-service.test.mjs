@@ -51,3 +51,38 @@ test("upload does not persist unresolvable storage refs", async () => {
   assert.match(savedPath, /^data:image\/png;base64,/);
   assert.doesNotMatch(savedPath, /^pgstore:/);
 });
+
+test("upload accepts a bundled default avatar sentinel", async () => {
+  let savedPath = "";
+  const service = createProfileAvatarService({
+    data: {
+      saveAvatarPath: async (_userId, avatarPath) => {
+        savedPath = avatarPath;
+        return { id: _userId, avatar_path: avatarPath };
+      },
+    },
+    uploadImage: async () => {
+      throw new Error("should not upload");
+    },
+    createTemporaryUrl: async () => null,
+  });
+
+  const result = await service.upload("user-1", { defaultAvatar: "default:food-3" });
+  assert.equal(result.avatarUrl, "default:food-3");
+  assert.equal(savedPath, "default:food-3");
+});
+
+test("upload rejects an unknown default avatar sentinel", async () => {
+  const service = createProfileAvatarService({
+    data: {
+      saveAvatarPath: async () => ({ id: "user-1" }),
+    },
+    uploadImage: async () => ({ fileId: "unused" }),
+    createTemporaryUrl: async () => null,
+  });
+
+  await assert.rejects(
+    () => service.upload("user-1", { defaultAvatar: "default:food-99" }),
+    (error) => error?.code === "AVATAR_IMAGE_INVALID",
+  );
+});

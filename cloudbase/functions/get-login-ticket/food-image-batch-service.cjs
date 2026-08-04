@@ -86,6 +86,9 @@ function isClaimableBatchItemStatus(status) {
 const RECOVERABLE_BATCH_ERROR_CODES = new Set([
   "FOOD_IMAGE_BATCH_EXECUTOR_MISSING",
   "FOOD_IMAGE_BATCH_ATTEMPTS_EXHAUSTED",
+  "FOOD_IMAGE_BATCH_GENERATING_UNLOCKED",
+  "FOOD_IMAGE_JOB_ACTIVE",
+  "FOOD_IMAGE_JOB_SUPERSEDED",
   "UNAUTHORIZED",
   "HY_IMAGE_UNAVAILABLE",
   "HY_IMAGE_DISABLED",
@@ -418,7 +421,8 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
       });
       const job = await jobs.createJob(executionUserId, {
         foodId: food.id, candidateCount: 1, extraPrompt: plan.extraPrompt,
-        cookingMethod: food.defaultCookingMethod, visualProfileKey: locked.data.visual_profile_key, deferWorker: true,
+        cookingMethod: food.defaultCookingMethod, visualProfileKey: locked.data.visual_profile_key,
+        deferWorker: true, supersedeActive: true,
       });
       const processed = await jobs.processQueue(null, { jobId: job.id });
       const result = processed.results?.[0];
@@ -527,6 +531,26 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
       item.status = "needs_retry";
       item.locked_at = null;
       item.locked_by = null;
+    } else if (item.status === "needs_review") {
+      // Missing preview / bad candidate: send back to the claimable queue.
+      const reopened = await db.from("food_image_batch_items").update({
+        status: "needs_retry",
+        error_code: null,
+        error_message: null,
+        retry_reason: item.retry_reason || "operator requested regeneration",
+        next_retry_at: null,
+        locked_at: null,
+        locked_by: null,
+      }).eq("id", item.id).eq("status", "needs_review");
+      if (reopened.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_RETRY_REOPEN_FAILED");
+      item.status = "needs_retry";
+    }
+    if (typeof jobs.cancelActiveJobs === "function" && item.food_id) {
+      try {
+        await jobs.cancelActiveJobs(item.food_id, item.visual_profile_id || null);
+      } catch (error) {
+        console.warn("[food-image-batches] cancelActiveJobs before retry failed:", error?.message || error);
+      }
     }
     return null;
   }
@@ -534,7 +558,7 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
   async function retryRejectedJob(userId, jobId) {
     await requireAdmin(userId);
     const result = await db.from("food_image_batch_items").select("*").eq("job_id", jobId)
-      .in("status", ["needs_retry", "failed", "generating"]).maybeSingle();
+      .in("status", ["needs_retry", "failed", "generating", "needs_review"]).maybeSingle();
     if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_RETRY_ITEM_LOOKUP_FAILED");
     if (!result.data) return { processed: 0, retryScheduled: false, reason: "RETRY_ITEM_NOT_READY" };
     const blocked = await reopenBatchItemForRetry(result.data);
@@ -548,7 +572,7 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
     const id = String(itemId || "").trim();
     if (!id) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_ITEM_REQUIRED");
     const result = await db.from("food_image_batch_items").select("*").eq("id", id)
-      .in("status", ["needs_retry", "failed", "generating"]).maybeSingle();
+      .in("status", ["needs_retry", "failed", "generating", "needs_review"]).maybeSingle();
     if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_RETRY_ITEM_LOOKUP_FAILED");
     if (!result.data) return { processed: 0, retryScheduled: false, reason: "RETRY_ITEM_NOT_READY" };
     const blocked = await reopenBatchItemForRetry(result.data);

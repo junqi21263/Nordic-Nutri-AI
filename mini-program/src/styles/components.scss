@@ -397,6 +397,11 @@
   gap: $space-8;
   padding-bottom: $space-8;
 }
+.brand-header__logo {
+  border-radius: 8px;
+  height: 36px;
+  width: 36px;
+}
 .brand-header__content .nordic-icon {
   filter: brightness(0) saturate(100%) hue-rotate(80deg);
 }
@@ -687,6 +692,7 @@
   font-weight: $font-weight-semibold;
   height: 80px;
   justify-content: center;
+  overflow: hidden;
   width: 80px;
 }
 .avatar--small {
@@ -700,8 +706,26 @@
 }
 .avatar--home {
   font-size: $font-h3;
-  height: 104px;
-  width: 104px;
+  height: 120px;
+  width: 120px;
+}
+.avatar--frame {
+  background: #f4f1ea;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+.avatar--bundled {
+  background: #f7f4ec;
+}
+.avatar__image {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+.avatar__image--zoom {
+  // Food illustrations ship with large paper padding; zoom so the subject fills the circle.
+  transform: scale(1.48);
 }
 .avatar--image {
   display: inline-block;

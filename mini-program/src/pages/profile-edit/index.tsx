@@ -8,7 +8,7 @@ import {
   saveProductNutritionPlan,
   saveProductProfile,
 } from "../../api/product-data-api";
-import { uploadProfileAvatar } from "../../api/profile-avatar-api";
+import { randomizeDefaultAvatar, uploadProfileAvatar } from "../../api/profile-avatar-api";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -16,7 +16,7 @@ import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { navigateBackOrHome } from "../../utils/navigation";
-import { resolveAvatarUrl } from "../../features/profile/avatar-defaults";
+import { resolveAvatarUrl, isDefaultAvatarSentinel } from "../../features/profile/avatar-defaults";
 import { nicknameModerationError } from "../../features/profile/nickname-moderation";
 
 const goalOptions = ["精益增肌", "轻盈减脂", "保持状态"];
@@ -34,9 +34,10 @@ export default function ProfileEditPage() {
   const [goalLabel, setGoalLabel] = useState(profile.profile.goalLabel);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isRandomizingAvatar, setIsRandomizingAvatar] = useState(false);
 
   const onChooseAvatar = async (event: { detail?: { avatarUrl?: string } }) => {
-    if (isUploadingAvatar || isSaving) return;
+    if (isUploadingAvatar || isSaving || isRandomizingAvatar) return;
     const filePath = typeof event.detail?.avatarUrl === "string" ? event.detail.avatarUrl.trim() : "";
     if (!filePath) return;
     try {
@@ -53,6 +54,23 @@ export default function ProfileEditPage() {
       }
     } finally {
       setIsUploadingAvatar(false);
+    }
+  };
+
+  const onRandomizeAvatar = async () => {
+    if (isUploadingAvatar || isSaving || isRandomizingAvatar) return;
+    try {
+      setIsRandomizingAvatar(true);
+      const updated = await randomizeDefaultAvatar(profile.profile.avatarUrl);
+      profile.setProfile({ avatarUrl: updated.avatarUrl });
+      feedback.show({ message: "已换一张默认头像", tone: "success" });
+    } catch (error) {
+      feedback.show({
+        message: error instanceof Error ? error.message : "随机头像失败，请稍后重试",
+        tone: "error",
+      });
+    } finally {
+      setIsRandomizingAvatar(false);
     }
   };
 
@@ -132,18 +150,37 @@ export default function ProfileEditPage() {
       className="page-layout--profile-edit"
     >
       <View className="profile-flow">
-        <Button
-          className="profile-edit__avatar"
-          openType="chooseAvatar"
-          onChooseAvatar={(event) => void onChooseAvatar(event)}
-        >
-          {resolveAvatarUrl(profile.profile.avatarUrl) ? (
-            <Image src={resolveAvatarUrl(profile.profile.avatarUrl)!} mode="aspectFill" />
-          ) : (
-            <Text>{profile.profile.nickname.slice(0, 1).toUpperCase()}</Text>
-          )}
-          <View className="profile-edit__avatar-action"><Text>{isUploadingAvatar ? "上传中" : "更换头像"}</Text></View>
-        </Button>
+        <View className="profile-edit__avatar-block">
+          <Button
+            className={`profile-edit__avatar${isDefaultAvatarSentinel(profile.profile.avatarUrl) || !profile.profile.avatarUrl ? " profile-edit__avatar--bundled" : ""}`}
+            openType="chooseAvatar"
+            onChooseAvatar={(event) => void onChooseAvatar(event)}
+          >
+            {resolveAvatarUrl(profile.profile.avatarUrl) ? (
+              <Image
+                className={
+                  isDefaultAvatarSentinel(profile.profile.avatarUrl) || !profile.profile.avatarUrl
+                    ? "profile-edit__avatar-image profile-edit__avatar-image--zoom"
+                    : "profile-edit__avatar-image"
+                }
+                src={resolveAvatarUrl(profile.profile.avatarUrl)!}
+                mode="aspectFill"
+              />
+            ) : (
+              <Text>{profile.profile.nickname.slice(0, 1).toUpperCase()}</Text>
+            )}
+            <View className="profile-edit__avatar-action">
+              <Text>{isUploadingAvatar ? "上传中" : "更换头像"}</Text>
+            </View>
+          </Button>
+          <View
+            className={`profile-edit__randomize ${isRandomizingAvatar ? "profile-edit__randomize--busy" : ""}`}
+            onClick={() => void onRandomizeAvatar()}
+          >
+            <NordicIcon name="refresh-cw" size={18} ariaLabel="随机头像" />
+            <Text>{isRandomizingAvatar ? "更换中…" : "随机换一张"}</Text>
+          </View>
+        </View>
         <View onClick={() => void Taro.navigateTo({ url: "/pages/goal-adjust/index" })}>
           <AppCard className="profile-form__summary profile-form__summary--action">
             <View className="profile-form__summary-icon">

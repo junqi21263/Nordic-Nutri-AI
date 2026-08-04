@@ -80,6 +80,12 @@
   transform: translate(-50%, -50%);
   white-space: nowrap;
 }
+.app-top-bar__logo {
+  border-radius: 10px;
+  flex-shrink: 0;
+  height: 40px;
+  width: 40px;
+}
 .app-top-bar__brand .nordic-icon {
   flex-shrink: 0;
 }

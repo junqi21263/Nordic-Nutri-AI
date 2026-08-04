@@ -54,7 +54,7 @@ describe("food catalog discovery and login profile sync", () => {
     expect(appConfig).toContain('"pages/food-detail/index"');
   });
 
-  it("keeps bootstrap robot avatar and only syncs a real WeChat nickname on login", () => {
+  it("keeps bootstrap default avatar and only syncs a real WeChat nickname on login", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/auth-entry/index.tsx"), "utf8");
     const profileEdit = readFileSync(resolve(sourceRoot, "pages/profile-edit/index.tsx"), "utf8");
 
@@ -64,6 +64,8 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("默认头像与昵称会自动生成");
     expect(page).not.toContain("uploadProfileAvatar");
     expect(profileEdit).toContain("uploadProfileAvatar");
+    expect(profileEdit).toContain("randomizeDefaultAvatar");
+    expect(profileEdit).toContain("随机换一张");
     expect(profileEdit).toContain("openType=\"chooseAvatar\"");
   });
 });

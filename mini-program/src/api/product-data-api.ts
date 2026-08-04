@@ -63,12 +63,20 @@ export function saveProductProfile(input: { nickname: string }) {
   });
 }
 
-export function uploadProductAvatar(input: { mimeType: "image/jpeg" | "image/png" | "image/webp"; base64: string }) {
+export function uploadProductAvatar(input: {
+  mimeType?: "image/jpeg" | "image/png" | "image/webp";
+  base64?: string;
+  defaultAvatar?: string;
+}) {
   return requestProductApi<{ avatarUrl: string }>("/profile/avatar", {
     method: "POST",
     data: input,
     fallbackMessage: "头像上传失败，请稍后重试",
   });
+}
+
+export function setDefaultProductAvatar(defaultAvatar: string) {
+  return uploadProductAvatar({ defaultAvatar });
 }
 
 export function saveProductBodyProfile(input: {

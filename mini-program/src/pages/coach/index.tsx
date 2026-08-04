@@ -21,6 +21,7 @@ import { getCoachGreeting } from "../../features/coach/server-time";
 import { clampProgress, formatTargetStatus } from "../../features/meals/domain";
 import { assertImageWithinPickLimit } from "../../features/media/image-upload-limits";
 import { getLocalDateString } from "../../features/onboarding/domain";
+import { useAppShare } from "../../hooks/use-app-share";
 import { PageLayout } from "../../layouts/page-layout";
 import { createClientRequestId } from "../../repositories/client-request-id";
 import { useCoachStore } from "../../stores/coach-store";
@@ -47,6 +48,7 @@ const defaultDailyTip: ProductCoachDailyTip = {
   model: null,
 };
 export default function CoachPage() {
+  useAppShare();
   const meals = useMealStore();
   const coach = useCoachStore();
   const feedback = useFeedbackStore();

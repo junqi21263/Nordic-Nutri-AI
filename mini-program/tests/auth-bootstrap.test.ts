@@ -103,10 +103,38 @@ describe("auth bootstrap", () => {
       clear,
     });
 
-    await bootstrap.start();
+    await bootstrap.start({ allowSilentLogin: false });
 
     expect(bootstrap.getState().status).toBe("unauthenticated");
-    expect(clear).not.toHaveBeenCalled();
+    // Persist wipe must run so restoreSession cannot revive a deleted-user JWT.
+    expect(clear).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-logins once when a restored session's user row is gone and silent login is allowed", async () => {
+    const login = vi.fn().mockResolvedValue(user);
+    const loadIdentity = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("SESSION_USER_MISSING"))
+      .mockResolvedValueOnce(undefined);
+    const getUser = vi
+      .fn()
+      .mockResolvedValueOnce(user)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(user);
+    const bootstrap = createAuthBootstrap({
+      restore: vi.fn().mockResolvedValue(session),
+      getUser,
+      refresh: vi.fn(),
+      login,
+      loadIdentity,
+      clear: vi.fn(),
+    });
+
+    await bootstrap.start({ allowSilentLogin: true });
+
+    expect(login).toHaveBeenCalledTimes(1);
+    expect(loadIdentity).toHaveBeenCalledTimes(2);
+    expect(bootstrap.getState().status).toBe("authenticated");
   });
 
   it("stays at the manual login entry when silent login is disabled", async () => {

@@ -40,12 +40,33 @@ function isDisplayableAvatarRef(value) {
   );
 }
 
+const DEFAULT_AVATAR_COUNT = 8;
+const DEFAULT_AVATAR_SENTINEL = /^default:food-([1-8])$/;
+const LEGACY_ROBOT_SENTINEL = /^default:robot-([1-4])$/;
+
+function pickDefaultAvatarSentinel() {
+  return `default:food-${1 + Math.floor(Math.random() * DEFAULT_AVATAR_COUNT)}`;
+}
+
+function isAllowedDefaultAvatarSentinel(value) {
+  return typeof value === "string" && (DEFAULT_AVATAR_SENTINEL.test(value.trim()) || LEGACY_ROBOT_SENTINEL.test(value.trim()));
+}
+
 function createProfileAvatarService({ data, uploadImage, createTemporaryUrl }) {
   if (!data || typeof data.saveAvatarPath !== "function" || typeof uploadImage !== "function" || typeof createTemporaryUrl !== "function") {
     throw new Error("Profile avatar service is unavailable");
   }
   return {
     async upload(userId, input) {
+      const defaultAvatar = typeof input?.defaultAvatar === "string" ? input.defaultAvatar.trim() : "";
+      if (defaultAvatar) {
+        if (!isAllowedDefaultAvatarSentinel(defaultAvatar)) {
+          throw new PublicProfileAvatarError("AVATAR_IMAGE_INVALID");
+        }
+        await data.saveAvatarPath(userId, defaultAvatar);
+        return { avatarUrl: defaultAvatar };
+      }
+
       const image = parseAvatarInput(input);
       const cloudPath = `avatars/${userId}/${crypto.randomUUID()}.${image.extension}`;
       let storedRef = "";
@@ -66,7 +87,7 @@ function createProfileAvatarService({ data, uploadImage, createTemporaryUrl }) {
       }
 
       // Only persist after we have something the client can actually render.
-      // This prevents overwriting default:robot-N with a broken pgstore:/cloud:// ref.
+      // This prevents overwriting default:food-N with a broken pgstore:/cloud:// ref.
       if (!avatarUrl) {
         if (image.content.length > MAX_INLINE_AVATAR_BYTES) {
           throw new PublicProfileAvatarError("AVATAR_IMAGE_INVALID");
@@ -83,8 +104,11 @@ function createProfileAvatarService({ data, uploadImage, createTemporaryUrl }) {
 
 module.exports = {
   MAX_AVATAR_BYTES,
+  DEFAULT_AVATAR_COUNT,
   PublicProfileAvatarError,
   createProfileAvatarService,
   parseAvatarInput,
   isDisplayableAvatarRef,
+  pickDefaultAvatarSentinel,
+  isAllowedDefaultAvatarSentinel,
 };

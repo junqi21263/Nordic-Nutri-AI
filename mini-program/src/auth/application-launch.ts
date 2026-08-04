@@ -1,7 +1,7 @@
 import type { AuthBootstrapStatus } from "./auth-bootstrap";
 
 export interface ApplicationAuthBootstrap {
-  start: (options?: { force?: boolean }) => Promise<void>;
+  start: (options?: { force?: boolean; allowSilentLogin?: boolean }) => Promise<void>;
   getStatus: () => AuthBootstrapStatus;
 }
 
@@ -17,6 +17,8 @@ export interface ApplicationDestinationDependencies {
 export interface ApplicationLaunchStartOptions {
   /** After login, discard a pre-login launch and route from the fresh session. */
   force?: boolean;
+  /** Welcome CTA: run wx.login when no usable session remains. */
+  allowSilentLogin?: boolean;
 }
 
 export function createApplicationLaunch(
@@ -27,11 +29,14 @@ export function createApplicationLaunch(
   let inFlight: Promise<void> | null = null;
   let launchId = 0;
 
-  const start = ({ force = false }: ApplicationLaunchStartOptions = {}) => {
+  const start = ({
+    force = false,
+    allowSilentLogin,
+  }: ApplicationLaunchStartOptions = {}) => {
     if (!inFlight || force) {
       const id = ++launchId;
       const promise = auth
-        .start({ force })
+        .start({ force, allowSilentLogin })
         .then(async () => {
           if (id !== launchId) return;
           if (auth.getStatus() === "authenticated") {

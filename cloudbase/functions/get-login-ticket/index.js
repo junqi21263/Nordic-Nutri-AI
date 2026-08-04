@@ -26,7 +26,7 @@ const { createVisionDataService, PublicVisionDataError } = require("./vision-dat
 const { createFoodCatalogService, PublicFoodCatalogError } = require("./food-catalog-service.cjs");
 const { createFoodQueryTranslator } = require("./food-query-translator.cjs");
 const { createNutritionBackfillService } = require("./nutrition-backfill-service.cjs");
-const { createProfileAvatarService, PublicProfileAvatarError } = require("./profile-avatar-service.cjs");
+const { createProfileAvatarService, PublicProfileAvatarError, pickDefaultAvatarSentinel } = require("./profile-avatar-service.cjs");
 const { createAccountDeletionService, PublicAccountDeletionError } = require("./account-deletion-service.cjs");
 const { createProductUserExists, resolveProductSession } = require("./product-session-auth.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
@@ -355,11 +355,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
         userId = created.data.id;
       }
 
-      // Seed a default profile (robot avatar + generated nickname) when missing, so
+      // Seed a default profile (food avatar + generated nickname) when missing, so
       // home/profile screens show a friendly identity instead of the "微信用户" placeholder.
       // Also backfills existing users who logged in before defaults were introduced.
-      const robotIndex = 1 + Math.floor(Math.random() * 4);
-      const defaultAvatarPath = `default:robot-${robotIndex}`;
+      const defaultAvatarPath = pickDefaultAvatarSentinel();
       const defaultNickname = pickNickname();
       try {
         const profileRow = await db
@@ -478,7 +477,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     uploadImage: async ({ cloudPath, content, contentType }) => {
       // Legacy CloudBase Storage JWT auth is broken in this HTTP function runtime.
       // Skip cloud upload and let the avatar service persist an inline data URL instead
-      // so we never overwrite default:robot-N with an unresolvable storage ref.
+      // so we never overwrite default:food-N with an unresolvable storage ref.
       void cloudPath;
       void content;
       void contentType;
@@ -700,6 +699,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       imageCdnBaseUrl: env.FOOD_IMAGE_CDN_BASE_URL,
       generationEnabled: hunyuanEnabled && Boolean(hunyuanImageService),
     },
+    resolveTempFileUrl: getTemporaryUrl,
     triggerWorker: async ({ jobId }) => {
       // Fire-and-forget same-process worker (SCF may freeze after response —
       // also expose POST /api/admin/food-image-jobs/worker for timer triggers).

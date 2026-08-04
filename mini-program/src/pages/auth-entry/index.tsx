@@ -8,13 +8,14 @@ import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomSheet } from "../../components/bottom-sheet";
 import { PageLayout } from "../../layouts/page-layout";
+import { useAppShare } from "../../hooks/use-app-share";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useProfileStore } from "../../stores/profile-store";
 
 /**
  * Persist a real WeChat nickname when available.
  * Never sync avatar from silent getUserInfo — modern WeChat often returns the grey
- * placeholder silhouette, which would overwrite bootstrap `default:robot-N`.
+ * placeholder silhouette, which would overwrite bootstrap `default:food-N`.
  * Users change avatars explicitly via chooseAvatar on the profile-edit page.
  */
 async function syncWechatNickname(nickname: string | null): Promise<string | null> {
@@ -29,6 +30,7 @@ async function syncWechatNickname(nickname: string | null): Promise<string | nul
 }
 
 export default function AuthEntryPage() {
+  useAppShare();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const feedback = useFeedbackStore();
 

@@ -22,6 +22,7 @@ import { getLocalDateString } from "../../features/onboarding/domain";
 import { createLogoutFlow } from "../../auth/logout-flow";
 import { signOut } from "../../auth/session-manager";
 import { PageLayout } from "../../layouts/page-layout";
+import { useAppShare } from "../../hooks/use-app-share";
 import { useAchievementStore } from "../../stores/achievement-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
@@ -29,6 +30,7 @@ import { useProfileStore } from "../../stores/profile-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 
 export default function ProfilePage() {
+  useAppShare();
   const profile = useProfileStore();
   const meals = useMealStore();
   const achievements = useAchievementStore();

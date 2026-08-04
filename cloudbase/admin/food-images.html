@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
   <title>Nordic Nutri · 管理后台</title>
+  <!-- admin-ui-build: 2026-08-03-regen-v2 -->
   <style>
     :root {
       --ink: #173d2a;
@@ -659,6 +662,8 @@
       FOOD_IMAGE_BATCH_SELECTION_EMPTY: "当前没有可生成的食材",
       FOOD_IMAGE_BATCH_EXECUTOR_MISSING: "批次缺少执行管理员（创建者账号可能已删除）。请点「立即重试」，系统会用当前后台帐号继续生成。",
       FOOD_IMAGE_BATCH_ATTEMPTS_EXHAUSTED: "已用尽自动重试次数，请点「立即重试」再试一次",
+      FOOD_IMAGE_JOB_ACTIVE: "该食材仍有卡住的生成任务。点「立即重试」会取消旧任务并重新生成。",
+      FOOD_IMAGE_JOB_SUPERSEDED: "旧生成任务已被新请求取代，可继续点「立即重试」。",
       HY_IMAGE_UNAVAILABLE: "混元生图暂时不可用，请稍后重试",
       HY_IMAGE_DISABLED: "生图功能已关闭，请检查云函数环境变量",
       HY_IMAGE_DAILY_LIMIT: "今日生图额度已用尽，请明天再试或提高日限额",
@@ -1246,16 +1251,17 @@
       const selectableIds = queue.filter(({ item, candidate }) => item.status === "needs_review" && candidate?.id).map(({ candidate }) => candidate.id);
       host.className = "review-grid"; host.innerHTML = queue.map(({ item, candidate }) => {
         const name = foodLabel(item); const imageUrl = preferredUrl(candidate); const selected = item.id === state.selectedItemId; const canSelect = item.status === "needs_review" && candidate?.id;
-        const canRetry = item.status === "needs_retry" || item.status === "failed" || item.status === "generating";
+        const canRetry = item.status === "needs_retry" || item.status === "failed" || item.status === "generating" || item.status === "needs_review";
         const reason = item.errorMessage || item.retryReason || "";
         const exception = (item.errorCode || reason) ? `<span class="card-exception">${escapeHtml(item.errorCode || "失败")}${reason ? ` · ${escapeHtml(reason)}` : ""}</span>` : "";
-        const retryLabel = item.status === "generating" ? "取消并重试" : "立即重试";
-        const toolbarLead = canSelect
+        const retryLabel = item.status === "generating" ? "取消并重试" : item.status === "needs_review" ? "重新生图" : "立即重试";
+        const selectControl = canSelect
           ? `<label class="card-select-label" aria-label="选择候选图"><input type="checkbox" data-candidate-select="${candidate.id}" ${state.selectedImageIds.has(candidate.id) ? "checked" : ""} /></label>`
-          : canRetry
-            ? `<button class="button secondary" data-retry-item-id="${escapeHtml(item.id)}" data-retry-job-id="${escapeHtml(item.jobId || "")}" data-food-name="${escapeHtml(name)}">${retryLabel}</button>`
-            : "<span></span>";
-        return `<article class="food-card ${selected ? "selected" : ""}"><button class="food-card-select" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}"><span class="food-card-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" />` : "<span class=\"food-card-placeholder\">N</span>"}<span class="image-status ${statusTone(item.status)}">${statusLabel(item.status)}</span></span><span class="food-card-body"><span class="food-card-title">${escapeHtml(name)}</span><span class="food-card-meta"><span>${escapeHtml(item.visualProfileLabelZh || visualProfileLabel(item.visualProfileKey))}</span><span>${item.attemptCount || 0} 次尝试</span></span>${exception}</span></button><div class="food-card-toolbar">${toolbarLead}<button class="button secondary" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}">${item.jobId ? "查看详情" : "查看异常"}</button></div></article>`;
+          : "";
+        const retryControl = canRetry
+          ? `<button class="button secondary" data-retry-item-id="${escapeHtml(item.id)}" data-retry-job-id="${escapeHtml(item.jobId || "")}" data-food-name="${escapeHtml(name)}">${retryLabel}</button>`
+          : "";
+        return `<article class="food-card ${selected ? "selected" : ""}"><button class="food-card-select" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}"><span class="food-card-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" />` : "<span class=\"food-card-placeholder\">N</span>"}<span class="image-status ${statusTone(item.status)}">${statusLabel(item.status)}</span></span><span class="food-card-body"><span class="food-card-title">${escapeHtml(name)}</span><span class="food-card-meta"><span>${escapeHtml(item.visualProfileLabelZh || visualProfileLabel(item.visualProfileKey))}</span><span>${item.attemptCount || 0} 次尝试</span></span>${exception}</span></button><div class="food-card-toolbar">${selectControl}${retryControl || (selectControl ? "" : "<span></span>")}<button class="button secondary" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}">${item.jobId ? "查看详情" : "查看异常"}</button></div></article>`;
       }).join("");
       host.querySelectorAll("button[data-item-id]").forEach((button) => { button.onclick = () => selectItem(button.dataset.itemId, button.dataset.foodName); });
       host.querySelectorAll("button[data-retry-item-id]").forEach((button) => { button.onclick = (event) => { event.stopPropagation(); retryItemNow(button.dataset.retryItemId, button.dataset.foodName, button.dataset.retryJobId); }; });
@@ -1279,7 +1285,7 @@
     }
     function itemHealthMarkup(item, job) {
       if (!item) return "";
-      const recoverable = ["FOOD_IMAGE_BATCH_EXECUTOR_MISSING", "FOOD_IMAGE_BATCH_ATTEMPTS_EXHAUSTED", "FOOD_IMAGE_BATCH_GENERATING_UNLOCKED", "UNAUTHORIZED", "HY_IMAGE_UNAVAILABLE", "HY_IMAGE_DISABLED", "HY_IMAGE_DAILY_LIMIT", "BAD_GATEWAY"].includes(item.errorCode);
+      const recoverable = ["FOOD_IMAGE_BATCH_EXECUTOR_MISSING", "FOOD_IMAGE_BATCH_ATTEMPTS_EXHAUSTED", "FOOD_IMAGE_BATCH_GENERATING_UNLOCKED", "FOOD_IMAGE_JOB_ACTIVE", "FOOD_IMAGE_JOB_SUPERSEDED", "UNAUTHORIZED", "HY_IMAGE_UNAVAILABLE", "HY_IMAGE_DISABLED", "HY_IMAGE_DAILY_LIMIT", "BAD_GATEWAY"].includes(item.errorCode);
       const retry = item.nextRetryAt ? `下次重试：${formatTime(item.nextRetryAt)}` : item.status === "needs_retry" ? "等待云端调度器安排下一次重试，也可点「立即重试」。" : "";
       const action = item.status === "generating"
         ? "卡在生成中（常见于接口 410/超时）。可点「取消并重试」解除锁定后重新生成。"
@@ -1287,22 +1293,32 @@
         ? (recoverable || !item.jobId
           ? "接口/配置类失败，可直接点「立即重试」；无需重新建批次。"
           : "已达到最大重试次数，可点「立即重试」再试一次，或查看失败原因后重建批次。")
-        : item.status === "needs_review" ? "候选图已生成，等待人工审核。" : retry;
+        : item.status === "needs_review"
+        ? (preferredUrl((job?.candidates || []).find((entry) => entry.id === state.selectedImageId) || (job?.candidates || [])[0])
+          ? "候选图已生成，等待人工审核。也可点「重新生图」丢弃当前候选并再生成。"
+          : "候选图记录存在但预览地址为空（常见于 CDN 未配置）。可点「重新生图」，或配置 FOOD_IMAGE_CDN_BASE_URL 后刷新。")
+        : retry;
       const error = item.errorCode ? `<div class="item-error"><b>${escapeHtml(item.errorCode)}</b>${escapeHtml(item.errorMessage || item.retryReason || "生成任务失败")}</div>` : "";
       return `<section class="item-health"><div class="item-health-head"><strong>任务状态</strong><span class="status-badge ${statusTone(item.status)}">${escapeHtml(statusLabel(item.status))}</span></div><p class="item-health-copy">尝试 ${item.attemptCount || 0}/${job?.maxAttempts || 3} 次${item.retryReason ? ` · 重试原因：${escapeHtml(item.retryReason)}` : ""}${item.lockedAt ? `<br>锁定于 ${escapeHtml(formatTime(item.lockedAt))}${item.lockedBy ? ` · ${escapeHtml(item.lockedBy)}` : ""}` : ""}<br>${escapeHtml(action || "当前状态正常。")}</p>${error}</section>`;
     }
     function renderInspector() { const host = $("inspector"); const item = selectedItem(); const job = state.selectedJobId ? state.jobs.get(state.selectedJobId) : null; const candidates = job?.candidates || []; const candidate = candidates.find((entry) => entry.id === state.selectedImageId) || candidates[0]; if (!item) { host.className = "inspector-intro"; host.innerHTML = "<div><h2>选择一张候选图</h2><p>从中央审核队列点击食物，即可查看大图、自动提示词、任务状态和异常原因。</p></div>"; return; }
-      const plan = item.promptPlan?.prompt || "暂无自动提示词。"; const category = item.food?.category || "未分类"; const profile = item.visualProfileLabelZh || visualProfileLabel(item.visualProfileKey); if (!candidate) {
-        const canRetryItem = item.status === "needs_retry" || item.status === "failed" || item.status === "generating";
-        const retryLabel = item.status === "generating" ? "取消并重试" : "立即重试";
+      const plan = item.promptPlan?.prompt || "暂无自动提示词。"; const category = item.food?.category || "未分类"; const profile = item.visualProfileLabelZh || visualProfileLabel(item.visualProfileKey);
+      const canRetryItem = item.status === "needs_retry" || item.status === "failed" || item.status === "generating" || item.status === "needs_review";
+      const retryLabel = item.status === "generating" ? "取消并重试" : item.status === "needs_review" ? "重新生图" : "立即重试";
+      const retryAction = canRetryItem
+        ? `<div class="inspector-actions" style="margin:0 0 12px"><button id="retryItemTop" class="button">${retryLabel}</button></div>`
+        : "";
+      if (!candidate) {
         host.className = "";
-        host.innerHTML = `<div class="inspector-content"><div><div class="inspector-title"><h2>${escapeHtml(state.selectedFoodName)}</h2><span class="category-badge">${escapeHtml(category)} · ${escapeHtml(profile)}</span></div>${itemHealthMarkup(item, job)}<details class="detail-block"><summary>查看自动提示词</summary><p>${escapeHtml(plan)}</p></details>${canRetryItem ? `<div class="inspector-actions"><button id="retryItem" class="button">${retryLabel}</button></div>` : ""}</div></div>`;
-        $("retryItem")?.addEventListener("click", () => retryItemNow(item.id, state.selectedFoodName, item.jobId || ""));
+        host.innerHTML = `<div class="inspector-content"><div><div class="inspector-title"><h2>${escapeHtml(state.selectedFoodName)}</h2><span class="category-badge">${escapeHtml(category)} · ${escapeHtml(profile)}</span></div>${retryAction}${itemHealthMarkup(item, job)}<details class="detail-block"><summary>查看自动提示词</summary><p>${escapeHtml(plan)}</p></details></div></div>`;
+        $("retryItemTop")?.addEventListener("click", () => retryItemNow(item.id, state.selectedFoodName, item.jobId || ""));
         return;
       }
       const imageUrl = preferredUrl(candidate);
-      host.className = ""; host.innerHTML = `<div class="inspector-content"><div class="inspector-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(state.selectedFoodName)}" />` : "<span class=\"food-card-placeholder\">N</span>"}</div><div><div class="inspector-title"><h2>${escapeHtml(state.selectedFoodName)}</h2><span class="category-badge">${escapeHtml(category)} · ${escapeHtml(profile)}</span></div>${itemHealthMarkup(item, job)}<div class="candidate-strip">${candidates.map((entry) => { const url = preferredUrl(entry); return `<button class="candidate-thumb ${entry.id === candidate.id ? "active" : ""}" data-candidate-id="${entry.id}">${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(state.selectedFoodName)} 候选图" />` : "<span class=\"food-card-placeholder\">N</span>"}</button>`; }).join("")}</div><details class="detail-block"><summary>查看自动提示词</summary><p>${escapeHtml(plan)}</p></details><details class="detail-block"><summary>生成信息</summary><p>视觉状态 ${escapeHtml(profile)}<br>任务 ${escapeHtml(state.selectedJobId)}<br>候选状态 ${escapeHtml(candidate.reviewStatus || candidate.status || "pending")}</p></details><div class="inspector-actions"><button id="approve" class="button">通过并设为该状态主图</button><button id="reject" class="button secondary">拒绝并填写原因</button></div></div></div>`;
+      host.className = ""; host.innerHTML = `<div class="inspector-content"><div class="inspector-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(state.selectedFoodName)}" />` : "<span class=\"food-card-placeholder\">N</span>"}</div><div><div class="inspector-title"><h2>${escapeHtml(state.selectedFoodName)}</h2><span class="category-badge">${escapeHtml(category)} · ${escapeHtml(profile)}</span></div>${retryAction}${itemHealthMarkup(item, job)}<div class="candidate-strip">${candidates.map((entry) => { const url = preferredUrl(entry); return `<button class="candidate-thumb ${entry.id === candidate.id ? "active" : ""}" data-candidate-id="${entry.id}">${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(state.selectedFoodName)} 候选图" />` : "<span class=\"food-card-placeholder\">N</span>"}</button>`; }).join("")}</div><details class="detail-block"><summary>查看自动提示词</summary><p>${escapeHtml(plan)}</p></details><details class="detail-block"><summary>生成信息</summary><p>视觉状态 ${escapeHtml(profile)}<br>任务 ${escapeHtml(state.selectedJobId)}<br>候选状态 ${escapeHtml(candidate.reviewStatus || candidate.status || "pending")}</p></details><div class="inspector-actions"><button id="approve" class="button">通过并设为该状态主图</button><button id="reject" class="button secondary">拒绝并填写原因</button><button id="retryItem" class="button secondary">重新生图</button></div></div></div>`;
       host.querySelectorAll("button[data-candidate-id]").forEach((button) => { button.onclick = () => { state.selectedImageId = button.dataset.candidateId; renderInspector(); }; }); $("approve")?.addEventListener("click", approveSelected); $("reject")?.addEventListener("click", rejectSelected);
+      $("retryItemTop")?.addEventListener("click", () => retryItemNow(item.id, state.selectedFoodName, item.jobId || ""));
+      $("retryItem")?.addEventListener("click", () => retryItemNow(item.id, state.selectedFoodName, item.jobId || ""));
     }
     async function approveImage(imageId, foodName = "食物") { const data = await api(`/food-images/${imageId}/approve`, { method: "POST", body: {} }); recordOperation({ title: "审核通过", detail: `${foodName} 已设为主图` }); return data; }
     async function approveSelected() { if (!state.selectedImageId) return; try { const data = await approveImage(state.selectedImageId, state.selectedFoodName); out(data); toast("已通过并设为主图"); state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }

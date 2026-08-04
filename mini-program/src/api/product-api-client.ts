@@ -1,5 +1,6 @@
 import Taro from "@tarojs/taro";
 import { useAuthStore } from "../auth/auth-store";
+import { clearInvalidSession } from "../auth/session-manager";
 import { clearProductLocalState } from "../features/account-cancellation/clear-local-state";
 import { productApiEndpoint } from "./product-api-config";
 
@@ -35,7 +36,9 @@ export async function requestProductApi<T>(path: string, request: ProductApiRequ
   if (response.statusCode !== 200) {
     const code = typeof data?.code === "string" ? data.code : "ProductApiRequestError";
     if (response.statusCode === 401 || code === "UNAUTHORIZED" || code === "SESSION_USER_MISSING") {
-      useAuthStore.getState().clear();
+      // Must wipe persisted storage too — memory-only clear lets restoreSession
+      // revive a JWT whose app_users row is gone (SESSION_USER_MISSING loop).
+      await clearInvalidSession();
       if (code === "SESSION_USER_MISSING") clearProductLocalState();
     }
     const message =

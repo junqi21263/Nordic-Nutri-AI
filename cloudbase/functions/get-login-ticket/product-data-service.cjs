@@ -1,4 +1,5 @@
 const { assertNicknameAllowed } = require("./nickname-moderation.cjs");
+const { pickDefaultAvatarSentinel } = require("./profile-avatar-service.cjs");
 
 function fail(message) {
   const error = new Error(message);
@@ -300,7 +301,7 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
           avatarUrl = avatarPath;
         }
         // Tiny inline images are almost always WeChat's grey placeholder silhouette
-        // that previously overwrote default:robot-N during silent getUserInfo sync.
+        // that previously overwrote default:food-N during silent getUserInfo sync.
         let tinyInlinePlaceholder = false;
         if (avatarPath.startsWith("data:image/")) {
           const comma = avatarPath.indexOf(",");
@@ -311,8 +312,7 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
         }
         const shouldRepair = tinyInlinePlaceholder || !avatarUrl;
         if (shouldRepair) {
-          const robotIndex = 1 + Math.floor(Math.random() * 4);
-          const repaired = `default:robot-${robotIndex}`;
+          const repaired = pickDefaultAvatarSentinel();
           try {
             await db.from("profiles").update({ avatar_path: repaired }).eq("id", userId);
             avatarUrl = repaired;

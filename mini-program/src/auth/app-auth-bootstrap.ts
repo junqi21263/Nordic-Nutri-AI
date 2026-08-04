@@ -88,7 +88,10 @@ const authBootstrap = createAuthBootstrap({
 const applicationLaunch = createRuntimeApplicationLaunch(
   {
     start: (options) =>
-      authBootstrap.start({ allowSilentLogin: false, force: options?.force }),
+      authBootstrap.start({
+        allowSilentLogin: options?.allowSilentLogin ?? false,
+        force: options?.force,
+      }),
     getStatus: () => authBootstrap.getState().status,
   },
   {
@@ -101,6 +104,9 @@ const applicationLaunch = createRuntimeApplicationLaunch(
   },
 );
 
-export function startApplicationAuth(options?: { force?: boolean }) {
+export function startApplicationAuth(options?: {
+  force?: boolean;
+  allowSilentLogin?: boolean;
+}) {
   return applicationLaunch.start(options);
 }

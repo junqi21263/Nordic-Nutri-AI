@@ -57,6 +57,7 @@ function createFoodImageJobService({
   imageService,
   config = {},
   triggerWorker,
+  resolveTempFileUrl,
 } = {}) {
   if (!db || !repository) throw new Error("Food image job service requires db + repository");
 
@@ -109,6 +110,20 @@ function createFoodImageJobService({
     return result.data ?? null;
   }
 
+  /** Mark stuck pending/processing jobs failed so a retry can create a fresh job. */
+  async function cancelActiveJobs(foodId, visualProfileId = null, { reason = "FOOD_IMAGE_JOB_SUPERSEDED" } = {}) {
+    let query = db.from("food_image_jobs").update({
+      status: "failed",
+      error_code: reason,
+      error_message: "superseded by a newer generation request",
+      finished_at: new Date().toISOString(),
+    }).eq("food_id", foodId).in("status", ["pending", "processing"]);
+    if (visualProfileId) query = query.eq("visual_profile_id", visualProfileId);
+    const result = await query;
+    if (result?.error) throw new FoodImageJobError("FOOD_IMAGE_JOB_SUPERSEDE_FAILED", result.error.message);
+    return true;
+  }
+
   async function ensureVisualProfile(food, requestedProfileKey = "auto") {
     const definition = resolveVisualProfile(food, requestedProfileKey);
     const ownerFoodId = food.imageOwnerFoodId || food.id;
@@ -149,6 +164,7 @@ function createFoodImageJobService({
     foodId,
     candidateCount,
     force = false,
+    supersedeActive = false,
     jobType = "generate",
     reason,
     extraPrompt,
@@ -175,7 +191,15 @@ function createFoodImageJobService({
     }
 
     const active = await findActiveJob(profile.food_id, profile.id);
-    if (active) throw new FoodImageJobError("FOOD_IMAGE_JOB_ACTIVE");
+    if (active) {
+      // Batch retries / regenerate must clear zombie pending|processing rows left
+      // by worker crashes; otherwise createJob loops on FOOD_IMAGE_JOB_ACTIVE.
+      if (force || supersedeActive || jobType === "regenerate") {
+        await cancelActiveJobs(profile.food_id, profile.id);
+      } else {
+        throw new FoodImageJobError("FOOD_IMAGE_JOB_ACTIVE");
+      }
+    }
 
     const count = Math.min(Math.max(Number(candidateCount) || candidateDefault, 1), 6);
     const prompt = buildFoodImagePrompt({
@@ -282,9 +306,29 @@ function createFoodImageJobService({
     if (result.error || !result.data) throw new FoodImageJobError("FOOD_IMAGE_JOB_NOT_FOUND");
     const images = await db.from("food_images").select("*").eq("job_id", jobId).order("created_at", { ascending: true });
     const { mapImageRow } = require("./food-repository.cjs");
+    const candidates = [];
+    for (const row of images.data ?? []) {
+      const mapped = mapImageRow(row, { imageUrlResolver });
+      if (!mapped) continue;
+      const hasDisplayUrl = Boolean(mapped.detailUrl || mapped.listUrl || mapped.thumbUrl || mapped.thumbnailUrl);
+      if (!hasDisplayUrl && row.original_file_id && typeof resolveTempFileUrl === "function") {
+        try {
+          const tempUrl = await resolveTempFileUrl(row.original_file_id);
+          if (tempUrl) {
+            mapped.detailUrl = tempUrl;
+            mapped.listUrl = tempUrl;
+            mapped.thumbUrl = tempUrl;
+            mapped.thumbnailUrl = tempUrl;
+          }
+        } catch (error) {
+          console.warn("[food-image-jobs] temp preview URL failed:", error?.message || error);
+        }
+      }
+      candidates.push(mapped);
+    }
     return {
       job: mapJobRow(result.data),
-      candidates: (images.data ?? []).map((row) => mapImageRow(row, { imageUrlResolver })).filter(Boolean),
+      candidates,
     };
   }
 
@@ -611,6 +655,7 @@ function createFoodImageJobService({
     approveImage,
     rejectImage,
     regenerate,
+    cancelActiveJobs,
     getStats,
     getDailyUsage,
     dailyLimit,

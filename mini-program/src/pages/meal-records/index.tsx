@@ -20,6 +20,7 @@ import {
 import { resolveHomeDailySummary } from "../../features/meals/home-daily-summary";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
+import { useAppShare } from "../../hooks/use-app-share";
 import { getProductMeals, getProductMealsRange, mapProductMeal } from "../../api/meal-data-api";
 import { getProductDailySummary, type ProductDailySummary } from "../../api/insight-api";
 import { type MealTypeFilter, useMealStore } from "../../stores/meal-store";
@@ -144,6 +145,7 @@ function TimelineMeal({ meal, onClick }: { meal: Meal; onClick: () => void }) {
 }
 
 export default function MealRecordsPage() {
+  useAppShare();
   const store = useMealStore();
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);

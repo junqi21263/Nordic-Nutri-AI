@@ -56,6 +56,7 @@ describe("product data HTTPS boundary", () => {
     expect(profile).toContain("/pages/account-cancellation/index");
     expect(authApi).toContain("syncOnboardingCompletedFromServer");
     expect(client).toContain("SESSION_USER_MISSING");
+    expect(client).toContain("clearInvalidSession");
     expect(client).toContain("clearProductLocalState");
     const bootstrap = readFileSync(resolve(sourceRoot, "auth/app-auth-bootstrap.ts"), "utf8");
     expect(bootstrap).toContain("syncOnboardingCompletedFromAccount");

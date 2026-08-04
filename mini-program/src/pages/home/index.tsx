@@ -1,5 +1,5 @@
 import { Text, View } from "@tarojs/components";
-import Taro, { useDidShow } from "@tarojs/taro";
+import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { DailyNutritionSummary } from "../../components/daily-nutrition-summary";
@@ -13,6 +13,7 @@ import { type MealType } from "../../features/meals/domain";
 import { resolveHomeDailySummary } from "../../features/meals/home-daily-summary";
 import { getCoachGreeting } from "../../features/coach/server-time";
 import { getLocalDateString } from "../../features/onboarding/domain";
+import { buildAppShareMessage, buildAppTimelineShare } from "../../features/share/app-share";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
 import { getProductMeals, mapProductMeal } from "../../api/meal-data-api";
@@ -20,11 +21,16 @@ import { getProductDailySummary, type ProductDailySummary } from "../../api/insi
 import { useProfileStore } from "../../stores/profile-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 import { hasSeenWelcome } from "../../features/welcome/welcome-seen";
+import { useAppShare } from "../../hooks/use-app-share";
 import { isOnboardingCompleted } from "../../utils/local-experience";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
 export default function HomePage() {
+  // Keep hooks in the page file so Taro enables share, plus useAppShare for real-device binding.
+  useShareAppMessage(() => buildAppShareMessage());
+  useShareTimeline(() => buildAppTimelineShare());
+  useAppShare();
   const store = useMealStore();
   const profile = useProfileStore();
   const today = getLocalDateString();

@@ -9,9 +9,9 @@ function read(relativePath: string) {
 }
 
 describe("icon vocabulary variety", () => {
-  it("keeps sparkles for brand marks and uses distinct icons elsewhere", () => {
-    expect(read("components/app-top-bar/index.tsx")).toContain('name="sparkles"');
-    expect(read("components/brand-header/index.tsx")).toContain('name="sparkles"');
+  it("uses the brand logo mark and keeps distinct icons elsewhere", () => {
+    expect(read("components/app-top-bar/index.tsx")).toContain("app-icon-ui");
+    expect(read("components/brand-header/index.tsx")).toContain("app-icon-ui");
 
     expect(read("components/ai-insight-card/index.tsx")).toContain('name="nova"');
     expect(read("pages/coach/index.tsx")).toContain('name="zap"');

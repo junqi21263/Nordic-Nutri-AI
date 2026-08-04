@@ -43,7 +43,11 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
     setStatus("unauthenticated");
   };
 
-  const authenticate = async (user: User | null, id: number) => {
+  const authenticate = async (
+    user: User | null,
+    id: number,
+    { retryLogin = false }: { retryLogin?: boolean } = {},
+  ) => {
     if (!user) {
       await clear();
       return;
@@ -53,7 +57,12 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
     } catch {
       // Identity load may clear the session (deleted user). Do not stay authenticated.
       if (!(await dependencies.getUser())) {
-        if (id === runId) setStatus("unauthenticated");
+        if (id !== runId) return;
+        if (retryLogin) {
+          await authenticate(await dependencies.login(), id);
+          return;
+        }
+        await clear();
         return;
       }
       // A profile/settings read failure must not invalidate an already verified Auth session.
@@ -77,7 +86,9 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
       }
 
       try {
-        await authenticate(await dependencies.getUser(), id);
+        await authenticate(await dependencies.getUser(), id, {
+          retryLogin: allowSilentLogin,
+        });
       } catch (error) {
         if (id !== runId) return;
         if (!isUnauthorized(error) || !(await dependencies.refresh())) {
@@ -85,7 +96,9 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
           return;
         }
         if (id !== runId) return;
-        await authenticate(await dependencies.getUser(), id);
+        await authenticate(await dependencies.getUser(), id, {
+          retryLogin: allowSilentLogin,
+        });
       }
     } catch {
       if (id !== runId) return;

@@ -1750,9 +1750,9 @@
   align-items: center;
   align-self: center;
   background: $color-forest-green;
-  border: 4px solid $color-warm-white;
+  border: none;
   border-radius: $radius-full;
-  box-shadow: 0 10px 24px rgba($color-forest-green, 0.16);
+  box-shadow: none;
   color: $color-warm-white;
   display: flex;
   font-size: $font-h2;
@@ -1765,12 +1765,24 @@
   position: relative;
   width: 144px;
 }
+.profile-edit__avatar--bundled {
+  background: #f7f4ec;
+}
+.profile-edit__avatar-block {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: $space-12;
+}
 .profile-edit__avatar::after {
   border: none;
 }
-.profile-edit__avatar image {
+.profile-edit__avatar-image {
   height: 100%;
   width: 100%;
+}
+.profile-edit__avatar-image--zoom {
+  transform: scale(1.48);
 }
 .profile-edit__avatar-action {
   align-items: center;
@@ -1783,6 +1795,22 @@
   left: 0;
   position: absolute;
   right: 0;
+  z-index: 1;
+}
+.profile-edit__randomize {
+  align-items: center;
+  color: $color-forest-green;
+  display: flex;
+  gap: $space-8;
+  min-height: 44px;
+  padding: $space-4 $space-12;
+}
+.profile-edit__randomize Text {
+  font-size: $font-caption;
+  font-weight: $font-weight-medium;
+}
+.profile-edit__randomize--busy {
+  opacity: 0.55;
 }
 .profile-form__summary,
 .profile-goal-hero {

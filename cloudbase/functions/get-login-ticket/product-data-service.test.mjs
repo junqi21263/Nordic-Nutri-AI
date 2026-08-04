@@ -166,7 +166,7 @@ test("resolves a signed-in user's stored avatar path into a temporary avatar URL
   assert.equal(result.avatarUrl, "https://temp.example/avatar.jpg");
 });
 
-test("repairs tiny WeChat placeholder data URLs back to a default robot avatar", async () => {
+test("repairs tiny WeChat placeholder data URLs back to a default food avatar", async () => {
   const tinyPng = `data:image/png;base64,${Buffer.alloc(1200, 1).toString("base64")}`;
   const rows = {
     profiles: { nickname: "果园探索家", avatar_path: tinyPng },
@@ -198,8 +198,8 @@ test("repairs tiny WeChat placeholder data URLs back to a default robot avatar",
     resolveAvatarUrl: async (path) => path,
   }).getAccount("user-1");
 
-  assert.match(result.avatarUrl, /^default:robot-[1-4]$/);
-  assert.match(updates[0]?.avatar_path, /^default:robot-[1-4]$/);
+  assert.match(result.avatarUrl, /^default:food-[1-8]$/);
+  assert.match(updates[0]?.avatar_path, /^default:food-[1-8]$/);
 });
 
 test("upserts settings for the authenticated user", async () => {

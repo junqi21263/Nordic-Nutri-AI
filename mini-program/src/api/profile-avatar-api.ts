@@ -1,5 +1,6 @@
 import Taro from "@tarojs/taro";
-import { uploadProductAvatar } from "./product-data-api";
+import { setDefaultProductAvatar, uploadProductAvatar } from "./product-data-api";
+import { pickDefaultAvatarSentinel } from "../features/profile/avatar-defaults";
 
 const MAX_AVATAR_BYTES = 1_500_000;
 
@@ -29,4 +30,10 @@ export async function uploadProfileAvatar(sourcePath: string) {
   if (!("size" in info) || info.size > MAX_AVATAR_BYTES) throw new Error("头像过大，请选择 1.5MB 以内的图片");
   const base64 = await readBase64(compressed.tempFilePath);
   return uploadProductAvatar({ mimeType: contentTypeForBase64(base64), base64 });
+}
+
+/** Persist a random bundled default avatar, excluding the current sentinel when possible. */
+export async function randomizeDefaultAvatar(exclude?: string | null) {
+  const defaultAvatar = pickDefaultAvatarSentinel(exclude);
+  return setDefaultProductAvatar(defaultAvatar);
 }

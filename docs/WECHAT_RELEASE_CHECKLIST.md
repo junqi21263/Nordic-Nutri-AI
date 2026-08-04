@@ -8,6 +8,8 @@
 - [ ] 已准备审核测试微信号、测试昵称、可识别的餐食图片和完整测试路径。
 - [ ] 生产请求域名和下载/上传域名已配置为 HTTPS；开发者工具的 `urlCheck: false` 未作为审核依据。
 - [ ] 已确认免责声明：营养识别与建议不构成医疗诊断或治疗建议。
+- [ ] 小程序头像已上传 `mini-program/branding/wechat-app-avatar-1024.jpg`；分享卡片标题为「让每一餐都有价值」。
+- [ ] downloadFile 合法域名已包含 `lewis-healthy-d4glgqqzv73a5bc10-1420560890.tcloudbaseapp.com`（分享卡片配图）。
 
 ## CloudBase 上线前
 

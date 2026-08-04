@@ -188,6 +188,9 @@ test("candidate cards keep a bare checkbox without repeating batch-select wordin
 test("retryable failed items expose an immediate retry action", async () => {
   const source = await pageSource();
   assert.match(source, /立即重试/);
+  assert.match(source, /重新生图/);
+  assert.match(source, /FOOD_IMAGE_JOB_ACTIVE/);
+  assert.match(source, /retryItemTop/);
   assert.match(source, /data-retry-item-id/);
   assert.match(source, /food-image-batch-items\/\$\{[^}]+\}\/retry|retryItemNow|retryFailedItem/);
   assert.match(source, /needs_retry.*failed.*generating|generating.*needs_retry|取消并重试/);

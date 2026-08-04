@@ -32,6 +32,7 @@ import {
   type CatalogPagination,
 } from "../../features/food-catalog/catalog-pagination";
 import { PageLayout } from "../../layouts/page-layout";
+import { useAppShare } from "../../hooks/use-app-share";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
 
@@ -94,6 +95,7 @@ function suggestionLabel(item: ProductFoodSuggestion) {
 }
 
 export default function FoodCatalogPage() {
+  useAppShare();
   const feedback = useFeedbackStore();
   const inspectFood = useFoodSelectionStore((state) => state.inspectFood);
   const [query, setQuery] = useState("");
