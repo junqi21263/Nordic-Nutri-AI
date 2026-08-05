@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatAchievementUnlockedAt,
   getAchievementRequirement,
+  sortAchievementsForProfilePreview,
 } from "../src/features/coach/achievement-catalog";
 
 const srcRoot = resolve(import.meta.dirname, "../src");
@@ -16,12 +17,30 @@ describe("achievement detail interactions", () => {
     expect(getAchievementRequirement("蛋白达人")).toContain("90%");
   });
 
-  it("uses a bottom sheet detail instead of a separate route", () => {
+  it("uses the shared bottom-sheet detail instead of a separate route", () => {
     const page = readFileSync(resolve(srcRoot, "pages/achievements/index.tsx"), "utf8");
-    expect(page).toContain("BottomSheet");
-    expect(page).toContain("unlockedAt");
-    expect(page).toContain("解锁目标");
+    const detailSheet = readFileSync(resolve(srcRoot, "components/achievement-detail-sheet/index.tsx"), "utf8");
+    expect(page).toContain("AchievementDetailSheet");
+    expect(detailSheet).toContain("BottomSheet");
+    expect(detailSheet).toContain("unlockedAt");
+    expect(detailSheet).toContain("解锁目标");
     expect(page).toContain("达成时间");
     expect(page).toContain("achievement-center__filters");
+  });
+
+  it("puts the latest unlocked achievements before locked achievements in the profile preview", () => {
+    const result = sortAchievementsForProfilePreview([
+      { id: "locked", title: "早餐节奏", unlocked: false, progress: 33 },
+      { id: "older", title: "第一餐记录", unlocked: true, progress: 100, unlockedAt: "2026-08-01T09:00:00+08:00" },
+      { id: "latest", title: "蛋白达人", unlocked: true, progress: 100, unlockedAt: "2026-08-04T09:00:00+08:00" },
+    ]);
+
+    expect(result.map((achievement) => achievement.id)).toEqual(["latest", "older", "locked"]);
+  });
+
+  it("opens the same achievement detail sheet from the profile preview for locked and unlocked achievements", () => {
+    const page = readFileSync(resolve(srcRoot, "pages/profile/index.tsx"), "utf8");
+    expect(page).toContain("AchievementDetailSheet");
+    expect(page).toContain("onClick={() => setSelectedAchievement(achievement)}");
   });
 });

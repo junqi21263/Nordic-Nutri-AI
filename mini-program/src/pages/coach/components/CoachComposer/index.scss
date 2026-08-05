@@ -53,29 +53,6 @@
   min-width: 0;
   position: relative;
 }
-// Single-line hint centered in the field; typed text still wraps below.
-.coach-composer__placeholder {
-  align-items: center;
-  bottom: 0;
-  display: flex;
-  justify-content: center;
-  left: 0;
-  padding: 0 $space-12;
-  pointer-events: none;
-  position: absolute;
-  right: 0;
-  top: 0;
-  z-index: 1;
-}
-.coach-composer__placeholder-text {
-  color: $color-text-secondary;
-  font-size: $font-body;
-  max-width: 100%;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 // Textarea — rounded rectangle, wraps at the right edge and grows with content.
 .coach-composer__input {
   background: $color-surface;
@@ -92,6 +69,11 @@
   white-space: pre-wrap;
   width: 100%;
   word-break: break-word;
+}
+.coach-composer__input-placeholder {
+  color: $color-text-secondary;
+  font-size: $font-body;
+  line-height: $line-body;
 }
 // Send button — rounded rectangle, NOT circle.
 .coach-composer__send {

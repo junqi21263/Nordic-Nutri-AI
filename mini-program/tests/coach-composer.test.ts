@@ -46,17 +46,34 @@ describe("coach composer shape", () => {
     expect(componentStyles).toContain("word-break: break-word");
   });
 
-  it("keeps the empty-state hint on one line without wrapping", () => {
+  it("keeps the native empty-state hint left-aligned without a custom overlay", () => {
     const component = read("src/pages/coach/components/CoachComposer/index.tsx");
     const componentStyles = read("src/pages/coach/components/CoachComposer/index.scss");
 
-    expect(component).toContain("coach-composer__placeholder");
-    expect(component).toContain("coach-composer__placeholder-text");
-    expect(component).toContain("showPlaceholder");
-    expect(componentStyles).toContain(".coach-composer__placeholder");
-    expect(componentStyles).toContain("justify-content: center;");
-    expect(componentStyles).toContain("white-space: nowrap;");
-    expect(componentStyles).toContain("text-overflow: ellipsis;");
+    expect(component).toContain("placeholder={placeholder}");
+    expect(component).toContain('placeholderClass="coach-composer__input-placeholder"');
+    expect(component).not.toContain("placeholderStyle");
+    expect(componentStyles).toContain(".coach-composer__input-placeholder");
+    expect(componentStyles).toContain("font-size: $font-body;");
+    expect(component).not.toContain("coach-composer__placeholder");
+  });
+
+  it("uses the native textarea placeholder so IME composition cannot overlap a custom text layer", () => {
+    const component = read("src/pages/coach/components/CoachComposer/index.tsx");
+    const page = read("src/pages/coach/index.tsx");
+
+    expect(component).toContain("placeholder={placeholder}");
+    expect(component).not.toContain("coach-composer__placeholder");
+    expect(component).not.toContain("onFocusChange");
+    expect(page).not.toContain("coach-chat__composer-scrim");
+  });
+
+  it("keeps the coach safety disclaimer on one truncated line", () => {
+    const pageStyles = read("src/styles/page.scss");
+    const safetyNote = pageStyles.match(/\.coach-chat__safety-note\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+
+    expect(safetyNote).toContain("white-space: nowrap;");
+    expect(safetyNote).toContain("text-overflow: ellipsis;");
   });
 
   it("keeps camera and send buttons enlarged and vertically centered with the input", () => {
@@ -69,6 +86,12 @@ describe("coach composer shape", () => {
     expect(componentStyles).toContain("height: 52px;");
     expect(component).toContain('name="camera" size={24}');
     expect(component).toContain('name="arrow-up" size={24}');
+  });
+
+  it("disables the send button for both empty input and an externally reached daily limit", () => {
+    const component = read("src/pages/coach/components/CoachComposer/index.tsx");
+
+    expect(component).toContain('disabled || (!value.trim() && !selectedImagePath)');
   });
 });
 

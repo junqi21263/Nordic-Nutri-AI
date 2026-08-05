@@ -3,6 +3,7 @@ import Taro from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
+import { AchievementDetailSheet } from "../../components/achievement-detail-sheet";
 import { Avatar } from "../../components/avatar";
 import { Badge } from "../../components/badge";
 import { BottomSheet, bottomSheetExitDuration } from "../../components/bottom-sheet";
@@ -16,7 +17,8 @@ import {
   type ProductWeeklyReview,
 } from "../../api/insight-api";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
-import { createAchievements } from "../../features/coach/domain";
+import { sortAchievementsForProfilePreview } from "../../features/coach/achievement-catalog";
+import { createAchievements, type Achievement } from "../../features/coach/domain";
 import { refreshProductAchievements } from "../../features/coach/refresh-achievements";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { createLogoutFlow } from "../../auth/logout-flow";
@@ -44,7 +46,8 @@ export default function ProfilePage() {
     ? Math.min(100, Math.round((summary.consumed.protein / summary.protein) * 100))
     : 0;
   const unlockedAchievements = list.filter((achievement) => achievement.unlocked).length;
-  const [activeModal, setActiveModal] = useState<"privacy" | "feedback" | "about" | null>(null);
+  const [activeModal, setActiveModal] = useState<"feedback" | "about" | null>(null);
+  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState("");
   const [weeklyReview, setWeeklyReview] = useState<ProductWeeklyReview | null>(null);
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
@@ -55,13 +58,13 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    if (activeModal) {
+    if (activeModal || selectedAchievement) {
       setTabBarVisible(false);
       return undefined;
     }
     const timer = setTimeout(() => setTabBarVisible(true), bottomSheetExitDuration);
     return () => clearTimeout(timer);
-  }, [activeModal, setTabBarVisible]);
+  }, [activeModal, selectedAchievement, setTabBarVisible]);
 
   useEffect(() => () => setTabBarVisible(true), [setTabBarVisible]);
 
@@ -199,10 +202,11 @@ export default function ProfilePage() {
           </Text>
         </View>
         <View className="profile-rhythm__achievement-row">
-          {list.slice(0, 3).map((achievement) => (
+          {sortAchievementsForProfilePreview(list).slice(0, 3).map((achievement) => (
             <View
               className={`profile-rhythm__achievement ${achievement.unlocked ? "" : "profile-rhythm__achievement--locked"}`}
               key={achievement.id}
+              onClick={() => setSelectedAchievement(achievement)}
             >
               <NordicIcon name={getAchievementIcon(achievement)} size={22} ariaLabel={achievement.title} />
               <Text>{achievement.title}</Text>
@@ -234,11 +238,11 @@ export default function ProfilePage() {
               description="身体数据、饮食偏好与忌口"
             />
           </View>
-          <View onClick={() => setActiveModal("privacy")}>
+          <View onClick={() => openPage("/pages/privacy-policy/index")}>
             <ListItem
-              icon={<NordicIcon name="check" size={20} ariaLabel="隐私与数据" />}
-              title="隐私与数据"
-              description="同步范围与数据说明"
+              icon={<NordicIcon name="check" size={20} ariaLabel="隐私政策与免责声明" />}
+              title="隐私政策与免责声明"
+              description="数据说明与健康提示"
             />
           </View>
           <View onClick={() => setActiveModal("feedback")}>
@@ -272,41 +276,10 @@ export default function ProfilePage() {
         </View>
       </View>
 
-      <BottomSheet
-        open={activeModal === "privacy"}
-        className="profile-sheet profile-sheet--info"
-        onDismiss={() => setActiveModal(null)}
-      >
-        <View className="profile-sheet__content">
-          <View className="profile-sheet__header">
-            <Text className="profile-modal__title">隐私与数据</Text>
-          </View>
-          <Text className="profile-modal__lead">你的记录，应该由你清楚掌握。</Text>
-          <View className="profile-modal__notice">
-            <Text>
-              我们会同步账号资料、身体档案、营养目标、饮食记录，以及你主动提交的反馈内容。
-            </Text>
-            <Text>
-              数据经 HTTPS 加密连接写入 CloudBase；业务接口只接受当前微信登录会话，小程序不能直接读写数据库。
-            </Text>
-            <Text>
-              服务端按登录身份隔离数据，仅你本人可查看与修改自己的记录；其他用户无法访问你的饮食与目标信息。
-            </Text>
-            <Text>
-              你可随时在资料页更新档案与目标，或退出当前设备登录。如需删除账号相关数据，可选择注销账号并立即删除相关数据。
-            </Text>
-            <Text
-              className="profile-modal__link"
-              onClick={() => {
-                setActiveModal(null);
-                openPage("/pages/account-cancellation/index");
-              }}
-            >
-              注销 Nordic Nutri AI 产品账号 ›
-            </Text>
-          </View>
-        </View>
-      </BottomSheet>
+      <AchievementDetailSheet
+        achievement={selectedAchievement}
+        onDismiss={() => setSelectedAchievement(null)}
+      />
 
       <BottomSheet
         open={activeModal === "feedback"}

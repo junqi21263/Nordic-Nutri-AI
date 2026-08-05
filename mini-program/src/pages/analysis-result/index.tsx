@@ -226,6 +226,9 @@ export default function AnalysisResultPage() {
           actionLabel="查看饮食记录"
           onActionClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
         />
+        <Text className="nutrition-disclaimer">
+          营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
+        </Text>
 
         <View className="analysis-result-page__actions">
           <AppButton

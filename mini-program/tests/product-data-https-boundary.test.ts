@@ -40,7 +40,7 @@ describe("product data HTTPS boundary", () => {
   it("cancels a product account through the authenticated HTTPS API after two local confirmations", () => {
     const api = readFileSync(resolve(sourceRoot, "api/product-data-api.ts"), "utf8");
     const page = readFileSync(resolve(sourceRoot, "pages/account-cancellation/index.tsx"), "utf8");
-    const profile = readFileSync(resolve(sourceRoot, "pages/profile/index.tsx"), "utf8");
+    const policy = readFileSync(resolve(sourceRoot, "pages/privacy-policy/index.tsx"), "utf8");
     const authApi = readFileSync(resolve(sourceRoot, "api/auth-api.ts"), "utf8");
     const client = readFileSync(resolve(sourceRoot, "api/product-api-client.ts"), "utf8");
 
@@ -53,7 +53,7 @@ describe("product data HTTPS boundary", () => {
     expect(api).toContain("DELETE_MY_NORDIC_NUTRI_ACCOUNT");
     expect(page).toContain("/pages/auth-entry/index");
     expect(page).toContain("确认注销并删除数据");
-    expect(profile).toContain("/pages/account-cancellation/index");
+    expect(policy).toContain("/pages/account-cancellation/index");
     expect(authApi).toContain("syncOnboardingCompletedFromServer");
     expect(client).toContain("SESSION_USER_MISSING");
     expect(client).toContain("clearInvalidSession");

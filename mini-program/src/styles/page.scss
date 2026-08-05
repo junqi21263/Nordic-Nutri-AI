@@ -1160,6 +1160,36 @@
 .coach-chat__streaming-copy {
   color: $color-text-secondary;
 }
+.coach-chat__scroll-top-area {
+  bottom: calc($bottom-tab-height + $safe-area-bottom + 120px);
+  height: calc(100vh - #{$safe-area-top} - $bottom-tab-height - $safe-area-bottom - 120px);
+  left: 0;
+  pointer-events: none;
+  position: fixed;
+  right: 0;
+  top: calc($safe-area-top + 96px);
+  width: 100%;
+  z-index: 90;
+}
+.coach-chat__scroll-top {
+  background: rgba($color-warm-white, 0.78);
+  border: 1px solid rgba($color-forest-green, 0.48);
+  border-radius: $radius-full;
+  box-shadow: $shadow-card;
+  height: 72px;
+  pointer-events: auto;
+  width: 72px;
+}
+.coach-chat__scroll-top-content {
+  align-items: center;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+  width: 100%;
+}
+.coach-chat__scroll-top .nordic-icon {
+  opacity: 0.86;
+}
 .coach-chat__message--coach {
   align-self: flex-start;
   background: $color-surface;
@@ -5561,7 +5591,10 @@
   font-size: $font-overline;
   line-height: $line-caption;
   margin-bottom: $space-16;
+  overflow: hidden;
   text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .analysis-ingredient {
   align-items: center;
@@ -6540,4 +6573,77 @@
   color: $color-text-secondary;
   font-size: $font-overline;
   font-weight: $font-weight-medium;
+}
+
+.nutrition-disclaimer {
+  color: $color-text-secondary;
+  display: block;
+  font-size: $font-overline;
+  line-height: $line-caption;
+  text-align: center;
+}
+
+.privacy-policy-page {
+  display: flex;
+  flex-direction: column;
+  gap: $space-12;
+  padding: $space-16 $space-16 calc(#{$space-24} + env(safe-area-inset-bottom));
+}
+.privacy-policy-page__title {
+  color: $color-text-primary;
+  font-size: $font-h2;
+  font-weight: $font-weight-semibold;
+  line-height: $line-heading;
+}
+.privacy-policy-page__lead {
+  color: $color-text-secondary;
+  font-size: $font-body;
+  line-height: $line-body;
+}
+.privacy-policy-page__contact,
+.privacy-policy-page__section-content {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+  line-height: $line-caption;
+}
+.privacy-policy-page__section {
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
+  padding: $space-16;
+  background: $color-surface;
+  border: 1px solid $color-border;
+  border-radius: $radius-card;
+}
+.privacy-policy-page__section-title {
+  color: $color-text-primary;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+  line-height: $line-body;
+}
+.privacy-policy-page__cancellation {
+  align-items: center;
+  background: $color-soft-beige;
+  border: 1px solid $color-border;
+  border-radius: $radius-card;
+  color: $color-text-primary;
+  display: flex;
+  gap: $space-12;
+  justify-content: space-between;
+  padding: $space-16;
+}
+.privacy-policy-page__cancellation > View {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: $space-4;
+}
+.privacy-policy-page__cancellation > View > Text:first-child {
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+}
+.privacy-policy-page__cancellation > View > Text:last-child {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+  line-height: $line-caption;
 }

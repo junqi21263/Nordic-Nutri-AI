@@ -679,6 +679,31 @@ test("streams coach events only for the authenticated product user", async () =>
   });
 });
 
+test("keeps the coach daily-limit code in streaming responses", async () => {
+  const server = createHttpServer({
+    service: {
+      verifySession: () => ({ sub: "user-1" }),
+      coach: {
+        streamMessage: async function* () {
+          const error = new Error("因个人开发成本有限，当前每人每日限制聊20句");
+          error.code = "COACH_DAILY_LIMIT_REACHED";
+          throw error;
+        },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/coach-answer/stream`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({ prompt: "晚餐怎么补蛋白？" }),
+    });
+    const event = JSON.parse((await response.text()).trim());
+    assert.equal(event.code, "COACH_DAILY_LIMIT_REACHED");
+  });
+});
+
 test("persists feedback only for the signed-in user", async () => {
   const calls = [];
   const server = createHttpServer({

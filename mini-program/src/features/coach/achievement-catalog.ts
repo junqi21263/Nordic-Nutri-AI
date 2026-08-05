@@ -1,3 +1,5 @@
+import type { Achievement } from "./domain";
+
 /** Shared copy for achievement detail sheets (aligned with server definitions). */
 export const ACHIEVEMENT_REQUIREMENTS: Record<string, string> = {
   第一餐记录: "成功记录任意 1 餐到云端。",
@@ -47,4 +49,27 @@ export function formatAchievementUnlockedAt(value?: string | null) {
     return `${y}-${m}-${d} ${hh}:${mm} 达成`;
   }
   return `${y}-${m}-${d} 达成`;
+}
+
+function unlockTimestamp(achievement: Achievement) {
+  if (!achievement.unlockedAt) return 0;
+  const timestamp = new Date(achievement.unlockedAt).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+/** Profile only shows a small preview: surface newly earned achievements before progress cards. */
+export function sortAchievementsForProfilePreview(achievements: Achievement[]) {
+  return achievements
+    .map((achievement, index) => ({ achievement, index }))
+    .sort((left, right) => {
+      if (left.achievement.unlocked !== right.achievement.unlocked) {
+        return left.achievement.unlocked ? -1 : 1;
+      }
+      if (left.achievement.unlocked) {
+        const timestampDifference = unlockTimestamp(right.achievement) - unlockTimestamp(left.achievement);
+        if (timestampDifference) return timestampDifference;
+      }
+      return left.index - right.index;
+    })
+    .map(({ achievement }) => achievement);
 }

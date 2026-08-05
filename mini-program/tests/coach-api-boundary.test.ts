@@ -13,6 +13,8 @@ describe("persisted coach boundary", () => {
     expect(api).toContain("getProductCoachBrief");
     expect(api).toContain("ProductCoachReply");
     expect(api).toContain("ProductCoachBrief");
+    expect(api).toContain("ProductCoachDailyUsage");
+    expect(api).toContain("dailyUsage: ProductCoachDailyUsage");
     expect(api).toContain("serverTime: string");
     expect(api).toContain("heroPrompt: string");
     expect(api).toContain("ProductCoachDailyTip");
@@ -34,6 +36,8 @@ describe("persisted coach boundary", () => {
     expect(page).toContain("getProductCoachMessages");
     expect(page).toContain("sendProductCoachMessage");
     expect(page).toContain("streamProductCoachMessage");
+    expect(page).toContain("COACH_DAILY_LIMIT_REACHED");
+    expect(page).toContain("当前每人每日限制聊20句");
     expect(page).toContain("getProductCoachBrief");
     expect(page).toContain("refreshCoachBrief");
     expect(page).toContain("useDidShow");

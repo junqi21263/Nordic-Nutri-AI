@@ -7,9 +7,12 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const medicalRiskPattern = /疾病|诊断|治疗|药物|吃药|处方|孕产|怀孕|哺乳|未成年|进食障碍|厌食|暴食/i;
 const urgentRiskPattern = /自杀|昏厥|胸痛|呼吸困难|严重过敏|急诊|急救/i;
-const nutritionScopePattern = /营养|饮食|食谱|食物|吃|喝|餐|蛋白|热量|卡路里|碳水|脂肪|纤维|蔬菜|水果|主食|食材|加餐|早餐|午餐|晚餐|增肌|减脂|体重|饱腹|恢复|训练|运动|今日进度/i;
+const nutritionScopePattern = /营养|营养素|营养成分|营养价值|健康成分|好处|益处|饮食|食谱|食物|吃|喝|餐|蛋白|热量|卡路里|碳水|脂肪|纤维|膳食纤维|维生素|矿物质|微量元素|抗氧化|蔬菜|水果|主食|食材|加餐|早餐|午餐|晚餐|增肌|减脂|体重|饱腹|恢复|训练|运动|今日进度/i;
+const foodNutrientQuestionPattern = /富含|含有|营养素|营养成分|营养价值|健康成分|好处|益处|维生素|矿物质|微量元素|抗氧化|膳食纤维/i;
 const unsafeStreamTextPattern = /诊断|治疗|处方|药物|用药|孕期|怀孕|哺乳|厌食|暴食/i;
 const streamPresentationPattern = /```|[`*#]|^\s*(?:回复|答复|回答|建议|说明)\s*[:：]/m;
+const DAILY_MESSAGE_LIMIT = 20;
+const DAILY_LIMIT_MESSAGE = "因个人开发成本有限，当前每人每日限制聊20句";
 
 class PublicCoachDataError extends Error {
   constructor(code, message = "教练消息无效") {
@@ -131,6 +134,19 @@ function safetyForPrompt(prompt) {
 
 function isNutritionQuestion(prompt) {
   return nutritionScopePattern.test(prompt);
+}
+
+function isNutritionFollowUp(prompt, history) {
+  const text = typeof prompt === "string" ? prompt.trim() : "";
+  if (!text || text.length > 20 || !/(?:呢|怎么样|如何|可以吗)[？?]?$/.test(text)) return false;
+  const priorUserMessage = [...(Array.isArray(history) ? history : [])]
+    .reverse()
+    .find((message) => message?.role === "user" && typeof message.content === "string");
+  return Boolean(priorUserMessage && isNutritionQuestion(priorUserMessage.content));
+}
+
+function isFoodNutrientQuestion(prompt) {
+  return foodNutrientQuestionPattern.test(prompt);
 }
 
 function isMissingAppUserError(error) {
@@ -270,6 +286,16 @@ function createRuleReply(prompt, context) {
     };
   }
 
+  if (isFoodNutrientQuestion(prompt)) {
+    return {
+      priority: "regularity",
+      headline: "可以从营养成分来判断",
+      actions: [{ label: "具体食物", detail: "告诉我食物名称，我可以说明它常见的营养素、食物成分和日常饮食价值。" }],
+      rationale: "食物成分会受品种、份量和烹饪方式影响；相关说明不等同于疾病预防或治疗建议。",
+      safety: "none",
+    };
+  }
+
   const remaining = context?.daily?.remaining ?? {};
   const protein = safeNumber(remaining.protein);
   const calories = safeNumber(remaining.calories);
@@ -364,6 +390,34 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
 
   const contextInflight = new Map();
 
+  function normalizeDailyUsage(value) {
+    const used = Math.min(DAILY_MESSAGE_LIMIT, safeNumber(value?.used_count ?? value?.usedCount));
+    return {
+      limit: DAILY_MESSAGE_LIMIT,
+      used,
+      remaining: Math.max(0, DAILY_MESSAGE_LIMIT - used),
+    };
+  }
+
+  async function getDailyUsage(userId) {
+    if (typeof db.rpc !== "function") throw new Error("Coach daily usage RPC is unavailable");
+    const result = await db.rpc("get_coach_daily_message_usage", { p_user_id: userId });
+    if (result?.error) throw new Error("Coach daily usage read failed");
+    return normalizeDailyUsage(Array.isArray(result?.data) ? result.data[0] : result?.data);
+  }
+
+  async function consumeDailyMessage(userId) {
+    if (typeof db.rpc !== "function") throw new Error("Coach daily usage RPC is unavailable");
+    const result = await db.rpc("consume_coach_daily_message", {
+      p_user_id: userId,
+      p_limit: DAILY_MESSAGE_LIMIT,
+    });
+    if (result?.error) throw new Error("Coach daily usage consume failed");
+    const record = Array.isArray(result?.data) ? result.data[0] : result?.data;
+    if (!record?.allowed) throw new PublicCoachDataError("COACH_DAILY_LIMIT_REACHED", DAILY_LIMIT_MESSAGE);
+    return normalizeDailyUsage(record);
+  }
+
   async function getConversation(userId) {
     const current = await db.from("coach_conversations").select("id").eq("user_id", userId).is("archived_at", null)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -377,9 +431,9 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
   async function getMessages(userId, limit = 30) {
     const conversationId = await getConversation(userId);
     const result = await db.from("coach_messages").select("*").eq("user_id", userId).eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true }).limit(Math.min(50, Math.max(1, limit)));
+      .order("created_at", { ascending: false }).limit(Math.min(50, Math.max(1, limit)));
     if (result.error) throw new Error("Coach messages read failed");
-    return (result.data ?? []).map(mapMessage);
+    return (result.data ?? []).reverse().map(mapMessage);
   }
 
   async function restartConversation(userId) {
@@ -441,7 +495,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     return userMessage.data;
   }
 
-  async function persistResponse({ userId, conversationId, userMessage, request, context, reply, source, content }) {
+  async function persistResponse({ userId, conversationId, userMessage, request, context, reply, source, content, dailyUsage }) {
     const persistedReply = addReplyMetadata(reply, source, model);
     const assistantMessage = await db.from("coach_messages").insert({
       user_id: userId,
@@ -455,21 +509,22 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       model: source === "deepseek" ? model : "rule_v2",
     }).select("*").single();
     if (assistantMessage.error || !assistantMessage.data) throw new Error("Coach answer save failed");
-    return { conversationId, messages: [mapMessage(userMessage), mapMessage(assistantMessage.data)], reply: persistedReply };
+    return { conversationId, messages: [mapMessage(userMessage), mapMessage(assistantMessage.data)], reply: persistedReply, dailyUsage };
   }
 
   async function sendMessage(userId, input) {
     const request = normalizeInput(input);
     const prior = await getPriorReply(userId, request.clientRequestId);
-    if (prior) return { conversationId: prior.conversationId, messages: await getMessages(userId), reply: prior.reply };
+    if (prior) return { conversationId: prior.conversationId, messages: await getMessages(userId), reply: prior.reply, dailyUsage: await getDailyUsage(userId) };
 
+    const dailyUsage = await consumeDailyMessage(userId);
     const conversationId = await getConversation(userId);
-    const userMessage = await createUserMessage(userId, conversationId, request);
-
     const [context, history] = await Promise.all([buildContext(userId, request.date), getMessages(userId, 10)]);
+    const userMessage = await createUserMessage(userId, conversationId, request);
+    const questionInScope = isNutritionQuestion(request.prompt) || isNutritionFollowUp(request.prompt, history);
     let source = "rule_v2";
     let reply = createRuleReply(request.prompt, context);
-    if (reply.safety === "none" && isNutritionQuestion(request.prompt) && typeof answer === "function") {
+    if (reply.safety === "none" && questionInScope && typeof answer === "function") {
       try {
         reply = await answer({ prompt: request.prompt, context, history });
         source = "deepseek";
@@ -477,23 +532,25 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
         // The deterministic reply remains available if the optional provider is unavailable.
       }
     }
-    return persistResponse({ userId, conversationId, userMessage, request, context, reply, source });
+    return persistResponse({ userId, conversationId, userMessage, request, context, reply, source, dailyUsage });
   }
 
   async function* streamMessage(userId, input) {
     const request = normalizeInput(input);
     const prior = await getPriorReply(userId, request.clientRequestId);
     if (prior) {
-      yield { type: "complete", conversationId: prior.conversationId, messages: await getMessages(userId), reply: prior.reply };
+      yield { type: "complete", conversationId: prior.conversationId, messages: await getMessages(userId), reply: prior.reply, dailyUsage: await getDailyUsage(userId) };
       return;
     }
 
+    const dailyUsage = await consumeDailyMessage(userId);
     const conversationId = await getConversation(userId);
-    const userMessage = await createUserMessage(userId, conversationId, request);
     const [context, history] = await Promise.all([buildContext(userId, request.date), getMessages(userId, 10)]);
+    const userMessage = await createUserMessage(userId, conversationId, request);
     const fallback = createRuleReply(request.prompt, context);
-    if (fallback.safety !== "none" || !isNutritionQuestion(request.prompt) || typeof streamAnswer !== "function") {
-      yield { type: "complete", ...await persistResponse({ userId, conversationId, userMessage, request, context, reply: fallback, source: "rule_v2" }) };
+    const questionInScope = isNutritionQuestion(request.prompt) || isNutritionFollowUp(request.prompt, history);
+    if (fallback.safety !== "none" || !questionInScope || typeof streamAnswer !== "function") {
+      yield { type: "complete", ...await persistResponse({ userId, conversationId, userMessage, request, context, reply: fallback, source: "rule_v2", dailyUsage }) };
       return;
     }
 
@@ -524,17 +581,18 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
         reply: fallback,
         source: "deepseek",
         content,
+        dailyUsage,
       });
       yield { type: "complete", ...result };
     } catch {
-      yield { type: "complete", ...await persistResponse({ userId, conversationId, userMessage, request, context, reply: fallback, source: "rule_v2" }) };
+      yield { type: "complete", ...await persistResponse({ userId, conversationId, userMessage, request, context, reply: fallback, source: "rule_v2", dailyUsage }) };
     }
   }
 
   async function getBrief(userId, date) {
     const safeDate = normalizeDate(date);
     const context = await buildContext(userId, safeDate);
-    const priority = priorityForContext(context);
+    const [priority, dailyUsage] = [priorityForContext(context), await getDailyUsage(userId)];
     const fallbackPrompts = quickPromptsForContext(context);
     // Keep brief on the rule-based prompt pack so coach entry stays interactive.
     // LLM generation remains reserved for daily tips and chat replies.
@@ -546,6 +604,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       completion: context.daily.completion,
       heroPrompt: fallbackPrompts[0],
       quickPrompts: fallbackPrompts.slice(0, 4),
+      dailyUsage,
     };
   }
 
@@ -632,6 +691,8 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
 }
 
 module.exports = {
+  DAILY_LIMIT_MESSAGE,
+  DAILY_MESSAGE_LIMIT,
   PublicCoachDataError,
   createCoachDataService,
   createContext,

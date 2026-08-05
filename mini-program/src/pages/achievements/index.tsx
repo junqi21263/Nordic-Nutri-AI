@@ -1,10 +1,9 @@
 import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useMemo, useState } from "react";
-import { BottomSheet } from "../../components/bottom-sheet";
+import { AchievementDetailSheet } from "../../components/achievement-detail-sheet";
 import { NordicIcon } from "../../components/nordic-icon";
 import {
-  formatAchievementUnlockedAt,
   getAchievementRequirement,
 } from "../../features/coach/achievement-catalog";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
@@ -55,10 +54,6 @@ export default function AchievementsPage() {
   const openDetail = (achievement: Achievement) => {
     setSelected(enrichAchievement(achievement));
   };
-
-  const metricLabel = selected
-    ? `${selected.metric ?? Math.round(((selected.progress || 0) / 100) * (selected.target || 100))}/${selected.target ?? "—"}${selected.unit || ""}`
-    : "";
 
   return (
     <PageLayout
@@ -147,56 +142,7 @@ export default function AchievementsPage() {
         </View>
       </View>
 
-      <BottomSheet open={Boolean(selected)} onDismiss={() => setSelected(null)} className="achievement-detail-sheet">
-        {selected ? (
-          <View className="achievement-detail">
-            <View className={`achievement-detail__badge ${selected.unlocked ? "" : "achievement-detail__badge--locked"}`}>
-              <NordicIcon name={getAchievementIcon(selected)} size={36} ariaLabel={selected.title} />
-            </View>
-            <Text className="achievement-detail__title">{selected.title}</Text>
-            <Text className={`achievement-detail__state ${selected.unlocked ? "achievement-detail__state--done" : ""}`}>
-              {selected.available === false
-                ? "即将上线"
-                : selected.unlocked
-                  ? "已解锁"
-                  : "未解锁"}
-            </Text>
-
-            {selected.unlocked ? (
-              <View className="achievement-detail__card">
-                <Text className="achievement-detail__label">达成时间</Text>
-                <Text className="achievement-detail__value">
-                  {formatAchievementUnlockedAt(selected.unlockedAt)}
-                </Text>
-              </View>
-            ) : (
-              <View className="achievement-detail__card">
-                <Text className="achievement-detail__label">解锁目标</Text>
-                <Text className="achievement-detail__value">
-                  {selected.requirement || getAchievementRequirement(selected.title)}
-                </Text>
-              </View>
-            )}
-
-            {selected.available !== false ? (
-              <View className="achievement-detail__card">
-                <Text className="achievement-detail__label">当前进度</Text>
-                <Text className="achievement-detail__value">{metricLabel}</Text>
-                <View className="achievement-detail__bar">
-                  <View
-                    className="achievement-detail__bar-fill"
-                    style={{ width: `${Math.min(100, selected.progress || 0)}%` }}
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            <Text className="achievement-detail__hint" onClick={() => setSelected(null)}>
-              轻触空白处关闭
-            </Text>
-          </View>
-        ) : null}
-      </BottomSheet>
+      <AchievementDetailSheet achievement={selected} onDismiss={() => setSelected(null)} />
     </PageLayout>
   );
 }

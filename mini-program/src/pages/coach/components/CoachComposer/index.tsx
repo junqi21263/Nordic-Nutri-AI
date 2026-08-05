@@ -1,4 +1,4 @@
-import { Image, Text, Textarea, View } from "@tarojs/components";
+import { Image, Textarea, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { NordicIcon } from "../../../../components/nordic-icon";
@@ -27,7 +27,6 @@ export function CoachComposer({
 }: CoachComposerProps) {
   const layout = useSystemLayout();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const showPlaceholder = !value;
 
   useEffect(() => {
     const handler = (res: { height: number }) => {
@@ -67,14 +66,11 @@ export function CoachComposer({
         <NordicIcon name="camera" size={24} ariaLabel="选择图片" />
       </View>
       <View className="coach-composer__field">
-        {showPlaceholder ? (
-          <View className="coach-composer__placeholder">
-            <Text className="coach-composer__placeholder-text">{placeholder}</Text>
-          </View>
-        ) : null}
         <Textarea
           className="coach-composer__input"
           value={value}
+          placeholder={placeholder}
+          placeholderClass="coach-composer__input-placeholder"
           maxlength={1000}
           autoHeight
           showConfirmBar={false}
@@ -86,7 +82,7 @@ export function CoachComposer({
         />
       </View>
       <View
-        className={`coach-composer__send ${!value.trim() && !selectedImagePath ? "coach-composer__send--disabled" : ""}`}
+        className={`coach-composer__send ${disabled || (!value.trim() && !selectedImagePath) ? "coach-composer__send--disabled" : ""}`}
         ariaLabel="发送消息"
         onClick={() => {
           if (!disabled && (value.trim() || selectedImagePath)) onSend();

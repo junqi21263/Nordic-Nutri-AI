@@ -96,6 +96,41 @@ describe("local coach and profile", () => {
     expect(styles).toContain(".coach-chat__safety-note {\n  color: $color-text-secondary;\n  font-size: $font-overline;\n  line-height: $line-caption;\n  margin-bottom: $space-16;");
   });
 
+  it("scrolls to the page bottom after a completed coach reply", () => {
+    const source = coachPageSource();
+
+    expect(source).toContain("setCompletedReplyVersion");
+    expect(source).toContain("Taro.pageScrollTo({ scrollTop: 999999, duration: 300 })");
+  });
+
+  it("keeps a draggable, remembered translucent control for returning the coach page to the top", () => {
+    const source = coachPageSource();
+    const styles = readFileSync(resolve(import.meta.dirname, "../src/styles/page.scss"), "utf8");
+
+    expect(source).toContain("MovableArea");
+    expect(source).toContain("MovableView");
+    expect(source).toContain('className="coach-chat__scroll-top"');
+    expect(source).toContain('ariaLabel="回到顶部"');
+    expect(source).toContain("Taro.pageScrollTo({ scrollTop: 0, duration: 300 })");
+    expect(source).toContain('name="arrow-up" size={22}');
+    expect(source).toContain("Taro.getStorageSync(scrollTopPositionStorageKey)");
+    expect(source).toContain("Taro.setStorageSync(scrollTopPositionStorageKey");
+    expect(source).toContain("function getSnappedScrollTopPosition");
+    expect(source).toContain("scrollTopControlSize / 2");
+    expect(source).toContain("const snappedPosition = getSnappedScrollTopPosition");
+    expect(source).toContain("Taro.setStorageSync(scrollTopPositionStorageKey, snappedPosition)");
+    expect(source).toContain("animation={scrollTopSnapAnimating}");
+    expect(source).toContain("onChange={handleScrollTopPositionChange}");
+    expect(source).toContain("onTouchEnd={handleScrollTopTouchEnd}");
+    expect(source).toContain('direction="all"');
+    expect(styles).toContain(".coach-chat__scroll-top");
+    expect(styles).toContain(".coach-chat__scroll-top-area");
+    expect(styles).toContain("height: calc(100vh - #{$safe-area-top} - $bottom-tab-height - $safe-area-bottom - 120px);");
+    expect(styles).toContain("width: 100%;");
+    expect(styles).toContain("background: rgba($color-warm-white, 0.78);");
+    expect(styles).toContain("border: 1px solid rgba($color-forest-green, 0.48);");
+  });
+
   it("keeps progress, quick replies, composer, and tab bar in separate vertical lanes", () => {
     const source = coachPageSource();
     const composer = readFileSync(
@@ -213,7 +248,9 @@ describe("local coach and profile", () => {
     expect(source).not.toContain("formatDietPreferencesSummary");
     expect(source).not.toContain("nutritionProfileSummary");
     expect(source).toContain("/pages/goal-adjust/index");
-    expect(source).toContain('title="隐私与数据"');
+    expect(appConfig).toContain("pages/privacy-policy/index");
+    expect(source).toContain('title="隐私政策与免责声明"');
+    expect(source).toContain("/pages/privacy-policy/index");
     expect(source).toContain('title="反馈与帮助"');
     expect(source).toContain('title="关于我们"');
     expect(source).not.toContain('title="主题"');
@@ -222,15 +259,19 @@ describe("local coach and profile", () => {
     expect(source).not.toContain("导出本地数据");
   });
 
-  it("keeps privacy, feedback and about as complete cloud-aware modals", () => {
+  it("routes privacy to its policy page and keeps feedback and about as modals", () => {
     const source = readFileSync(
       resolve(import.meta.dirname, "../src/pages/profile/index.tsx"),
       "utf8",
     );
 
-    expect(source).toContain('activeModal === "privacy"');
-    expect(source).toContain("写入 CloudBase");
-    expect(source).toContain("如需删除账号相关数据");
+    const policy = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/privacy-policy/index.tsx"),
+      "utf8",
+    );
+    expect(source).not.toContain('activeModal === "privacy"');
+    expect(policy).toContain("写入 CloudBase");
+    expect(policy).toContain("注销 Nordic Nutri AI 产品账号");
     expect(source).toContain('activeModal === "feedback"');
     expect(source).toContain("提交反馈");
     expect(source).toContain('activeModal === "about"');

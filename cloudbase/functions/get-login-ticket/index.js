@@ -1660,8 +1660,10 @@ function createHttpServer({ service }) {
             for await (const event of service.coach.streamMessage(session.sub, body)) {
               res.write(`${JSON.stringify(event)}\n`);
             }
-          } catch {
-            res.write(`${JSON.stringify({ type: "error", code: "COACH_SERVICE_UNAVAILABLE" })}\n`);
+          } catch (error) {
+            const code = error instanceof PublicCoachDataError || typeof error?.code === "string" ? error.code : "COACH_SERVICE_UNAVAILABLE";
+            const message = error instanceof PublicCoachDataError ? error.message : undefined;
+            res.write(`${JSON.stringify({ type: "error", code, ...(message ? { message } : {}) })}\n`);
           }
           res.end();
           return;
@@ -1669,7 +1671,7 @@ function createHttpServer({ service }) {
         return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       } catch (error) {
         if (error instanceof PublicCoachDataError) {
-          const status = error.code === "SESSION_USER_MISSING" ? 401 : 400;
+          const status = error.code === "SESSION_USER_MISSING" ? 401 : error.code === "COACH_DAILY_LIMIT_REACHED" ? 429 : 400;
           return sendJson(res, status, { code: error.code, message: error.message });
         }
         console.error("[coach] failed:", error?.message || error);

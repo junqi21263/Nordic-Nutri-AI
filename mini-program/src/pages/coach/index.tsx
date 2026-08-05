@@ -1,6 +1,6 @@
-import { Image, Text, View } from "@tarojs/components";
+import { Image, MovableArea, MovableView, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getProductCoachMessages,
   getProductCoachBrief,
@@ -9,6 +9,7 @@ import {
   sendProductCoachMessage,
   streamProductCoachMessage,
   type ProductCoachDailyTip,
+  type ProductCoachDailyUsage,
   type ProductCoachMessage,
 } from "../../api/coach-api";
 import { analyzeProductImage } from "../../api/vision-api";
@@ -39,6 +40,11 @@ type ChatMessage = {
 
 const defaultHeroPrompt = "下一餐怎么补充蛋白质？";
 const defaultQuickPrompts = ["我想补记今天的一餐", "这餐怎么记录更准确？", "今天还差哪些营养？", "下一餐怎么搭配？"];
+const dailyLimitMessage = "因个人开发成本有限，当前每人每日限制聊20句";
+const defaultDailyUsage: ProductCoachDailyUsage = { limit: 20, used: 0, remaining: 20 };
+const scrollTopPositionStorageKey = "nordic.coach.scrollTopPosition";
+const scrollTopControlSize = 36;
+const scrollTopControlEdgeInset = 12;
 const defaultDailyTip: ProductCoachDailyTip = {
   type: "nutrition_tip",
   headline: "下一餐加一份深色蔬菜",
@@ -47,6 +53,49 @@ const defaultDailyTip: ProductCoachDailyTip = {
   source: "rule_v2",
   model: null,
 };
+
+type ScrollTopPosition = { x: number; y: number };
+
+function getDefaultScrollTopPosition(): ScrollTopPosition {
+  try {
+    const { windowHeight, windowWidth } = Taro.getWindowInfo();
+    return {
+      x: Math.max(0, windowWidth - scrollTopControlSize - scrollTopControlEdgeInset),
+      y: Math.max(0, Math.round((windowHeight - scrollTopControlSize) * 0.32)),
+    };
+  } catch {
+    return { x: 327, y: 250 };
+  }
+}
+
+function getStoredScrollTopPosition(): ScrollTopPosition {
+  const fallback = getDefaultScrollTopPosition();
+  try {
+    const stored = Taro.getStorageSync(scrollTopPositionStorageKey) as Partial<ScrollTopPosition> | null;
+    if (typeof stored?.x === "number" && typeof stored?.y === "number") {
+      return { x: Math.max(0, stored.x), y: Math.max(0, stored.y) };
+    }
+  } catch {
+    // The default position remains available when local storage is unavailable.
+  }
+  return fallback;
+}
+
+function getSnappedScrollTopPosition(position: ScrollTopPosition): ScrollTopPosition {
+  try {
+    const { windowWidth } = Taro.getWindowInfo();
+    const snapLeft = position.x + scrollTopControlSize / 2 < windowWidth / 2;
+    return {
+      x: snapLeft
+        ? scrollTopControlEdgeInset
+        : Math.max(0, windowWidth - scrollTopControlSize - scrollTopControlEdgeInset),
+      y: position.y,
+    };
+  } catch {
+    return position;
+  }
+}
+
 export default function CoachPage() {
   useAppShare();
   const meals = useMealStore();
@@ -65,6 +114,12 @@ export default function CoachPage() {
   const [dailyTip, setDailyTip] = useState<ProductCoachDailyTip | null>(null);
   const [dailyTipLoading, setDailyTipLoading] = useState(false);
   const [selectedImagePath, setSelectedImagePath] = useState<string | null>(null);
+  const [dailyUsage, setDailyUsage] = useState<ProductCoachDailyUsage>(defaultDailyUsage);
+  const [completedReplyVersion, setCompletedReplyVersion] = useState(0);
+  const [scrollTopPosition, setScrollTopPosition] = useState<ScrollTopPosition>(getStoredScrollTopPosition);
+  const [scrollTopSnapAnimating, setScrollTopSnapAnimating] = useState(false);
+  const scrollTopPositionRef = useRef(scrollTopPosition);
+  const scrollTopDraggedRef = useRef(false);
   const [expandedSections, setExpandedSections] = useState({
     suggestion: true,
     progress: true,
@@ -82,7 +137,7 @@ export default function CoachPage() {
   ]);
 
   const mergeServerMessages = (
-    result: { messages: ProductCoachMessage[] },
+    result: { messages: ProductCoachMessage[]; dailyUsage: ProductCoachDailyUsage },
     temporaryIds: string[],
     attachment?: Pick<ChatMessage, "imagePath" | "imageLabel">,
   ) => {
@@ -101,7 +156,17 @@ export default function CoachPage() {
           })),
       ];
     });
+    setDailyUsage(result.dailyUsage);
+    setCompletedReplyVersion((version) => version + 1);
   };
+
+  useEffect(() => {
+    if (!completedReplyVersion) return undefined;
+    const timer = setTimeout(() => {
+      void Taro.pageScrollTo({ scrollTop: 999999, duration: 300 });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [completedReplyVersion]);
 
   const refreshCoachBrief = async () => {
     try {
@@ -109,6 +174,7 @@ export default function CoachPage() {
       if (brief.quickPrompts.length) setQuickPrompts(brief.quickPrompts);
       if (brief.heroPrompt) setHeroPrompt(brief.heroPrompt);
       setServerTime(brief.serverTime);
+      setDailyUsage(brief.dailyUsage);
     } catch {
       // A previous server brief or the local defaults remain usable offline.
     }
@@ -182,6 +248,10 @@ export default function CoachPage() {
   const sendMessage = async (value = draft, imagePath = selectedImagePath) => {
     const userPrompt = value.trim();
     if ((!userPrompt && !imagePath) || sending) return;
+    if (dailyUsage.remaining <= 0) {
+      feedback.show({ message: dailyLimitMessage, tone: "error" });
+      return;
+    }
     let content = userPrompt;
     let attachment: Pick<ChatMessage, "imagePath" | "imageLabel"> | undefined;
     if (imagePath) {
@@ -243,15 +313,26 @@ export default function CoachPage() {
         requestId,
       );
       if (!completed) throw new Error("流式回复未完成");
-    } catch {
+    } catch (streamError) {
+      if (streamError instanceof Error && streamError.name === "COACH_DAILY_LIMIT_REACHED") {
+        setMessages((current) => current.filter((message) => message.id !== optimisticId && message.id !== streamingId));
+        setDailyUsage((current) => ({ ...current, used: current.limit, remaining: 0 }));
+        feedback.show({ message: dailyLimitMessage, tone: "error" });
+        return;
+      }
       try {
         const result = await sendProductCoachMessage(content, date, requestId);
         mergeServerMessages(result, [optimisticId, streamingId], attachment);
-      } catch {
+      } catch (sendError) {
         setMessages((current) =>
           current.filter((message) => message.id !== optimisticId && message.id !== streamingId),
         );
-        feedback.show({ message: "营养教练暂时无法回答，请稍后重试", tone: "error" });
+        if (sendError instanceof Error && sendError.name === "COACH_DAILY_LIMIT_REACHED") {
+          setDailyUsage((current) => ({ ...current, used: current.limit, remaining: 0 }));
+          feedback.show({ message: dailyLimitMessage, tone: "error" });
+        } else {
+          feedback.show({ message: "营养教练暂时无法回答，请稍后重试", tone: "error" });
+        }
       }
     } finally {
       setSending(false);
@@ -282,6 +363,38 @@ export default function CoachPage() {
             : "无法选择图片，请检查相册或相机权限",
         tone: "error",
       });
+    }
+  };
+
+  const scrollToCoachTop = () => {
+    void Taro.pageScrollTo({ scrollTop: 0, duration: 300 });
+  };
+
+  const handleScrollTopPositionChange = (event: {
+    detail: ScrollTopPosition & { source: "touch" | "touch-out-of-bounds" | "out-of-bounds" | "friction" | "" };
+  }) => {
+    if (event.detail.source !== "touch") return;
+    const nextPosition = { x: event.detail.x, y: event.detail.y };
+    setScrollTopSnapAnimating(false);
+    scrollTopDraggedRef.current = true;
+    scrollTopPositionRef.current = nextPosition;
+    setScrollTopPosition(nextPosition);
+  };
+
+  const handleScrollTopTouchEnd = () => {
+    if (!scrollTopDraggedRef.current) {
+      scrollToCoachTop();
+      return;
+    }
+    scrollTopDraggedRef.current = false;
+    const snappedPosition = getSnappedScrollTopPosition(scrollTopPositionRef.current);
+    setScrollTopSnapAnimating(true);
+    scrollTopPositionRef.current = snappedPosition;
+    setScrollTopPosition(snappedPosition);
+    try {
+      Taro.setStorageSync(scrollTopPositionStorageKey, snappedPosition);
+    } catch {
+      // The new position is still retained for the current page session.
     }
   };
 
@@ -501,14 +614,30 @@ export default function CoachPage() {
           </View>
 
           <Text className="coach-chat__safety-note">
-            营养建议仅供日常饮食参考，不替代医疗意见。
+            营养建议仅供日常饮食参考；营养识别与建议不构成医疗诊断或治疗建议。
           </Text>
         </View>
       </View>
 
+      <MovableArea className="coach-chat__scroll-top-area">
+        <MovableView
+          className="coach-chat__scroll-top"
+          direction="all"
+          x={scrollTopPosition.x}
+          y={scrollTopPosition.y}
+          animation={scrollTopSnapAnimating}
+          onChange={handleScrollTopPositionChange}
+          onTouchEnd={handleScrollTopTouchEnd}
+        >
+          <View className="coach-chat__scroll-top-content" ariaLabel="回到顶部">
+            <NordicIcon name="arrow-up" size={22} ariaLabel="回到顶部" />
+          </View>
+        </MovableView>
+      </MovableArea>
+
       <CoachComposer
         value={draft}
-        disabled={sending}
+        disabled={sending || dailyUsage.remaining <= 0}
         selectedImagePath={selectedImagePath}
         onInput={setDraft}
         onSend={() => void sendMessage()}

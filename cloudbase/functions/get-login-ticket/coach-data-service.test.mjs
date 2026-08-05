@@ -23,12 +23,25 @@ const validReply = {
 
 function createDb() {
   const inserts = [];
+  const usage = new Map();
   const rows = {
     coach_conversations: [{ id: "conversation-1", user_id: "user-1", archived_at: null }],
     coach_messages: [{ id: "old-message", user_id: "user-1", conversation_id: "conversation-1", role: "assistant", content: "历史消息", created_at: "2026-07-20T10:00:00.000Z" }],
     coach_daily_tips: [],
   };
   const db = {
+    async rpc(name, input) {
+      const key = `${input.p_user_id}:coach_daily_message`;
+      const usedCount = usage.get(key) ?? 0;
+      if (name === "get_coach_daily_message_usage") return { data: [{ used_count: usedCount }], error: null };
+      if (name === "consume_coach_daily_message") {
+        if (usedCount >= input.p_limit) return { data: [{ allowed: false, used_count: usedCount }], error: null };
+        const nextCount = usedCount + 1;
+        usage.set(key, nextCount);
+        return { data: [{ allowed: true, used_count: nextCount }], error: null };
+      }
+      return { data: null, error: { message: "Unexpected RPC" } };
+    },
     from(table) {
       if (!rows[table]) rows[table] = [];
       let selectedRows = rows[table];
@@ -73,7 +86,7 @@ function createDb() {
       };
     },
   };
-  return { db, inserts, rows };
+  return { db, inserts, rows, usage };
 }
 
 function dependencies(overrides = {}) {
@@ -150,6 +163,35 @@ test("does not call the model again for the same client request id", async () =>
   assert.deepEqual(second.reply, first.reply);
 });
 
+test("enforces an atomic 20-message daily limit before invoking the model", async () => {
+  const { db, usage } = createDb();
+  let calls = 0;
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    answer: async () => { calls += 1; return validReply; },
+  });
+
+  for (let index = 1; index <= 20; index += 1) {
+    const result = await service.sendMessage("user-1", {
+      ...validRequest,
+      clientRequestId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    });
+    assert.equal(result.dailyUsage.used, index);
+    assert.equal(result.dailyUsage.remaining, 20 - index);
+  }
+
+  await assert.rejects(
+    () => service.sendMessage("user-1", {
+      ...validRequest,
+      clientRequestId: "00000000-0000-4000-8000-000000000021",
+    }),
+    (error) => error.code === "COACH_DAILY_LIMIT_REACHED" && error.message === "因个人开发成本有限，当前每人每日限制聊20句",
+  );
+  assert.equal(calls, 20);
+  assert.equal(usage.get("user-1:coach_daily_message"), 20);
+});
+
 test("uses a fixed consultation response instead of calling the model for medical risk", async () => {
   const { db } = createDb();
   let calls = 0;
@@ -172,6 +214,83 @@ test("keeps unrelated questions inside the nutrition-coach boundary without call
   assert.equal(calls, 0);
   assert.equal(result.reply.source, "rule_v2");
   assert.match(result.messages[1].content, /营养、饮食、食谱或训练恢复/);
+});
+
+test("treats a food's daily nutrition value as an in-scope coach question", async () => {
+  const { db } = createDb();
+  let calls = 0;
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    answer: async () => { calls += 1; return validReply; },
+  });
+
+  const result = await service.sendMessage("user-1", {
+    ...validRequest,
+    clientRequestId: "33333333-3333-4333-8333-333333333334",
+    prompt: "蓝莓有什么好处？",
+  });
+
+  assert.equal(calls, 1);
+  assert.equal(result.reply.source, "deepseek");
+});
+
+test("continues a short food follow-up after an in-scope nutrition question", async () => {
+  const { db } = createDb();
+  const prompts = [];
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    answer: async ({ prompt }) => { prompts.push(prompt); return validReply; },
+  });
+
+  await service.sendMessage("user-1", {
+    ...validRequest,
+    clientRequestId: "33333333-3333-4333-8333-333333333335",
+    prompt: "蓝莓有什么好处？",
+  });
+  const result = await service.sendMessage("user-1", {
+    ...validRequest,
+    clientRequestId: "33333333-3333-4333-8333-333333333336",
+    prompt: "香蕉呢？",
+  });
+
+  assert.deepEqual(prompts, ["蓝莓有什么好处？", "香蕉呢？"]);
+  assert.equal(result.reply.source, "deepseek");
+});
+
+test("keeps the latest nutrition context for a short follow-up in a long conversation", async () => {
+  const { db, rows } = createDb();
+  const prompts = [];
+  for (let index = 0; index < 12; index += 1) {
+    rows.coach_messages.push({
+      id: `older-message-${index}`,
+      user_id: "user-1",
+      conversation_id: "conversation-1",
+      role: index % 2 ? "assistant" : "user",
+      content: index % 2 ? "旧回复" : "旧问题",
+      created_at: `2026-07-19T10:00:${String(index).padStart(2, "0")}.000Z`,
+    });
+  }
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    answer: async ({ prompt }) => { prompts.push(prompt); return validReply; },
+  });
+
+  await service.sendMessage("user-1", {
+    ...validRequest,
+    clientRequestId: "33333333-3333-4333-8333-333333333337",
+    prompt: "草莓有什么好处？",
+  });
+  const result = await service.sendMessage("user-1", {
+    ...validRequest,
+    clientRequestId: "33333333-3333-4333-8333-333333333338",
+    prompt: "蓝莓呢？",
+  });
+
+  assert.deepEqual(prompts.slice(-2), ["草莓有什么好处？", "蓝莓呢？"]);
+  assert.equal(result.reply.source, "deepseek");
 });
 
 test("streams a bounded nutrition reply and persists only after completion", async () => {

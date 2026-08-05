@@ -47,6 +47,13 @@ export interface ProductCoachBrief {
   completion: number;
   heroPrompt: string;
   quickPrompts: string[];
+  dailyUsage: ProductCoachDailyUsage;
+}
+
+export interface ProductCoachDailyUsage {
+  limit: number;
+  used: number;
+  remaining: number;
 }
 
 export interface ProductCoachDailyTip {
@@ -66,6 +73,7 @@ export type ProductCoachStreamEvent =
       conversationId: string;
       messages: ProductCoachMessage[];
       reply: ProductCoachReply;
+      dailyUsage: ProductCoachDailyUsage;
     }
   | { type: "error"; code: string };
 
@@ -151,7 +159,11 @@ export function streamProductCoachMessage(
           const event: unknown = JSON.parse(line);
           if (!isCoachStreamEvent(event)) throw new Error("流式事件无效");
           if (event.type === "error") {
-            finish(() => reject(new Error("营养教练暂时无法回答，请稍后重试")));
+            finish(() => {
+              const error = new Error("营养教练暂时无法回答，请稍后重试");
+              error.name = event.code;
+              reject(error);
+            });
             return;
           }
           onEvent(event);
@@ -210,6 +222,7 @@ export function sendProductCoachMessage(
     conversationId: string;
     messages: ProductCoachMessage[];
     reply?: ProductCoachReply;
+    dailyUsage: ProductCoachDailyUsage;
   }>("/coach-answer", {
     method: "POST",
     data: { clientRequestId, prompt, date },

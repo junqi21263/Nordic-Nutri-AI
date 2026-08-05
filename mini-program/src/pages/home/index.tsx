@@ -144,6 +144,9 @@ export default function HomePage() {
             actionLabel="查看饮食记录"
           />
         </View>
+        <Text className="nutrition-disclaimer">
+          营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
+        </Text>
         <View className="home-page__actions">
           <View className="home-page__action home-page__action--primary" onClick={openScanner}>
             <NordicIcon name="camera" size={20} ariaLabel="拍照识别" />
