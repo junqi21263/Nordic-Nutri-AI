@@ -482,7 +482,7 @@ async function loadPrimaryImagesForFoods(db, foodsOrIds, imageUrlResolver) {
   const missingIds = foodIds.filter((id) => !mapped.has(id));
   if (!missingIds.length) return mapped;
   const legacy = await db.from("food_images").select("*")
-    .in("food_id", missingIds).eq("is_primary", true).eq("status", "ready");
+    .in("food_id", missingIds).is("visual_profile_id", null).eq("is_primary", true).eq("status", "ready");
   if (legacy.error) throw new FoodRepositoryError("FOOD_IMAGE_LOOKUP_FAILED");
   for (const row of legacy.data ?? []) {
     if ((row.review_status == null || row.review_status === "approved") && !mapped.has(row.food_id)) {

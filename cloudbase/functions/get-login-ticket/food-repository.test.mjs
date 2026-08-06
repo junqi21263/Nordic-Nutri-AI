@@ -268,6 +268,26 @@ test("listExistingPrimaryImagesForAudit selects the configured current visual pr
   ]);
 });
 
+test("listExistingPrimaryImagesForAudit excludes a food when only another visual profile has a ready primary image", async () => {
+  const db = mockDb({
+    foods: [{ id: "f-profile", name_zh: "草莓酸奶", category_id: "c-dairy", visual_profile_key: "solid", is_active: true, publish_status: "published" }],
+    food_categories: [{ id: "c-dairy", code: "dairy", name_zh: "乳制品", is_active: true }],
+    food_tag_relations: [],
+    food_image_visual_profiles: [
+      { id: "profile-standard", food_id: "f-profile", profile_key: "standard", is_default: true },
+      { id: "profile-solid", food_id: "f-profile", profile_key: "solid", is_default: false },
+    ],
+    food_images: [
+      { id: "image-other-profile", food_id: "f-profile", visual_profile_id: "profile-standard", is_primary: true, status: "ready", review_status: "approved" },
+    ],
+  });
+  const repo = createFoodRepository({ db });
+
+  const result = await repo.listExistingPrimaryImagesForAudit({ limit: 20 });
+
+  assert.deepEqual(result.items, []);
+});
+
 test("listExistingPrimaryImagesForAudit caps at 100 foods and continues from a nonzero cursor", async () => {
   const foods = Array.from({ length: 101 }, (_, index) => {
     const id = `f-${String(index).padStart(3, "0")}`;
