@@ -363,6 +363,15 @@ function createObservabilityService({ db }) {
     }
   }
 
+  async function purgeExpiredDeletionLogs({ now = new Date() } = {}) {
+    const result = await db
+      .from("ops_account_deletion_log")
+      .delete()
+      .lt("expires_at", now.toISOString());
+    if (result?.error) throw new Error("Deletion log retention purge failed");
+    return { deleted: result?.data?.length || 0 };
+  }
+
   return {
     recordMetric,
     getOverview,
@@ -371,6 +380,7 @@ function createObservabilityService({ db }) {
     getModelBoard,
     listDeletionLog,
     recordDeletion,
+    purgeExpiredDeletionLogs,
   };
 }
 

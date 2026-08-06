@@ -233,3 +233,28 @@ test("recordDeletion and listDeletionLog persist durable audit rows", async () =
   assert.equal(rows.length, 2);
   assert.equal(rows[0].outcome, "succeeded");
 });
+
+test("purgeExpiredDeletionLogs removes only audit records whose retention has elapsed", async () => {
+  const calls = [];
+  const service = createObservabilityService({
+    db: {
+      from(table) {
+        assert.equal(table, "ops_account_deletion_log");
+        return {
+          delete() {
+            return {
+              lt(column, value) {
+                calls.push([column, value]);
+                return Promise.resolve({ data: [{ id: "expired-log" }], error: null });
+              },
+            };
+          },
+        };
+      },
+    },
+  });
+
+  const result = await service.purgeExpiredDeletionLogs({ now: new Date("2026-08-06T00:00:00.000Z") });
+  assert.deepEqual(result, { deleted: 1 });
+  assert.deepEqual(calls, [["expires_at", "2026-08-06T00:00:00.000Z"]]);
+});

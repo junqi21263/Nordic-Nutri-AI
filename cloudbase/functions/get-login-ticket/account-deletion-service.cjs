@@ -37,6 +37,12 @@ function appendPaths(target, rows, key) {
   }
 }
 
+function isMissingOptionalTableError(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || error || "");
+  return code === "PGRST205" || /could not find (the )?table|relation .* does not exist|schema cache/i.test(message);
+}
+
 function createAccountDeletionService({ db, deleteFiles, operationGuard = null, onStorageCleanupFailed = null }) {
   if (!db || typeof db.from !== "function" || typeof deleteFiles !== "function") {
     throw new Error("Account deletion dependencies are unavailable");
@@ -49,17 +55,22 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null, 
         LOOKUP_TIMEOUT_MS,
         `optional ${table} lookup timed out`,
       );
-      // Image/asset tables were introduced incrementally. A missing optional table
-      // must not prevent the product account itself from being physically deleted.
       if (result?.error) {
         const message = result.error?.message || result.error?.code || "unknown";
-        console.warn(`[account-cancellation] optional ${table} lookup skipped:`, message);
-        return [];
+        if (isMissingOptionalTableError(result.error)) {
+          console.warn(`[account-cancellation] optional ${table} table is unavailable:`, message);
+          return [];
+        }
+        throw new PublicAccountDeletionError("ACCOUNT_CANCELLATION_ASSET_LOOKUP_FAILED", "无法读取待删除文件，账号尚未注销，请稍后重试");
       }
       return result?.data || [];
     } catch (error) {
-      console.warn(`[account-cancellation] optional ${table} lookup skipped:`, error?.message || error);
-      return [];
+      if (error instanceof PublicAccountDeletionError) throw error;
+      if (isMissingOptionalTableError(error)) {
+        console.warn(`[account-cancellation] optional ${table} table is unavailable:`, error?.message || error);
+        return [];
+      }
+      throw new PublicAccountDeletionError("ACCOUNT_CANCELLATION_ASSET_LOOKUP_FAILED", "无法读取待删除文件，账号尚未注销，请稍后重试");
     }
   }
 
@@ -99,7 +110,6 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null, 
         appendPaths(paths, profiles, "avatar_path");
         appendPaths(paths, analyses, "image_path");
         appendPaths(paths, meals, "image_path");
-        let storageCleanupSkipped = false;
         if (paths.size) {
           try {
             await withTimeout(
@@ -108,9 +118,7 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null, 
               "storage cleanup timed out",
             );
           } catch (error) {
-            // Prefer completing product-account deletion over failing closed on
-            // orphaned private objects; cascade deletes already remove PG rows.
-            console.error("[account-cancellation] storage cleanup skipped:", error?.message || error);
+            console.error("[account-cancellation] storage cleanup failed:", error?.message || error);
             if (typeof onStorageCleanupFailed === "function") {
               try {
                 await onStorageCleanupFailed({
@@ -123,13 +131,16 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null, 
                 console.error("[account-cancellation] storage cleanup audit failed:", auditError?.message || auditError);
               }
             }
-            storageCleanupSkipped = true;
+            throw new PublicAccountDeletionError(
+              "ACCOUNT_CANCELLATION_STORAGE_CLEANUP_FAILED",
+              "文件清理失败，账号尚未注销，请稍后重试",
+            );
           }
         }
 
         const deleted = await db.from("app_users").delete().eq("id", userId);
         if (deleted?.error) throw new Error("Account deletion database removal failed");
-        return { deleted: true, ...(storageCleanupSkipped ? { storageCleanupSkipped: true } : {}) };
+        return { deleted: true };
       } catch (error) {
         if (operationGuard) {
           try {

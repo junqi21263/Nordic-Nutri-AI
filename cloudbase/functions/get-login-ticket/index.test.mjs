@@ -22,6 +22,13 @@ async function withServer(server, run) {
   }
 }
 
+function createRuntimeDb() {
+  return {
+    from: () => ({}),
+    rpc: () => Promise.resolve({ data: [{ allowed: true }], error: null }),
+  };
+}
+
 test("validates runtime configuration without constructing database-dependent services", () => {
   assert.deepEqual(readRuntimeConfig({
     WX_APPID: "wx-app",
@@ -41,7 +48,7 @@ test("validates runtime configuration without constructing database-dependent se
 });
 
 test("assembles every runtime service after the RDB client is available", () => {
-  const db = { from: () => ({}) };
+  const db = createRuntimeDb();
   const service = createRuntimeService({
     WX_APPID: "wx-app",
     WX_SECRET: "wx-secret",
@@ -60,7 +67,7 @@ test("assembles every runtime service after the RDB client is available", () => 
 });
 
 test("uses the existing worker secret only as a first-rollout fallback for dispatch", () => {
-  const db = { from: () => ({}) };
+  const db = createRuntimeDb();
   const service = createRuntimeService({
     WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
     CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret", AI_WORKER_SHARED_SECRET: "worker-secret",
@@ -76,7 +83,7 @@ test("delegates food insight to dev through the existing signed worker configura
     HY_IMAGE_WORKER_ENDPOINT: "https://dev-d8g3hqv2b0de38046.service.tcloudbase.com/hunyuan-image-worker/generate",
     AI_WORKER_SHARED_SECRET: "worker-secret",
   }, {
-    cloudbaseSdk: { init: () => ({ rdb: () => ({ from: () => ({}) }) }) },
+    cloudbaseSdk: { init: () => ({ rdb: () => createRuntimeDb() }) },
     cloudbaseNodeSdk: { init: () => ({}) },
     nutritionInsightWorkerClientFactory: (options) => {
       workerOptions.push(options);
@@ -112,7 +119,7 @@ test("routes homepage daily insight to DeepSeek while auxiliary content stays on
     HY_IMAGE_WORKER_ENDPOINT: "https://dev-d8g3hqv2b0de38046.service.tcloudbase.com/hunyuan-image-worker/generate",
     AI_WORKER_SHARED_SECRET: "worker-secret",
   }, {
-    cloudbaseSdk: { init: () => ({ rdb: () => ({ from: () => ({}) }) }) },
+    cloudbaseSdk: { init: () => ({ rdb: () => createRuntimeDb() }) },
     cloudbaseNodeSdk: { init: () => ({}) },
     dailyInsightFactory: (options) => {
       dailyInsightOptions.push(options);
@@ -136,7 +143,7 @@ test("routes homepage daily insight to DeepSeek while auxiliary content stays on
 
 test("uses the primary runtime identity for generated-image storage in remote-worker mode", async () => {
   const uploads = [];
-  const db = { from: () => ({}) };
+  const db = createRuntimeDb();
   const runtimeStorage = {
     uploadFile: async ({ cloudPath }) => {
       uploads.push(cloudPath);
@@ -984,6 +991,36 @@ test("internal batch dispatcher requires an HMAC signature and does not use an a
     assert.equal(accepted.status, 200);
     assert.deepEqual(await accepted.json(), { dispatched: 2, attempted: 2 });
     assert.deepEqual(calls, [{ maxItems: 2 }]);
+  });
+});
+
+test("internal vision purge fails closed when deletion-audit retention is unavailable", async () => {
+  const server = createHttpServer({
+    service: {
+      foodImageDispatchSecret: "dispatch-test-secret",
+      visionImageRetention: { purgeExpiredVisionImages: async () => ({ deleted: 0, failed: 0 }) },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const path = "/get-login-ticket/api/internal/vision-images/purge";
+    const body = JSON.stringify({ limit: 2, purgeDeletionAudit: true });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = signFoodImageDispatch("dispatch-test-secret", {
+      timestamp,
+      path: "/api/internal/vision-images/purge",
+      body,
+    });
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-food-image-dispatch-timestamp": timestamp,
+        "x-food-image-dispatch-signature": signature,
+      },
+      body,
+    });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { code: "DELETION_AUDIT_PURGE_UNAVAILABLE" });
   });
 });
 

@@ -38,7 +38,7 @@ const { createOperationGuard, PublicOperationError } = require("./operation-guar
 const { createObservabilityService } = require("./observability-service.cjs");
 const { recordModelUsage } = require("./model-usage.cjs");
 const { createContentModerationService, PublicContentModerationError } = require("./content-moderation-service.cjs");
-const { createAdminConsoleAuthService, PublicAdminAuthError } = require("./admin-console-auth-service.cjs");
+const { createAdminConsoleAuthService, createPersistentLoginAttemptTracker, PublicAdminAuthError } = require("./admin-console-auth-service.cjs");
 const { createFoodRepository, FoodRepositoryError } = require("./food-repository.cjs");
 const { createUsdaService, UsdaServiceError } = require("./usda-service.cjs");
 const { createOpenFoodFactsService, OpenFoodFactsError } = require("./open-food-facts-service.cjs");
@@ -1006,6 +1006,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     identityPepper: config.identityPepper,
     username: env.ADMIN_CONSOLE_USERNAME,
     password: env.ADMIN_CONSOLE_PASSWORD,
+    loginAttemptTracker: createPersistentLoginAttemptTracker({ db }),
   });
 
   // Hunyuan food-image generation (小程序成长计划). Model ID comes from env —
@@ -1564,13 +1565,20 @@ function createHttpServer({ service }) {
           const result = await service.visionImageRetention.purgeExpiredVisionImages({
             limit: payload.body?.limit,
           });
+          let deletionAudit = null;
+          if (payload.body?.purgeDeletionAudit) {
+            if (typeof service.observability?.purgeExpiredDeletionLogs !== "function") {
+              return sendJson(res, 503, { code: "DELETION_AUDIT_PURGE_UNAVAILABLE" });
+            }
+            deletionAudit = await service.observability.purgeExpiredDeletionLogs();
+          }
           service.observability?.recordMetric?.("vision_purge_deleted", result.deleted || 0, {
             feature: "vision_retention",
           }).catch(() => {});
           service.observability?.recordMetric?.("vision_purge_failed", result.failed || 0, {
             feature: "vision_retention",
           }).catch(() => {});
-          return sendJson(res, 200, result);
+          return sendJson(res, 200, { ...result, deletionAudit });
         }
         if (!service?.foodImageBatches?.dispatchTrusted) return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_UNAVAILABLE" });
         let patrol;

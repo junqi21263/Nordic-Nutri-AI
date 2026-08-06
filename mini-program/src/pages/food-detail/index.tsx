@@ -14,6 +14,18 @@ import { navigateBackOrHome } from "../../utils/navigation";
 
 const portionOptions = [100, 150, 200];
 
+type TouchPoint = { clientX: number; clientY: number };
+
+function readTouch(event: unknown, key: "touches" | "changedTouches"): TouchPoint | null {
+  if (!event || typeof event !== "object") return null;
+  const value = (event as Record<string, unknown>)[key];
+  if (!Array.isArray(value)) return null;
+  const touch = value[0];
+  if (!touch || typeof touch !== "object") return null;
+  const { clientX, clientY } = touch as Record<string, unknown>;
+  return typeof clientX === "number" && typeof clientY === "number" ? { clientX, clientY } : null;
+}
+
 const scaleNutrition = (value: number | null, grams: number) => {
   if (value === null) return "—";
   return `${Math.round((value * grams) / 10) / 10}`;
@@ -125,16 +137,16 @@ export default function FoodDetailPage() {
 
   // Taro View types touch handlers as CommonEventFunction (BaseEventOrig), while
   // runtime events include touches — keep a narrow structural read without fighting JSX types.
-  const onTouchStart = (event: any) => {
-    const touch = event?.touches?.[0] ?? event?.changedTouches?.[0];
+  const onTouchStart = (event: unknown) => {
+    const touch = readTouch(event, "touches") ?? readTouch(event, "changedTouches");
     if (!touch) return;
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
   };
 
-  const onTouchEnd = (event: any) => {
+  const onTouchEnd = (event: unknown) => {
     const start = touchStartRef.current;
     touchStartRef.current = null;
-    const touch = event?.changedTouches?.[0];
+    const touch = readTouch(event, "changedTouches");
     if (!start || !touch || queue.length <= 1) return;
     if (Date.now() < ignoreSwipeUntilRef.current) return;
     const direction = resolveHorizontalSwipe(touch.clientX - start.x, touch.clientY - start.y);

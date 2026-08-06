@@ -43,6 +43,14 @@
       "handler": "index.main",
       "installDependency": true,
       "ignore": ["*.test.mjs", "node_modules/**", ".git/**"]
+    },
+    {
+      "name": "hunyuan-image-worker",
+      "type": "HTTP",
+      "timeout": 900,
+      "runtime": "Nodejs18.15",
+      "installDependency": true,
+      "ignore": ["*.test.mjs", ".git/**"]
     }
   ]
 }

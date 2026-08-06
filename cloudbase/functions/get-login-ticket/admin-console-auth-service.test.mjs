@@ -5,6 +5,7 @@ import {
   createAdminAccessToken,
   createAdminConsoleAuthService,
   createLoginAttemptTracker,
+  createPersistentLoginAttemptTracker,
   PublicAdminAuthError,
 } from "./admin-console-auth-service.cjs";
 import { verifyAccessToken } from "./product-session-service.cjs";
@@ -117,4 +118,37 @@ test("rate-limits repeated admin login failures within the window", async () => 
     () => service.login({ username: "ops", password: "wrong" }),
     (error) => error instanceof PublicAdminAuthError && error.code === "ADMIN_AUTH_INVALID",
   );
+});
+
+test("persistent login attempt tracker consumes only a peppered username hash through PG RPC", async () => {
+  const calls = [];
+  const tracker = createPersistentLoginAttemptTracker({
+    identityPepper: "pepper",
+    db: {
+      rpc(name, payload) {
+        calls.push([name, payload]);
+        return Promise.resolve({ data: [{ allowed: true }], error: null });
+      },
+    },
+  });
+  const service = createAdminConsoleAuthService({
+    sessionSecret: "session-secret",
+    identityPepper: "pepper",
+    username: "ops",
+    password: "secret-pass",
+    loginAttemptTracker: tracker,
+    db: {
+      from() {
+        return {
+          select() { return { eq() { return { maybeSingle: async () => ({ data: { id: "admin-user-1", is_admin: true }, error: null }) }; } }; },
+        };
+      },
+    },
+  });
+
+  await service.login({ username: "ops", password: "secret-pass" });
+  assert.equal(calls[0][0], "consume_admin_login_attempt");
+  assert.match(calls[0][1].p_attempt_key, /^[a-f0-9]{64}$/);
+  assert.notEqual(calls[0][1].p_attempt_key, "ops");
+  assert.equal(calls[1][0], "clear_admin_login_attempt");
 });

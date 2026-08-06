@@ -120,7 +120,7 @@ test("does not delete files again when the idempotency guard has a completed can
   }), { deleted: true });
 });
 
-test("continues account deletion and audits when storage cleanup fails", async () => {
+test("does not delete the account when storage cleanup fails", async () => {
   const events = [];
   const audits = [];
   const service = createAccountDeletionService({
@@ -138,12 +138,38 @@ test("continues account deletion and audits when storage cleanup fails", async (
     onStorageCleanupFailed: async (payload) => { audits.push(payload); },
   });
 
-  assert.deepEqual(await service.cancelAccount("user-a", {
-    confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT",
-    clientRequestId: "11111111-1111-4111-8111-111111111111",
-  }), { deleted: true, storageCleanupSkipped: true });
-  assert.deepEqual(events, ["deleted"]);
+  await assert.rejects(
+    () => service.cancelAccount("user-a", {
+      confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT",
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+    }),
+    (error) => error instanceof PublicAccountDeletionError && error.code === "ACCOUNT_CANCELLATION_STORAGE_CLEANUP_FAILED",
+  );
+  assert.deepEqual(events, []);
   assert.equal(audits.length, 1);
   assert.equal(audits[0].pathCount, 1);
   assert.match(audits[0].reason, /storage unavailable/);
+});
+
+test("does not delete the account when asset lookup fails for a reason other than a missing optional table", async () => {
+  const events = [];
+  const service = createAccountDeletionService({
+    db: {
+      from(table) {
+        if (table === "uploaded_assets") return { select: () => ({ eq: async () => ({ data: null, error: { code: "42501", message: "permission denied" } }) }) };
+        if (table === "app_users") return { delete: () => ({ eq: async () => { events.push("deleted"); return { error: null }; } }) };
+        throw new Error(`unexpected table ${table}`);
+      },
+    },
+    deleteFiles: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.cancelAccount("user-a", {
+      confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT",
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+    }),
+    (error) => error instanceof PublicAccountDeletionError && error.code === "ACCOUNT_CANCELLATION_ASSET_LOOKUP_FAILED",
+  );
+  assert.deepEqual(events, []);
 });

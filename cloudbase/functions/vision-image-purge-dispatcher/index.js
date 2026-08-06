@@ -27,7 +27,7 @@ async function purgeOnce({
 } = {}) {
   if (!secret || typeof request !== "function") throw new Error("VISION_PURGE_CONFIG_MISSING");
   const url = getPurgeUrl(endpoint);
-  const body = JSON.stringify({ limit: clampLimit(limit) });
+  const body = JSON.stringify({ limit: clampLimit(limit), purgeDeletionAudit: true });
   const timestamp = String(Math.floor(now() / 1000));
   const signature = makeSignature(secret, {
     timestamp,

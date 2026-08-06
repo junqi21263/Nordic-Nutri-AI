@@ -66,6 +66,30 @@ function createLoginAttemptTracker({
   };
 }
 
+function createPersistentLoginAttemptTracker({ db }) {
+  if (!db || typeof db.rpc !== "function") {
+    throw new Error("Admin login attempt storage is unavailable");
+  }
+
+  return {
+    async consume(attemptKey) {
+      const result = await db.rpc("consume_admin_login_attempt", {
+        p_attempt_key: attemptKey,
+        p_limit: ADMIN_LOGIN_MAX_FAILURES,
+        p_window_seconds: ADMIN_LOGIN_WINDOW_MS / 1000,
+      });
+      if (result?.error) throw new Error("Admin login attempt consume failed");
+      if (result?.data?.[0]?.allowed !== true) {
+        throw new PublicAdminAuthError("ADMIN_AUTH_RATE_LIMITED", "登录失败次数过多，请稍后再试");
+      }
+    },
+    async clear(attemptKey) {
+      const result = await db.rpc("clear_admin_login_attempt", { p_attempt_key: attemptKey });
+      if (result?.error) throw new Error("Admin login attempt clear failed");
+    },
+  };
+}
+
 function createAdminConsoleAuthService({
   db,
   sessionSecret,
@@ -79,6 +103,11 @@ function createAdminConsoleAuthService({
   const configuredPass = typeof password === "string" ? password : "";
   if (!sessionSecret || !identityPepper) throw new Error("Admin console auth dependencies are unavailable");
   const attempts = loginAttemptTracker || createLoginAttemptTracker({ now });
+
+  function attemptKey(usernameValue) {
+    const normalized = String(usernameValue || "").trim().toLowerCase() || configuredUser.toLowerCase() || "admin";
+    return createHmac("sha256", identityPepper).update(`admin-login:${normalized}`).digest("hex");
+  }
 
   async function ensureActor() {
     if (!db || typeof db.from !== "function") throw new Error("Admin console database is unavailable");
@@ -109,15 +138,22 @@ function createAdminConsoleAuthService({
       }
       const inputUser = typeof input?.username === "string" ? input.username.trim() : "";
       const inputPass = typeof input?.password === "string" ? input.password : "";
-      const attemptKey = inputUser || configuredUser || "admin";
-      attempts.assertAllowed(attemptKey);
+      const loginAttemptKey = attemptKey(inputUser);
+      try {
+        if (typeof attempts.consume === "function") await attempts.consume(loginAttemptKey);
+        else attempts.assertAllowed(loginAttemptKey);
+      } catch (error) {
+        if (error instanceof PublicAdminAuthError) throw error;
+        console.error("[admin-auth] durable login rate limit unavailable:", error?.message || error);
+        throw new PublicAdminAuthError("ADMIN_AUTH_FAILED", "管理员登录暂时不可用");
+      }
       if (!safeEqualText(inputUser, configuredUser) || !safeEqualText(inputPass, configuredPass)) {
-        attempts.recordFailure(attemptKey);
+        if (typeof attempts.recordFailure === "function") attempts.recordFailure(loginAttemptKey);
         throw new PublicAdminAuthError("ADMIN_AUTH_INVALID", "帐号或密码错误");
       }
       try {
         const userId = await ensureActor();
-        attempts.clear(attemptKey);
+        await attempts.clear(loginAttemptKey);
         return {
           user: { id: userId },
           session: { accessToken: createAdminAccessToken(userId, sessionSecret, now) },
@@ -136,5 +172,6 @@ module.exports = {
   ADMIN_TOKEN_TTL_SECONDS,
   createAdminAccessToken,
   createLoginAttemptTracker,
+  createPersistentLoginAttemptTracker,
   createAdminConsoleAuthService,
 };
