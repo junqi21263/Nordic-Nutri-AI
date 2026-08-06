@@ -48,7 +48,6 @@ create table if not exists public.food_image_audit_items (
     check (ai_confidence is null or ai_confidence between 0 and 1),
   status text not null default 'pending_review'
     check (status in ('pending_review','ai_pass','needs_review','failed','kept','regeneration_requested')),
-  check (status <> 'regeneration_requested' or regeneration_job_id is not null),
   operator_decision text
     check (operator_decision is null or operator_decision in ('keep','regenerate')),
   created_at timestamptz not null default now(),
@@ -61,10 +60,23 @@ returns trigger
 language plpgsql
 as $$
 begin
-  -- A food deletion intentionally nulls food_id to retain the immutable audit
-  -- snapshot. New audit rows and regular updates with a food_id must match the
-  -- food's current ready, approved primary image.
+  -- ON DELETE SET NULL must preserve historical audit snapshots. PostgreSQL
+  -- does not identify the FK action to a row trigger, so the null transition is
+  -- accepted only when it preserves the original image and prompt snapshots.
   if new.food_id is null then
+    if tg_op = 'INSERT' and new.food_id is null then
+      raise exception 'food_image_audit_items.food_id is required when creating an audit item'
+        using errcode = '23514';
+    end if;
+
+    if old.food_id is null
+      or new.old_image_id is distinct from old.old_image_id
+      or new.image_url is distinct from old.image_url
+      or new.prompt_plan_json is distinct from old.prompt_plan_json then
+      raise exception 'food_image_audit_items.food_id may only be nulled while preserving the historical audit snapshot'
+        using errcode = '23514';
+    end if;
+
     return new;
   end if;
 
@@ -75,7 +87,7 @@ begin
       and image.food_id = new.food_id
       and image.is_primary
       and image.status = 'ready'
-      and image.review_status = 'approved'
+      and (image.review_status is null or image.review_status = 'approved')
   ) then
     raise exception 'food_image_audit_items.old_image_id must reference a ready approved primary image for the same food'
       using errcode = '23514';
@@ -89,6 +101,37 @@ drop trigger if exists food_image_audit_items_validate_old_image on public.food_
 create trigger food_image_audit_items_validate_old_image
   before insert or update of food_id, old_image_id on public.food_image_audit_items
   for each row execute function public.validate_food_image_audit_item_old_image();
+
+create or replace function public.validate_food_image_audit_item_regeneration_job()
+returns trigger
+language plpgsql
+as $regeneration_job$
+begin
+  -- A deleted job uses ON DELETE SET NULL. Retain that historical audit record,
+  -- while every live non-null job reference must be this food's regenerate job.
+  if new.regeneration_job_id is null or new.food_id is null then
+    return new;
+  end if;
+
+  if not exists (
+    select 1
+    from public.food_image_jobs job
+    where job.id = new.regeneration_job_id
+      and job.food_id = new.food_id
+      and job.job_type = 'regenerate'
+  ) then
+    raise exception $$food_image_audit_items.regeneration_job_id must reference the same food's regenerate job$$
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$regeneration_job$;
+
+drop trigger if exists food_image_audit_items_validate_regeneration_job on public.food_image_audit_items;
+create trigger food_image_audit_items_validate_regeneration_job
+  before insert or update of food_id, regeneration_job_id on public.food_image_audit_items
+  for each row execute function public.validate_food_image_audit_item_regeneration_job();
 
 create index if not exists food_image_audit_runs_status_created_idx
   on public.food_image_audit_runs (status, created_at desc);
