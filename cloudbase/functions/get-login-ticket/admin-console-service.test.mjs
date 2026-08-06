@@ -124,6 +124,41 @@ test("lists feedback and updates status", async () => {
   assert.equal(updated.status, "reviewing");
 });
 
+test("replies to feedback, resets the read state, and marks it resolved", async () => {
+  const feedbackId = "11111111-2222-4333-8444-555555555555";
+  const rows = [{
+    id: feedbackId,
+    user_id: "u1",
+    category: "product",
+    content: "希望加餐筛选",
+    status: "reviewing",
+    admin_reply: "旧回复",
+    replied_at: "2026-07-30T02:00:00Z",
+    reply_read_at: "2026-07-30T03:00:00Z",
+    created_at: "2026-07-30T02:00:00Z",
+    updated_at: "2026-07-30T02:00:00Z",
+  }];
+  const svc = createAdminConsoleService({
+    db: makeDb({ feedback: rows, profiles: [{ id: "u1", nickname: "北欧", last_login_at: null }] }),
+    isAdmin: async () => true,
+  });
+
+  const updated = await svc.updateFeedback("admin", feedbackId, { reply: "  我们已加入计划  " });
+
+  assert.equal(updated.status, "resolved");
+  assert.equal(updated.adminReply, "我们已加入计划");
+  assert.ok(updated.repliedAt);
+  assert.equal(updated.replyReadAt, null);
+});
+
+test("rejects empty, oversized, and missing feedback updates", async () => {
+  const svc = createAdminConsoleService({ db: makeDb({ feedback: [] }), isAdmin: async () => true });
+  const id = "11111111-2222-4333-8444-555555555555";
+  await assert.rejects(() => svc.updateFeedback("admin", id, { reply: "   " }), (e) => e.code === "FEEDBACK_REPLY_INVALID");
+  await assert.rejects(() => svc.updateFeedback("admin", id, { reply: "x".repeat(2001) }), (e) => e.code === "FEEDBACK_REPLY_INVALID");
+  await assert.rejects(() => svc.updateFeedback("admin", id, {}), (e) => e.code === "FEEDBACK_UPDATE_INVALID");
+});
+
 test("rejects invalid feedback status", async () => {
   const svc = createAdminConsoleService({ db: makeDb({ feedback: [] }), isAdmin: async () => true });
   await assert.rejects(

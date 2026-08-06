@@ -1241,9 +1241,9 @@ test("admin users and feedback routes require session and accept admin", async (
           calls.push(["feedback", userId, query]);
           return { items: [], nextCursor: null };
         },
-        updateFeedbackStatus: async (userId, id, body) => {
+        updateFeedback: async (userId, id, body) => {
           calls.push(["patch", userId, id, body]);
-          return { id, status: body.status };
+          return { id, status: body.reply ? "resolved" : body.status };
         },
       },
     },
@@ -1265,10 +1265,12 @@ test("admin users and feedback routes require session and accept admin", async (
     const patched = await fetch(`${baseUrl}/get-login-ticket/api/admin/feedback/11111111-2222-4333-8444-555555555555`, {
       method: "PATCH",
       headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
-      body: JSON.stringify({ status: "resolved" }),
+      body: JSON.stringify({ reply: "已加入后续优化" }),
     });
     assert.equal(patched.status, 200);
-    assert.equal(calls.some((c) => c[0] === "patch"), true);
+    assert.deepEqual(calls.find((c) => c[0] === "patch"), [
+      "patch", "admin-1", "11111111-2222-4333-8444-555555555555", { reply: "已加入后续优化" },
+    ]);
   });
 });
 

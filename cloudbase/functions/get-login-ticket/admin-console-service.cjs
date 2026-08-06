@@ -34,9 +34,41 @@ function createAdminConsoleService({ db, isAdmin }) {
       category: row.category,
       content: row.content,
       status: row.status,
+      adminReply: row.admin_reply ?? null,
+      repliedAt: row.replied_at ?? null,
+      replyReadAt: row.reply_read_at ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  async function updateFeedback(userId, feedbackId, { status, reply } = {}) {
+    await requireAdmin(userId);
+    if (!UUID_RE.test(String(feedbackId || ""))) throw new AdminConsoleError("FEEDBACK_NOT_FOUND");
+    const hasStatus = status !== undefined;
+    const hasReply = reply !== undefined;
+    if (!hasStatus && !hasReply) throw new AdminConsoleError("FEEDBACK_UPDATE_INVALID");
+    if (hasStatus && !FEEDBACK_STATUSES.has(status)) throw new AdminConsoleError("FEEDBACK_STATUS_INVALID");
+
+    const patch = hasStatus ? { status } : {};
+    if (hasReply) {
+      if (typeof reply !== "string") throw new AdminConsoleError("FEEDBACK_REPLY_INVALID");
+      const normalizedReply = reply.trim();
+      if (!normalizedReply || normalizedReply.length > 2000) throw new AdminConsoleError("FEEDBACK_REPLY_INVALID");
+      patch.admin_reply = normalizedReply;
+      patch.replied_at = new Date().toISOString();
+      patch.reply_read_at = null;
+      patch.status = "resolved";
+    }
+    const result = await db
+      .from("user_feedback")
+      .update(patch)
+      .eq("id", feedbackId)
+      .select("id,user_id,category,content,status,admin_reply,created_at,replied_at,reply_read_at,updated_at")
+      .single();
+    if (result.error || !result.data) throw new AdminConsoleError("FEEDBACK_NOT_FOUND");
+    const profile = await db.from("profiles").select("nickname").eq("id", result.data.user_id).maybeSingle();
+    return mapFeedback(result.data, profile.data?.nickname);
   }
 
   return {
@@ -79,7 +111,7 @@ function createAdminConsoleService({ db, isAdmin }) {
       const cap = Math.min(Math.max(Number(limit) || 50, 1), 100);
       let query = db
         .from("user_feedback")
-        .select("id,user_id,category,content,status,created_at,updated_at")
+        .select("id,user_id,category,content,status,admin_reply,created_at,replied_at,reply_read_at,updated_at")
         .order("created_at", { ascending: false })
         .limit(cap);
       if (status) {
@@ -98,19 +130,9 @@ function createAdminConsoleService({ db, isAdmin }) {
       return { items: rows.map((r) => mapFeedback(r, nickMap.get(r.user_id))), nextCursor: null };
     },
 
+    updateFeedback,
     async updateFeedbackStatus(userId, feedbackId, { status } = {}) {
-      await requireAdmin(userId);
-      if (!UUID_RE.test(String(feedbackId || ""))) throw new AdminConsoleError("FEEDBACK_NOT_FOUND");
-      if (!FEEDBACK_STATUSES.has(status)) throw new AdminConsoleError("FEEDBACK_STATUS_INVALID");
-      const result = await db
-        .from("user_feedback")
-        .update({ status })
-        .eq("id", feedbackId)
-        .select("id,user_id,category,content,status,created_at,updated_at")
-        .single();
-      if (result.error || !result.data) throw new AdminConsoleError("FEEDBACK_NOT_FOUND");
-      const profile = await db.from("profiles").select("nickname").eq("id", result.data.user_id).maybeSingle();
-      return mapFeedback(result.data, profile.data?.nickname);
+      return updateFeedback(userId, feedbackId, { status });
     },
   };
 }

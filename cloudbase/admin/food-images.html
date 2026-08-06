@@ -435,10 +435,10 @@
             <h2>问题反馈</h2>
             <select id="feedbackStatusFilter">
               <option value="">全部状态</option>
-              <option value="new">new</option>
-              <option value="reviewing">reviewing</option>
-              <option value="resolved">resolved</option>
-              <option value="closed">closed</option>
+              <option value="new">已收到</option>
+              <option value="reviewing">处理中</option>
+              <option value="resolved">已回复</option>
+              <option value="closed">已关闭</option>
             </select>
             <button id="refreshFeedback" class="button secondary" type="button">刷新</button>
           </div>
@@ -779,6 +779,15 @@
       </div>
     </section>
   </div>
+  <div id="feedbackReplyModal" class="food-admin-modal" hidden>
+    <button type="button" class="food-admin-modal__backdrop" id="feedbackReplyBackdrop" aria-label="关闭回复反馈"></button>
+    <section class="food-admin-modal__panel" role="dialog" aria-modal="true" aria-labelledby="feedbackReplyTitle">
+      <div class="food-admin-editor__head"><h3 id="feedbackReplyTitle">回复反馈</h3><button id="feedbackReplyClose" class="button link" type="button">关闭</button></div>
+      <div id="feedbackReplyContext" class="food-admin-editor__grid span-2"></div>
+      <label style="display:grid;gap:6px;margin-top:12px">回复内容<textarea id="feedbackReplyInput" rows="5" maxlength="2000" placeholder="输入回复内容"></textarea></label>
+      <div class="food-admin-editor__actions"><button id="feedbackReplyCancel" class="button secondary" type="button">取消</button><button id="feedbackReplySave" class="button" type="button">保存回复并通知用户</button></div>
+    </section>
+  </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
@@ -841,7 +850,7 @@
       const entry = moduleCache[key];
       return Boolean(entry && Date.now() - entry.at < MODULE_CACHE_TTL_MS);
     }
-    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, auditRun: null, auditItems: [], auditSelectedIds: new Set(), auditActiveFilter: "all", batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, batchRailCollapsed: false };
+    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, auditRun: null, auditItems: [], auditSelectedIds: new Set(), auditActiveFilter: "all", batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, feedbackReplyItem: null, batchRailCollapsed: false };
     try { state.batchRailCollapsed = localStorage.getItem(CREDENTIAL_KEYS.batchRailCollapsed) === "1"; } catch { /* ignore */ }
     // Same root taxonomy as mini-program food library chips (STANDARD_FOOD_CATEGORY_ROOT_CODES).
     const FOOD_LIBRARY_ROOT_CODES = ["meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables", "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples", "nordic_staples", "north_american_staples"];
@@ -1762,6 +1771,30 @@
         moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() };
       } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
     }
+    const feedbackStatusLabels = { new: "已收到", reviewing: "处理中", resolved: "已回复", closed: "已关闭" };
+    function closeFeedbackReply() { state.feedbackReplyItem = null; $("feedbackReplyModal").hidden = true; }
+    function openFeedbackReply(item) {
+      state.feedbackReplyItem = item;
+      $("feedbackReplyContext").innerHTML = `<p class="muted">用户：${escapeHtml(item.nickname || item.userId || "—")}</p><p class="muted">分类：${escapeHtml(feedbackCategoryLabel(item.category))} · ${escapeHtml(feedbackStatusLabels[item.status] || item.status)}</p><p>原反馈：${escapeHtml(item.content)}</p>${item.repliedAt ? `<p class="muted">最近回复：${escapeHtml(formatTime(item.repliedAt))}</p>` : ""}`;
+      $("feedbackReplyInput").value = item.adminReply || "";
+      $("feedbackReplyModal").hidden = false;
+    }
+    async function saveFeedbackReply() {
+      const item = state.feedbackReplyItem; const reply = ($("feedbackReplyInput").value || "").trim();
+      if (!item || !reply) return toast("请填写回复内容", true);
+      try { await api(`/feedback/${item.id}`, { method: "PATCH", body: { reply } }); moduleCache.feedback = null; closeFeedbackReply(); toast("回复已保存并通知用户"); await loadFeedback({ force: true }); }
+      catch (error) { toast(apiErrorMessage(error), true); }
+    }
+    function bindFeedbackTable(host, items) {
+      host.querySelectorAll("select[data-feedback-id]").forEach((select) => {
+        select.onchange = async () => {
+          const id = select.dataset.feedbackId; const nextStatus = select.value;
+          try { await api(`/feedback/${id}`, { method: "PATCH", body: { status: nextStatus } }); moduleCache.feedback = null; toast("反馈状态已更新"); }
+          catch (error) { toast(apiErrorMessage(error), true); loadFeedback({ force: true }).catch(() => {}); }
+        };
+      });
+      host.querySelectorAll("button[data-feedback-reply-id]").forEach((button) => { button.onclick = () => openFeedbackReply(items.find((item) => item.id === button.dataset.feedbackReplyId)); });
+    }
     async function loadFeedback({ force = false } = {}) {
       const host = $("feedbackTable");
       if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
@@ -1769,13 +1802,7 @@
       const cacheKey = `feedback:${status}`;
       if (!force && moduleCache.feedback?.key === cacheKey && moduleCacheFresh("feedback")) {
         host.innerHTML = moduleCache.feedback.html;
-        host.querySelectorAll("select[data-feedback-id]").forEach((select) => {
-          select.onchange = async () => {
-            const id = select.dataset.feedbackId; const nextStatus = select.value;
-            try { await api(`/feedback/${id}`, { method: "PATCH", body: { status: nextStatus } }); moduleCache.feedback = null; toast("反馈状态已更新"); }
-            catch (error) { toast(apiErrorMessage(error), true); loadFeedback({ force: true }).catch(() => {}); }
-          };
-        });
+        bindFeedbackTable(host, moduleCache.feedback.items || []);
         return;
       }
       try {
@@ -1783,16 +1810,10 @@
         const data = await api(`/feedback${qs}`);
         const items = data.items || [];
         if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无反馈记录</p>"; moduleCache.feedback = { key: cacheKey, html: host.innerHTML, at: Date.now() }; return; }
-        const statusOptions = ["new", "reviewing", "resolved", "closed"];
-        host.innerHTML = `<table><thead><tr><th>用户</th><th>分类</th><th>内容</th><th>状态</th><th>提交时间</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.nickname || item.userId || "—")}</td><td>${escapeHtml(feedbackCategoryLabel(item.category))}</td><td>${escapeHtml(item.content)}</td><td><select data-feedback-id="${escapeHtml(item.id)}">${statusOptions.map((entry) => `<option value="${entry}" ${item.status === entry ? "selected" : ""}>${entry}</option>`).join("")}</select></td><td>${escapeHtml(formatTime(item.createdAt))}</td></tr>`).join("")}</tbody></table>`;
-        moduleCache.feedback = { key: cacheKey, html: host.innerHTML, at: Date.now() };
-        host.querySelectorAll("select[data-feedback-id]").forEach((select) => {
-          select.onchange = async () => {
-            const id = select.dataset.feedbackId; const nextStatus = select.value;
-            try { await api(`/feedback/${id}`, { method: "PATCH", body: { status: nextStatus } }); moduleCache.feedback = null; toast("反馈状态已更新"); }
-            catch (error) { toast(apiErrorMessage(error), true); loadFeedback({ force: true }).catch(() => {}); }
-          };
-        });
+        const statusOptions = Object.entries(feedbackStatusLabels);
+        host.innerHTML = `<table><thead><tr><th>用户</th><th>分类</th><th>内容</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.nickname || item.userId || "—")}</td><td>${escapeHtml(feedbackCategoryLabel(item.category))}</td><td>${escapeHtml(item.content)}</td><td><select data-feedback-id="${escapeHtml(item.id)}">${statusOptions.map(([value, label]) => `<option value="${value}" ${item.status === value ? "selected" : ""}>${label}</option>`).join("")}</select></td><td>${escapeHtml(formatTime(item.createdAt))}</td><td><button class="button secondary" type="button" data-feedback-reply-id="${escapeHtml(item.id)}">回复反馈</button></td></tr>`).join("")}</tbody></table>`;
+        moduleCache.feedback = { key: cacheKey, html: host.innerHTML, items, at: Date.now() };
+        bindFeedbackTable(host, items);
       } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
     }
     function renderOpsPatrolMetrics(foodImage = {}) {
@@ -2657,6 +2678,10 @@
     };
     $("approveSelected").onclick = approveSelectedImages;
     $("regenerateSelected").onclick = regenerateSelectedImages;
+    $("feedbackReplyClose").onclick = closeFeedbackReply;
+    $("feedbackReplyCancel").onclick = closeFeedbackReply;
+    $("feedbackReplyBackdrop").onclick = closeFeedbackReply;
+    $("feedbackReplySave").onclick = () => saveFeedbackReply();
     showLoginGate();
     if (hasToken()) connect().catch(() => {});
   </script>

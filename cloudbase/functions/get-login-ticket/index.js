@@ -2041,7 +2041,7 @@ function createHttpServer({ service }) {
           if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.adminConsole) return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });
           const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
-          return sendJson(res, 200, await service.adminConsole.updateFeedbackStatus(session.sub, adminFoodRoute.feedbackId, body || {}));
+          return sendJson(res, 200, await service.adminConsole.updateFeedback(session.sub, adminFoodRoute.feedbackId, body || {}));
         }
         if (adminFoodRoute.operation === "missingImages") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
