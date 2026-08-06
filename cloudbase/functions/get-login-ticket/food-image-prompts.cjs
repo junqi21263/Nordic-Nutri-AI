@@ -18,6 +18,10 @@ const {
 } = require("./food-image-visual-type.cjs");
 
 const STYLE_SLOT = "北欧自然光，浅米白桌面，浅木色餐具，低饱和，主体居中，轻微虚化，4:3";
+// This compact direction is deliberately placed before all food-specific slots.
+// Hunyuan has a 500-character prompt limit, so the full style slot may be
+// trimmed but the photographic language must remain stable across every form.
+const NORDIC_ART_DIRECTION_SLOT = "北欧自然食物摄影：柔和侧向窗光，暖白或浅米白桌面，少量浅木道具，低饱和留白；主体居中，3/4轻斜俯视，50mm自然透视，轻景深，4:3横构图；避免顶视平铺、强逆光、硬闪、广角畸变、广告棚拍";
 
 const COOKING_HINTS = {
   水煮: "水煮熟制，无焦痕无煎烤无酱汁无油脂",
@@ -260,7 +264,7 @@ function joinSlots(slots) {
  * Identity is never dropped.
  */
 function assemblePromptSlots(slotMap, { forceOverflow = false } = {}) {
-  const order = ["identity", "class", "subject", "state", "correction", "negatives", "serving", "style"];
+  const order = ["identity", "artDirection", "class", "subject", "state", "correction", "negatives", "serving", "style"];
   const dropOrder = ["style", "serving", "negatives", "correction", "subject", "state", "class"];
   const values = { ...slotMap };
   const trimmedSlots = [];
@@ -355,6 +359,7 @@ function buildFoodImagePromptPlan(input = {}) {
 
   const assembled = assemblePromptSlots({
     identity: [`真实可食用健康食物摄影，主体：${nameZh}`, nameEn ? `英文：${nameEn}` : ""].filter(Boolean).join("，"),
+    artDirection: NORDIC_ART_DIRECTION_SLOT,
     class: categoryLabel ? `视觉分类：${categoryLabel}` : "",
     subject,
     state: cookingHint || "",
@@ -416,6 +421,7 @@ module.exports = {
   PHOTO_TEMPLATES,
   REJECT_REASON_CODES,
   STYLE_SLOT,
+  NORDIC_ART_DIRECTION_SLOT,
   CATEGORY_CODE_TEMPLATE,
   FOOD_VISUAL_TYPES,
   FOOD_VISUAL_TYPE_OPTIONS,

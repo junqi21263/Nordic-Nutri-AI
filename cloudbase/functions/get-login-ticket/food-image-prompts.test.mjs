@@ -125,7 +125,7 @@ test("visual types use their own prompt templates instead of a shared seafood or
   assert.equal(fruit.template, "whole_fruit");
 });
 
-test("budget trim drops style before identity and correction", () => {
+test("budget trim keeps Nordic light, composition, and camera direction", () => {
   const plan = buildFoodImagePromptPlan({
     foodNameZh: "熟海螺",
     foodNameEn: "whelk cooked moist heat with very long english disambiguation text for identity",
@@ -143,7 +143,20 @@ test("budget trim drops style before identity and correction", () => {
   assert.match(plan.prompt, /主体：熟海螺/);
   assert.match(plan.prompt, /闭壳生海螺|壳口打开|审核反馈修正/);
   assert.equal(plan.trimmedSlots?.includes("style"), true);
-  assert.doesNotMatch(plan.prompt, /北欧自然光/);
+  assert.match(plan.prompt, /北欧自然食物摄影/);
+  assert.match(plan.prompt, /柔和侧向窗光/);
+  assert.match(plan.prompt, /3\/4轻斜俯视/);
+  assert.match(plan.prompt, /4:3横构图/);
+});
+
+test("processed food templates retain the shared Nordic art direction", () => {
+  for (const foodNameZh of ["低热量水果味饮料粉", "仙粉黛红葡萄酒", "番茄酱"]) {
+    const plan = buildFoodImagePromptPlan({ foodNameZh });
+    assert.match(plan.prompt, /北欧自然食物摄影/);
+    assert.match(plan.prompt, /暖白或浅米白桌面/);
+    assert.match(plan.prompt, /低饱和留白/);
+    assert.match(plan.prompt, /避免顶视平铺、强逆光、硬闪、广角畸变/);
+  }
 });
 
 test("category code selects meat template when the food name is obscure", () => {
@@ -242,7 +255,7 @@ test("cooked whelk uses a shellfish template and explicit cooked visual anchors 
   assert.doesNotMatch(plan.prompt, /蒸烹饪/);
 });
 
-test("review correction is retained before style text when a prompt reaches the character budget", () => {
+test("review correction and Nordic art direction both survive the character budget", () => {
   const plan = buildFoodImagePromptPlan({
     foodNameZh: "熟海螺",
     foodNameEn: "whelk cooked moist heat",
@@ -253,7 +266,8 @@ test("review correction is retained before style text when a prompt reaches the 
   });
 
   assert.match(plan.prompt, /上一张错误生成了完整闭壳生海螺/);
-  assert.ok(plan.prompt.indexOf("根据审核反馈修正") < plan.prompt.indexOf("北欧自然光"));
+  assert.match(plan.prompt, /北欧自然食物摄影/);
+  assert.match(plan.prompt, /3\/4轻斜俯视/);
 });
 
 test("a verified per-food visual subject supplements the canonical template for difficult foods", () => {
