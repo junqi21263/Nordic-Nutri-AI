@@ -16,7 +16,8 @@ test("0038 creates isolated food image audit runs and items", () => {
 
 test("0038 snapshots audit inputs with foreign keys and query indexes", () => {
   assert.match(migration, /run_id uuid not null references public\.food_image_audit_runs\(id\) on delete cascade/i);
-  assert.match(migration, /food_id uuid references public\.foods\(id\) on delete set null/i);
+  assert.match(migration, /food_id uuid references public\.foods\(id\) on delete restrict/i);
+  assert.doesNotMatch(migration, /food_id uuid references public\.foods\(id\) on delete set null/i);
   assert.doesNotMatch(migration, /food_id uuid not null references public\.foods\(id\) on delete cascade/i);
   assert.match(migration, /old_image_id uuid not null references public\.food_images\(id\) on delete restrict/i);
   assert.match(migration, /regeneration_job_id uuid references public\.food_image_jobs\(id\) on delete set null/i);
@@ -39,18 +40,27 @@ test("0038 validates that an audited old image matches repository-ready primary 
   assert.match(migration, /before insert or update of food_id, old_image_id on public\.food_image_audit_items/i);
 });
 
-test("0038 rejects null food_id creation and only permits unchanged historical snapshots to null it", () => {
-  assert.match(migration, /if tg_op = 'INSERT' and new\.food_id is null then/i);
+test("0038 rejects manual null food_id and permits only the controlled food-delete path", () => {
+  assert.match(migration, /if tg_op = 'INSERT' then/i);
   assert.match(migration, /food_image_audit_items\.food_id is required when creating an audit item/i);
+  assert.match(migration, /current_setting\('app\.food_image_audit_preserve_history', true\) is distinct from 'on'/i);
+  assert.match(migration, /food_image_audit_items\.food_id may only be nulled by the controlled food deletion path/i);
   assert.match(migration, /old\.food_id is null/i);
   assert.match(migration, /new\.old_image_id is distinct from old\.old_image_id/i);
   assert.match(migration, /new\.image_url is distinct from old\.image_url/i);
   assert.match(migration, /new\.prompt_plan_json is distinct from old\.prompt_plan_json/i);
-  assert.match(migration, /food_image_audit_items\.food_id may only be nulled while preserving the historical audit snapshot/i);
 });
 
-test("0038 validates non-null regeneration jobs without blocking their FK deletion history", () => {
-  assert.doesNotMatch(
+test("0038 preserves food-delete history only through a transaction-local GUC", () => {
+  assert.match(migration, /create or replace function public\.preserve_food_image_audit_history_before_food_delete\(\)/i);
+  assert.match(migration, /set_config\('app\.food_image_audit_preserve_history', 'on', true\)/i);
+  assert.match(migration, /update public\.food_image_audit_items\s+set food_id = null\s+where food_id = old\.id/i);
+  assert.match(migration, /set_config\('app\.food_image_audit_preserve_history', 'off', true\)/i);
+  assert.match(migration, /before delete on public\.foods/i);
+});
+
+test("0038 validates regeneration jobs and preserves history before a job delete", () => {
+  assert.match(
     migration,
     /check \(status <> 'regeneration_requested' or regeneration_job_id is not null\)/i,
   );
@@ -62,6 +72,10 @@ test("0038 validates non-null regeneration jobs without blocking their FK deleti
   assert.match(migration, /job\.job_type = 'regenerate'/i);
   assert.match(migration, /food_image_audit_items\.regeneration_job_id must reference the same food's regenerate job/i);
   assert.match(migration, /before insert or update of food_id, regeneration_job_id on public\.food_image_audit_items/i);
+  assert.match(migration, /create or replace function public\.preserve_food_image_audit_job_history_before_delete\(\)/i);
+  assert.match(migration, /set status = 'needs_review',\s+regeneration_job_id = null,\s+operator_decision = null/i);
+  assert.match(migration, /where regeneration_job_id = old\.id\s+and status = 'regeneration_requested'/i);
+  assert.match(migration, /before delete on public\.food_image_jobs/i);
 });
 
 test("0038 keeps audit tables server-only with updated timestamps", () => {
