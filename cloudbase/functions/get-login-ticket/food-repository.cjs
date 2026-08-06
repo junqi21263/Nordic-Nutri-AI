@@ -624,7 +624,11 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       ]);
       const items = foods.flatMap((food) => {
         const image = imageMap.get(food.id);
-        if (!image) return [];
+        // Audit snapshots must refer to the same food as the primary image.
+        // Variants can intentionally borrow an owner's image for catalog display,
+        // but auditing that shared image under the variant would violate the
+        // audit-item integrity constraint and create duplicate review work.
+        if (!image || image.foodId !== food.id) return [];
         return [{
           food: mapFoodRow(food, {
             category: food.category_id ? categoryMap.get(food.category_id) : null,

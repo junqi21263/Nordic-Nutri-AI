@@ -288,6 +288,28 @@ test("listExistingPrimaryImagesForAudit excludes a food when only another visual
   assert.deepEqual(result.items, []);
 });
 
+test("listExistingPrimaryImagesForAudit excludes a variant that borrows its owner's primary image", async () => {
+  const db = mockDb({
+    foods: [{
+      id: "f-variant", name_zh: "低热量水果味饮料粉（变体）", category_id: "c-drinks",
+      image_owner_food_id: "f-owner", visual_profile_key: "standard",
+      is_active: true, publish_status: "published", is_primary_variant: false,
+    }],
+    food_categories: [{ id: "c-drinks", code: "beverages", name_zh: "饮品", is_active: true }],
+    food_tag_relations: [],
+    food_image_visual_profiles: [{ id: "profile-owner", food_id: "f-owner", profile_key: "standard", is_default: true }],
+    food_images: [{
+      id: "image-owner", food_id: "f-owner", visual_profile_id: "profile-owner",
+      is_primary: true, status: "ready", review_status: "approved",
+    }],
+  });
+  const repo = createFoodRepository({ db });
+
+  const result = await repo.listExistingPrimaryImagesForAudit({ limit: 20 });
+
+  assert.deepEqual(result.items, []);
+});
+
 test("listExistingPrimaryImagesForAudit caps at 100 foods and continues from a nonzero cursor", async () => {
   const foods = Array.from({ length: 101 }, (_, index) => {
     const id = `f-${String(index).padStart(3, "0")}`;
