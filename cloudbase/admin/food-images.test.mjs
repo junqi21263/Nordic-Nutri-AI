@@ -274,6 +274,18 @@ test("old image audit is a standalone admin module with explicit latest-prompt r
   assert.match(source, /重新生图会使用当前最新的食物视觉形态提示词/);
 });
 
+test("old image audit presents old images as review cards and follows regenerated job status", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="auditReviewWorkspace"/);
+  assert.match(source, /id="auditReviewGrid"/);
+  assert.match(source, /async function renderAuditWorkspace\(/);
+  assert.match(source, /loadJobCandidates\(item\.regenerationJobId\)/);
+  assert.match(source, /旧主图/);
+  assert.match(source, /新候选图/);
+  assert.match(source, /待 AI 复核/);
+  assert.match(source, /待审核/);
+});
+
 test("user images module wires list delete and purge APIs", async () => {
   const source = await pageSource();
   assert.match(source, /id="userImageKindFilter"/);

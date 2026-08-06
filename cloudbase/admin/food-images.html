@@ -86,6 +86,9 @@
     .batch-selection-note { min-height: 18px; color: var(--muted); font-size: 12px; }
     .selection-preview-panel { display: none; padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--linen); }
     .selection-preview-panel.visible { display: block; }
+    .audit-review-workspace { margin-top: 18px; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.58); }
+    .audit-review-workspace[hidden] { display: none !important; }
+    .audit-image-caption { display: block; padding: 7px 13px 0; color: var(--muted); font-size: 11px; font-weight: 700; }
     .composer-rules { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; overflow-x: auto; }
     .composer-rules table { width: 100%; border-collapse: collapse; font-size: 12px; }
     .composer-rules th, .composer-rules td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
@@ -489,6 +492,12 @@
               <div id="auditPreviewPanel" class="selection-preview-panel" aria-live="polite"></div>
             </section>
           </div>
+          <section id="auditReviewWorkspace" class="audit-review-workspace" hidden aria-label="旧图审计候选图工作台">
+            <div class="queue-heading"><div><p class="eyebrow">Historical review queue</p><h2>旧图审计候选图</h2><p id="auditReviewCopy" class="muted">预览风险项后显示旧主图和 AI 复核状态。</p></div><button id="auditRefreshStatus" class="button secondary" type="button">刷新状态</button></div>
+            <div id="auditStatusPanel" class="batch-status-panel"></div>
+            <div id="auditFilterRow" class="filter-row" aria-label="旧图审计状态筛选"><button class="filter active" type="button" data-audit-filter="all">全部</button><button class="filter" type="button" data-audit-filter="pending_review">待 AI 复核</button><button class="filter" type="button" data-audit-filter="manual_review">人工复核</button><button class="filter" type="button" data-audit-filter="generating">生成中</button><button class="filter" type="button" data-audit-filter="needs_review">待审核</button><button class="filter" type="button" data-audit-filter="completed">已通过</button><button class="filter" type="button" data-audit-filter="failed">失败</button></div>
+            <div id="auditReviewGrid" class="review-grid"></div>
+          </section>
         </section>
 
         <section id="moduleImages" class="admin-module">
@@ -832,7 +841,7 @@
       const entry = moduleCache[key];
       return Boolean(entry && Date.now() - entry.at < MODULE_CACHE_TTL_MS);
     }
-    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, auditRun: null, auditItems: [], auditSelectedIds: new Set(), batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, batchRailCollapsed: false };
+    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, auditRun: null, auditItems: [], auditSelectedIds: new Set(), auditActiveFilter: "all", batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, batchRailCollapsed: false };
     try { state.batchRailCollapsed = localStorage.getItem(CREDENTIAL_KEYS.batchRailCollapsed) === "1"; } catch { /* ignore */ }
     // Same root taxonomy as mini-program food library chips (STANDARD_FOOD_CATEGORY_ROOT_CODES).
     const FOOD_LIBRARY_ROOT_CODES = ["meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables", "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples", "nordic_staples", "north_american_staples"];
@@ -2547,32 +2556,85 @@
       return food.nameZh || food.name || food.nameEn || food.name_zh || food.name_en
         || plan.foodNameZh || plan.foodNameEn || item?.foodNameZh || item?.foodNameEn || "未命名食材";
     }
-    function auditStatusLabel(status) { return ({ pending_review: "待 AI 复核", ai_pass: "AI 通过", needs_review: "需要人工复核", failed: "复核失败", kept: "保留旧图", regeneration_requested: "已加入重生队列" })[status] || status || "待处理"; }
-    function renderAuditPreview() {
-      const host = $("auditPreviewPanel"); const items = state.auditItems || [];
-      if (!items.length) { host.classList.remove("visible"); host.innerHTML = ""; return; }
-      host.classList.add("visible");
-      host.innerHTML = `<p>本次发现 ${items.length} 条高风险旧图。勾选后执行 AI 复核；AI 结论仅供审核，不会替换主图。</p><div class="preview-foods">${items.map((item) => `<div class="preview-food ${state.auditSelectedIds.has(item.id) ? "selected" : ""}"><button type="button" data-audit-item-id="${escapeHtml(item.id)}">${escapeHtml(auditItemLabel(item))} · ${escapeHtml(item.visualTypeLabelZh || item.visualType || "未知形态")} · ${escapeHtml(auditStatusLabel(item.status))}</button><span><button class="button link" type="button" data-audit-keep-id="${escapeHtml(item.id)}">保留旧图</button><button class="button link" type="button" data-audit-regenerate-id="${escapeHtml(item.id)}">加入重生队列</button></span></div>`).join("")}</div>`;
-      host.querySelectorAll("button[data-audit-item-id]").forEach((button) => { button.onclick = () => { const id = button.dataset.auditItemId; if (state.auditSelectedIds.has(id)) state.auditSelectedIds.delete(id); else state.auditSelectedIds.add(id); renderAuditPreview(); }; });
+    function auditStatusLabel(status) { return ({ pending_review: "待 AI 复核", ai_pass: "AI 通过", needs_review: "需要人工复核", failed: "复核失败", kept: "已通过（保留旧图）", regeneration_requested: "已加入重生队列" })[status] || status || "待处理"; }
+    function auditJobCandidate(jobData) {
+      const candidates = jobData?.candidates || [];
+      return candidates.find((candidate) => candidate.reviewStatus === "pending") || candidates[0] || null;
+    }
+    function auditPresentation(item, jobData) {
+      const oldImage = { imageUrl: item.imageUrl || "", imageLabel: "旧主图", filter: item.status, status: item.status, label: auditStatusLabel(item.status), candidate: null, detail: item.aiResult?.reasons?.join("；") || item.riskReasons?.join("；") || "等待 AI 复核" };
+      if (item.status === "kept") return { ...oldImage, filter: "completed", status: "completed", label: "已通过（保留旧图）", detail: "人工确认保留旧主图" };
+      if (item.status === "ai_pass") return { ...oldImage, filter: "completed", status: "completed", label: "AI 通过（建议保留）" };
+      if (item.status !== "regeneration_requested") return { ...oldImage, filter: item.status === "needs_review" ? "manual_review" : item.status };
+      const job = jobData?.job || jobData || {};
+      const candidate = auditJobCandidate(jobData);
+      const candidateStatus = candidate?.reviewStatus || candidate?.status || "";
+      const imageUrl = preferredUrl(candidate) || oldImage.imageUrl;
+      if (candidateStatus === "approved") return { imageUrl, imageLabel: "新候选图", filter: "completed", status: "completed", label: "已通过（新图）", candidate, detail: "新图已通过审核并设为当前主图" };
+      if (candidateStatus === "pending") return { imageUrl, imageLabel: "新候选图", filter: "needs_review", status: "needs_review", label: "待审核", candidate, detail: "新候选图已生成，等待人工审核" };
+      if (candidateStatus === "rejected" || job.status === "failed") return { imageUrl, imageLabel: candidate ? "新候选图" : "旧主图", filter: "failed", status: "failed", label: "失败", candidate, detail: candidate?.rejectReason || job.errorMessage || "新图生成或审核失败" };
+      return { imageUrl: oldImage.imageUrl, imageLabel: "旧主图", filter: "generating", status: job.status === "pending" ? "pending" : "generating", label: job.status === "pending" ? "待生成" : "生成中", candidate: null, detail: "正在按最新食物视觉形态提示词生成新候选图" };
+    }
+    async function auditJobMap(items, { reload = false } = {}) {
+      const result = new Map();
+      await Promise.all(items.filter((item) => item.regenerationJobId).map(async (item) => {
+        if (reload) state.jobs.delete(item.regenerationJobId);
+        try { result.set(item.id, await loadJobCandidates(item.regenerationJobId)); } catch { result.set(item.id, null); }
+      }));
+      return result;
+    }
+    function renderAuditSummary(presentations) {
+      const counts = { pending_review: 0, manual_review: 0, generating: 0, needs_review: 0, completed: 0, failed: 0 };
+      presentations.forEach((entry) => { if (Object.hasOwn(counts, entry.filter)) counts[entry.filter] += 1; });
+      $("auditStatusPanel").innerHTML = `<div class="queue-heading"><b>审计状态</b><span class="category-badge">${escapeHtml(state.auditRun?.status || "previewed")}</span></div><div class="scheduler-hint">旧主图会一直保留，只有新候选审核通过后才会替换。</div><div class="status-metrics"><span class="status-metric">待 AI 复核<b>${counts.pending_review}</b></span><span class="status-metric warning">人工复核<b>${counts.manual_review}</b></span><span class="status-metric">生成中<b>${counts.generating}</b></span><span class="status-metric warning">待审核<b>${counts.needs_review}</b></span><span class="status-metric">已通过<b>${counts.completed}</b></span><span class="status-metric danger">失败<b>${counts.failed}</b></span></div>`;
+    }
+    async function renderAuditWorkspace({ reloadJobs = false } = {}) {
+      const workspace = $("auditReviewWorkspace"); const items = state.auditItems || []; const summary = $("auditPreviewPanel");
+      if (!items.length) { workspace.hidden = true; summary.classList.remove("visible"); summary.innerHTML = ""; return; }
+      workspace.hidden = false; summary.classList.add("visible"); summary.innerHTML = `<p>本次预览 ${items.length} 条高风险旧图。可先查看旧主图、勾选待 AI 复核项目，再在同一张卡片追踪新候选图状态。</p>`;
+      const jobs = await auditJobMap(items, { reload: reloadJobs });
+      const entries = items.map((item) => ({ item, presentation: auditPresentation(item, jobs.get(item.id)) }));
+      renderAuditSummary(entries.map((entry) => entry.presentation));
+      const visible = state.auditActiveFilter === "all" ? entries : entries.filter((entry) => entry.presentation.filter === state.auditActiveFilter);
+      $("auditReviewCopy").textContent = `本次 ${items.length} 条 · 当前显示 ${visible.length} 条；旧图和新候选图均保留在同一审计卡片。`;
+      const host = $("auditReviewGrid");
+      if (!visible.length) { host.className = "empty-state"; host.innerHTML = "<div><strong>当前没有该状态的审计项</strong><p>可切换状态筛选或刷新任务状态。</p></div>"; return; }
+      host.className = "review-grid";
+      host.innerHTML = visible.map(({ item, presentation }) => {
+        const canReview = item.status === "pending_review";
+        const canDecide = item.status === "ai_pass" || item.status === "needs_review" || item.status === "failed";
+        const actions = presentation.candidate?.reviewStatus === "pending"
+          ? `<button class="button" type="button" data-audit-approve-image-id="${escapeHtml(presentation.candidate.id)}" data-audit-food-name="${escapeHtml(auditItemLabel(item))}">通过并设为主图</button><button class="button secondary" type="button" data-audit-regenerate-id="${escapeHtml(item.id)}">重新生图</button>`
+          : canDecide
+            ? `<button class="button secondary" type="button" data-audit-keep-id="${escapeHtml(item.id)}">保留旧图</button><button class="button" type="button" data-audit-regenerate-id="${escapeHtml(item.id)}">重新生图</button>`
+            : `<button class="button secondary" type="button" data-audit-refresh-job-id="${escapeHtml(item.regenerationJobId || "")}">刷新状态</button>`;
+        return `<article class="food-card"><span class="food-card-image">${presentation.imageUrl ? `<img src="${escapeHtml(presentation.imageUrl)}" alt="${escapeHtml(auditItemLabel(item))} ${presentation.imageLabel}" loading="lazy" decoding="async" />` : "<span class=\"food-card-placeholder\">N</span>"}<span class="image-status ${statusTone(presentation.status)}">${escapeHtml(presentation.label)}</span></span><span class="audit-image-caption">${escapeHtml(presentation.imageLabel)}</span><span class="food-card-body"><span class="food-card-title">${escapeHtml(auditItemLabel(item))}</span><span class="food-card-meta"><span>${escapeHtml(item.visualTypeLabel || item.visualType || "未知形态")}</span><span>${escapeHtml(item.matchedKeywords?.join("、") || "自动识别")}</span></span><span class="muted">${escapeHtml(presentation.detail)}</span></span><div class="food-card-toolbar">${canReview ? `<label class="card-select-label" aria-label="选择 AI 复核项"><input type="checkbox" data-audit-item-select="${escapeHtml(item.id)}" ${state.auditSelectedIds.has(item.id) ? "checked" : ""} /></label>` : "<span></span>"}${actions}</div></article>`;
+      }).join("");
+      host.querySelectorAll("input[data-audit-item-select]").forEach((input) => { input.onchange = () => { if (input.checked) state.auditSelectedIds.add(input.dataset.auditItemSelect); else state.auditSelectedIds.delete(input.dataset.auditItemSelect); $("auditRunReview").disabled = !state.auditSelectedIds.size; }; });
       host.querySelectorAll("button[data-audit-keep-id]").forEach((button) => { button.onclick = () => keepAuditItem(button.dataset.auditKeepId); });
       host.querySelectorAll("button[data-audit-regenerate-id]").forEach((button) => { button.onclick = () => regenerateAuditItem(button.dataset.auditRegenerateId); });
+      host.querySelectorAll("button[data-audit-approve-image-id]").forEach((button) => { button.onclick = () => approveAuditCandidate(button.dataset.auditApproveImageId, button.dataset.auditFoodName); });
+      host.querySelectorAll("button[data-audit-refresh-job-id]").forEach((button) => { button.onclick = () => refreshAuditRun({ reloadJobs: true }); });
     }
     async function previewAudit() {
       try {
         const data = await api("/food-image-audits/preview", { method: "POST", body: { count: Number($("auditCount").value || 50) } });
-        state.auditRun = data.run || data; state.auditItems = data.items || data.run?.items || []; state.auditSelectedIds = new Set(state.auditItems.map((item) => item.id));
-        $("auditRunReview").disabled = !state.auditSelectedIds.size; $("auditSelectionNote").textContent = `已创建只读审计：${state.auditItems.length} 条风险项。请选择条目后执行 AI 复核。`; renderAuditPreview(); out(data); toast("风险项预览完成");
+        state.auditRun = data.run || data; state.auditItems = data.items || data.run?.items || []; state.auditSelectedIds = new Set(state.auditItems.map((item) => item.id)); state.auditActiveFilter = "all";
+        $("auditRunReview").disabled = !state.auditSelectedIds.size; $("auditSelectionNote").textContent = `已创建只读审计：${state.auditItems.length} 条风险项。请选择旧图后执行 AI 复核。`; await renderAuditWorkspace(); out(data); toast("风险项预览完成");
       } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); }
     }
     async function reviewAudit() {
       const runId = state.auditRun?.id; const itemIds = [...state.auditSelectedIds]; if (!runId || !itemIds.length) return toast("请先预览并选择风险项", true);
       if (!window.confirm(`确认调用 AI 复核 ${itemIds.length} 张旧图？该操作不会替换主图。`)) return;
-      try { const data = await api(`/food-image-audits/${runId}/review`, { method: "POST", body: { itemIds } }); state.auditRun = data.run || state.auditRun; state.auditItems = data.items || state.auditItems; renderAuditPreview(); out(data); toast("AI 复核完成，请在审计清单中人工确认"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); }
+      try { const data = await api(`/food-image-audits/${runId}/review`, { method: "POST", body: { itemIds } }); state.auditRun = data.run || state.auditRun; state.auditItems = data.items || state.auditItems; state.auditSelectedIds.clear(); $("auditRunReview").disabled = true; await refreshAuditRun(); out(data); toast("AI 复核完成，请在旧图卡片中人工确认"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); }
     }
-    async function refreshAuditRun() { if (!state.auditRun?.id) return; const data = await api(`/food-image-audits/${state.auditRun.id}`); state.auditRun = data.run || data; state.auditItems = data.items || data.run?.items || []; renderAuditPreview(); }
+    async function refreshAuditRun({ reloadJobs = false } = {}) { if (!state.auditRun?.id) return; const data = await api(`/food-image-audits/${state.auditRun.id}`); state.auditRun = data.run || data; state.auditItems = data.items || data.run?.items || []; await renderAuditWorkspace({ reloadJobs }); }
     async function keepAuditItem(itemId) { if (!window.confirm("确认保留当前旧主图？该决定不会删除图片。")) return; try { const data = await api(`/food-image-audit-items/${itemId}/keep`, { method: "POST", body: {} }); out(data); await refreshAuditRun(); toast("已保留旧图"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
-    async function regenerateAuditItem(itemId) { if (!window.confirm("确认加入重生队列？将使用当前最新的食物视觉形态提示词重新生成；旧主图会保留，直到新候选审核通过。")) return; try { const data = await api(`/food-image-audit-items/${itemId}/regenerate`, { method: "POST", body: {} }); out(data); await refreshAuditRun(); toast("已加入重生队列，将使用最新提示词进入现有审核流程"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function regenerateAuditItem(itemId) { if (!window.confirm("确认重新生图？将使用当前最新的食物视觉形态提示词创建新候选图；旧主图会保留，直到新候选审核通过。")) return; try { const data = await api(`/food-image-audit-items/${itemId}/regenerate`, { method: "POST", body: {} }); out(data); await refreshAuditRun({ reloadJobs: true }); toast("已加入重生队列，新候选图会在当前审计卡片更新"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function approveAuditCandidate(imageId, foodName) { if (!window.confirm(`确认通过 ${foodName || "该新候选图"} 并设为主图？`)) return; try { await approveImage(imageId, foodName); await refreshAuditRun({ reloadJobs: true }); toast("新候选图已通过并设为主图"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
     $("auditPreview").onclick = previewAudit; $("auditRunReview").onclick = reviewAudit;
+    $("auditRefreshStatus").onclick = () => refreshAuditRun({ reloadJobs: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("auditFilterRow").querySelectorAll("button[data-audit-filter]").forEach((button) => { button.onclick = () => { state.auditActiveFilter = button.dataset.auditFilter; $("auditFilterRow").querySelectorAll(".filter").forEach((entry) => entry.classList.toggle("active", entry === button)); renderAuditWorkspace().catch((error) => toast(apiErrorMessage(error), true)); }; });
     $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory; $("visualProfileKey").onchange = previewCategory;
     $("addPatrolRule").onclick = () => addPatrolRule().catch((error) => toast(apiErrorMessage(error), true));
     $("runPatrolNow").onclick = () => runPatrolNow().catch((error) => toast(apiErrorMessage(error), true));
