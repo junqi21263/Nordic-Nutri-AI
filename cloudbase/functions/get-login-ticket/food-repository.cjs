@@ -470,7 +470,7 @@ async function loadPrimaryImagesForFoods(db, foodsOrIds, imageUrlResolver) {
     : { data: [], error: null };
   if (profileImages.error) throw new FoodRepositoryError("FOOD_IMAGE_LOOKUP_FAILED");
   const imageByProfileId = new Map((profileImages.data ?? [])
-    .filter((row) => !row.review_status || row.review_status === "approved")
+    .filter((row) => row.review_status == null || row.review_status === "approved")
     .map((row) => [row.visual_profile_id, mapImageRow(row, { imageUrlResolver })]));
 
   const mapped = new Map();
@@ -485,7 +485,7 @@ async function loadPrimaryImagesForFoods(db, foodsOrIds, imageUrlResolver) {
     .in("food_id", missingIds).eq("is_primary", true).eq("status", "ready");
   if (legacy.error) throw new FoodRepositoryError("FOOD_IMAGE_LOOKUP_FAILED");
   for (const row of legacy.data ?? []) {
-    if ((!row.review_status || row.review_status === "approved") && !mapped.has(row.food_id)) {
+    if ((row.review_status == null || row.review_status === "approved") && !mapped.has(row.food_id)) {
       mapped.set(row.food_id, mapImageRow(row, { imageUrlResolver }));
     }
   }
@@ -603,52 +603,37 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       const size = Math.min(Math.max(Number(limit) || DEFAULT_AUDIT_IMAGE_PAGE_SIZE, 1), MAX_AUDIT_IMAGE_PAGE_SIZE);
       const parsedCursor = Number(cursor);
       const offset = Number.isInteger(parsedCursor) && parsedCursor >= 0 ? parsedCursor : 0;
-      // Fetch one extra row so callers can continue with an opaque offset
-      // cursor, while all returned candidates remain bounded by `size`.
-      const imageResult = await db.from("food_images").select("*")
-        .eq("is_primary", true)
-        .eq("status", "ready")
+      // Page over foods, not image rows, so the continuation cursor remains
+      // stable even when a food has historical primary images for other states.
+      const foodResult = await db.from("foods").select("*")
+        .eq("is_active", true)
+        .eq("publish_status", "published")
         .order("id", { ascending: true })
         .range(offset, offset + size);
-      if (imageResult.error) {
-        throw new FoodRepositoryError("FOOD_IMAGE_AUDIT_CANDIDATES_FAILED", imageResult.error.message || "旧图审计候选查询失败");
-      }
-
-      const scannedImages = imageResult.data ?? [];
-      const pageImages = scannedImages.slice(0, size)
-        .filter((image) => image.review_status == null || image.review_status === "approved");
-      const foodIds = Array.from(new Set(pageImages.map((image) => image.food_id).filter(Boolean)));
-      if (!foodIds.length) {
-        return { items: [], nextCursor: scannedImages.length > size ? String(offset + size) : null };
-      }
-
-      const foodResult = await db.from("foods").select("*")
-        .in("id", foodIds)
-        .eq("is_active", true)
-        .eq("publish_status", "published");
       if (foodResult.error) {
         throw new FoodRepositoryError("FOOD_IMAGE_AUDIT_CANDIDATES_FAILED", foodResult.error.message || "旧图审计食物查询失败");
       }
 
-      const foods = foodResult.data ?? [];
-      const foodById = new Map(foods.map((food) => [food.id, food]));
+      const scannedFoods = foodResult.data ?? [];
+      const foods = scannedFoods.slice(0, size);
       const categoryIds = Array.from(new Set(foods.map((food) => food.category_id).filter(Boolean)));
-      const [categoryMap, tagMap] = await Promise.all([
+      const [categoryMap, tagMap, imageMap] = await Promise.all([
         loadCategoriesByIds(db, categoryIds),
         loadTagsForFoods(db, foods.map((food) => food.id)),
+        loadPrimaryImagesForFoods(db, foods, imageUrlResolver),
       ]);
-      const items = pageImages.flatMap((image) => {
-        const food = foodById.get(image.food_id);
-        if (!food) return [];
+      const items = foods.flatMap((food) => {
+        const image = imageMap.get(food.id);
+        if (!image) return [];
         return [{
           food: mapFoodRow(food, {
             category: food.category_id ? categoryMap.get(food.category_id) : null,
             tags: tagMap.get(food.id) ?? [],
           }),
-          image: mapImageRow(image, { imageUrlResolver }),
+          image,
         }];
       });
-      return { items, nextCursor: scannedImages.length > size ? String(offset + size) : null };
+      return { items, nextCursor: scannedFoods.length > size ? String(offset + size) : null };
     },
 
     async listTags() {

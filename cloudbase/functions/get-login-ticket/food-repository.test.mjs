@@ -31,7 +31,7 @@ function mockDb(tables = {}) {
       is(col, val) { this._filters.push(["is", col, val]); return this; },
       or(expr) { this._or = expr; return this; },
       order(col, opts) { this._order = { col, asc: opts?.ascending }; return this; },
-      range(a, b) { this._range = [a, b]; return this; },
+      range(a, b) { this._range = [a, b]; calls.push({ t: "range", table, start: a, end: b }); return this; },
       limit(n) { this._limit = n; return this; },
       maybeSingle() { this._maybe = true; return this._resolve(); },
       single() { this._single = true; return this._resolve(); },
@@ -235,6 +235,68 @@ test("listExistingPrimaryImagesForAudit returns only approved ready primary imag
   assert.equal(result.nextCursor, null);
   assert.ok(db._calls.some((call) => call.t === "select" && call.table === "food_images"));
   assert.ok(db._calls.some((call) => call.t === "select" && call.table === "foods"));
+});
+
+test("listExistingPrimaryImagesForAudit selects the configured current visual profile once per food", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-profile", name_zh: "草莓酸奶", category_id: "c-dairy", visual_profile_key: "solid", is_active: true, publish_status: "published" },
+      { id: "f-legacy", name_zh: "苹果醋", category_id: "c-condiment", is_active: true, publish_status: "published" },
+    ],
+    food_categories: [
+      { id: "c-dairy", code: "dairy", name_zh: "乳制品", is_active: true },
+      { id: "c-condiment", code: "condiments", name_zh: "调味品", is_active: true },
+    ],
+    food_tag_relations: [],
+    food_image_visual_profiles: [
+      { id: "profile-standard", food_id: "f-profile", profile_key: "standard", is_default: true },
+      { id: "profile-solid", food_id: "f-profile", profile_key: "solid", is_default: false },
+    ],
+    food_images: [
+      { id: "image-stale-standard", food_id: "f-profile", visual_profile_id: "profile-standard", is_primary: true, status: "ready", review_status: "approved" },
+      { id: "image-current-solid", food_id: "f-profile", visual_profile_id: "profile-solid", is_primary: true, status: "ready", review_status: "approved" },
+      { id: "image-legacy", food_id: "f-legacy", is_primary: true, status: "ready", review_status: null },
+    ],
+  });
+  const repo = createFoodRepository({ db });
+
+  const result = await repo.listExistingPrimaryImagesForAudit({ limit: 20 });
+
+  assert.deepEqual(result.items.map((item) => [item.food.id, item.image.id]), [
+    ["f-legacy", "image-legacy"],
+    ["f-profile", "image-current-solid"],
+  ]);
+});
+
+test("listExistingPrimaryImagesForAudit caps at 100 foods and continues from a nonzero cursor", async () => {
+  const foods = Array.from({ length: 101 }, (_, index) => {
+    const id = `f-${String(index).padStart(3, "0")}`;
+    return { id, name_zh: id, category_id: "c-drinks", visual_profile_key: "standard", is_active: true, publish_status: "published" };
+  });
+  const profiles = foods.map((food) => ({ id: `profile-${food.id}`, food_id: food.id, profile_key: "standard", is_default: true }));
+  const images = [
+    { id: "image-000-stale", food_id: "f-000", visual_profile_id: "profile-stale", is_primary: true, status: "ready", review_status: "approved" },
+    ...foods.map((food) => ({ id: `image-current-${food.id}`, food_id: food.id, visual_profile_id: `profile-${food.id}`, is_primary: true, status: "ready", review_status: "approved" })),
+  ];
+  const db = mockDb({
+    foods,
+    food_categories: [{ id: "c-drinks", code: "beverages", name_zh: "饮品", is_active: true }],
+    food_tag_relations: [],
+    food_image_visual_profiles: profiles,
+    food_images: images,
+  });
+  const repo = createFoodRepository({ db });
+
+  const firstPage = await repo.listExistingPrimaryImagesForAudit({ limit: 999 });
+  const secondPage = await repo.listExistingPrimaryImagesForAudit({ limit: 100, cursor: firstPage.nextCursor });
+
+  assert.equal(firstPage.items.length, 100);
+  assert.deepEqual(firstPage.items.map((item) => item.food.id), foods.slice(0, 100).map((food) => food.id));
+  assert.equal(firstPage.nextCursor, "100");
+  assert.deepEqual(secondPage.items.map((item) => item.food.id), ["f-100"]);
+  assert.equal(secondPage.nextCursor, null);
+  assert.ok(db._calls.some((call) => call.t === "range" && call.table === "foods" && call.start === 0 && call.end === 100));
+  assert.ok(db._calls.some((call) => call.t === "range" && call.table === "foods" && call.start === 100 && call.end === 200));
 });
 
 test("listBatchImageCandidates expands a selected parent category to all descendant categories", async () => {
