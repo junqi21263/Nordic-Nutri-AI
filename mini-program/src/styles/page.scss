@@ -1708,10 +1708,15 @@
   color: $color-forest-green;
   font-weight: $font-weight-semibold;
 }
-.profile-feedback-bell {
+.profile-feedback-title {
   align-items: center;
   display: flex;
-  gap: $space-8;
+  gap: $space-4;
+}
+.profile-feedback-title__bell {
+  align-items: center;
+  color: $color-forest-green;
+  display: flex;
 }
 .profile-feedback-mode-picker {
   align-items: center;
@@ -1720,8 +1725,13 @@
   color: $color-text-primary;
   display: flex;
   font-weight: $font-weight-semibold;
-  justify-content: space-between;
+  justify-content: center;
   padding: $space-12 $space-16;
+  position: relative;
+}
+.profile-feedback-mode-picker Text {
+  position: absolute;
+  right: $space-16;
 }
 .profile-feedback-list {
   display: flex;
@@ -1730,6 +1740,26 @@
   gap: $space-12;
   max-height: 520px;
   overflow-y: auto;
+}
+.profile-feedback-empty {
+  align-items: center;
+  background: $color-selected-surface;
+  border-radius: $radius-12;
+  color: $color-text-secondary;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  font-size: $font-caption;
+  gap: $space-8;
+  justify-content: center;
+  min-height: 208px;
+  padding: $space-24;
+  text-align: center;
+}
+.profile-feedback-empty Text:first-child {
+  color: $color-text-primary;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
 }
 .profile-feedback-card {
   background: $color-warm-white;

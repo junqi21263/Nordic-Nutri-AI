@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 export interface ListItemProps {
   icon?: ReactNode;
-  title: string;
+  title: ReactNode;
   description?: string;
   trailing?: ReactNode;
 }
@@ -12,7 +12,7 @@ export function ListItem({ icon = "◌", title, description, trailing = "›" }:
     <View className="list-item">
       <View className="list-item__leading">{icon}</View>
       <View className="list-item__content">
-        <Text className="list-item__title">{title}</Text>
+        {typeof title === "string" ? <Text className="list-item__title">{title}</Text> : <View className="list-item__title">{title}</View>}
         {description ? <Text className="list-item__description">{description}</Text> : null}
       </View>
       <View className="list-item__trailing">{trailing}</View>

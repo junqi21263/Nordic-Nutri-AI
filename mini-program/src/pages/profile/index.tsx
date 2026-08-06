@@ -277,9 +277,9 @@ export default function ProfilePage() {
           <View onClick={() => { setFeedbackMode("submit"); setActiveModal("feedback"); }}>
             <ListItem
               icon={<NordicIcon name="heart" size={20} ariaLabel="反馈与帮助" />}
-              title="反馈与帮助"
+              title={<View className="profile-feedback-title"><Text>反馈与帮助</Text>{unreadReplyCount > 0 ? <View className="profile-feedback-title__bell"><NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" /></View> : null}</View>}
               description="告诉我们你的想法"
-              trailing={<View className="profile-feedback-bell">{unreadReplyCount > 0 ? <NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" /> : null}<Text>›</Text></View>}
+              trailing="›"
             />
           </View>
           <View onClick={() => setActiveModal("about")}>
@@ -340,7 +340,7 @@ export default function ProfilePage() {
               <View className="profile-feedback-card__head"><Text className="profile-feedback-status">{{ new: "已收到", reviewing: "处理中", resolved: "已回复", closed: "已关闭" }[item.status]}</Text><Text>{item.createdAt.slice(0, 10)}</Text></View>
               <Text className="profile-feedback-label">你的反馈</Text><Text>{item.content}</Text>
               {item.adminReply ? <View className="profile-feedback-reply"><Text className="profile-feedback-label">我们的回复</Text><Text>{item.adminReply}</Text></View> : null}
-            </View>) : <Text className="profile-modal__hint">暂时还没有提交过反馈。</Text>}
+            </View>) : <View className="profile-feedback-empty"><Text>暂无反馈记录</Text><Text>你提交的反馈会在这里显示处理进度和回复。</Text></View>}
           </View>}
         </View>
       </BottomSheet>

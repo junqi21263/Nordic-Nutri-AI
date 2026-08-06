@@ -251,7 +251,8 @@ describe("local coach and profile", () => {
     expect(appConfig).toContain("pages/privacy-policy/index");
     expect(source).toContain('title="隐私政策与免责声明"');
     expect(source).toContain("/pages/privacy-policy/index");
-    expect(source).toContain('title="反馈与帮助"');
+    expect(source).toContain('className="profile-feedback-title"');
+    expect(source).toContain("反馈与帮助");
     expect(source).toContain('title="关于我们"');
     expect(source).not.toContain('title="主题"');
     expect(source).not.toContain('title="语言"');
