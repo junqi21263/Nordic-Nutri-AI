@@ -53,7 +53,7 @@ function mockDb(tables = {}) {
         }
         if (this._or) {
           const clauses = this._or.split(",").map((c) => {
-            const m = c.match(/^(\w+)\.ilike\.\*(\w+)\*/);
+            const m = c.match(/^([\p{L}\p{N}_]+)\.ilike\.\*(.*?)\*$/u);
             if (m) return { op: "ilike", col: m[1], val: m[2] };
             const isNull = c.match(/^(\w+)\.is\.null$/);
             if (isNull) return { op: "isNull", col: isNull[1] };
@@ -296,6 +296,34 @@ test("listFoods applies search filter, pagination, and joins", async () => {
   assert.equal(result.items[0].nameEn, "Chicken breast");
   assert.equal(result.pagination.page, 1);
   assert.equal(result.pagination.pageSize, 10);
+});
+
+test("listFoods finds a selected suggestion with Chinese variant punctuation", async () => {
+  const db = mockDb({
+    foods: [
+      {
+        id: "f-instant-breakfast",
+        name_zh: "速溶早餐粉（巧克力味，无糖）",
+        normalized_name: "速溶早餐粉",
+        calories: 358,
+        protein_g: 36,
+        carbs_g: 41,
+        fat_g: 5,
+        is_active: true,
+        publish_status: "published",
+        is_primary_variant: true,
+        popularity_score: 5,
+      },
+    ],
+    food_categories: [],
+    food_tag_relations: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+
+  const result = await repo.listFoods({ q: "速溶早餐粉（巧克力味，无糖）", page: 1, pageSize: 10 });
+
+  assert.deepEqual(result.items.map((item) => item.id), ["f-instant-breakfast"]);
 });
 
 test("listFoods hides non-primary food variants while retaining ungrouped foods", async () => {

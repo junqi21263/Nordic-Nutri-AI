@@ -305,8 +305,9 @@ function sanitizeFilterTerm(raw, { maxLength = 48 } = {}) {
   const normalized = String(raw ?? "")
     .trim()
     .toLowerCase()
-    // Prefer the primary name before USDA comma lists ("Beef, cured, ..." → "Beef").
-    .split(",")[0]
+    // Prefer the primary name before USDA lists and Chinese variant labels
+    // ("Beef, cured, ..." / "速溶早餐粉（巧克力味，无糖）" → primary name).
+    .split(/[,(（，]/)[0]
     .replace(/[().*\\]/g, " ")
     .replace(/[^a-z0-9\u3400-\u9fff\s-]/gi, " ")
     .replace(/\s+/g, " ")
