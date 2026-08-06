@@ -10,12 +10,14 @@ test("0038 creates isolated food image audit runs and items", () => {
   assert.match(migration, /scope text not null default 'high_risk_processed'/i);
   assert.match(migration, /check \(scope = 'high_risk_processed'\)/i);
   assert.match(migration, /check \(status in \('previewed','reviewing','completed','completed_with_errors'\)\)/i);
+  assert.match(migration, /check \(reviewed_count <= candidate_count\)/i);
   assert.match(migration, /check \(status in \('pending_review','ai_pass','needs_review','failed','kept','regeneration_requested'\)\)/i);
 });
 
 test("0038 snapshots audit inputs with foreign keys and query indexes", () => {
   assert.match(migration, /run_id uuid not null references public\.food_image_audit_runs\(id\) on delete cascade/i);
-  assert.match(migration, /food_id uuid not null references public\.foods\(id\) on delete cascade/i);
+  assert.match(migration, /food_id uuid references public\.foods\(id\) on delete set null/i);
+  assert.doesNotMatch(migration, /food_id uuid not null references public\.foods\(id\) on delete cascade/i);
   assert.match(migration, /old_image_id uuid not null references public\.food_images\(id\) on delete restrict/i);
   assert.match(migration, /regeneration_job_id uuid references public\.food_image_jobs\(id\) on delete set null/i);
   assert.match(migration, /image_url text not null/i);
@@ -23,6 +25,25 @@ test("0038 snapshots audit inputs with foreign keys and query indexes", () => {
   assert.match(migration, /create index if not exists food_image_audit_items_run_status_idx/i);
   assert.match(migration, /create index if not exists food_image_audit_items_food_created_idx/i);
   assert.match(migration, /create index if not exists food_image_audit_items_old_image_idx/i);
+});
+
+test("0038 validates that an audited old image is the same food's ready approved primary", () => {
+  assert.match(migration, /create or replace function public\.validate_food_image_audit_item_old_image\(\)/i);
+  assert.match(migration, /from public\.food_images image/i);
+  assert.match(migration, /image\.id = new\.old_image_id/i);
+  assert.match(migration, /image\.food_id = new\.food_id/i);
+  assert.match(migration, /image\.is_primary/i);
+  assert.match(migration, /image\.status = 'ready'/i);
+  assert.match(migration, /image\.review_status = 'approved'/i);
+  assert.match(migration, /raise exception 'food_image_audit_items\.old_image_id must reference a ready approved primary image for the same food'/i);
+  assert.match(migration, /before insert or update of food_id, old_image_id on public\.food_image_audit_items/i);
+});
+
+test("0038 permits regeneration_requested only after a regeneration job is recorded", () => {
+  assert.match(
+    migration,
+    /check \(status <> 'regeneration_requested' or regeneration_job_id is not null\)/i,
+  );
 });
 
 test("0038 keeps audit tables server-only with updated timestamps", () => {

@@ -13,6 +13,7 @@ create table if not exists public.food_image_audit_runs (
     check (candidate_count >= 0),
   reviewed_count integer not null default 0
     check (reviewed_count >= 0),
+  check (reviewed_count <= candidate_count),
   created_by uuid references public.app_users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -21,7 +22,7 @@ create table if not exists public.food_image_audit_runs (
 create table if not exists public.food_image_audit_items (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references public.food_image_audit_runs(id) on delete cascade,
-  food_id uuid not null references public.foods(id) on delete cascade,
+  food_id uuid references public.foods(id) on delete set null,
   old_image_id uuid not null references public.food_images(id) on delete restrict,
   regeneration_job_id uuid references public.food_image_jobs(id) on delete set null,
   image_url text not null
@@ -47,12 +48,47 @@ create table if not exists public.food_image_audit_items (
     check (ai_confidence is null or ai_confidence between 0 and 1),
   status text not null default 'pending_review'
     check (status in ('pending_review','ai_pass','needs_review','failed','kept','regeneration_requested')),
+  check (status <> 'regeneration_requested' or regeneration_job_id is not null),
   operator_decision text
     check (operator_decision is null or operator_decision in ('keep','regenerate')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (run_id, old_image_id)
 );
+
+create or replace function public.validate_food_image_audit_item_old_image()
+returns trigger
+language plpgsql
+as $$
+begin
+  -- A food deletion intentionally nulls food_id to retain the immutable audit
+  -- snapshot. New audit rows and regular updates with a food_id must match the
+  -- food's current ready, approved primary image.
+  if new.food_id is null then
+    return new;
+  end if;
+
+  if not exists (
+    select 1
+    from public.food_images image
+    where image.id = new.old_image_id
+      and image.food_id = new.food_id
+      and image.is_primary
+      and image.status = 'ready'
+      and image.review_status = 'approved'
+  ) then
+    raise exception 'food_image_audit_items.old_image_id must reference a ready approved primary image for the same food'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists food_image_audit_items_validate_old_image on public.food_image_audit_items;
+create trigger food_image_audit_items_validate_old_image
+  before insert or update of food_id, old_image_id on public.food_image_audit_items
+  for each row execute function public.validate_food_image_audit_item_old_image();
 
 create index if not exists food_image_audit_runs_status_created_idx
   on public.food_image_audit_runs (status, created_at desc);
