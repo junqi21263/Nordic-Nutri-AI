@@ -11,6 +11,8 @@ test("0038 creates isolated food image audit runs and items", () => {
   assert.match(migration, /check \(scope = 'high_risk_processed'\)/i);
   assert.match(migration, /check \(status in \('previewed','reviewing','completed','completed_with_errors'\)\)/i);
   assert.match(migration, /check \(reviewed_count <= candidate_count\)/i);
+  assert.match(migration, /cached service-maintained audit candidate summary/i);
+  assert.match(migration, /intentionally not maintained by a row-count trigger/i);
   assert.match(migration, /check \(status in \('pending_review','ai_pass','needs_review','failed','kept','regeneration_requested'\)\)/i);
 });
 
@@ -59,11 +61,22 @@ test("0038 preserves food-delete history only through a transaction-local GUC", 
   assert.match(migration, /before delete on public\.foods/i);
 });
 
-test("0038 validates regeneration jobs and preserves history before a job delete", () => {
+test("0038 enforces audit state, decision, and regeneration job consistency", () => {
   assert.match(
     migration,
-    /check \(status <> 'regeneration_requested' or regeneration_job_id is not null\)/i,
+    /status = 'regeneration_requested'\s+and operator_decision is not distinct from 'regenerate'\s+and regeneration_job_id is not null/i,
   );
+  assert.match(
+    migration,
+    /status = 'kept'\s+and operator_decision is not distinct from 'keep'\s+and regeneration_job_id is null/i,
+  );
+  assert.match(
+    migration,
+    /status not in \('regeneration_requested','kept'\)\s+and operator_decision is null\s+and regeneration_job_id is null/i,
+  );
+});
+
+test("0038 validates regeneration jobs and preserves history before a job delete", () => {
   assert.match(migration, /create or replace function public\.validate_food_image_audit_item_regeneration_job\(\)/i);
   assert.match(migration, /if new\.regeneration_job_id is null or new\.food_id is null then/i);
   assert.match(migration, /from public\.food_image_jobs job/i);
@@ -76,6 +89,19 @@ test("0038 validates regeneration jobs and preserves history before a job delete
   assert.match(migration, /set status = 'needs_review',\s+regeneration_job_id = null,\s+operator_decision = null/i);
   assert.match(migration, /where regeneration_job_id = old\.id\s+and status = 'regeneration_requested'/i);
   assert.match(migration, /before delete on public\.food_image_jobs/i);
+});
+
+test("0038 makes audit snapshots immutable after creation", () => {
+  assert.match(migration, /create or replace function public\.prevent_food_image_audit_item_snapshot_mutation\(\)/i);
+  assert.match(migration, /new\.old_image_id is distinct from old\.old_image_id/i);
+  assert.match(migration, /new\.image_url is distinct from old\.image_url/i);
+  assert.match(migration, /new\.visual_type is distinct from old\.visual_type/i);
+  assert.match(migration, /new\.decision_source is distinct from old\.decision_source/i);
+  assert.match(migration, /new\.matched_keywords is distinct from old\.matched_keywords/i);
+  assert.match(migration, /new\.risk_reasons is distinct from old\.risk_reasons/i);
+  assert.match(migration, /new\.prompt_plan_json is distinct from old\.prompt_plan_json/i);
+  assert.match(migration, /food_image_audit_items snapshots are immutable after creation/i);
+  assert.match(migration, /before update of old_image_id, image_url, visual_type, decision_source, matched_keywords, risk_reasons, prompt_plan_json/i);
 });
 
 test("0038 keeps audit tables server-only with updated timestamps", () => {

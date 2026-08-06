@@ -48,9 +48,19 @@ create table if not exists public.food_image_audit_items (
     check (ai_confidence is null or ai_confidence between 0 and 1),
   status text not null default 'pending_review'
     check (status in ('pending_review','ai_pass','needs_review','failed','kept','regeneration_requested')),
-  check (status <> 'regeneration_requested' or regeneration_job_id is not null),
   operator_decision text
     check (operator_decision is null or operator_decision in ('keep','regenerate')),
+  check (
+    (status = 'regeneration_requested'
+      and operator_decision is not distinct from 'regenerate'
+      and regeneration_job_id is not null)
+    or (status = 'kept'
+      and operator_decision is not distinct from 'keep'
+      and regeneration_job_id is null)
+    or (status not in ('regeneration_requested','kept')
+      and operator_decision is null
+      and regeneration_job_id is null)
+  ),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (run_id, old_image_id)
@@ -101,6 +111,31 @@ drop trigger if exists food_image_audit_items_validate_old_image on public.food_
 create trigger food_image_audit_items_validate_old_image
   before insert or update of food_id, old_image_id on public.food_image_audit_items
   for each row execute function public.validate_food_image_audit_item_old_image();
+
+create or replace function public.prevent_food_image_audit_item_snapshot_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.old_image_id is distinct from old.old_image_id
+    or new.image_url is distinct from old.image_url
+    or new.visual_type is distinct from old.visual_type
+    or new.decision_source is distinct from old.decision_source
+    or new.matched_keywords is distinct from old.matched_keywords
+    or new.risk_reasons is distinct from old.risk_reasons
+    or new.prompt_plan_json is distinct from old.prompt_plan_json then
+    raise exception 'food_image_audit_items snapshots are immutable after creation'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists food_image_audit_items_prevent_snapshot_mutation on public.food_image_audit_items;
+create trigger food_image_audit_items_prevent_snapshot_mutation
+  before update of old_image_id, image_url, visual_type, decision_source, matched_keywords, risk_reasons, prompt_plan_json
+  on public.food_image_audit_items
+  for each row execute function public.prevent_food_image_audit_item_snapshot_mutation();
 
 create or replace function public.preserve_food_image_audit_history_before_food_delete()
 returns trigger
@@ -183,6 +218,11 @@ create index if not exists food_image_audit_items_food_created_idx
   on public.food_image_audit_items (food_id, created_at desc);
 create index if not exists food_image_audit_items_old_image_idx
   on public.food_image_audit_items (old_image_id);
+
+comment on column public.food_image_audit_runs.candidate_count is
+  'Cached service-maintained audit candidate summary; intentionally not maintained by a row-count trigger.';
+comment on column public.food_image_audit_runs.reviewed_count is
+  'Cached service-maintained audit reviewed summary; intentionally not maintained by a row-count trigger.';
 
 drop trigger if exists food_image_audit_runs_set_updated_at on public.food_image_audit_runs;
 create trigger food_image_audit_runs_set_updated_at
