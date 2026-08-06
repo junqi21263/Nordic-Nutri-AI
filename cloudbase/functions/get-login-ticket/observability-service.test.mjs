@@ -97,15 +97,16 @@ test("recordMetric swallows insert failures", async () => {
 });
 
 test("getOverview aggregates vision, rate limit, cancel, and coach metrics", async () => {
+  const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60 * 1000).toISOString();
   const metrics = [
-    { metric: "vision_success", value: 3, created_at: "2026-08-05T10:00:00.000Z" },
-    { metric: "vision_failure", value: 1, created_at: "2026-08-05T10:01:00.000Z" },
-    { metric: "vision_latency_ms", value: 100, created_at: "2026-08-05T10:00:00.000Z" },
-    { metric: "vision_latency_ms", value: 500, created_at: "2026-08-05T10:01:00.000Z" },
-    { metric: "rate_limited", value: 2, created_at: "2026-08-05T10:02:00.000Z" },
-    { metric: "account_cancel_success", value: 1, created_at: "2026-08-05T10:03:00.000Z" },
-    { metric: "coach_message", value: 4, created_at: "2026-08-05T10:04:00.000Z" },
-    { metric: "coach_limited", value: 1, created_at: "2026-08-05T10:05:00.000Z" },
+    { metric: "vision_success", value: 3, created_at: minutesAgo(8) },
+    { metric: "vision_failure", value: 1, created_at: minutesAgo(7) },
+    { metric: "vision_latency_ms", value: 100, created_at: minutesAgo(8) },
+    { metric: "vision_latency_ms", value: 500, created_at: minutesAgo(7) },
+    { metric: "rate_limited", value: 2, created_at: minutesAgo(6) },
+    { metric: "account_cancel_success", value: 1, created_at: minutesAgo(5) },
+    { metric: "coach_message", value: 4, created_at: minutesAgo(4) },
+    { metric: "coach_limited", value: 1, created_at: minutesAgo(3) },
   ];
   const { db } = createDb({ metrics });
   const service = createObservabilityService({ db });
