@@ -569,7 +569,7 @@
               <div id="filterRow" class="filter-row" aria-label="批次项目筛选">
                 <button class="filter" data-filter="all">全部</button><button class="filter active" data-filter="needs_review">待审核</button><button class="filter" data-filter="needs_retry">待重试</button><button class="filter" data-filter="failed">失败</button><button class="filter" data-filter="generating">生成中</button>
               </div>
-              <div id="bulkReviewBar" class="bulk-review-bar" hidden><label class="bulk-review-label"><input id="selectAllReview" type="checkbox" /> 选择当前待审核候选图</label><button id="approveSelected" class="button" disabled>批量通过并设为主图（0）</button></div>
+              <div id="bulkReviewBar" class="bulk-review-bar" hidden><label class="bulk-review-label"><input id="selectAllReview" type="checkbox" /> 选择当前待审核候选图</label><button id="approveSelected" class="button" disabled>批量通过并设为主图（0）</button><button id="regenerateSelected" class="button secondary" disabled>批量重新生图（0）</button></div>
               <div id="reviewGrid" class="queue-loading">请连接后台后加载候选图。</div>
             </section>
 
@@ -1478,12 +1478,14 @@
     async function loadJobCandidates(jobId) { if (!jobId) return null; if (state.jobs.has(jobId)) return state.jobs.get(jobId); const data = await api(`/food-image-jobs/${jobId}`, { quiet: true }); state.jobs.set(jobId, data); return data; }
     async function hydrateQueue(items) { const result = new Map(); let cursor = 0; const workers = Array.from({ length: Math.min(4, items.length) }, async () => { while (cursor < items.length) { const item = items[cursor++]; if (!item.jobId) continue; try { result.set(item.jobId, await loadJobCandidates(item.jobId)); } catch { result.set(item.jobId, null); } } }); await Promise.all(workers); return result; }
     function syncBulkControls(candidateIds = []) {
-      const bar = $("bulkReviewBar"); const selectAll = $("selectAllReview"); const approve = $("approveSelected");
+      const bar = $("bulkReviewBar"); const selectAll = $("selectAllReview"); const approve = $("approveSelected"); const regenerate = $("regenerateSelected");
       state.selectedImageIds = new Set([...state.selectedImageIds].filter((id) => candidateIds.includes(id)));
       bar.hidden = state.activeFilter !== "needs_review" || !candidateIds.length;
       selectAll.checked = Boolean(candidateIds.length) && candidateIds.every((id) => state.selectedImageIds.has(id));
       approve.disabled = !state.selectedImageIds.size;
       approve.textContent = `批量通过并设为主图（${state.selectedImageIds.size}）`;
+      regenerate.disabled = !state.selectedImageIds.size;
+      regenerate.textContent = `批量重新生图（${state.selectedImageIds.size}）`;
     }
     async function renderQueue() {
       const batch = selectedBatch(); const items = filteredItems(); $("queueTitle").textContent = batch ? batch.name : "待审核候选图"; $("reviewCopy").textContent = batch ? `总数 ${batch.totalCount || 0} · 已完成 ${progress(batch).terminal} · 失败 ${batch.failedCount || 0}` : "连接后显示批次进度";
@@ -1509,7 +1511,7 @@
         const exception = (item.errorCode || reason) ? `<span class="card-exception">${escapeHtml(item.errorCode || "失败")}${reason ? ` · ${escapeHtml(reason)}` : ""}</span>` : "";
         const retryLabel = item.status === "generating" ? "取消并重试" : item.status === "needs_review" ? "重新生图" : "立即重试";
         const selectControl = canSelect
-          ? `<label class="card-select-label" aria-label="选择候选图"><input type="checkbox" data-candidate-select="${candidate.id}" ${state.selectedImageIds.has(candidate.id) ? "checked" : ""} /></label>`
+          ? `<label class="card-select-label" aria-label="选择候选图"><input type="checkbox" data-candidate-select="${candidate.id}" data-batch-item-id="${item.id}" ${state.selectedImageIds.has(candidate.id) ? "checked" : ""} /></label>`
           : "";
         const retryControl = canRetry
           ? `<button class="button secondary" data-retry-item-id="${escapeHtml(item.id)}" data-retry-job-id="${escapeHtml(item.jobId || "")}" data-food-name="${escapeHtml(name)}">${retryLabel}</button>`
@@ -1607,6 +1609,24 @@
       for (const imageId of imageIds) { try { await approveImage(imageId); } catch (error) { failures.push(apiErrorMessage(error)); } }
       state.selectedImageIds.clear(); await refreshBatches();
       if (failures.length) { recordOperation({ title: "批量审核部分失败", detail: failures.join("；"), isError: true }); toast(`${imageIds.length - failures.length}/${imageIds.length} 张已通过，${failures.length} 张失败`, true); } else toast(`已通过并设为主图 ${imageIds.length} 张候选图`);
+    }
+    async function regenerateSelectedImages() {
+      const itemIds = [...new Set([...document.querySelectorAll("input[data-candidate-select]:checked")].map((input) => input.dataset.batchItemId).filter(Boolean))];
+      if (!itemIds.length) return;
+      if (!window.confirm(`确认重新生成 ${itemIds.length} 张候选图？将取消当前候选图，并使用当前最新的食物视觉形态提示词创建新任务；新图仍需审核，不会自动设为主图。`)) return;
+      $("regenerateSelected").disabled = true; const failures = [];
+      for (const itemId of itemIds) {
+        try { await api(`/food-image-batch-items/${itemId}/retry`, { method: "POST", body: {} }); }
+        catch (error) { failures.push(apiErrorMessage(error)); }
+      }
+      state.selectedImageIds.clear(); await refreshBatches();
+      if (failures.length) {
+        recordOperation({ title: "批量重新生图部分失败", detail: failures.join("；"), isError: true });
+        toast(`${itemIds.length - failures.length}/${itemIds.length} 张已提交重新生图，${failures.length} 张失败`, true);
+      } else {
+        recordOperation({ title: "批量重新生图已提交", detail: `${itemIds.length} 张候选图已按最新提示词重新生成，等待审核。` });
+        toast(`已提交 ${itemIds.length} 张重新生图任务`);
+      }
     }
     const REJECT_REASON_OPTIONS = [
       { code: "wrong_identity", label: "认错食材", hint: "品类或主体不对" },
@@ -2574,6 +2594,7 @@
       syncBulkControls(candidateIds);
     };
     $("approveSelected").onclick = approveSelectedImages;
+    $("regenerateSelected").onclick = regenerateSelectedImages;
     showLoginGate();
     if (hasToken()) connect().catch(() => {});
   </script>

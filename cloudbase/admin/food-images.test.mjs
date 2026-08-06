@@ -166,6 +166,15 @@ test("review queue supports selectable batch approval and an operator workflow g
   assert.match(source, /async function approveSelectedImages\(/);
 });
 
+test("review queue can batch regenerate selected candidates through the existing retry route", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="regenerateSelected"/);
+  assert.match(source, /async function regenerateSelectedImages\(/);
+  assert.match(source, /data-batch-item-id=/);
+  assert.match(source, /food-image-batch-items\/\$\{itemId\}\/retry/);
+  assert.match(source, /当前最新的食物视觉形态提示词/);
+});
+
 test("category preview exposes a clickable selected-food panel instead of a count only", async () => {
   const source = await pageSource();
   assert.match(source, /id="selectionPreviewPanel"/);
