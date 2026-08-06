@@ -479,6 +479,15 @@
           </details>
 
           <div class="composer-deck" aria-label="生图批次配置">
+            <section class="batch-controller composer-card" aria-label="历史主图审计">
+              <div class="composer-card__head"><div class="composer-card__copy"><p class="eyebrow">Historical audit</p><h2>旧图审计</h2><p class="muted">仅扫描高风险加工食品的现有主图；AI 复核与重新生图均不会自动替换旧主图。</p></div></div>
+              <div class="composer-form composer-form--with-actions">
+                <label class="batch-control-field" for="auditCount">扫描数量<select id="auditCount"><option value="20">20 条</option><option value="50" selected>50 条</option><option value="100">100 条</option></select></label>
+                <div class="composer-actions"><button id="auditPreview" class="button secondary" type="button">预览风险项</button><button id="auditRunReview" class="button" type="button" disabled>执行 AI 复核</button></div>
+              </div>
+              <p id="auditSelectionNote" class="batch-selection-note">范围：饮料粉、酒类、醋、酱料、乳制品、粉末、罐头、零食和熟食等高风险加工食品。</p>
+              <div id="auditPreviewPanel" class="selection-preview-panel" aria-live="polite"></div>
+            </section>
             <section class="batch-controller composer-card" aria-label="自动巡检生图">
               <div class="composer-card__head">
                 <div class="composer-card__copy">
@@ -813,7 +822,7 @@
       const entry = moduleCache[key];
       return Boolean(entry && Date.now() - entry.at < MODULE_CACHE_TTL_MS);
     }
-    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, batchRailCollapsed: false };
+    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, auditRun: null, auditItems: [], auditSelectedIds: new Set(), batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, batchRailCollapsed: false };
     try { state.batchRailCollapsed = localStorage.getItem(CREDENTIAL_KEYS.batchRailCollapsed) === "1"; } catch { /* ignore */ }
     // Same root taxonomy as mini-program food library chips (STANDARD_FOOD_CATEGORY_ROOT_CODES).
     const FOOD_LIBRARY_ROOT_CODES = ["meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables", "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples", "nordic_staples", "north_american_staples"];
@@ -2500,6 +2509,33 @@
     $("refreshQueue").onclick = () => refreshBatches().catch((error) => toast(apiErrorMessage(error), true));
     $("loadStats").onclick = loadStats;
     $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
+    function auditItemLabel(item) { return foodLabel(item.food || item) || item.foodNameZh || "未命名食材"; }
+    function auditStatusLabel(status) { return ({ pending_review: "待 AI 复核", ai_pass: "AI 通过", needs_review: "需要人工复核", failed: "复核失败", kept: "保留旧图", regeneration_requested: "已加入重生队列" })[status] || status || "待处理"; }
+    function renderAuditPreview() {
+      const host = $("auditPreviewPanel"); const items = state.auditItems || [];
+      if (!items.length) { host.classList.remove("visible"); host.innerHTML = ""; return; }
+      host.classList.add("visible");
+      host.innerHTML = `<p>本次发现 ${items.length} 条高风险旧图。勾选后执行 AI 复核；AI 结论仅供审核，不会替换主图。</p><div class="preview-foods">${items.map((item) => `<div class="preview-food ${state.auditSelectedIds.has(item.id) ? "selected" : ""}"><button type="button" data-audit-item-id="${escapeHtml(item.id)}">${escapeHtml(auditItemLabel(item))} · ${escapeHtml(item.visualTypeLabelZh || item.visualType || "未知形态")} · ${escapeHtml(auditStatusLabel(item.status))}</button><span><button class="button link" type="button" data-audit-keep-id="${escapeHtml(item.id)}">保留旧图</button><button class="button link" type="button" data-audit-regenerate-id="${escapeHtml(item.id)}">加入重生队列</button></span></div>`).join("")}</div>`;
+      host.querySelectorAll("button[data-audit-item-id]").forEach((button) => { button.onclick = () => { const id = button.dataset.auditItemId; if (state.auditSelectedIds.has(id)) state.auditSelectedIds.delete(id); else state.auditSelectedIds.add(id); renderAuditPreview(); }; });
+      host.querySelectorAll("button[data-audit-keep-id]").forEach((button) => { button.onclick = () => keepAuditItem(button.dataset.auditKeepId); });
+      host.querySelectorAll("button[data-audit-regenerate-id]").forEach((button) => { button.onclick = () => regenerateAuditItem(button.dataset.auditRegenerateId); });
+    }
+    async function previewAudit() {
+      try {
+        const data = await api("/food-image-audits/preview", { method: "POST", body: { count: Number($("auditCount").value || 50) } });
+        state.auditRun = data.run || data; state.auditItems = data.items || data.run?.items || []; state.auditSelectedIds = new Set(state.auditItems.map((item) => item.id));
+        $("auditRunReview").disabled = !state.auditSelectedIds.size; $("auditSelectionNote").textContent = `已创建只读审计：${state.auditItems.length} 条风险项。请选择条目后执行 AI 复核。`; renderAuditPreview(); out(data); toast("风险项预览完成");
+      } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); }
+    }
+    async function reviewAudit() {
+      const runId = state.auditRun?.id; const itemIds = [...state.auditSelectedIds]; if (!runId || !itemIds.length) return toast("请先预览并选择风险项", true);
+      if (!window.confirm(`确认调用 AI 复核 ${itemIds.length} 张旧图？该操作不会替换主图。`)) return;
+      try { const data = await api(`/food-image-audits/${runId}/review`, { method: "POST", body: { itemIds } }); state.auditRun = data.run || state.auditRun; state.auditItems = data.items || state.auditItems; renderAuditPreview(); out(data); toast("AI 复核完成，请在审计清单中人工确认"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); }
+    }
+    async function refreshAuditRun() { if (!state.auditRun?.id) return; const data = await api(`/food-image-audits/${state.auditRun.id}`); state.auditRun = data.run || data; state.auditItems = data.items || data.run?.items || []; renderAuditPreview(); }
+    async function keepAuditItem(itemId) { if (!window.confirm("确认保留当前旧主图？该决定不会删除图片。")) return; try { const data = await api(`/food-image-audit-items/${itemId}/keep`, { method: "POST", body: {} }); out(data); await refreshAuditRun(); toast("已保留旧图"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function regenerateAuditItem(itemId) { if (!window.confirm("确认加入重生队列？旧主图会保留，直到新候选审核通过。")) return; try { const data = await api(`/food-image-audit-items/${itemId}/regenerate`, { method: "POST", body: {} }); out(data); await refreshAuditRun(); toast("已加入重生队列，候选图将进入现有审核流程"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    $("auditPreview").onclick = previewAudit; $("auditRunReview").onclick = reviewAudit;
     $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory; $("visualProfileKey").onchange = previewCategory;
     $("addPatrolRule").onclick = () => addPatrolRule().catch((error) => toast(apiErrorMessage(error), true));
     $("runPatrolNow").onclick = () => runPatrolNow().catch((error) => toast(apiErrorMessage(error), true));

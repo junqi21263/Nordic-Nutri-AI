@@ -433,3 +433,14 @@ test("persists admin credentials in localStorage and auto-connects on reload", a
   assert.match(source, /saveCredentials\(\)/);
   assert.doesNotMatch(source, /管理员 Bearer Token/);
 });
+
+test("food image admin exposes a safe old-image audit workflow", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="auditPreview"/);
+  assert.match(source, /id="auditRunReview"/);
+  assert.match(source, /保留旧图/);
+  assert.match(source, /加入重生队列/);
+  assert.match(source, /food-image-audits\/preview/);
+  assert.match(source, /food-image-audit-items\/\$\{itemId\}\/regenerate/);
+  assert.match(source, /旧主图会保留，直到新候选审核通过/);
+});
