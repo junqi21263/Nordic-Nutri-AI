@@ -257,6 +257,14 @@ test("admin console shell uses left nav modules and renames the page", async () 
   assert.match(source, /内容安全/);
 });
 
+test("old image audit is a standalone admin module with explicit latest-prompt regeneration copy", async () => {
+  const source = await pageSource();
+  assert.match(source, /data-module="audit"[^>]*>旧图审计/);
+  assert.match(source, /id="moduleAudit" class="admin-module" hidden/);
+  assert.match(source, /\$\("moduleAudit"\)\.hidden = name !== "audit"/);
+  assert.match(source, /重新生图会使用当前最新的食物视觉形态提示词/);
+});
+
 test("user images module wires list delete and purge APIs", async () => {
   const source = await pageSource();
   assert.match(source, /id="userImageKindFilter"/);
@@ -382,17 +390,21 @@ test("admin food categories match food-library root taxonomy only", async () => 
   assert.doesNotMatch(source, /seafood\.marine_fish|海水鱼/);
 });
 
-test("connection settings sit in system config while image tools live under 食材生图", async () => {
+test("connection settings sit in system config while patrol and old-image audit have separate workspaces", async () => {
   const source = await pageSource();
+  const audit = source.indexOf('id="moduleAudit"');
   const images = source.indexOf('id="moduleImages"');
   const system = source.indexOf('id="moduleSystem"');
   const guide = source.indexOf('id="workflowGuide"');
   const tools = source.indexOf('id="utilityDrawer"');
-  const batch = source.indexOf('class="composer-deck"');
+  const auditCard = source.indexOf('aria-label="历史主图审计"');
+  const patrolCard = source.indexOf('aria-label="自动巡检生图"');
   assert.ok(images >= 0 && system > images, "system module after images module");
+  assert.ok(audit >= 0 && audit < images, "audit workspace before images module");
+  assert.ok(auditCard > audit && auditCard < images, "audit card inside audit workspace");
   assert.ok(guide > images && guide < system, "workflow guide inside images");
+  assert.ok(patrolCard > images && patrolCard < system, "patrol controls inside images");
   assert.ok(tools > system, "connection tools inside system");
-  assert.ok(batch > images && batch < system, "batch composer inside images");
   assert.match(source, /会话与诊断/);
 });
 

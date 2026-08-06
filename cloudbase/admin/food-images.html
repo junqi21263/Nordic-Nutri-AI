@@ -409,6 +409,7 @@
         <button type="button" class="admin-nav__item" data-module="feedback">问题反馈</button>
         <button type="button" class="admin-nav__item" data-module="foods">食材管理</button>
         <button type="button" class="admin-nav__item active" data-module="images">食材生图</button>
+        <button type="button" class="admin-nav__item" data-module="audit">旧图审计</button>
         <button type="button" class="admin-nav__item" data-module="ops">运营总览</button>
         <button type="button" class="admin-nav__item" data-module="quota">额度管理</button>
         <button type="button" class="admin-nav__item" data-module="user-images">用户图片</button>
@@ -472,15 +473,14 @@
           </div>
         </section>
 
-        <section id="moduleImages" class="admin-module">
-          <details id="workflowGuide" class="workflow-guide">
-            <summary>操作流程与状态说明</summary>
-            <div class="workflow-steps"><div class="workflow-step"><b>1. 自动巡检</b><span>选分类 → 添加规则或点「立即巡检」；云端自动建批生图。</span></div><div class="workflow-step"><b>2. 审核候选图</b><span>在下方队列通过/拒绝；拒绝会自动重试。</span></div><div class="workflow-step"><b>3. 必要时手工建批</b><span>展开「手工建批」预览选材后一键创建并启动。</span></div></div>
+        <section id="moduleAudit" class="admin-module" hidden>
+          <details class="workflow-guide" open>
+            <summary>旧图审计说明</summary>
+            <div class="workflow-steps"><div class="workflow-step"><b>1. 预览风险项</b><span>仅扫描高风险加工食品的已审核主图，不会修改现有图片。</span></div><div class="workflow-step"><b>2. AI 复核</b><span>选择风险项后执行视觉复核；AI 结论仅供人工判断。</span></div><div class="workflow-step"><b>3. 人工决策</b><span>可保留旧图，或加入重生队列。重新生图会使用当前最新的食物视觉形态提示词，旧主图会保留至新候选审核通过。</span></div></div>
           </details>
-
-          <div class="composer-deck" aria-label="生图批次配置">
+          <div class="composer-deck" aria-label="旧图审计工作区">
             <section class="batch-controller composer-card" aria-label="历史主图审计">
-              <div class="composer-card__head"><div class="composer-card__copy"><p class="eyebrow">Historical audit</p><h2>旧图审计</h2><p class="muted">仅扫描高风险加工食品的现有主图；AI 复核与重新生图均不会自动替换旧主图。</p></div></div>
+              <div class="composer-card__head"><div class="composer-card__copy"><p class="eyebrow">Historical audit</p><h2>旧图审计</h2><p class="muted">扫描高风险加工食品的现有主图；AI 复核和重新生图均不会自动替换旧主图。</p></div></div>
               <div class="composer-form composer-form--with-actions">
                 <label class="batch-control-field" for="auditCount">扫描数量<select id="auditCount"><option value="20">20 条</option><option value="50" selected>50 条</option><option value="100">100 条</option></select></label>
                 <div class="composer-actions"><button id="auditPreview" class="button secondary" type="button">预览风险项</button><button id="auditRunReview" class="button" type="button" disabled>执行 AI 复核</button></div>
@@ -488,6 +488,16 @@
               <p id="auditSelectionNote" class="batch-selection-note">范围：饮料粉、酒类、醋、酱料、乳制品、粉末、罐头、零食和熟食等高风险加工食品。</p>
               <div id="auditPreviewPanel" class="selection-preview-panel" aria-live="polite"></div>
             </section>
+          </div>
+        </section>
+
+        <section id="moduleImages" class="admin-module">
+          <details id="workflowGuide" class="workflow-guide">
+            <summary>操作流程与状态说明</summary>
+            <div class="workflow-steps"><div class="workflow-step"><b>1. 自动巡检</b><span>选分类 → 添加规则或点「立即巡检」；云端自动建批生图。</span></div><div class="workflow-step"><b>2. 审核候选图</b><span>在下方队列通过/拒绝；拒绝会自动重试。</span></div><div class="workflow-step"><b>3. 必要时手工建批</b><span>展开「手工建批」预览选材后一键创建并启动。</span></div></div>
+          </details>
+
+          <div class="composer-deck" aria-label="生图批次配置">
             <section class="batch-controller composer-card" aria-label="自动巡检生图">
               <div class="composer-card__head">
                 <div class="composer-card__copy">
@@ -2371,6 +2381,7 @@
       $("moduleFeedback").hidden = name !== "feedback";
       $("moduleFoods").hidden = name !== "foods";
       $("moduleImages").hidden = name !== "images";
+      $("moduleAudit").hidden = name !== "audit";
       $("moduleOps").hidden = name !== "ops";
       $("moduleQuota").hidden = name !== "quota";
       if ($("moduleUserImages")) $("moduleUserImages").hidden = name !== "user-images";
@@ -2379,6 +2390,7 @@
       if (name === "users") loadUsers().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "feedback") loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "foods") loadFoodAdminList().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "audit") refreshAuditRun().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "ops") loadOpsOverview().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "quota") loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "user-images") loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
@@ -2509,7 +2521,12 @@
     $("refreshQueue").onclick = () => refreshBatches().catch((error) => toast(apiErrorMessage(error), true));
     $("loadStats").onclick = loadStats;
     $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
-    function auditItemLabel(item) { return foodLabel(item.food || item) || item.foodNameZh || "未命名食材"; }
+    function auditItemLabel(item) {
+      const food = item?.food || item || {};
+      const plan = item?.promptPlan || item?.prompt_plan_json || {};
+      return food.nameZh || food.name || food.nameEn || food.name_zh || food.name_en
+        || plan.foodNameZh || plan.foodNameEn || item?.foodNameZh || item?.foodNameEn || "未命名食材";
+    }
     function auditStatusLabel(status) { return ({ pending_review: "待 AI 复核", ai_pass: "AI 通过", needs_review: "需要人工复核", failed: "复核失败", kept: "保留旧图", regeneration_requested: "已加入重生队列" })[status] || status || "待处理"; }
     function renderAuditPreview() {
       const host = $("auditPreviewPanel"); const items = state.auditItems || [];
@@ -2534,7 +2551,7 @@
     }
     async function refreshAuditRun() { if (!state.auditRun?.id) return; const data = await api(`/food-image-audits/${state.auditRun.id}`); state.auditRun = data.run || data; state.auditItems = data.items || data.run?.items || []; renderAuditPreview(); }
     async function keepAuditItem(itemId) { if (!window.confirm("确认保留当前旧主图？该决定不会删除图片。")) return; try { const data = await api(`/food-image-audit-items/${itemId}/keep`, { method: "POST", body: {} }); out(data); await refreshAuditRun(); toast("已保留旧图"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
-    async function regenerateAuditItem(itemId) { if (!window.confirm("确认加入重生队列？旧主图会保留，直到新候选审核通过。")) return; try { const data = await api(`/food-image-audit-items/${itemId}/regenerate`, { method: "POST", body: {} }); out(data); await refreshAuditRun(); toast("已加入重生队列，候选图将进入现有审核流程"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
+    async function regenerateAuditItem(itemId) { if (!window.confirm("确认加入重生队列？将使用当前最新的食物视觉形态提示词重新生成；旧主图会保留，直到新候选审核通过。")) return; try { const data = await api(`/food-image-audit-items/${itemId}/regenerate`, { method: "POST", body: {} }); out(data); await refreshAuditRun(); toast("已加入重生队列，将使用最新提示词进入现有审核流程"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
     $("auditPreview").onclick = previewAudit; $("auditRunReview").onclick = reviewAudit;
     $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory; $("visualProfileKey").onchange = previewCategory;
     $("addPatrolRule").onclick = () => addPatrolRule().catch((error) => toast(apiErrorMessage(error), true));
