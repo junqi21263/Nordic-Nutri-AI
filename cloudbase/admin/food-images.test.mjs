@@ -113,6 +113,10 @@ test("prompt inspector exposes visual type diagnostics and a manual override", a
   assert.match(source, /命中的关键词/);
   assert.match(source, /最终正向提示词/);
   assert.match(source, /最终负向提示词/);
+  assert.match(source, /饮品子类型/);
+  assert.match(source, /忽略的低优先级关键词/);
+  assert.match(source, /被排除的候选类型/);
+  assert.match(source, /最终规则优先级/);
   assert.match(source, /id="visualTypeOverride"/);
   assert.match(source, /saveVisualTypeOverride/);
   assert.match(source, /visualType/);

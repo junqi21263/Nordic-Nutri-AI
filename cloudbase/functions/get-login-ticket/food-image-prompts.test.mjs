@@ -7,10 +7,63 @@ const {
   buildFoodImagePrompt,
   buildFoodImagePromptPlan,
   resolveFoodVisualType,
+  resolveFlavor,
   MAX_PROMPT_CHARS,
   REJECT_REASON_CODES,
   formatRejectCorrection,
 } = promptModule;
+
+test("ready-to-drink tea outranks lemon flavor and uses the liquid tea template", () => {
+  const food = {
+    nameZh: "柠檬味无糖即饮茶",
+    nameEn: "lemon diet ready-to-drink tea",
+    category: { nameZh: "其他非酒精饮品", code: "beverages" },
+  };
+  const resolved = resolveFoodVisualType(food);
+  const plan = buildFoodImagePromptPlan({
+    foodNameZh: food.nameZh,
+    foodNameEn: food.nameEn,
+    category: food.category.nameZh,
+    categoryCode: food.category.code,
+  });
+  assert.equal(resolved.visualType, "beverage_liquid");
+  assert.ok(resolved.matchedKeywords.includes("即饮茶"));
+  assert.ok(resolved.matchedKeywords.includes("ready-to-drink tea"));
+  assert.equal(resolved.beverageSubtype, "ready_to_drink_tea");
+  assert.ok(resolved.ignoredKeywords.includes("柠檬"));
+  assert.ok(resolved.excludedVisualTypes.includes("whole_fruit"));
+  assert.equal(plan.templateName, "Ready-to-Drink Tea Template");
+  assert.match(plan.subject, /茶饮液体/);
+  assert.match(plan.negativePrompt, /完整柠檬/);
+  assert.match(plan.negativePrompt, /干燥茶叶主体/);
+  // The image model only receives the positive prompt, so the focused
+  // anti-ambiguity terms must survive its 500-character budget too.
+  assert.match(plan.prompt, /完整水果/);
+  assert.match(plan.prompt, /干燥茶叶主体/);
+  assert.doesNotMatch(plan.subject, /自然表皮|果肉切面/);
+  assert.equal(plan.foodProcessingLevel, "processed");
+  assert.equal(plan.foodProcessingLabel, "即饮饮品");
+});
+
+test("explicit tea leaves stay tea_leaf while finished tea drinks stay beverage_liquid", () => {
+  const cases = [
+    [{ nameZh: "柠檬风味红茶茶叶", nameEn: "lemon flavored black tea leaves" }, "tea_leaf"],
+    [{ nameZh: "无糖绿茶饮料" }, "beverage_liquid"],
+    [{ nameZh: "瓶装乌龙茶" }, "beverage_liquid"],
+    [{ nameZh: "蜜桃味即饮红茶" }, "beverage_liquid"],
+    [{ nameEn: "lemon iced tea" }, "beverage_liquid"],
+    [{ nameEn: "bottled green tea" }, "beverage_liquid"],
+    [{ nameEn: "loose leaf green tea" }, "tea_leaf"],
+    [{ nameZh: "绿茶茶叶" }, "tea_leaf"],
+    [{ nameZh: "柠檬汁", nameEn: "lemon juice" }, "beverage_liquid"],
+    [{ nameZh: "柠檬味饮料粉", nameEn: "lemon flavored drink powder" }, "drink_powder"],
+    [{ nameZh: "柠檬", nameEn: "lemon", category: { nameZh: "水果" } }, "whole_fruit"],
+    [{ nameZh: "新鲜黄柠檬", nameEn: "fresh lemon", category: { nameZh: "水果" } }, "whole_fruit"],
+  ];
+  for (const [food, expected] of cases) assert.equal(resolveFoodVisualType(food).visualType, expected, food.nameZh || food.nameEn);
+  assert.equal(resolveFoodVisualType({ nameZh: "瓶装乌龙茶" }).beverageSubtype, "ready_to_drink_tea");
+  assert.equal(resolveFlavor({ nameZh: "柠檬味无糖即饮茶", nameEn: "lemon diet ready-to-drink tea" }).flavor, "柠檬味");
+});
 
 test("processed form keywords beat fruit flavor and category keywords", () => {
   const cases = [
