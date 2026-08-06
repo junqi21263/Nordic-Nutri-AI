@@ -83,6 +83,10 @@ function createRepository() {
     candidates,
     updates,
     async listExistingPrimaryImagesForAudit() { return { items: candidates, nextCursor: null }; },
+    async getFoodByIdAdmin(id) {
+      const candidate = candidates.find((item) => item.food.id === id);
+      return candidate ? { ...candidate.food, visualType: id === "food-wine" ? "alcohol_bottle" : null } : null;
+    },
     async updateFood(id, patch) { updates.push({ id, patch }); return { id, ...patch }; },
   };
 }
@@ -129,6 +133,27 @@ test("reviewItems isolates one vision failure and persists other verdicts withou
   assert.equal(db.writes.some((write) => write.table === "food_images"), false);
 });
 
+test("reviewItems keeps a partially reviewed run in reviewing state and derives its count from persisted terminal items", async () => {
+  const { db, service } = createService();
+  const preview = await service.previewHighRisk("admin-1", { count: 20 });
+
+  await service.reviewItems("admin-1", preview.run.id, { itemIds: [preview.items[0].id] });
+
+  assert.equal(db.state.food_image_audit_runs[0].status, "reviewing");
+  assert.equal(db.state.food_image_audit_runs[0].reviewed_count, 1);
+});
+
+test("reviewItems does not inflate reviewed count when the same item is submitted again", async () => {
+  const { db, service } = createService();
+  const preview = await service.previewHighRisk("admin-1", { count: 20 });
+
+  await service.reviewItems("admin-1", preview.run.id, { itemIds: [preview.items[0].id] });
+  await service.reviewItems("admin-1", preview.run.id, { itemIds: [preview.items[0].id] });
+
+  assert.equal(db.state.food_image_audit_runs[0].status, "reviewing");
+  assert.equal(db.state.food_image_audit_runs[0].reviewed_count, 1);
+});
+
 test("listRun returns the persisted audit run with its immutable item snapshots", async () => {
   const { service } = createService();
   const preview = await service.previewHighRisk("admin-1", { count: 20 });
@@ -173,4 +198,19 @@ test("requestRegeneration rejects visual types outside the unified food visual t
     () => service.requestRegeneration("admin-1", preview.items[0].id, { visualType: "fruit_powder" }),
     (error) => error.code === "FOOD_IMAGE_AUDIT_VISUAL_TYPE_INVALID",
   );
+});
+
+test("requestRegeneration restores the prior visual override when job creation fails and leaves audit item unchanged", async () => {
+  const { db, repository, jobs, service } = createService();
+  jobs.regenerate = async () => { throw new Error("generation unavailable"); };
+  const preview = await service.previewHighRisk("admin-1", { count: 20 });
+
+  await assert.rejects(() => service.requestRegeneration("admin-1", preview.items[1].id, { visualType: "non_alcohol_wine" }));
+
+  assert.deepEqual(repository.updates, [
+    { id: "food-wine", patch: { visualType: "non_alcohol_wine" } },
+    { id: "food-wine", patch: { visualType: "alcohol_bottle" } },
+  ]);
+  assert.equal(db.state.food_image_audit_items[1].status, "pending_review");
+  assert.equal(db.state.food_image_audit_items[1].regeneration_job_id, undefined);
 });

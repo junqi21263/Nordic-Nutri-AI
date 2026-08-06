@@ -6,6 +6,7 @@ const HIGH_RISK_PROCESSED_TYPES = new Set([
   "alcohol_bottle", "non_alcohol_wine", "condiment_liquid", "sauce_paste",
   "dairy_liquid", "dairy_solid", "canned_food", "packaged_snack", "prepared_dish",
 ]);
+const REVIEWED_ITEM_STATUSES = new Set(["ai_pass", "needs_review", "failed"]);
 
 class FoodImageAuditError extends Error {
   constructor(code, message = code) {
@@ -100,6 +101,24 @@ function createFoodImageAuditService({ db, repository, auditVision, jobs, requir
     const result = await db.from("food_image_audit_items").update(patch).eq("id", itemId).select("*").maybeSingle();
     if (result.error || !result.data) throw new FoodImageAuditError("FOOD_IMAGE_AUDIT_ITEM_UPDATE_FAILED", result.error?.message);
     return mapItem(result.data);
+  }
+
+  async function refreshRunReviewSummary(runId) {
+    const itemsResult = await db.from("food_image_audit_items").select("status").eq("run_id", runId);
+    if (itemsResult.error) throw new FoodImageAuditError("FOOD_IMAGE_AUDIT_ITEMS_READ_FAILED", itemsResult.error.message);
+    const items = itemsResult.data || [];
+    const reviewedCount = items.filter((item) => REVIEWED_ITEM_STATUSES.has(item.status)).length;
+    const pendingCount = items.filter((item) => !REVIEWED_ITEM_STATUSES.has(item.status)).length;
+    const status = pendingCount > 0
+      ? "reviewing"
+      : items.some((item) => item.status === "failed") ? "completed_with_errors" : "completed";
+    const updated = await db.from("food_image_audit_runs").update({
+      status,
+      candidate_count: items.length,
+      reviewed_count: reviewedCount,
+    }).eq("id", runId).select("*").maybeSingle();
+    if (updated.error || !updated.data) throw new FoodImageAuditError("FOOD_IMAGE_AUDIT_RUN_UPDATE_FAILED", updated.error?.message);
+    return mapRun(updated.data);
   }
 
   async function previewHighRisk(userId, { count } = {}) {
@@ -197,13 +216,8 @@ function createFoodImageAuditService({ db, repository, auditVision, jobs, requir
         }));
       }
     }
-    const previous = Number(run.data.reviewed_count) || 0;
-    const successful = reviewed.filter((item) => item.status !== "failed").length;
-    await db.from("food_image_audit_runs").update({
-      status: reviewed.some((item) => item.status === "failed") ? "completed_with_errors" : "completed",
-      reviewed_count: Math.min(Number(run.data.candidate_count) || 0, previous + successful),
-    }).eq("id", runId);
-    return { runId, items: reviewed };
+    const refreshedRun = await refreshRunReviewSummary(runId);
+    return { runId, run: refreshedRun, items: reviewed };
   }
 
   async function keepItem(userId, itemId) {
@@ -219,7 +233,27 @@ function createFoodImageAuditService({ db, repository, auditVision, jobs, requir
     if (override && !FOOD_VISUAL_TYPES.includes(override)) throw new FoodImageAuditError("FOOD_IMAGE_AUDIT_VISUAL_TYPE_INVALID");
     if (override) {
       if (typeof repository.updateFood !== "function") throw new FoodImageAuditError("FOOD_IMAGE_AUDIT_VISUAL_OVERRIDE_UNSUPPORTED");
+      if (typeof repository.getFoodByIdAdmin !== "function") throw new FoodImageAuditError("FOOD_IMAGE_AUDIT_VISUAL_OVERRIDE_UNSUPPORTED");
+      const food = await repository.getFoodByIdAdmin(item.food_id);
+      if (!food) throw new FoodImageAuditError("FOOD_IMAGE_AUDIT_FOOD_NOT_FOUND");
+      const previousVisualType = food.visualType ?? food.visual_type ?? null;
       await repository.updateFood(item.food_id, { visualType: override });
+      try {
+        const job = await jobs.regenerate(userId, item.food_id, {
+          reason: "旧图审计确认需要重新生图",
+          extraPrompt: "使用最新食物视觉形态提示词重新生成，旧图审计确认主体不符合预期。",
+        });
+        const jobId = getJobId(job);
+        if (!jobId) throw new FoodImageAuditError("FOOD_IMAGE_AUDIT_REGENERATION_JOB_INVALID");
+        return writeItem(itemId, {
+          status: "regeneration_requested",
+          operator_decision: "regenerate",
+          regeneration_job_id: jobId,
+        });
+      } catch (error) {
+        await repository.updateFood(item.food_id, { visualType: previousVisualType });
+        throw error;
+      }
     }
     const job = await jobs.regenerate(userId, item.food_id, {
       reason: "旧图审计确认需要重新生图",
@@ -239,6 +273,7 @@ function createFoodImageAuditService({ db, repository, auditVision, jobs, requir
 
 module.exports = {
   HIGH_RISK_PROCESSED_TYPES,
+  REVIEWED_ITEM_STATUSES,
   FoodImageAuditError,
   createFoodImageAuditService,
 };
