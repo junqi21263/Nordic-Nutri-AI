@@ -1543,8 +1543,11 @@ function normalizeFoodImageDispatchPath(pathname) {
   return String(pathname || "").replace(/^\/get-login-ticket/, "");
 }
 
-function isFeedbackRoute(pathname) {
-  return pathname.replace(/^\/get-login-ticket/, "") === "/feedback";
+function getFeedbackRoute(pathname) {
+  const path = pathname.replace(/^\/get-login-ticket/, "");
+  if (path === "/feedback") return { operation: "feedback" };
+  if (path === "/feedback/read") return { operation: "markRepliesRead" };
+  return null;
 }
 
 function isVisionRoute(pathname) {
@@ -1584,7 +1587,7 @@ function createHttpServer({ service }) {
     const foodRoute = getFoodRoute(url.pathname);
     const adminFoodRoute = getAdminFoodRoute(url.pathname);
     const internalFoodImageRoute = getInternalFoodImageRoute(url.pathname);
-    const feedbackRoute = isFeedbackRoute(url.pathname);
+    const feedbackRoute = getFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
     if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
@@ -2595,7 +2598,28 @@ function createHttpServer({ service }) {
     if (feedbackRoute) {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
-      if (!service.feedback?.submitFeedback) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+      if (feedbackRoute.operation === "feedback" && req.method === "GET") {
+        if (!service.feedback?.listFeedbackForUser) return sendJson(res, 503, { code: "FEEDBACK_LIST_UNAVAILABLE" });
+        try {
+          return sendJson(res, 200, await service.feedback.listFeedbackForUser(session.sub));
+        } catch (error) {
+          console.error("[feedback] list failed:", error?.message || error);
+          return sendJson(res, 503, { code: "FEEDBACK_LIST_FAILED" });
+        }
+      }
+      if (feedbackRoute.operation === "markRepliesRead") {
+        if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        if (!service.feedback?.markRepliesRead) return sendJson(res, 503, { code: "FEEDBACK_READ_UNAVAILABLE" });
+        try {
+          const body = await readJsonBody(req);
+          return sendJson(res, 200, await service.feedback.markRepliesRead(session.sub, body?.feedbackIds));
+        } catch (error) {
+          if (error instanceof PublicFeedbackError) return sendJson(res, 400, { code: error.code });
+          console.error("[feedback] read update failed:", error?.message || error);
+          return sendJson(res, 503, { code: "FEEDBACK_READ_FAILED" });
+        }
+      }
+      if (!service.feedback?.submitFeedback) return sendJson(res, 503, { code: "FEEDBACK_SAVE_UNAVAILABLE" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       try {
         const body = await readJsonBody(req);

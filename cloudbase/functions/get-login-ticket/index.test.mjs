@@ -731,6 +731,41 @@ test("persists feedback only for the signed-in user", async () => {
   assert.equal(calls[0].userId, "user-1");
 });
 
+test("lists and marks feedback replies only for the signed-in user", async () => {
+  const calls = [];
+  const feedbackId = "11111111-2222-4333-8444-555555555555";
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      feedback: {
+        listFeedbackForUser: async (userId) => {
+          calls.push(["list", userId]);
+          return { items: [], unreadReplyCount: 0 };
+        },
+        markRepliesRead: async (userId, ids) => {
+          calls.push(["read", userId, ids]);
+          return { markedCount: ids.length };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const headers = { authorization: "Bearer valid-session", "content-type": "application/json" };
+    const listed = await fetch(`${baseUrl}/get-login-ticket/feedback`, { headers });
+    assert.equal(listed.status, 200);
+
+    const marked = await fetch(`${baseUrl}/get-login-ticket/feedback/read`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ feedbackIds: [feedbackId], userId: "attacker" }),
+    });
+    assert.equal(marked.status, 200);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/feedback/read`, { headers })).status, 405);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/feedback`)).status, 401);
+  });
+  assert.deepEqual(calls, [["list", "user-1"], ["read", "user-1", [feedbackId]]]);
+});
+
 test("accepts authenticated visual analysis without trusting a client user id", async () => {
   const calls = [];
   const server = createHttpServer({
