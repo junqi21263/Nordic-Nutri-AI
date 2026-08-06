@@ -32,20 +32,21 @@ const READY_TO_DRINK_TEA_KEYWORDS = Object.freeze([
 const TEA_LEAF_KEYWORDS = Object.freeze(["散装茶叶", "绿茶茶叶", "红茶茶叶", "乌龙茶叶", "茉莉花茶叶", "普洱茶叶", "茶叶", "tea leaves", "tea leaf", "loose leaf tea", "dried tea leaves"]);
 const READY_TO_DRINK_TEA_PATTERNS = Object.freeze([["瓶装茶", /瓶装.*茶/], ["罐装茶", /罐装.*茶/], ["bottled tea", /\bbottled\b.*\btea\b/], ["canned tea", /\bcanned\b.*\btea\b/]]);
 const TEA_LEAF_PATTERNS = Object.freeze([["茶叶", /茶叶/], ["tea leaves", /\btea\b.*\bleaves\b/], ["loose leaf tea", /\bloose\s+leaf\b.*\btea\b/], ["dried tea leaves", /\bdried\b.*\btea\b.*\bleaves\b/]]);
+const DRINK_POWDER_PATTERNS = Object.freeze([["风味饮品粉", /(?:水果?|柠檬|橙子?|葡萄|草莓|芒果|莓果).{0,6}(?:饮料|饮品|果汁|冲饮|水)粉/]]);
 const FRUIT_FLAVOR_KEYWORDS = Object.freeze(["水果", "橙", "橙子", "苹果", "葡萄", "草莓", "柠檬", "芒果", "莓果", "fruit", "orange", "apple", "grape", "strawberry", "lemon", "mango", "berry"]);
 
 // Higher priority wins after keyword length. Keep processed form words above
 // ingredient names, then sort by the literal keyword length for long-word-first.
 const RULES = Object.freeze([
   ["non_alcohol_wine", 100, ["alcohol-free sparkling wine", "无酒精葡萄酒", "无醇葡萄酒", "脱醇葡萄酒", "无醇起泡酒", "alcohol-free wine", "non-alcoholic wine", "dealcoholized wine"]],
-  ["drink_powder", 98, ["breakfast drink powder", "运动饮料粉", "meal replacement powder", "nutrition powder", "electrolyte powder", "低热量水果味饮料粉", "早餐饮料粉", "固体饮料", "冲调粉", "冲泡粉", "果味粉", "电解质粉", "饮料粉", "代餐粉", "营养粉", "蛋白粉", "增肌粉", "protein powder", "drink powder", "drink mix", "beverage powder"]],
+  ["drink_powder", 98, ["breakfast drink powder", "lemonade powder", "juice powder", "运动饮料粉", "meal replacement powder", "nutrition powder", "electrolyte powder", "低热量水果味饮料粉", "早餐饮料粉", "固体饮料", "冲调粉", "冲泡粉", "果汁粉", "饮品粉", "果味粉", "电解质粉", "饮料粉", "代餐粉", "营养粉", "蛋白粉", "增肌粉", "protein powder", "drink powder", "drink mix", "beverage powder"]],
   ["alcohol_bottle", 97, ["sparkling wine", "red wine", "white wine", "红葡萄酒", "白葡萄酒", "葡萄酒", "起泡酒", "威士忌", "伏特加", "朗姆酒", "香槟", "啤酒", "红酒", "白酒", "清酒", "champagne", "whisky", "whiskey", "vodka", "rum", "sake", "wine", "beer"]],
   ["coffee_powder", 96, ["instant coffee powder", "coffee powder", "ground coffee", "速溶咖啡粉", "研磨咖啡", "咖啡粉"]],
   ["condiment_liquid", 95, ["apple cider vinegar", "cooking wine", "fish sauce", "rice vinegar", "soy sauce", "苹果醋", "米醋", "陈醋", "酱油", "生抽", "老抽", "鱼露", "料酒", "vinegar"]],
   ["sauce_paste", 94, ["peanut butter", "sesame paste", "mayonnaise", "番茄酱", "花生酱", "芝麻酱", "沙拉酱", "豆瓣酱", "蛋黄酱", "果酱", "酱料", "味噌", "sauce", "paste", "ketchup", "miso", "jam", "酱", "泥", "糊"]],
   ["dry_spice", 93, ["cinnamon powder", "onion powder", "garlic powder", "pepper powder", "chili powder", "spice powder", "curry powder", "cumin powder", "胡椒粉", "辣椒粉", "孜然粉", "五香粉", "蒜粉", "洋葱粉", "肉桂粉", "咖喱粉", "调味粉"]],
   ["flour_powder", 92, ["tapioca starch", "wheat flour", "oat flour", "rice flour", "corn flour", "低筋面粉", "中筋面粉", "高筋面粉", "全麦面粉", "燕麦粉", "玉米粉", "木薯粉", "面粉", "淀粉", "flour", "starch"]],
-  ["beverage_liquid", 91, [...READY_TO_DRINK_TEA_KEYWORDS, "energy drink", "sports drink", "coffee drink", "soy milk", "oat milk", "果汁", "牛奶", "豆奶", "燕麦奶", "汽水", "可乐", "苏打水", "茶饮", "咖啡饮料", "能量饮料", "运动饮料", "juice", "milk", "soda", "cola"]],
+  ["beverage_liquid", 91, [...READY_TO_DRINK_TEA_KEYWORDS, "lemonade concentrate", "beverage concentrate", "drink concentrate", "juice concentrate", "energy drink", "sports drink", "coffee drink", "soy milk", "oat milk", "饮料浓缩液", "果汁浓缩液", "浓缩果汁", "浓缩液", "果汁", "牛奶", "豆奶", "燕麦奶", "汽水", "可乐", "苏打水", "茶饮", "咖啡饮料", "能量饮料", "运动饮料", "juice", "milk", "soda", "cola"]],
   ["canned_food", 90, ["罐头", "canned"]], ["packaged_snack", 89, ["包装零食", "薯片", "饼干", "糖果", "snack", "chips", "cookie"]],
   ["processed_meat", 88, ["香肠", "火腿", "培根", "腊肉", "肉肠", "sausage", "ham", "bacon"]], ["bread_baked", 87, ["面包", "蛋糕", "贝果", "吐司", "bread", "cake", "bagel", "toast"]],
   ["prepared_dish", 86, ["炒饭", "意面", "沙拉", "炖菜", "汤", "菜肴", "prepared dish", "cooked dish"]],
@@ -79,6 +80,9 @@ function findRule(text, source = "") {
   }
   for (const [keyword, pattern] of TEA_LEAF_PATTERNS) {
     if (pattern.test(evidence)) candidates.push({ visualType: "tea_leaf", keyword, priority: 92, order: 15, source });
+  }
+  for (const [keyword, pattern] of DRINK_POWDER_PATTERNS) {
+    if (pattern.test(evidence)) candidates.push({ visualType: "drink_powder", keyword, priority: 98, order: 1, source });
   }
   candidates.sort((a, b) => b.priority - a.priority || normalizeMatchText(b.keyword).length - normalizeMatchText(a.keyword).length || a.order - b.order);
   if (!candidates.length) return null;
