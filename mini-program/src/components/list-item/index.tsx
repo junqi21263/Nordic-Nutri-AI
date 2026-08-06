@@ -5,7 +5,7 @@ export interface ListItemProps {
   icon?: ReactNode;
   title: string;
   description?: string;
-  trailing?: string;
+  trailing?: ReactNode;
 }
 export function ListItem({ icon = "◌", title, description, trailing = "›" }: ListItemProps) {
   return (
@@ -15,7 +15,7 @@ export function ListItem({ icon = "◌", title, description, trailing = "›" }:
         <Text className="list-item__title">{title}</Text>
         {description ? <Text className="list-item__description">{description}</Text> : null}
       </View>
-      <Text className="list-item__trailing">{trailing}</Text>
+      <View className="list-item__trailing">{trailing}</View>
     </View>
   );
 }

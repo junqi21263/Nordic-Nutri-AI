@@ -1,4 +1,4 @@
-import { Text, Textarea, View } from "@tarojs/components";
+import { Picker, Text, Textarea, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { AppButton } from "../../components/app-button";
@@ -10,7 +10,7 @@ import { BottomSheet, bottomSheetExitDuration } from "../../components/bottom-sh
 import { ListItem } from "../../components/list-item";
 import { NordicIcon } from "../../components/nordic-icon";
 import { StatisticCard } from "../../components/statistic-card";
-import { submitProductFeedback } from "../../api/feedback-api";
+import { getMyFeedback, markFeedbackRepliesRead, submitProductFeedback, type ProductFeedbackItem } from "../../api/feedback-api";
 import { getProductAccount } from "../../api/product-data-api";
 import {
   getProductWeeklyReview,
@@ -49,6 +49,9 @@ export default function ProfilePage() {
   const [activeModal, setActiveModal] = useState<"feedback" | "about" | null>(null);
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState("");
+  const [feedbackMode, setFeedbackMode] = useState<"submit" | "history">("submit");
+  const [feedbackItems, setFeedbackItems] = useState<ProductFeedbackItem[]>([]);
+  const [unreadReplyCount, setUnreadReplyCount] = useState(0);
   const [weeklyReview, setWeeklyReview] = useState<ProductWeeklyReview | null>(null);
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
@@ -78,6 +81,19 @@ export default function ProfilePage() {
       })
       .catch(() => undefined);
   }, [date]);
+
+  const refreshFeedbackHistory = () => {
+    void getMyFeedback()
+      .then((result) => {
+        setFeedbackItems(result.items);
+        setUnreadReplyCount(result.unreadReplyCount);
+      })
+      .catch(() => undefined);
+  };
+
+  useEffect(() => {
+    refreshFeedbackHistory();
+  }, []);
 
   // Silently refresh the user profile from the backend on page show,
   // so nickname/avatar/settings changes from other pages are reflected immediately.
@@ -135,11 +151,24 @@ export default function ProfilePage() {
     try {
       await submitProductFeedback(feedbackDraft.trim());
       setFeedbackDraft("");
-      setActiveModal(null);
+      refreshFeedbackHistory();
       showNotice("感谢你的反馈");
     } catch {
       feedback.show({ message: "反馈提交失败，请稍后重试", tone: "error" });
     }
+  };
+  const changeFeedbackMode = (value: number) => {
+    const nextMode = value === 1 ? "history" : "submit";
+    setFeedbackMode(nextMode);
+    if (nextMode !== "history") return;
+    const unreadIds = feedbackItems.filter((item) => item.adminReply && !item.replyReadAt).map((item) => item.id);
+    if (!unreadIds.length) return;
+    void markFeedbackRepliesRead(unreadIds)
+      .then(() => {
+        setUnreadReplyCount(0);
+        setFeedbackItems((items) => items.map((item) => unreadIds.includes(item.id) ? { ...item, replyReadAt: "read" } : item));
+      })
+      .catch(() => undefined);
   };
   const logout = () => {
     void logoutFlow
@@ -245,11 +274,12 @@ export default function ProfilePage() {
               description="数据说明与账号注销"
             />
           </View>
-          <View onClick={() => setActiveModal("feedback")}>
+          <View onClick={() => { setFeedbackMode("submit"); setActiveModal("feedback"); }}>
             <ListItem
               icon={<NordicIcon name="heart" size={20} ariaLabel="反馈与帮助" />}
               title="反馈与帮助"
               description="告诉我们你的想法"
+              trailing={<View className="profile-feedback-bell">{unreadReplyCount > 0 ? <NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" /> : null}<Text>›</Text></View>}
             />
           </View>
           <View onClick={() => setActiveModal("about")}>
@@ -297,21 +327,21 @@ export default function ProfilePage() {
               <NordicIcon name="x" size={20} ariaLabel="关闭" />
             </View>
           </View>
-          <Text className="profile-modal__lead">告诉我们哪里不顺手，或你希望下一步看到什么。</Text>
-          <Textarea
-            className="profile-modal__input"
-            value={feedbackDraft}
-            placeholder="例如：我希望回顾中能看到每餐的蛋白变化"
-            maxlength={120}
-            autoHeight
-            onInput={(event) => setFeedbackDraft(event.detail.value)}
-          />
-          <Text className="profile-modal__hint">提交后将安全保存，用于定位问题和改进体验。</Text>
-          <View className="profile-sheet__action">
-            <AppButton size="medium" onClick={() => void submitFeedback()}>
-              提交反馈
-            </AppButton>
-          </View>
+          <Picker mode="selector" range={["提交反馈", "反馈处理"]} value={feedbackMode === "submit" ? 0 : 1} onChange={(event) => changeFeedbackMode(Number(event.detail.value))}>
+            <View className="profile-feedback-mode-picker">{feedbackMode === "submit" ? "提交反馈" : "反馈处理"}<Text>⌄</Text></View>
+          </Picker>
+          {feedbackMode === "submit" ? <>
+            <Text className="profile-modal__lead">告诉我们哪里不顺手，或你希望下一步看到什么。</Text>
+            <Textarea className="profile-modal__input" value={feedbackDraft} placeholder="例如：我希望回顾中能看到每餐的蛋白变化" maxlength={120} autoHeight onInput={(event) => setFeedbackDraft(event.detail.value)} />
+            <Text className="profile-modal__hint">提交后将安全保存，用于定位问题和改进体验。</Text>
+            <View className="profile-sheet__action"><AppButton size="medium" onClick={() => void submitFeedback()}>提交反馈</AppButton></View>
+          </> : <View className="profile-feedback-list">
+            {feedbackItems.length ? feedbackItems.map((item) => <View className="profile-feedback-card" key={item.id}>
+              <View className="profile-feedback-card__head"><Text className="profile-feedback-status">{{ new: "已收到", reviewing: "处理中", resolved: "已回复", closed: "已关闭" }[item.status]}</Text><Text>{item.createdAt.slice(0, 10)}</Text></View>
+              <Text className="profile-feedback-label">你的反馈</Text><Text>{item.content}</Text>
+              {item.adminReply ? <View className="profile-feedback-reply"><Text className="profile-feedback-label">我们的回复</Text><Text>{item.adminReply}</Text></View> : null}
+            </View>) : <Text className="profile-modal__hint">暂时还没有提交过反馈。</Text>}
+          </View>}
         </View>
       </BottomSheet>
 

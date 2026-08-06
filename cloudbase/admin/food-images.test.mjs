@@ -482,7 +482,6 @@ test("food image admin exposes a safe old-image audit workflow", async () => {
   assert.match(source, /旧主图会保留，直到新候选审核通过/);
 });
 
-
 test("feedback console uses Chinese statuses and exposes a reply action", async () => {
   const source = await readFile(new URL("./food-images.html", import.meta.url), "utf8");
   assert.match(source, /new: "已收到", reviewing: "处理中", resolved: "已回复", closed: "已关闭"/);
@@ -490,4 +489,3 @@ test("feedback console uses Chinese statuses and exposes a reply action", async 
   assert.match(source, /保存回复并通知用户/);
   assert.match(source, /body: \{ reply \}/);
 });
-
