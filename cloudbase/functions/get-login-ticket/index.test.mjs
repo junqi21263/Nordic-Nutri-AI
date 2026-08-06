@@ -1122,6 +1122,76 @@ test("admin can immediately retry a rejected or failed image job", async () => {
   assert.deepEqual(calls, [{ userId: "admin-1", jobId: "11111111-2222-4333-8444-555555555555" }]);
 });
 
+test("old food image audit routes require an admin session and normalize bounded request bodies", async () => {
+  const calls = [];
+  const runId = "11111111-2222-4333-8444-555555555555";
+  const itemId = "66666666-7777-4888-8999-aaaaaaaaaaaa";
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null,
+      foodImageAudit: {
+        previewHighRisk: async (userId, body) => {
+          calls.push(["preview", userId, body]);
+          return { run: { id: runId }, items: [] };
+        },
+        listRun: async (userId, id) => {
+          calls.push(["get", userId, id]);
+          return { id, items: [] };
+        },
+        reviewItems: async (userId, id, body) => {
+          calls.push(["review", userId, id, body]);
+          return { runId: id, items: [] };
+        },
+        keepItem: async (userId, id) => {
+          calls.push(["keep", userId, id]);
+          return { id, status: "kept" };
+        },
+        requestRegeneration: async (userId, id, body) => {
+          calls.push(["regenerate", userId, id, body]);
+          return { id, status: "regeneration_requested" };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const prefix = `${baseUrl}/get-login-ticket/api/admin`;
+    const denied = await fetch(`${prefix}/food-image-audits/preview`, { method: "POST" });
+    assert.equal(denied.status, 401);
+
+    const headers = { authorization: "Bearer valid-session", "content-type": "application/json" };
+    const preview = await fetch(`${prefix}/food-image-audits/preview`, {
+      method: "POST", headers, body: JSON.stringify({ count: 73, ignored: true }),
+    });
+    assert.equal(preview.status, 200);
+    assert.equal((await preview.json()).run.id, runId);
+
+    const detail = await fetch(`${prefix}/food-image-audits/${runId}`, { headers });
+    assert.equal(detail.status, 200);
+
+    const review = await fetch(`${prefix}/food-image-audits/${runId}/review`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ itemIds: Array.from({ length: 101 }, (_, index) => `item-${index}`), ignored: true }),
+    });
+    assert.equal(review.status, 200);
+
+    const keep = await fetch(`${prefix}/food-image-audit-items/${itemId}/keep`, { method: "POST", headers, body: "{}" });
+    assert.equal(keep.status, 200);
+
+    const regenerate = await fetch(`${prefix}/food-image-audit-items/${itemId}/regenerate`, {
+      method: "POST", headers, body: JSON.stringify({ visualType: "drink_powder", ignored: true }),
+    });
+    assert.equal(regenerate.status, 200);
+  });
+  assert.deepEqual(calls, [
+    ["preview", "admin-1", { count: 100 }],
+    ["get", "admin-1", runId],
+    ["review", "admin-1", runId, { itemIds: Array.from({ length: 100 }, (_, index) => `item-${index}`) }],
+    ["keep", "admin-1", itemId],
+    ["regenerate", "admin-1", itemId, { visualType: "drink_powder" }],
+  ]);
+});
+
 test("admin users and feedback routes require session and accept admin", async () => {
   const calls = [];
   const server = createHttpServer({

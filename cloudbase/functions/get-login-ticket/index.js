@@ -52,6 +52,8 @@ const { createHunyuanWorkerClient } = require("./hunyuan-worker-client.cjs");
 const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
 const { createFoodImageBatchService, FoodImageBatchError } = require("./food-image-batch-service.cjs");
 const { createFoodImagePatrolService, FoodImagePatrolError } = require("./food-image-patrol-service.cjs");
+const { createFoodImageAuditVision } = require("./food-image-audit-vision.cjs");
+const { createFoodImageAuditService } = require("./food-image-audit-service.cjs");
 const { getFoodDisplayName } = require("./food-display-name.cjs");
 const { formulaNutritionPlanFallback } = require("./nutrition-plan-formula.cjs");
 
@@ -1179,6 +1181,21 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       uploadImage: uploadVisionImage,
     });
   }
+  // Old-image auditing is deliberately Qwen-only: it needs strict visual JSON
+  // output and its credentials stay entirely in this server runtime.
+  const foodImageAudit = typeof qwenApiKey === "string" && qwenApiKey.trim()
+    ? createFoodImageAuditService({
+      db,
+      repository: foodRepository,
+      auditVision: createFoodImageAuditVision({
+        apiKey: qwenApiKey,
+        workspaceId: env.QWEN_WORKSPACE_ID || "llm-ekun6ter25w7d0ms",
+        model: env.QWEN_VL_FLASH_MODEL || "qwen3-vl-flash",
+      }),
+      jobs: foodImageJobs,
+      requireAdmin: allowAdminConsole,
+    })
+    : null;
   const operationGuard = typeof db?.from === "function" ? createOperationGuard({ db }) : null;
   const observability = createObservabilityService({ db });
   opsRef.observability = observability;
@@ -1297,6 +1314,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodImageJobs,
     foodImageBatches,
     foodImagePatrol,
+    foodImageAudit,
     hunyuanImage: hunyuanImageService,
     hunyuanAiAuthMode: aiAuthMode,
     hunyuanAiDiagnostics: {
@@ -1448,6 +1466,15 @@ function getAdminFoodRoute(pathname) {
   if (feedbackMatch) return { operation: "patchFeedback", feedbackId: feedbackMatch[1] };
   if (path === "/foods/missing-images") return { operation: "missingImages" };
   if (path === "/foods/sync-jobs") return { operation: "syncJobs" };
+  if (path === "/food-image-audits/preview") return { operation: "imageAuditPreview" };
+  const auditReviewMatch = path.match(/^\/food-image-audits\/([0-9a-f-]{36})\/review$/i);
+  if (auditReviewMatch) return { operation: "imageAuditReview", runId: auditReviewMatch[1] };
+  const auditRunMatch = path.match(/^\/food-image-audits\/([0-9a-f-]{36})$/i);
+  if (auditRunMatch) return { operation: "imageAuditRun", runId: auditRunMatch[1] };
+  const auditKeepMatch = path.match(/^\/food-image-audit-items\/([0-9a-f-]{36})\/keep$/i);
+  if (auditKeepMatch) return { operation: "imageAuditKeep", itemId: auditKeepMatch[1] };
+  const auditRegenerateMatch = path.match(/^\/food-image-audit-items\/([0-9a-f-]{36})\/regenerate$/i);
+  if (auditRegenerateMatch) return { operation: "imageAuditRegenerate", itemId: auditRegenerateMatch[1] };
   if (path === "/food-image-batches") return { operation: "imageBatches" };
   if (path === "/food-image-batches/preview") return { operation: "imageBatchPreview" };
   if (path === "/food-image-batches/first-sample") return { operation: "imageBatchFirstSample" };
@@ -1489,6 +1516,20 @@ function getAdminFoodRoute(pathname) {
   const foodPatchMatch = path.match(/^\/foods\/([0-9a-f-]{36})$/i);
   if (foodPatchMatch) return { operation: "adminFoodItem", foodId: foodPatchMatch[1] };
   return null;
+}
+
+function clampFoodImageAuditPreviewCount(value) {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count <= 20) return 20;
+  if (count <= 50) return 50;
+  return 100;
+}
+
+function clampFoodImageAuditItemIds(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .filter((itemId) => typeof itemId === "string" && itemId.trim())
+    .map((itemId) => itemId.trim()))].slice(0, 100);
 }
 
 function getInternalFoodImageRoute(pathname) {
@@ -2008,6 +2049,40 @@ function createHttpServer({ service }) {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           const limit = Number(url.searchParams.get("limit") ?? "20");
           return sendJson(res, 200, { items: await service.foodAdmin.listSyncJobs(session.sub, limit) });
+        }
+        if (adminFoodRoute.operation === "imageAuditPreview") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.foodImageAudit?.previewHighRisk) return sendJson(res, 503, { code: "FOOD_IMAGE_AUDIT_UNAVAILABLE" });
+          const body = await readJsonBody(req, 16 * 1024);
+          return sendJson(res, 200, await service.foodImageAudit.previewHighRisk(session.sub, {
+            count: clampFoodImageAuditPreviewCount(body?.count),
+          }));
+        }
+        if (adminFoodRoute.operation === "imageAuditRun") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.foodImageAudit?.listRun) return sendJson(res, 503, { code: "FOOD_IMAGE_AUDIT_UNAVAILABLE" });
+          return sendJson(res, 200, await service.foodImageAudit.listRun(session.sub, adminFoodRoute.runId));
+        }
+        if (adminFoodRoute.operation === "imageAuditReview") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.foodImageAudit?.reviewItems) return sendJson(res, 503, { code: "FOOD_IMAGE_AUDIT_UNAVAILABLE" });
+          const body = await readJsonBody(req, 16 * 1024);
+          return sendJson(res, 200, await service.foodImageAudit.reviewItems(session.sub, adminFoodRoute.runId, {
+            itemIds: clampFoodImageAuditItemIds(body?.itemIds),
+          }));
+        }
+        if (adminFoodRoute.operation === "imageAuditKeep") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.foodImageAudit?.keepItem) return sendJson(res, 503, { code: "FOOD_IMAGE_AUDIT_UNAVAILABLE" });
+          return sendJson(res, 200, await service.foodImageAudit.keepItem(session.sub, adminFoodRoute.itemId));
+        }
+        if (adminFoodRoute.operation === "imageAuditRegenerate") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.foodImageAudit?.requestRegeneration) return sendJson(res, 503, { code: "FOOD_IMAGE_AUDIT_UNAVAILABLE" });
+          const body = await readJsonBody(req, 16 * 1024);
+          return sendJson(res, 200, await service.foodImageAudit.requestRegeneration(session.sub, adminFoodRoute.itemId, {
+            visualType: body?.visualType,
+          }));
         }
         if (adminFoodRoute.operation === "imageBatches") {
           if (req.method === "GET") {
