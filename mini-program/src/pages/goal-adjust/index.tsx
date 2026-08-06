@@ -9,6 +9,7 @@ import {
 import { AppButton } from "../../components/app-button";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
+import { useMealStore } from "../../stores/meal-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
@@ -97,6 +98,12 @@ export default function GoalAdjustPage() {
         fatG: nextFat,
       });
       profile.setProfile({ targetWeight: nextTargetWeight, targetCalories: nextCalories });
+      useMealStore.getState().setDailyTargets({
+        calories: nextCalories,
+        protein: nextProtein,
+        carbs: nextCarbs,
+        fat: nextFat,
+      });
       feedback.show({ message: "今日目标已更新", tone: "success" });
       navigateBackOrHome("/pages/home/index");
     } catch {

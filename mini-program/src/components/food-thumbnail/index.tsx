@@ -1,7 +1,7 @@
 import { Image, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
 import type { ProductFoodCatalogItem } from "../../api/food-catalog-api";
-import { getFoodVisualAspectRatio, getFoodVisualFallback, resolveFoodVisual } from "../../features/food-catalog/food-visuals";
+import { getFoodVisualFallback, resolveFoodVisual } from "../../features/food-catalog/food-visuals";
 import { NordicIcon } from "../nordic-icon";
 
 interface FoodThumbnailProps {
@@ -11,6 +11,8 @@ interface FoodThumbnailProps {
   /** list cards use list/thumb; detail pages may prefer detailUrl */
   prefer?: "list" | "detail" | "thumb";
   showSkeleton?: boolean;
+  /** Lock the frame aspect ratio (e.g. 1 for square detail hero). */
+  aspectRatio?: number;
 }
 
 export function FoodThumbnail({
@@ -19,11 +21,14 @@ export function FoodThumbnail({
   iconSize = 28,
   prefer = "list",
   showSkeleton = true,
+  /** When set, locks frame ratio (detail swipe must stay square to avoid layout jump). */
+  aspectRatio,
 }: FoodThumbnailProps) {
   const preferred = resolveFoodVisual(food, prefer);
   const fallback = getFoodVisualFallback(food);
-  const frameStyle = prefer === "detail"
-    ? { aspectRatio: String(getFoodVisualAspectRatio(food)), height: "auto" }
+  const lockedRatio = aspectRatio ?? (prefer === "detail" ? 1 : undefined);
+  const frameStyle = lockedRatio
+    ? { aspectRatio: String(lockedRatio), height: "auto" }
     : undefined;
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);

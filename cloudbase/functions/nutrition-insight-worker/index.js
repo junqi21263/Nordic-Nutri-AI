@@ -130,7 +130,16 @@ function createWorkerService(env = process.env, dependencies = {}) {
           { role: "user", content: JSON.stringify({ foodContext: context }) },
         ],
       });
-      return { ...validateInsight(response?.text), source: MODEL_GROUP, model: config.modelName };
+      const usage = (() => {
+        const u = response?.usage;
+        if (!u || typeof u !== "object") return null;
+        const promptTokens = Number(u.prompt_tokens ?? u.input_tokens ?? u.promptTokens) || 0;
+        const completionTokens = Number(u.completion_tokens ?? u.output_tokens ?? u.completionTokens) || 0;
+        const totalTokens = Number(u.total_tokens ?? u.totalTokens) || (promptTokens + completionTokens);
+        if (!promptTokens && !completionTokens && !totalTokens) return null;
+        return { promptTokens, completionTokens, totalTokens };
+      })();
+      return { ...validateInsight(response?.text), source: MODEL_GROUP, model: config.modelName, usage };
     },
   };
 }

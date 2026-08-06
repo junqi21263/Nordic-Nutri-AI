@@ -498,9 +498,16 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
 
   async function reopenBatchItemForRetry(item) {
     const batch = await findBatch(item.batch_id);
-    if (["completed", "completed_with_errors"].includes(batch.status)) {
-      const resumed = await db.from("food_image_batches").update({ status: "running", finished_at: null }).eq("id", batch.id);
+    // Operator retries must resume terminal / paused batches; cancelled batches
+    // previously blocked with RETRY_BATCH_NOT_RUNNING and left items stuck.
+    if (["completed", "completed_with_errors", "cancelled", "paused"].includes(batch.status)) {
+      const resumed = await db.from("food_image_batches").update({
+        status: "running",
+        finished_at: null,
+        started_at: batch.started_at || new Date().toISOString(),
+      }).eq("id", batch.id);
       if (resumed.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_RETRY_RESUME_FAILED");
+      batch.status = "running";
     } else if (batch.status !== "running") {
       return { processed: 0, retryScheduled: false, reason: "RETRY_BATCH_NOT_RUNNING", batch };
     }

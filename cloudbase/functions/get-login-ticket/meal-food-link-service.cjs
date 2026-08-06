@@ -12,6 +12,7 @@ function normalizeFoodName(value) {
 }
 
 function createDeepseekFoodClassifyService({ apiKey, model, fetchImpl = globalThis.fetch, requestCompletion } = {}) {
+  const { extractContentAndUsage } = require("./model-usage.cjs");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
   const complete = requestCompletion ?? (async ({ name, macros }) => {
     if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("DeepSeek configuration is incomplete");
@@ -39,8 +40,9 @@ function createDeepseekFoodClassifyService({ apiKey, model, fetchImpl = globalTh
       });
       if (!response.ok) throw new Error("FOOD_CLASSIFY_RETRYABLE");
       const data = await response.json();
-      const content = data?.choices?.[0]?.message?.content;
-      return typeof content === "string" ? JSON.parse(content) : content;
+      const parsed = extractContentAndUsage(data);
+      const content = typeof parsed.content === "string" ? JSON.parse(parsed.content) : parsed.content;
+      return { payload: content, usage: parsed.usage, model: selectedModel };
     } finally {
       clearTimeout(timer);
     }
@@ -48,16 +50,22 @@ function createDeepseekFoodClassifyService({ apiKey, model, fetchImpl = globalTh
 
   return async ({ name, macros }) => {
     try {
-      const payload = await complete({ name, macros });
+      const raw = await complete({ name, macros });
+      const payload = raw && typeof raw === "object" && "payload" in raw ? raw.payload : raw;
       const code = typeof payload?.categoryCode === "string" ? payload.categoryCode.trim() : "";
-      return CATEGORY_CODES.has(code) ? code : "other";
+      return {
+        categoryCode: CATEGORY_CODES.has(code) ? code : "other",
+        usage: raw?.usage || null,
+        model: raw?.model || selectedModel,
+      };
     } catch {
-      return "other";
+      return { categoryCode: "other", usage: null, model: selectedModel };
     }
   };
 }
 
 function createDeepseekMealInsightService({ apiKey, model, fetchImpl = globalThis.fetch, requestCompletion } = {}) {
+  const { extractContentAndUsage } = require("./model-usage.cjs");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
   const complete = requestCompletion ?? (async ({ mealName, items }) => {
     if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("DeepSeek configuration is incomplete");
@@ -85,18 +93,21 @@ function createDeepseekMealInsightService({ apiKey, model, fetchImpl = globalThi
       });
       if (!response.ok) throw new Error("MEAL_INSIGHT_RETRYABLE");
       const data = await response.json();
-      const content = data?.choices?.[0]?.message?.content;
-      return typeof content === "string" ? JSON.parse(content) : content;
+      const parsed = extractContentAndUsage(data);
+      const content = typeof parsed.content === "string" ? JSON.parse(parsed.content) : parsed.content;
+      return { payload: content, usage: parsed.usage, model: selectedModel };
     } finally {
       clearTimeout(timer);
     }
   });
 
   return async ({ mealName, items }) => {
-    const payload = await complete({ mealName, items });
+    const raw = await complete({ mealName, items });
+    const payload = raw && typeof raw === "object" && "payload" in raw ? raw.payload : raw;
     const insight = typeof payload?.insight === "string" ? payload.insight.trim().slice(0, 1000) : "";
     if (!insight) throw new Error("MEAL_INSIGHT_EMPTY");
-    return insight;
+    if (typeof raw === "string") return insight;
+    return { insight, usage: raw?.usage || null, model: raw?.model || selectedModel };
   };
 }
 
@@ -169,7 +180,7 @@ function createMealFoodLinkService({ db, classifyFoodCategory, enqueueFoodImage 
         if (!createMissing) return { foodId: null, imageUrl: null };
         let categoryCode = "other";
         if (typeof classifyFoodCategory === "function") {
-          categoryCode = await classifyFoodCategory({
+          const classified = await classifyFoodCategory({
             name: item.name,
             macros: {
               caloriesPer100g: item.caloriesPer100g,
@@ -178,6 +189,9 @@ function createMealFoodLinkService({ db, classifyFoodCategory, enqueueFoodImage 
               fatPer100g: item.fatPer100g,
             },
           });
+          categoryCode = typeof classified === "string"
+            ? classified
+            : (classified?.categoryCode || "other");
         }
         food = await createFoodFromItem(item, categoryCode);
       }

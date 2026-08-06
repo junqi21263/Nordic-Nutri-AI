@@ -10,6 +10,14 @@
       "handler": "index.main",
       "installDependency": true,
       "ignore": ["*.test.mjs", "node_modules/**", ".git/**"]
+    },
+    {
+      "name": "vision-image-purge-dispatcher",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": false,
+      "ignore": ["*.test.mjs", "node_modules/**", ".git/**"]
     }
   ]
 }

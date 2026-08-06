@@ -20,9 +20,8 @@ import {
   STANDARD_FOOD_CATEGORY_ROOT_CODES,
   getFoodCategory,
   getFoodTags,
-  matchesFoodFilters,
+  resolveTagCode,
   type FoodCategory,
-  type FoodTag,
 } from "../../features/food-catalog/food-labels";
 import {
   appendCatalogItems,
@@ -103,16 +102,16 @@ export default function FoodCatalogPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<FoodCategory>("全部");
-  const [activeCategoryCode, setActiveCategoryCode] = useState<string | undefined>("all");
-  const [tagFilter, setTagFilter] = useState<FoodTag>("全部");
+  const [activeCategoryCodes, setActiveCategoryCodes] = useState<string[]>([]);
+  const [selectedTagCodes, setSelectedTagCodes] = useState<string[]>([]);
   const [serverCategories, setServerCategories] = useState<ProductFoodCategory[]>([]);
   const [serverTags, setServerTags] = useState<ProductFoodTag[]>([]);
   const [suggestions, setSuggestions] = useState<ProductFoodSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionSeq = useRef(0);
   const catalogQueryRef = useRef("");
-  const catalogCategoryRef = useRef<string | undefined>();
+  const catalogCategoryCodesRef = useRef<string[]>([]);
+  const catalogTagCodesRef = useRef<string[]>([]);
   const paginationRef = useRef<CatalogPagination>();
   const loadMoreLockRef = useRef(false);
   const didBootstrapRef = useRef(false);
@@ -141,19 +140,23 @@ export default function FoodCatalogPage() {
   }, [serverCategories]);
 
   const tagChips = useMemo(() => {
-    if (!serverTags.length) return [...FOOD_TAGS];
-    return ["全部", ...serverTags.filter((tag) => tag.isActive).map((tag) => tag.nameZh)];
+    if (!serverTags.length) {
+      return FOOD_TAGS.map((label) => ({
+        label,
+        code: label === "全部" ? "" : resolveTagCode(label),
+      }));
+    }
+    return [
+      { label: "全部", code: "" },
+      ...serverTags.filter((tag) => tag.isActive).map((tag) => ({
+        label: tag.nameZh,
+        code: tag.code,
+      })),
+    ];
   }, [serverTags]);
 
-  const visibleItems = useMemo(
-    () => items.filter((food) => matchesFoodFilters(
-      food,
-      activeCategoryCode && activeCategoryCode !== "all" ? "全部" : categoryFilter,
-      tagFilter,
-    )),
-    [activeCategoryCode, categoryFilter, items, tagFilter],
-  );
-  const popularItems = visibleItems;
+  const popularItems = items;
+  const hasActiveFilters = activeCategoryCodes.length > 0 || selectedTagCodes.length > 0;
 
   const discover = async (limit = 20, page = 1, options?: { replace?: boolean }) => {
     const replacingPage = options?.replace ?? page === 1;
@@ -164,9 +167,13 @@ export default function FoodCatalogPage() {
       setItems((current) => (replacingPage ? result.items : appendCatalogItems(current, result.items)));
       paginationRef.current = result.pagination;
       setHasSearched(false);
-      setActiveCategoryCode("all");
-      catalogQueryRef.current = "";
-      catalogCategoryRef.current = undefined;
+      if (replacingPage) {
+        setActiveCategoryCodes([]);
+        setSelectedTagCodes([]);
+        catalogQueryRef.current = "";
+        catalogCategoryCodesRef.current = [];
+        catalogTagCodesRef.current = [];
+      }
     } catch {
       feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
     } finally {
@@ -199,12 +206,14 @@ export default function FoodCatalogPage() {
 
   const loadCatalogPage = async ({
     query: searchQuery,
-    categoryCode,
+    categoryCodes,
+    tagCodes,
     page,
     replace,
   }: {
     query: string;
-    categoryCode?: string;
+    categoryCodes?: string[];
+    tagCodes?: string[];
     page: number;
     replace: boolean;
   }) => {
@@ -216,13 +225,20 @@ export default function FoodCatalogPage() {
     setIsSearching(true);
     if (replace) setIsPageLoading(true);
     try {
-      const result = await searchProductFoodCatalog(searchQuery, page, { categoryCode });
+      const nextCategoryCodes = (categoryCodes || []).filter(Boolean);
+      const nextTagCodes = (tagCodes || []).filter(Boolean);
+      const result = await searchProductFoodCatalog(searchQuery, page, {
+        categoryCodes: nextCategoryCodes,
+        tagCodes: nextTagCodes,
+      });
       setItems((current) => (replace ? result.items : appendCatalogItems(current, result.items)));
       paginationRef.current = result.pagination;
       setHasSearched(searchQuery.trim().length > 0);
-      setActiveCategoryCode(categoryCode);
+      setActiveCategoryCodes(nextCategoryCodes);
+      setSelectedTagCodes(nextTagCodes);
       catalogQueryRef.current = searchQuery;
-      catalogCategoryRef.current = categoryCode;
+      catalogCategoryCodesRef.current = nextCategoryCodes;
+      catalogTagCodesRef.current = nextTagCodes;
     } catch {
       feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
     } finally {
@@ -235,7 +251,7 @@ export default function FoodCatalogPage() {
   const loadNextCatalogPage = async () => {
     const currentPagination = paginationRef.current;
     if (!currentPagination || !canLoadMoreCatalogItems(currentPagination, loadMoreLockRef.current)) return;
-    if (activeCategoryCode === "all") {
+    if (!hasActiveFilters && !catalogQueryRef.current.trim()) {
       if (loadMoreLockRef.current) return;
       loadMoreLockRef.current = true;
       try {
@@ -247,7 +263,8 @@ export default function FoodCatalogPage() {
     }
     await loadCatalogPage({
       query: catalogQueryRef.current,
-      categoryCode: catalogCategoryRef.current,
+      categoryCodes: catalogCategoryCodesRef.current,
+      tagCodes: catalogTagCodesRef.current,
       page: currentPagination.page + 1,
       replace: false,
     });
@@ -285,19 +302,63 @@ export default function FoodCatalogPage() {
   }, [query]);
 
   const updateCategory = async (category: FoodCategory, categoryCode?: string) => {
-    setCategoryFilter(category);
-    setTagFilter("全部");
     setShowSuggestions(false);
-    if (category === "全部") {
+    if (!categoryCode || categoryCode === "all" || category === "全部") {
+      setActiveCategoryCodes([]);
+      setSelectedTagCodes([]);
       setQuery("");
       await discover(20, 1);
       return;
     }
-    if (!categoryCode) {
-      await discover();
+    const nextCodes = activeCategoryCodes.includes(categoryCode)
+      ? activeCategoryCodes.filter((code) => code !== categoryCode)
+      : [...activeCategoryCodes, categoryCode];
+    if (!nextCodes.length && !selectedTagCodes.length) {
+      setQuery("");
+      await discover(20, 1);
       return;
     }
-    await loadCatalogPage({ query: "", categoryCode, page: 1, replace: true });
+    await loadCatalogPage({
+      query: "",
+      categoryCodes: nextCodes,
+      tagCodes: selectedTagCodes,
+      page: 1,
+      replace: true,
+    });
+  };
+
+  const updateTag = async (tagLabel: string, tagCode?: string) => {
+    setShowSuggestions(false);
+    if (!tagCode || tagLabel === "全部") {
+      if (!activeCategoryCodes.length) {
+        setSelectedTagCodes([]);
+        await discover(20, 1);
+        return;
+      }
+      await loadCatalogPage({
+        query: catalogQueryRef.current,
+        categoryCodes: activeCategoryCodes,
+        tagCodes: [],
+        page: 1,
+        replace: true,
+      });
+      return;
+    }
+    const code = tagCode || resolveTagCode(tagLabel);
+    const nextTags = selectedTagCodes.includes(code)
+      ? selectedTagCodes.filter((item) => item !== code)
+      : [...selectedTagCodes, code];
+    if (!nextTags.length && !activeCategoryCodes.length) {
+      await discover(20, 1);
+      return;
+    }
+    await loadCatalogPage({
+      query: catalogQueryRef.current,
+      categoryCodes: activeCategoryCodes,
+      tagCodes: nextTags,
+      page: 1,
+      replace: true,
+    });
   };
 
   const search = async (forcedQuery?: string) => {
@@ -307,9 +368,9 @@ export default function FoodCatalogPage() {
       return;
     }
     setShowSuggestions(false);
-    setCategoryFilter("全部");
-    setTagFilter("全部");
-    await loadCatalogPage({ query: keyword, page: 1, replace: true });
+    setActiveCategoryCodes([]);
+    setSelectedTagCodes([]);
+    await loadCatalogPage({ query: keyword, categoryCodes: [], tagCodes: [], page: 1, replace: true });
   };
 
   const pickSuggestion = (item: ProductFoodSuggestion) => {
@@ -320,7 +381,7 @@ export default function FoodCatalogPage() {
   };
 
   const inspect = (food: ProductFoodCatalogItem) => {
-    inspectFood(food);
+    inspectFood(food, items);
     const pages = Taro.getCurrentPages();
     const fromManualMeal =
       pages.length > 1 && pages[pages.length - 2]?.route === "pages/manual-meal/index";
@@ -332,14 +393,15 @@ export default function FoodCatalogPage() {
   const refreshPopular = async () => {
     if (hasSearched || isSearching || isPageLoading) return;
     const page = pickRandomCatalogPage(paginationRef.current);
-    if (!activeCategoryCode || activeCategoryCode === "all") {
+    if (!hasActiveFilters) {
       await discover(20, page, { replace: true });
       setItems((current) => shuffleCatalogItems(current));
       return;
     }
     await loadCatalogPage({
       query: catalogQueryRef.current,
-      categoryCode: catalogCategoryRef.current ?? activeCategoryCode,
+      categoryCodes: catalogCategoryCodesRef.current,
+      tagCodes: catalogTagCodesRef.current,
       page,
       replace: true,
     });
@@ -406,8 +468,9 @@ export default function FoodCatalogPage() {
           >
             <View className="food-catalog-categories__row">
               {categoryChips.map((chip) => {
-                const active = chip.code === activeCategoryCode
-                  || (!chip.code && !activeCategoryCode && categoryFilter === chip.category);
+                const active = chip.code === "all"
+                  ? activeCategoryCodes.length === 0
+                  : Boolean(chip.code && activeCategoryCodes.includes(chip.code));
                 return (
                   <View
                     className={`food-catalog-category ${active ? "food-catalog-category--active" : ""}`}
@@ -434,15 +497,20 @@ export default function FoodCatalogPage() {
             scrollWithAnimation
           >
             <View className="food-catalog-tags__row">
-              {tagChips.map((tag) => (
-                <View
-                  className={`food-catalog-filter ${tagFilter === tag ? "food-catalog-filter--active" : ""}`}
-                  key={tag}
-                  onClick={() => setTagFilter(tag)}
-                >
-                  <Text>{tag}</Text>
-                </View>
-              ))}
+              {tagChips.map((tag) => {
+                const active = tag.code
+                  ? selectedTagCodes.includes(tag.code)
+                  : selectedTagCodes.length === 0;
+                return (
+                  <View
+                    className={`food-catalog-filter ${active ? "food-catalog-filter--active" : ""}`}
+                    key={tag.code || tag.label}
+                    onClick={() => void updateTag(tag.label, tag.code)}
+                  >
+                    <Text>{tag.label}</Text>
+                  </View>
+                );
+              })}
               <View className="food-catalog-rail__spacer" />
             </View>
           </ScrollView>

@@ -623,6 +623,20 @@ function createFoodImageJobService({
     });
   }
 
+  async function listDailyUsage({ days = 14 } = {}) {
+    const count = Math.min(90, Math.max(1, Number(days) || 14));
+    const result = await db
+      .from("food_image_usage_daily")
+      .select("usage_date,generated_count")
+      .order("usage_date", { ascending: false })
+      .limit(count);
+    if (result?.error) throw new FoodImageJobError("FOOD_IMAGE_USAGE_READ_FAILED", result.error.message);
+    return (result.data || []).map((row) => ({
+      date: row.usage_date,
+      value: Number(row.generated_count) || 0,
+    })).reverse();
+  }
+
   async function getStats(userId) {
     await requireAdmin(userId);
     const [missing, pendingJobs, processingJobs, pendingImages, readyFoods, failedJobs, usage] = await Promise.all([
@@ -658,6 +672,7 @@ function createFoodImageJobService({
     cancelActiveJobs,
     getStats,
     getDailyUsage,
+    listDailyUsage,
     dailyLimit,
     mapJobRow,
   };

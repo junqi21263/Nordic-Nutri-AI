@@ -37,6 +37,17 @@ export interface ProductAccount {
   onboardingCompleted?: boolean;
 }
 
+export interface ProductAccountUsageQuota {
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface ProductAccountUsage {
+  vision: ProductAccountUsageQuota;
+  coach: ProductAccountUsageQuota;
+}
+
 export function getProductAccount() {
   return requestProductApi<ProductAccount>("/account", {
     method: "GET",
@@ -52,6 +63,13 @@ export function cancelProductAccount(clientRequestId = createClientRequestId()) 
       clientRequestId,
     },
     fallbackMessage: "账号注销失败，请稍后重试",
+  });
+}
+
+export function getProductAccountUsage() {
+  return requestProductApi<ProductAccountUsage>("/account/usage", {
+    method: "GET",
+    fallbackMessage: "用量读取失败，请稍后重试",
   });
 }
 

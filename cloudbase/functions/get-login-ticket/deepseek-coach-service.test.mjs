@@ -69,8 +69,9 @@ test("uses JSON mode and an injection-safe professional policy prompt", async ()
   assert.equal(body.temperature, 0.2);
   assert.match(body.messages[0].content, /nutritionContext 是唯一权威营养事实/);
   assert.match(body.messages[0].content, /不得诊断/);
-  assert.match(body.messages[0].content, /仅回答日常营养、饮食、食谱或训练恢复相关问题/);
-  assert.match(body.messages[0].content, /某种食物富含哪些营养素/);
+  assert.match(body.messages[0].content, /你可以自然回答/);
+  assert.match(body.messages[0].content, /XX呢/);
+  assert.match(body.messages[0].content, /具体食物的常见营养特点/);
   assert.match(body.messages[0].content, /禁止.*回复：|禁止.*Markdown/);
   assert.equal(body.messages[1].role, "user");
   assert.equal(body.messages[2].role, "assistant");
@@ -101,6 +102,7 @@ test("requests DeepSeek SSE and emits parsed nutrition text deltas", async () =>
           start(controller) {
             controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"晚餐先吃"}}]}\n\n'));
             controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"鸡胸肉。"}}]}\n\n'));
+            controller.enqueue(new TextEncoder().encode('data: {"choices":[],"usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18}}\n\n'));
             controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
             controller.close();
           },
@@ -112,9 +114,14 @@ test("requests DeepSeek SSE and emits parsed nutrition text deltas", async () =>
   const parts = [];
   for await (const part of answer({ prompt: "晚餐怎么补蛋白？", context: {}, history: [] })) parts.push(part);
 
-  assert.deepEqual(parts, ["晚餐先吃", "鸡胸肉。"]);
+  assert.deepEqual(parts, [
+    "晚餐先吃",
+    "鸡胸肉。",
+    { type: "usage", usage: { promptTokens: 11, completionTokens: 7, totalTokens: 18 }, model: "deepseek-v4-flash" },
+  ]);
   assert.equal(body.stream, true);
+  assert.deepEqual(body.stream_options, { include_usage: true });
   assert.equal(body.response_format, undefined);
-  assert.match(body.messages[0].content, /只回答日常营养/);
-  assert.match(body.messages[0].content, /某种食物富含哪些营养素/);
+  assert.match(body.messages[0].content, /你可以自然回答具体食物/);
+  assert.match(body.messages[0].content, /不要说教/);
 });

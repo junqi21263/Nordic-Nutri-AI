@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { DailyNutritionSummary } from "../../components/daily-nutrition-summary";
 import { EmptyState } from "../../components/empty-state";
+import { FirstRunTip } from "../../components/first-run-tip";
 import { Loading } from "../../components/loading";
 import { MealGroup } from "../../components/meal-group";
 import { SectionTitle } from "../../components/section-title";
@@ -13,6 +14,11 @@ import { type MealType } from "../../features/meals/domain";
 import { resolveHomeDailySummary } from "../../features/meals/home-daily-summary";
 import { getCoachGreeting } from "../../features/coach/server-time";
 import { getLocalDateString } from "../../features/onboarding/domain";
+import {
+  hasSeenFirstRunTip,
+  markFirstRunTipSeen,
+  retireFirstRunTipsIfRecordedMeals,
+} from "../../features/first-run-tips/first-run-tips";
 import { buildAppShareMessage, buildAppTimelineShare } from "../../features/share/app-share";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
@@ -37,6 +43,9 @@ export default function HomePage() {
   const [remoteSummary, setRemoteSummary] = useState<ProductDailySummary | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [guideFirstMeal, setGuideFirstMeal] = useState(
+    () => !hasSeenFirstRunTip("home-first-meal"),
+  );
   const localSummary = store.getDailySummary(today);
   const summary = resolveHomeDailySummary(
     remoteSummary
@@ -59,6 +68,12 @@ export default function HomePage() {
       });
       return;
     }
+    const mealState = useMealStore.getState();
+    if (retireFirstRunTipsIfRecordedMeals(mealState.meals, mealState.dataSource)) {
+      setGuideFirstMeal(false);
+    } else if (hasSeenFirstRunTip("home-first-meal")) {
+      setGuideFirstMeal(false);
+    }
     setRefreshVersion((version) => version + 1);
   });
   useEffect(() => {
@@ -69,6 +84,7 @@ export default function HomePage() {
     void getProductDailySummary(today)
       .then(async (dailySummary) => {
         setRemoteSummary(dailySummary);
+        store.setDailyTargets(dailySummary.targets);
         if (Array.isArray(dailySummary.meals)) {
           store.replaceRemoteMeals(dailySummary.meals.map(mapProductMeal), today);
           return;
@@ -84,7 +100,12 @@ export default function HomePage() {
   }, [refreshVersion, store.replaceRemoteMeals, today]);
   const openDetail = (id: string) => Taro.navigateTo({ url: `/pages/meal-detail/index?id=${id}` });
   // Both destinations are native tabBar pages. navigateTo cannot open them.
-  const openScanner = () => Taro.navigateTo({ url: "/pages/food-scanner/index" });
+  const openScanner = () => {
+    // Primary「拍照识别」bypasses the tip CTA — still mark step 1 done.
+    markFirstRunTipSeen("home-first-meal");
+    setGuideFirstMeal(false);
+    void Taro.navigateTo({ url: "/pages/food-scanner/index" });
+  };
   const openRecords = () => {
     useTabBarStore.getState().setActiveKey("meal-records");
     void Taro.switchTab({ url: "/pages/meal-records/index" });
@@ -135,6 +156,17 @@ export default function HomePage() {
             <DailyNutritionSummary summary={summary} dashboard />
           </View>
         </View>
+        {guideFirstMeal && meals.length === 0 ? (
+          <FirstRunTip
+            tipId="home-first-meal"
+            step="1/3"
+            title="先拍下今天的第一餐"
+            body="点「去拍照」，对准整盘食物即可。AI 识别后还能改餐次和份量再保存。"
+            actionLabel="去拍照"
+            onAction={openScanner}
+            onClose={() => setGuideFirstMeal(false)}
+          />
+        ) : null}
         <View onClick={openRecords}>
           <AIInsightCard
             label="NOVA · 营养洞察"
@@ -147,7 +179,9 @@ export default function HomePage() {
         <Text className="nutrition-disclaimer">
           营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
         </Text>
-        <View className="home-page__actions">
+        <View
+          className={`home-page__actions ${guideFirstMeal && meals.length === 0 ? "home-page__actions--guided" : ""}`}
+        >
           <View className="home-page__action home-page__action--primary" onClick={openScanner}>
             <NordicIcon name="camera" size={20} ariaLabel="拍照识别" />
             <Text>拍照识别</Text>
@@ -165,7 +199,13 @@ export default function HomePage() {
             onActionClick={openRecords}
           />
           {store.loadingState === "empty" ? (
-            <EmptyState title="今天还没有记录" description="从一餐开始，建立属于你的营养节奏。" />
+            <EmptyState
+              title="今天还没有记录"
+              description="从一餐开始，建立属于你的营养节奏。"
+              actionLabel="拍第一餐"
+              onAction={openScanner}
+              showMark={false}
+            />
           ) : (
             <View className="content-stack content-stack--compact">
               {mealTypes.map((mealType) => (

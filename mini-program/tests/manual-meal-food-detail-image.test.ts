@@ -40,8 +40,9 @@ describe("manual meal and food detail image layout", () => {
   it("keeps the detail image square by default while allowing future source ratios", () => {
     expect(foodDetailPage).toContain('className="food-detail-page__hero food-detail-page__hero--square"');
     expect(foodDetailPage).toContain('prefer="detail"');
-    expect(foodThumbnail).toContain("getFoodVisualAspectRatio");
+    expect(foodDetailPage).toContain("aspectRatio={1}");
     expect(foodThumbnail).toContain("aspectRatio");
+    expect(foodThumbnail).toContain('prefer === "detail" ? 1');
     expect(pageStyles).not.toContain("aspect-ratio: 16 / 9");
     expect(pageStyles).toContain("aspect-ratio: 1 / 1");
   });

@@ -483,6 +483,75 @@ test("previewCategory falls back to localized English food names when name_zh is
   ]);
 });
 
+test("retryFailedItem resumes a cancelled batch before regenerating", async () => {
+  const batch = { id: "batch-1", status: "cancelled", created_by: "admin", concurrency: 1, max_attempts: 3, started_at: "2026-01-01T00:00:00.000Z" };
+  const item = {
+    id: "item-1",
+    batch_id: batch.id,
+    food_id: "food-1",
+    visual_profile_id: "profile-1",
+    job_id: "old-job",
+    status: "needs_retry",
+    attempt_count: 1,
+    locked_at: null,
+    locked_by: null,
+    error_code: "FOOD_IMAGE_REJECTED",
+    error_message: "形态不符",
+  };
+  const db = {
+    from(table) {
+      if (table === "food_image_batches") return {
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: batch, error: null }) }) }),
+        update: (patch) => ({ eq: async () => { Object.assign(batch, patch); return { data: batch, error: null }; } }),
+      };
+      if (table === "food_image_batch_items") return {
+        select: (columns) => {
+          if (columns === "status") return { eq: async () => ({ data: [{ status: item.status }], error: null }) };
+          let statusFilter = null;
+          const query = {
+            eq: () => query,
+            in: (column, values) => {
+              if (column === "status") statusFilter = values;
+              return query;
+            },
+            or: () => query,
+            order: () => query,
+            limit: () => query,
+            maybeSingle: async () => {
+              if (statusFilter && !statusFilter.includes(item.status)) return { data: null, error: null };
+              return { data: item, error: null };
+            },
+          };
+          return query;
+        },
+        update: (patch) => {
+          Object.assign(item, patch);
+          const query = { eq: () => query, select: () => ({ maybeSingle: async () => ({ data: item, error: null }) }) };
+          return query;
+        },
+      };
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+  const service = createFoodImageBatchService({
+    db,
+    repository: {
+      isAdmin: async (userId) => userId === "admin",
+      getFoodById: async () => ({ id: "food-1", nameZh: "速溶早餐粉", category: { nameZh: "蛋类与乳制品" } }),
+    },
+    jobs: {
+      cancelActiveJobs: async () => {},
+      createJob: async () => ({ id: "fresh-job", visualProfileId: "profile-1" }),
+      processQueue: async () => ({ results: [{ generated: 1 }] }),
+    },
+  });
+
+  const result = await service.retryFailedItem("admin", "item-1");
+  assert.equal(result.retryScheduled, true);
+  assert.equal(batch.status, "running");
+  assert.equal(batch.finished_at, null);
+});
+
 test("retryFailedItem reopens needs_review items for regeneration", async () => {
   const batch = { id: "batch-1", status: "running", created_by: "admin", concurrency: 1, max_attempts: 3 };
   const item = {

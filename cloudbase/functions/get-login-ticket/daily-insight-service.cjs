@@ -138,6 +138,8 @@ function createRuleInsight(context) {
   };
 }
 
+const { extractContentAndUsage } = require("./model-usage.cjs");
+
 function createDeepseekDailyInsightCompletion({ apiKey, model, fetchImpl = globalThis.fetch } = {}) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("DeepSeek configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
@@ -164,7 +166,8 @@ function createDeepseekDailyInsightCompletion({ apiKey, model, fetchImpl = globa
       });
       if (!response.ok) throw insightError();
       const data = await response.json();
-      return data?.choices?.[0]?.message?.content;
+      const parsed = extractContentAndUsage(data);
+      return { content: parsed.content, usage: parsed.usage };
     } catch (error) {
       if (error?.message === "DAILY_INSIGHT_RETRYABLE") throw error;
       throw insightError();
@@ -177,6 +180,7 @@ function createDeepseekDailyInsightCompletion({ apiKey, model, fetchImpl = globa
 function createCloudbaseDailyInsightCompletion({ ai, model, groupName = "cloudbase" } = {}) {
   if (!ai || typeof ai.createModel !== "function") throw new Error("CloudBase AI client is unavailable");
   if (groupName !== "cloudbase") throw new Error("CloudBase AI group is unavailable");
+  const { extractUsageFromAny } = require("./model-usage.cjs");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "hy3";
   return async ({ date, context }) => {
     try {
@@ -191,7 +195,7 @@ function createCloudbaseDailyInsightCompletion({ ai, model, groupName = "cloudba
         ],
       });
       if (typeof response?.text !== "string") throw insightError();
-      return response.text;
+      return { content: response.text, usage: extractUsageFromAny(response) };
     } catch (error) {
       if (error?.message === "DAILY_INSIGHT_RETRYABLE") throw error;
       throw insightError();
@@ -208,12 +212,15 @@ function createDailyInsightService({ ai, apiKey, model, requestCompletion, sourc
     : (apiKey ? createDeepseekDailyInsightCompletion({ apiKey, model: selectedModel }) : null));
   return async ({ date, context } = {}) => {
     assertDate(date);
-    if (!complete) return { ...createRuleInsight(context), source: "rule_v3", model: null };
+    if (!complete) return { ...createRuleInsight(context), source: "rule_v3", model: null, usage: null };
     try {
-      const insight = validateDailyInsight(await complete({ date, context }));
-      return { ...insight, source: resolvedSource, model: selectedModel };
+      const raw = await complete({ date, context });
+      const content = typeof raw === "string" ? raw : raw?.content;
+      const usage = typeof raw === "object" && raw ? raw.usage : null;
+      const insight = validateDailyInsight(content);
+      return { ...insight, source: resolvedSource, model: selectedModel, usage };
     } catch {
-      return { ...createRuleInsight(context), source: "rule_v3", model: null };
+      return { ...createRuleInsight(context), source: "rule_v3", model: null, usage: null };
     }
   };
 }

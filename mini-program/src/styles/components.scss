@@ -968,6 +968,86 @@
   font-size: $font-caption;
   max-width: 480px;
 }
+.first-run-tip {
+  animation: first-run-tip-enter 320ms ease-out both;
+  background: $color-dark-forest;
+  border-radius: $radius-16;
+  display: flex;
+  flex-direction: column;
+  gap: $space-12;
+  overflow: hidden;
+  padding: $space-16;
+  position: relative;
+}
+.first-run-tip__header {
+  align-items: center;
+  display: flex;
+  gap: $space-8;
+}
+.first-run-tip__step {
+  align-items: center;
+  background: rgba(#ffffff, 0.16);
+  border-radius: $radius-full;
+  color: #ffffff;
+  display: flex;
+  flex-shrink: 0;
+  font-size: 20px;
+  font-weight: $font-weight-semibold;
+  height: 40px;
+  justify-content: center;
+  min-width: 64px;
+  padding: 0 $space-8;
+}
+.first-run-tip__title {
+  color: #ffffff;
+  flex: 1;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+  line-height: 1.3;
+}
+.first-run-tip__body {
+  color: rgba(#ffffff, 0.78);
+  font-size: $font-overline;
+  line-height: 1.5;
+}
+.first-run-tip__actions {
+  display: flex;
+  gap: $space-8;
+}
+.first-run-tip__action {
+  align-items: center;
+  border-radius: $radius-full;
+  display: flex;
+  flex: 1 1 0;
+  font-size: $font-overline;
+  font-weight: $font-weight-semibold;
+  height: 64px;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 $space-12;
+}
+.first-run-tip__action--primary {
+  background: #ffffff;
+  color: $color-dark-forest;
+}
+.first-run-tip__action--ghost {
+  background: transparent;
+  border: 1px solid rgba(#ffffff, 0.28);
+  color: rgba(#ffffff, 0.88);
+}
+.first-run-tip__action:active {
+  opacity: 0.88;
+}
+@keyframes first-run-tip-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .loading {
   align-items: center;
   color: $color-forest-green;

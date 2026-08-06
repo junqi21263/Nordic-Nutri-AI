@@ -6,6 +6,8 @@ import { AppCard } from "../../components/app-card";
 import { ErrorState } from "../../components/error-state";
 import { MacroProgress } from "../../components/macro-progress";
 import { PageLayout } from "../../layouts/page-layout";
+import { mealTypeOptions } from "../../features/meals/meal-type";
+import type { MealType } from "../../features/meals/domain";
 import { createMealFromAnalysis } from "../../features/scanner/domain";
 import { createProductMeal, getProductMeals, updateProductMeal } from "../../api/meal-data-api";
 import { toProductMealInput } from "../../features/meals/product-meal-input";
@@ -51,6 +53,8 @@ export default function PortionAdjustmentPage() {
         : `比原始份量减少 ${100 - percentage}%`;
   const canDecrease = portion.multiplier > 0.25;
   const canIncrease = portion.multiplier < 2;
+  const selectedMealType = portion.meal.mealType;
+  const setMealType = (mealType: MealType) => portion.setMealType(mealType);
   const save = async () => {
     const editingId = portion.editingMealId;
     const draftMeal = portion.meal;
@@ -63,7 +67,8 @@ export default function PortionAdjustmentPage() {
         const current = meals.getMealById(editingId);
         if (!current) throw new Error("Meal not found");
         const saved = await updateProductMeal(editingId, {
-          items: toProductMealInput({ ...current, items: adjusted.items }).items,
+          mealType: draftMeal.mealType,
+          items: toProductMealInput({ ...current, mealType: draftMeal.mealType, items: adjusted.items }).items,
         });
         if (!saved) throw new Error("Meal not found");
         id = saved.id;
@@ -113,6 +118,25 @@ export default function PortionAdjustmentPage() {
           <View className="portion-summary__energy">
             <Text className="portion-summary__label">调整后热量</Text>
             <Text className="portion-summary__value">{adjusted.calories} kcal</Text>
+          </View>
+        </AppCard>
+        <AppCard className="content-stack content-stack--compact">
+          <View className="portion-adjustment-page__meal-type-block">
+            <Text className="portion-adjustment-page__meal-type-label">这是哪一餐？</Text>
+            <View className="portion-adjustment-page__meal-types" ariaLabel="选择餐次类型">
+              {mealTypeOptions.map((option) => (
+                <View
+                  key={option.value}
+                  className={`portion-adjustment-page__meal-type ${
+                    selectedMealType === option.value ? "portion-adjustment-page__meal-type--active" : ""
+                  }`}
+                  ariaLabel={option.label}
+                  onClick={() => setMealType(option.value)}
+                >
+                  <Text>{option.label}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         </AppCard>
         <AppCard className="content-stack content-stack--compact">

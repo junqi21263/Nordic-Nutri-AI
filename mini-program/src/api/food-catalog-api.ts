@@ -24,6 +24,8 @@ export interface ProductFoodCatalogItem {
   proteinGPer100g: number | null;
   carbsGPer100g: number | null;
   fatGPer100g: number | null;
+  fiberGPer100g?: number | null;
+  tags?: Array<{ code: string; nameZh?: string | null }>;
   imageUrl: string | null;
   image?: ProductFoodImage | null;
   sourceUrl: string | null;
@@ -85,10 +87,20 @@ export interface ProductFoodInsight {
   cached?: boolean;
 }
 
-export function searchProductFoodCatalog(query: string, page = 1, options?: { categoryCode?: string }) {
+export function searchProductFoodCatalog(
+  query: string,
+  page = 1,
+  options?: { categoryCode?: string; categoryCodes?: string[]; tagCodes?: string[] },
+) {
   const params = new URLSearchParams({ page: String(page) });
   if (query.trim()) params.set("query", query.trim());
-  if (options?.categoryCode) params.set("category", options.categoryCode);
+  const categoryCodes = [
+    ...(options?.categoryCodes || []),
+    ...(options?.categoryCode ? [options.categoryCode] : []),
+  ].map((code) => String(code || "").trim()).filter(Boolean);
+  if (categoryCodes.length) params.set("category", categoryCodes.join(","));
+  const tagCodes = (options?.tagCodes || []).map((code) => String(code || "").trim()).filter(Boolean);
+  if (tagCodes.length) params.set("tags", tagCodes.join(","));
   return requestProductApi<ProductFoodCatalogSearch>(
     `/foods?${params.toString()}`,
     { method: "GET", fallbackMessage: "食物库暂时不可用，请稍后重试" },

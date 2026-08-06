@@ -1,18 +1,32 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getProductAccountUsage } from "../../api/product-data-api";
 import { analyzeProductImage } from "../../api/vision-api";
 import { AppButton } from "../../components/app-button";
 import { BottomSheet } from "../../components/bottom-sheet";
+import { FirstRunTip } from "../../components/first-run-tip";
 import { NordicIcon } from "../../components/nordic-icon";
 import bowlImage from "../../assets/meal-bowl.svg";
 import oatsImage from "../../assets/meal-oats.svg";
 import salmonImage from "../../assets/meal-salmon.svg";
-import { assertImageWithinPickLimit } from "../../features/media/image-upload-limits";
+import { assertImageWithinPickLimit, formatVisionUploadHint } from "../../features/media/image-upload-limits";
+import {
+  hasSeenFirstRunTip,
+  markFirstRunTipSeen,
+  retireFirstRunTipsIfRecordedMeals,
+} from "../../features/first-run-tips/first-run-tips";
 import { PageLayout } from "../../layouts/page-layout";
 import { useAnalysisStore } from "../../stores/analysis-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
+import { useMealStore } from "../../stores/meal-store";
 import { useScannerStore } from "../../stores/scanner-store";
+
+function shouldShowScannerTip(): boolean {
+  const meals = useMealStore.getState();
+  if (retireFirstRunTipsIfRecordedMeals(meals.meals, meals.dataSource)) return false;
+  return !hasSeenFirstRunTip("scanner-capture");
+}
 
 const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
 
@@ -38,6 +52,8 @@ export default function FoodScannerPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [fallbackOpen, setFallbackOpen] = useState(false);
   const [fallbackMessage, setFallbackMessage] = useState("可检查相机、相册和网络权限；如果视觉服务尚未配置，可以先手动记录。");
+  const [showScannerTip, setShowScannerTip] = useState(shouldShowScannerTip);
+  const [visionRemaining, setVisionRemaining] = useState<number | null>(null);
   const isScanningRef = useRef(false);
   const suppressPreviewResetRef = useRef(false);
   const preview = scanner.capturedMeal ?? scanner.candidates[0] ?? null;
@@ -47,38 +63,56 @@ export default function FoodScannerPage() {
     scanner.setGalleryMode(false);
   };
 
+  const dismissScannerTip = () => {
+    markFirstRunTipSeen("scanner-capture");
+    setShowScannerTip(false);
+  };
+
   useDidShow(() => {
+    // Re-sync: tip key may be missing even when meals already prove first-run is done.
+    if (!shouldShowScannerTip()) setShowScannerTip(false);
     // Returning from analysis/result should reset the frame; skip while a pick/analyze
     // session is active so chooseMedia onShow does not wipe the just-selected image.
     if (suppressPreviewResetRef.current || isScanningRef.current) return;
     clearPreviewDisplay();
   });
 
+  useEffect(() => {
+    void getProductAccountUsage()
+      .then((usage) => setVisionRemaining(usage.vision.remaining))
+      .catch(() => undefined);
+  }, []);
+
   const analyzeCurrentPreview = async (previewPath: string) => {
     if (isScanningRef.current) return;
     isScanningRef.current = true;
     setIsScanning(true);
+    dismissScannerTip();
     try {
       const meal = await analyzeProductImage(previewPath);
       scanner.setCapturedMeal(meal);
       analysis.setAnalysis(meal);
       await Taro.navigateTo({ url: "/pages/analysis-result/index" });
     } catch (error) {
-      const isNotConfigured = error instanceof Error && error.name === "VISION_SERVICE_NOT_CONFIGURED";
+      const errorName = error instanceof Error ? error.name : "";
+      const isNotConfigured = errorName === "VISION_SERVICE_NOT_CONFIGURED";
+      const isContentBlocked = errorName === "VISION_CONTENT_BLOCKED";
+      const isNonFood = errorName === "VISION_NON_FOOD";
       console.error("[vision] analyzeProductImage failed:", error);
-      setFallbackMessage(
-        isNotConfigured
-          ? "图片识别服务尚未配置，可先手动记录。"
-          : error instanceof Error
-            ? error.message
-            : "图片识别失败，请重新选择图片或手动记录。",
-      );
+      const userMessage = isNotConfigured
+        ? "图片识别服务尚未配置，可先手动记录。"
+        : isContentBlocked
+          ? "图片未通过安全审核，请更换后重试"
+          : isNonFood
+            ? "上传的图片为非食物，请重新上传食物图片"
+            : error instanceof Error
+              ? error.message
+              : "图片识别失败，请重新选择图片或手动记录。";
+      setFallbackMessage(userMessage);
       feedback.show({
         message: isNotConfigured
           ? "图片识别服务尚未配置，可先手动记录"
-          : error instanceof Error
-            ? error.message
-            : "图片识别失败，请重新拍摄或手动记录",
+          : userMessage.replace(/。$/, ""),
         tone: "error",
       });
       setFallbackOpen(true);
@@ -105,6 +139,8 @@ export default function FoodScannerPage() {
       scanner.setPreviewPath(previewPath);
       scanner.setGalleryMode(source === "album");
       setFallbackOpen(false);
+      // Any successful capture path completes step 2 — not only the tip CTA.
+      dismissScannerTip();
       await analyzeCurrentPreview(previewPath);
     } catch (error) {
       // User closed the album/camera without picking — stay on the page quietly.
@@ -128,6 +164,7 @@ export default function FoodScannerPage() {
 
   const openManualMeal = () => {
     setFallbackOpen(false);
+    dismissScannerTip();
     void Taro.navigateTo({ url: "/pages/manual-meal/index" });
   };
 
@@ -138,7 +175,7 @@ export default function FoodScannerPage() {
       title="食物扫描"
       className="page-layout--food-scanner"
     >
-      <View className="food-scanner-page">
+      <View className={`food-scanner-page${showScannerTip && !isScanning ? " food-scanner-page--with-tip" : ""}`}>
         <View className="food-scanner-page__header">
           <View className="food-scanner-page__heading">
             <Text className="food-scanner-page__title">记录这一餐</Text>
@@ -151,6 +188,22 @@ export default function FoodScannerPage() {
             <Text>AI 识别中</Text>
           </View>
         </View>
+
+        {visionRemaining != null && visionRemaining <= 2 ? (
+          <Text className="usage-quota-tip">今日识别剩余 {visionRemaining} 次</Text>
+        ) : null}
+
+        {showScannerTip && !isScanning ? (
+          <FirstRunTip
+            tipId="scanner-capture"
+            step="2/3"
+            title="把整盘食物拍进取景框"
+            body="尽量自然光、餐盘完整入镜。准备好后点「开始拍摄」，也可改用图库。"
+            actionLabel="开始拍摄"
+            onAction={() => void chooseImage("camera")}
+            onClose={() => setShowScannerTip(false)}
+          />
+        ) : null}
 
         <View
           className={`scanner-frame ${scanner.flashEnabled ? "scanner-frame--flash" : ""} ${isScanning ? "scanner-frame--scanning" : ""}`}
@@ -227,6 +280,7 @@ export default function FoodScannerPage() {
             {isScanning ? "正在 AI 分析" : "拍摄并 AI 分析"}
           </AppButton>
         </View>
+        <Text className="scanner-upload-hint">{formatVisionUploadHint()}</Text>
       </View>
       <BottomSheet
         open={fallbackOpen}

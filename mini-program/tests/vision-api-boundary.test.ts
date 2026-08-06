@@ -15,8 +15,13 @@ describe("real visual analysis boundary", () => {
     expect(api).toContain("contentType,");
     expect(api).toContain("MAX_PICK_IMAGE_BYTES");
     expect(api).toContain("formatImageTooLargeMessage");
+    expect(api).toContain("compressedWidth");
+    expect(api).toContain("VISION_CONTENT_BLOCKED");
+    expect(api).toContain("图片未通过安全审核");
     expect(scanner).toContain("analyzeProductImage");
+    expect(scanner).toContain("VISION_CONTENT_BLOCKED");
     expect(scanner).toContain("assertImageWithinPickLimit");
+    expect(scanner).toContain("formatVisionUploadHint");
     expect(scanner).toContain('sizeType: ["compressed"]');
     expect(scanner).not.toContain("captureRandom");
   });

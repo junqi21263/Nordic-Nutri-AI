@@ -164,20 +164,72 @@ export function getFoodCategory(food: ProductFoodCatalogItem): Exclude<FoodCateg
   return "其他";
 }
 
+const PLANT_PROTEIN_CATEGORY_LABELS = new Set([
+  "豆制品",
+  "谷物",
+  "豆类与植物蛋白",
+  "谷物与薯类",
+]);
+
+const PLANT_PROTEIN_CATEGORY_CODES = new Set([
+  "plant_protein",
+  "grains_tubers",
+  "soy",
+  "grain",
+]);
+
+const TAG_CODE_BY_LABEL: Record<string, string> = {
+  高蛋白: "high_protein",
+  低脂: "low_fat",
+  高碳水: "high_carb",
+  低热量: "low_calorie",
+  植物蛋白: "plant_protein",
+  高膳食纤维: "high_fiber",
+};
+
+const TAG_LABEL_BY_CODE: Record<string, Exclude<FoodTag, "全部">> = {
+  high_protein: "高蛋白",
+  low_fat: "低脂",
+  high_carb: "高碳水",
+  low_calorie: "低热量",
+  plant_protein: "植物蛋白",
+  high_fiber: "高膳食纤维",
+};
+
+export function resolveTagCode(tag: string) {
+  const value = String(tag || "").trim();
+  if (!value || value === "全部") return "";
+  if (TAG_LABEL_BY_CODE[value]) return value;
+  return TAG_CODE_BY_LABEL[value] || value;
+}
+
+function isPlantProteinFood(food: ProductFoodCatalogItem) {
+  const categoryCode = String(food.category ?? "").split(".")[0];
+  if (PLANT_PROTEIN_CATEGORY_CODES.has(categoryCode)) return true;
+  return PLANT_PROTEIN_CATEGORY_LABELS.has(getFoodCategory(food));
+}
+
 /** Infer tag labels using the same thresholds as the server auto-tag rules. */
 export function getFoodTags(food: ProductFoodCatalogItem): Exclude<FoodTag, "全部">[] {
+  if (Array.isArray(food.tags) && food.tags.length) {
+    return food.tags
+      .map((tag) => tag.nameZh || TAG_LABEL_BY_CODE[tag.code] || "")
+      .filter((label): label is Exclude<FoodTag, "全部"> => Boolean(label));
+  }
+
   const tags: Exclude<FoodTag, "全部">[] = [];
   const protein = food.proteinGPer100g ?? 0;
   const fat = food.fatGPer100g ?? Number.POSITIVE_INFINITY;
   const carbs = food.carbsGPer100g ?? 0;
   const calories = food.caloriesKcalPer100g ?? Number.POSITIVE_INFINITY;
-  const category = getFoodCategory(food);
+  const fiber = food.fiberGPer100g;
 
   if (protein >= 15) tags.push("高蛋白");
   if (fat <= 3) tags.push("低脂");
   if (carbs >= 30) tags.push("高碳水");
   if (calories <= 100) tags.push("低热量");
-  if (category === "豆制品" || category === "谷物") tags.push("植物蛋白");
+  if (isPlantProteinFood(food)) tags.push("植物蛋白");
+  if (typeof fiber === "number" && Number.isFinite(fiber) && fiber >= 5) tags.push("高膳食纤维");
   return tags;
 }
 
@@ -186,12 +238,31 @@ export function matchesFoodFilters(
   category: FoodCategory,
   tag: FoodTag,
 ) {
+  return matchesFoodMultiFilters(
+    food,
+    category === "全部" ? [] : [category],
+    tag === "全部" ? [] : [tag],
+  );
+}
+
+/** OR within categories, OR within tags; AND between the two dimensions. */
+export function matchesFoodMultiFilters(
+  food: ProductFoodCatalogItem,
+  categories: FoodCategory[],
+  tags: FoodTag[],
+) {
   const foodCategory = getFoodCategory(food);
-  const categoryMatched =
-    category === "全部"
-    || foodCategory === category
-    // Legacy chip "蔬菜水果" maps to either vegetable or fruit.
+  const selectedCategories = (categories || []).filter((item) => item && item !== "全部");
+  const selectedTags = (tags || []).filter((item) => item && item !== "全部");
+
+  const categoryMatched = selectedCategories.length === 0 || selectedCategories.some((category) => (
+    foodCategory === category
     || (category === "蔬菜水果" && (foodCategory === "蔬菜" || foodCategory === "水果"))
-    || (category === "谷薯主食" && foodCategory === "谷物");
-  return categoryMatched && (tag === "全部" || getFoodTags(food).includes(tag));
+    || (category === "谷薯主食" && (foodCategory === "谷物" || foodCategory === "谷物与薯类"))
+  ));
+
+  if (!categoryMatched) return false;
+  if (!selectedTags.length) return true;
+  const foodTags = getFoodTags(food);
+  return selectedTags.some((tag) => foodTags.includes(tag) || foodTags.includes(TAG_LABEL_BY_CODE[resolveTagCode(tag)]));
 }

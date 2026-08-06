@@ -21,7 +21,7 @@ describe("profile information bottom sheets", () => {
     expect(source).toContain("onDismiss={() => setActiveModal(null)}");
     expect(source).toContain('className="profile-sheet__close"');
     expect(source).toContain('ariaLabel="关闭反馈与帮助"');
-    expect(source).not.toContain('ariaLabel="关闭隐私与数据"');
+    expect(source).toContain('ariaLabel="关闭隐私与数据"');
     expect(source).not.toContain('ariaLabel="关闭关于我们"');
     expect(styles).toContain(".profile-sheet {");
     expect(styles).toContain("min-height: 720px");

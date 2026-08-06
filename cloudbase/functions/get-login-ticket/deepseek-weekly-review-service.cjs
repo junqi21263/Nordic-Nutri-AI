@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { extractContentAndUsage } = require("./model-usage.cjs");
 
 const forbiddenPresentationWording = /```|[`*#]|^\s*(?:回复|答复|回答|建议|说明)\s*[:：]/m;
 const unsafeWording = /诊断|治疗|处方|药物|吃药|用药|孕期|怀孕|哺乳|未成年|厌食|暴食|替代医疗/i;
@@ -132,7 +133,9 @@ function createWeeklyCompletion({ apiKey, model, fetchImpl = globalThis.fetch, t
         signal: controller.signal,
       });
       if (!response.ok) throw new Error("WEEKLY_REVIEW_RETRYABLE");
-      return (await response.json())?.choices?.[0]?.message?.content;
+      const data = await response.json();
+      const parsed = extractContentAndUsage(data);
+      return { content: parsed.content, usage: parsed.usage };
     } catch (error) {
       if (error?.message === "WEEKLY_REVIEW_RETRYABLE") throw error;
       throw new Error("WEEKLY_REVIEW_RETRYABLE");
@@ -153,8 +156,11 @@ function createDeepseekWeeklyReviewService({ apiKey, model, requestCompletion, f
     const fallback = createFallbackWeeklyReview(context);
     if (!shouldGenerateWeeklyAi(context) || !complete) return fallback;
     try {
-      const result = validateWeeklyReview(await complete({ date, context }));
-      return result ? { ...result, source: "deepseek", model: selectedModel } : fallback;
+      const raw = await complete({ date, context });
+      const content = typeof raw === "string" ? raw : raw?.content;
+      const usage = typeof raw === "object" && raw ? raw.usage : null;
+      const result = validateWeeklyReview(content);
+      return result ? { ...result, source: "deepseek", model: selectedModel, usage } : fallback;
     } catch {
       return fallback;
     }

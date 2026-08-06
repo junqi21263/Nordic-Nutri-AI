@@ -108,6 +108,7 @@ test("service returns a DeepSeek-generated coach question and uses a safe fallba
     prompt: "下午训练后怎么补充蛋白质？",
     source: "deepseek",
     model: "deepseek-v4-flash",
+    usage: null,
   });
 });
 

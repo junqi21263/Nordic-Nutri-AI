@@ -40,13 +40,14 @@ function normalizeItems(items) {
   });
 }
 
-/** Store durable short paths only — cloud file IDs or short local/https URLs (DB max 512). */
+/** Store durable short paths only — cloud file IDs or short https URLs (DB max 512). */
 function normalizeStoredImagePath(value) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > 512) return null;
   if (/^cloud:\/\//i.test(trimmed)) return trimmed;
-  if (/^(wxfile:|http:\/\/tmp|https:\/\/tmp)/i.test(trimmed)) return trimmed;
+  // Ephemeral device / WeChat temp paths are not durable across sessions.
+  if (/^(wxfile:|http:\/\/tmp|https:\/\/tmp)/i.test(trimmed)) return null;
   if (/^https:\/\//i.test(trimmed)) return trimmed;
   return null;
 }
@@ -131,13 +132,20 @@ function createMealDataService({
 
   async function withResolvedImage(meal) {
     if (!meal?.imageUrl || typeof resolveImageUrl !== "function") return meal;
-    if (!/^cloud:\/\//i.test(meal.imageUrl)) return meal;
+    if (!/^cloud:\/\//i.test(meal.imageUrl)) {
+      // Drop non-https leftovers (e.g. stale wxfile) so UI shows the food icon fallback.
+      if (/^(wxfile:|http:\/\/tmp|https:\/\/tmp)/i.test(meal.imageUrl)) {
+        return { ...meal, imageUrl: null };
+      }
+      return meal;
+    }
     try {
       const url = await resolveImageUrl(meal.imageUrl);
-      return url ? { ...meal, imageUrl: url } : meal;
+      // Unresolvable cloud refs render as broken <Image>; prefer explicit empty thumb.
+      return { ...meal, imageUrl: url && /^https:\/\//i.test(url) ? url : null };
     } catch (err) {
       console.error("[meals] resolveImageUrl failed:", err?.message || err);
-      return meal;
+      return { ...meal, imageUrl: null };
     }
   }
 
@@ -169,6 +177,7 @@ function createMealDataService({
     if (!allowGenerate || typeof generateMealInsight !== "function") return null;
     try {
       const generated = await generateMealInsight({
+        userId,
         mealName,
         items: items.map((item) => ({
           name: item.name,
@@ -180,6 +189,9 @@ function createMealDataService({
         })),
       });
       if (typeof generated === "string" && generated.trim()) return generated.trim().slice(0, 1000);
+      if (generated && typeof generated === "object" && typeof generated.insight === "string" && generated.insight.trim()) {
+        return generated.insight.trim().slice(0, 1000);
+      }
     } catch (error) {
       console.warn("[meals] insight generation failed:", error?.message || error);
     }
@@ -261,7 +273,7 @@ function createMealDataService({
     async createAnalysis(userId, input) {
       if (typeof analyze !== "function") throw new PublicMealDataError("MEAL_ANALYSIS_UNAVAILABLE", "餐食分析暂不可用");
       const clientRequestId = assertUuid(input?.clientRequestId, "请求 ID");
-      const result = await analyze({ items: input?.items });
+      const result = await analyze({ items: input?.items, userId });
       const saved = await db.from("ai_analysis").insert({
         user_id: userId,
         provider: "deepseek",

@@ -1,12 +1,14 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getProductFoodInsight, getProductFoodVariants, type ProductFoodCatalogItem, type ProductFoodInsight } from "../../api/food-catalog-api";
 import { AppButton } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
 import { FoodThumbnail } from "../../components/food-thumbnail";
+import { resolveHorizontalSwipe, siblingIndex } from "../../features/food-catalog/detail-swipe";
 import { getFoodCategory, getFoodTags } from "../../features/food-catalog/food-labels";
 import { PageLayout } from "../../layouts/page-layout";
+import { useFeedbackStore } from "../../stores/feedback-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
@@ -19,31 +21,48 @@ const scaleNutrition = (value: number | null, grams: number) => {
 
 export default function FoodDetailPage() {
   const router = useRouter();
+  const feedback = useFeedbackStore();
   const food = useFoodSelectionStore((state) => state.detailFood);
+  const detailQueue = useFoodSelectionStore((state) => state.detailQueue);
+  const inspectFood = useFoodSelectionStore((state) => state.inspectFood);
   const selectFood = useFoodSelectionStore((state) => state.selectFood);
   const fromManualMeal = router.params.mode === "select";
   const [portionG, setPortionG] = useState(150);
   const [activeFood, setActiveFood] = useState<ProductFoodCatalogItem | null>(food);
   const [variants, setVariants] = useState<ProductFoodCatalogItem[]>([]);
+  const [variantsForId, setVariantsForId] = useState<string | null>(null);
   const [insight, setInsight] = useState<ProductFoodInsight | null>(null);
   const [insightLoading, setInsightLoading] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const ignoreSwipeUntilRef = useRef(0);
   const returnToCatalog = () => navigateBackOrHome("/pages/food-catalog/index");
+
+  const queue = detailQueue.length > 0 ? detailQueue : food ? [food] : [];
+  const queueIndex = (() => {
+    if (!food || queue.length === 0) return 0;
+    const index = queue.findIndex((item) => item.id === food.id);
+    return index >= 0 ? index : 0;
+  })();
 
   useEffect(() => {
     if (!food) {
       setActiveFood(null);
       setVariants([]);
+      setVariantsForId(null);
       return;
     }
     let cancelled = false;
     setActiveFood(food);
-    setVariants([]);
     void getProductFoodVariants(food.id)
       .then((result) => {
-        if (!cancelled) setVariants(result.items ?? []);
+        if (cancelled) return;
+        setVariants(result.items ?? []);
+        setVariantsForId(food.id);
       })
       .catch(() => {
-        if (!cancelled) setVariants([]);
+        if (cancelled) return;
+        setVariants([]);
+        setVariantsForId(food.id);
       });
     return () => {
       cancelled = true;
@@ -60,7 +79,6 @@ export default function FoodDetailPage() {
       return;
     }
     let cancelled = false;
-    setInsight(null);
     setInsightLoading(true);
     void getProductFoodInsight(displayedFood.id)
       .then((result) => {
@@ -88,6 +106,43 @@ export default function FoodDetailPage() {
         : [],
     [displayedFood, portionG],
   );
+
+  const switchSibling = (delta: -1 | 1) => {
+    const nextIndex = siblingIndex(queueIndex, delta, queue.length);
+    if (nextIndex == null) {
+      feedback.show({
+        message: delta < 0 ? "已经是第一个" : "已经是最后一个",
+        tone: "default",
+      });
+      return;
+    }
+    const nextFood = queue[nextIndex];
+    if (!nextFood) return;
+    ignoreSwipeUntilRef.current = Date.now() + 320;
+    inspectFood(nextFood, queue);
+    setPortionG(150);
+  };
+
+  const onTouchStart = (event: {
+    touches?: Array<{ clientX: number; clientY: number }>;
+    changedTouches?: Array<{ clientX: number; clientY: number }>;
+  }) => {
+    const touch = event.touches?.[0] ?? event.changedTouches?.[0];
+    if (!touch) return;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const onTouchEnd = (event: {
+    changedTouches?: Array<{ clientX: number; clientY: number }>;
+  }) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const touch = event.changedTouches?.[0];
+    if (!start || !touch || queue.length <= 1) return;
+    if (Date.now() < ignoreSwipeUntilRef.current) return;
+    const direction = resolveHorizontalSwipe(touch.clientX - start.x, touch.clientY - start.y);
+    if (direction !== 0) switchSibling(direction);
+  };
 
   if (!displayedFood) {
     return (
@@ -123,7 +178,11 @@ export default function FoodDetailPage() {
       onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--food-detail"
     >
-      <View className="food-detail-page">
+      <View
+        className="food-detail-page"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         <View className="food-detail-page__identity">
           <View className="food-detail-page__name-row">
             <Text className="food-detail-page__name">{displayedFood.description}</Text>
@@ -142,10 +201,58 @@ export default function FoodDetailPage() {
         </View>
 
         <View className="food-detail-page__hero food-detail-page__hero--square">
-          <FoodThumbnail className="food-detail-page__image" food={displayedFood} iconSize={40} prefer="detail" />
+          <FoodThumbnail
+            className="food-detail-page__image"
+            food={displayedFood}
+            iconSize={40}
+            prefer="detail"
+            aspectRatio={1}
+          />
+          {queue.length > 1 ? (
+            <>
+              <View
+                className={`food-detail-page__nav food-detail-page__nav--prev ${
+                  queueIndex <= 0 ? "food-detail-page__nav--disabled" : ""
+                }`}
+                onClick={(event) => {
+                  event.stopPropagation?.();
+                  switchSibling(-1);
+                }}
+                onTouchStart={(event) => {
+                  event.stopPropagation?.();
+                  ignoreSwipeUntilRef.current = Date.now() + 320;
+                }}
+                onTouchEnd={(event) => {
+                  event.stopPropagation?.();
+                }}
+                ariaLabel="上一个食物"
+              >
+                <Text className="food-detail-page__nav-icon">‹</Text>
+              </View>
+              <View
+                className={`food-detail-page__nav food-detail-page__nav--next ${
+                  queueIndex >= queue.length - 1 ? "food-detail-page__nav--disabled" : ""
+                }`}
+                onClick={(event) => {
+                  event.stopPropagation?.();
+                  switchSibling(1);
+                }}
+                onTouchStart={(event) => {
+                  event.stopPropagation?.();
+                  ignoreSwipeUntilRef.current = Date.now() + 320;
+                }}
+                onTouchEnd={(event) => {
+                  event.stopPropagation?.();
+                }}
+                ariaLabel="下一个食物"
+              >
+                <Text className="food-detail-page__nav-icon">›</Text>
+              </View>
+            </>
+          ) : null}
         </View>
 
-        {variants.length > 1 ? (
+        {displayedFood && variantsForId === displayedFood.id && variants.length > 1 ? (
           <View className="food-detail-page__variants">
             <View className="food-detail-page__section-heading">
               <Text>版本选择</Text>

@@ -23,6 +23,11 @@ const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-d
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
 const { createQwenVisionService, PublicQwenVisionError } = require("./qwen-vision-service.cjs");
 const { createVisionDataService, PublicVisionDataError } = require("./vision-data-service.cjs");
+const { createWechatImageSecurity, PublicImageSecurityError } = require("./wechat-image-security.cjs");
+const { createVisionImageRetentionService } = require("./vision-image-retention-service.cjs");
+const { createVisionImageReviewService } = require("./vision-image-review-service.cjs");
+const { createUserImageOpsService, PublicUserImageError } = require("./user-image-ops-service.cjs");
+const { createDeepseekBudgetService, PublicDeepseekBudgetError } = require("./deepseek-budget-service.cjs");
 const { createFoodCatalogService, PublicFoodCatalogError } = require("./food-catalog-service.cjs");
 const { createFoodQueryTranslator } = require("./food-query-translator.cjs");
 const { createNutritionBackfillService } = require("./nutrition-backfill-service.cjs");
@@ -30,6 +35,9 @@ const { createProfileAvatarService, PublicProfileAvatarError, pickDefaultAvatarS
 const { createAccountDeletionService, PublicAccountDeletionError } = require("./account-deletion-service.cjs");
 const { createProductUserExists, resolveProductSession } = require("./product-session-auth.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
+const { createObservabilityService } = require("./observability-service.cjs");
+const { recordModelUsage } = require("./model-usage.cjs");
+const { createContentModerationService, PublicContentModerationError } = require("./content-moderation-service.cjs");
 const { createAdminConsoleAuthService, PublicAdminAuthError } = require("./admin-console-auth-service.cjs");
 const { createFoodRepository, FoodRepositoryError } = require("./food-repository.cjs");
 const { createUsdaService, UsdaServiceError } = require("./usda-service.cjs");
@@ -72,7 +80,15 @@ function pickNickname() {
 }
 
 const MAX_BODY_BYTES = 4096;
-const MAX_VISION_BODY_BYTES = 30 * 1024 * 1024;
+// ~4MB decoded image ≈ ~5.4MB base64 + JSON envelope.
+const MAX_VISION_BODY_BYTES = 6 * 1024 * 1024;
+const VISION_DAILY_LIMIT = 10;
+const VISION_BURST_LIMIT = 3;
+const VISION_DAILY_WINDOW_SECONDS = 86400;
+const VISION_BURST_WINDOW_SECONDS = 600;
+const COACH_DAILY_MESSAGE_LIMIT = 20;
+const DEEPSEEK_DAILY_CALL_LIMIT = Number(process.env.DEEPSEEK_DAILY_CALL_LIMIT) || 50;
+const DEEPSEEK_DAILY_TOKEN_LIMIT = Number(process.env.DEEPSEEK_DAILY_TOKEN_LIMIT) || 120_000;
 // CloudBase HTTP access already injects Access-Control-Allow-Origin for the
 // request origin. Setting it here as "*" produces duplicate values and browsers
 // reject the response ("The 'Access-Control-Allow-Origin' header contains
@@ -93,6 +109,30 @@ function sendJson(res, statusCode, data) {
 
 function mapRepositoryFoodForCatalog(food) {
   const nutrition = food?.nutritionPer100g ?? {};
+  const categoryCode = food?.category?.code ?? null;
+  const rootCode = typeof categoryCode === "string" ? categoryCode.split(".")[0] : "";
+  const inferredTagCodes = [];
+  if (Number(nutrition.protein) >= 15) inferredTagCodes.push("high_protein");
+  if (Number.isFinite(Number(nutrition.fat)) && Number(nutrition.fat) <= 3) inferredTagCodes.push("low_fat");
+  if (Number(nutrition.carbs) >= 30) inferredTagCodes.push("high_carb");
+  if (Number.isFinite(Number(nutrition.calories)) && Number(nutrition.calories) <= 100) inferredTagCodes.push("low_calorie");
+  if (Number.isFinite(Number(nutrition.fiber)) && Number(nutrition.fiber) >= 5) inferredTagCodes.push("high_fiber");
+  if (["plant_protein", "grains_tubers", "soy", "grain"].includes(rootCode)) inferredTagCodes.push("plant_protein");
+  const tagLabels = {
+    high_protein: "高蛋白",
+    low_fat: "低脂",
+    high_carb: "高碳水",
+    low_calorie: "低热量",
+    plant_protein: "植物蛋白",
+    high_fiber: "高膳食纤维",
+  };
+  const dbTags = Array.isArray(food?.tags)
+    ? food.tags.map((tag) => ({ code: tag.code, nameZh: tag.nameZh || tagLabels[tag.code] || tag.code }))
+    : [];
+  const tagByCode = new Map(dbTags.map((tag) => [tag.code, tag]));
+  for (const code of inferredTagCodes) {
+    if (!tagByCode.has(code)) tagByCode.set(code, { code, nameZh: tagLabels[code] || code });
+  }
   return {
     id: food.id,
     source: food.source,
@@ -100,13 +140,15 @@ function mapRepositoryFoodForCatalog(food) {
     description: getFoodDisplayName(food),
     brandName: food.brandName ?? null,
     dataType: food.foodForm ?? null,
-    category: food.category?.code ?? null,
+    category: categoryCode,
     servingSize: food.servingSize ?? null,
     servingUnit: food.servingUnit ?? null,
     caloriesKcalPer100g: nutrition.calories ?? null,
     proteinGPer100g: nutrition.protein ?? null,
     carbsGPer100g: nutrition.carbs ?? null,
     fatGPer100g: nutrition.fat ?? null,
+    fiberGPer100g: nutrition.fiber ?? null,
+    tags: Array.from(tagByCode.values()),
     foodGroupId: food.foodGroupId ?? null,
     isPrimaryVariant: food.isPrimaryVariant !== false,
     variantLabelZh: food.variantLabelZh ?? null,
@@ -277,6 +319,63 @@ function selectDeepseekModel(value) {
   return model;
 }
 
+function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = null, deepseekModel = null } = {}) {
+  const weeklyModel = env.DEEPSEEK_WEEKLY_MODEL || "deepseek-v4-pro";
+  const textModel = typeof env.HY_TEXT_MODEL === "string" && env.HY_TEXT_MODEL.trim()
+    ? env.HY_TEXT_MODEL.trim()
+    : "hunyuan-2.0-instruct-20251111";
+  const resolvedDeepseek = deepseekModel || selectDeepseekModel(env.DEEPSEEK_MODEL);
+  return [
+    {
+      feature: "vision",
+      featureLabel: "食物识别",
+      provider: vision?.provider || (env.QWEN_API_KEY || env.DASHSCOPE_API_KEY ? "qwen" : "vita"),
+      model: vision?.model || env.QWEN_VL_FLASH_MODEL || env.VITA_MODEL || "qwen3-vl-flash",
+      dailyLimit: VISION_DAILY_LIMIT,
+      burstLimit: VISION_BURST_LIMIT,
+      burstWindowSeconds: VISION_BURST_WINDOW_SECONDS,
+    },
+    {
+      feature: "coach",
+      featureLabel: "营养教练",
+      provider: "deepseek",
+      model: resolvedDeepseek,
+      dailyLimit: COACH_DAILY_MESSAGE_LIMIT,
+    },
+    {
+      feature: "daily_insight",
+      featureLabel: "每日洞察",
+      provider: "deepseek",
+      model: resolvedDeepseek,
+    },
+    {
+      feature: "weekly_review",
+      featureLabel: "周回顾",
+      provider: "deepseek",
+      model: weeklyModel,
+    },
+    {
+      feature: "nutrition_plan",
+      featureLabel: "营养计划",
+      provider: "deepseek",
+      model: resolvedDeepseek,
+    },
+    {
+      feature: "daily_tip",
+      featureLabel: "每日小贴士",
+      provider: "hunyuan",
+      model: textModel,
+    },
+    {
+      feature: "food_image",
+      featureLabel: "食材生图",
+      provider: "hunyuan",
+      model: hunyuanModel || env.HY_IMAGE_MODEL || "HY-Image-3.0-Plus-4090-Tob-v1.0",
+      dailyLimit: Number(env.HY_IMAGE_DAILY_LIMIT) || 500,
+    },
+  ];
+}
+
 function createHunyuanGenerationService({ env, aiClient, createWorkerClient = createHunyuanWorkerClient } = {}) {
   const enabled = String(env?.FOOD_IMAGE_GENERATION_ENABLED ?? "true").toLowerCase() !== "false";
   if (!enabled) return null;
@@ -324,6 +423,7 @@ function downloadImageBuffer(url) {
 
 function createRuntimeService(env = process.env, dependencies = {}) {
   const config = readRuntimeConfig(env);
+  const opsRef = { observability: null, withDeepseekBudget: null, deepseekBudget: null };
   const cloudbase = dependencies.cloudbaseSdk ?? require("@cloudbase/js-sdk");
   const app = cloudbase.init({
     env: config.cloudbaseEnvId,
@@ -332,9 +432,42 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   });
   const db = typeof app.rdb === "function" ? app.rdb() : app.rdb;
   if (!db || typeof db.from !== "function") throw new Error("Relational database client is unavailable");
+  const deepseekBudget = createDeepseekBudgetService({
+    db,
+    callLimit: DEEPSEEK_DAILY_CALL_LIMIT,
+    tokenLimit: DEEPSEEK_DAILY_TOKEN_LIMIT,
+  });
+  const withDeepseekBudget = async (userId, run) => {
+    if (userId) await deepseekBudget.assertCanCall(userId);
+    const result = await run();
+    const usage = result?.usage || null;
+    if (userId && usage) {
+      deepseekBudget.recordTokens(userId, usage).catch((error) => {
+        console.warn("[deepseek-budget] recordTokens failed:", error?.message || error);
+      });
+    }
+    return result;
+  };
+  opsRef.deepseekBudget = deepseekBudget;
+  opsRef.withDeepseekBudget = withDeepseekBudget;
   const deepseekModel = selectDeepseekModel(env.DEEPSEEK_MODEL);
-  const evaluateMeal = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
+  const evaluateMealRaw = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
     ? createDeepseekEvaluationService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
+    : null;
+  const evaluateMeal = evaluateMealRaw
+    ? async (input) => {
+      const result = await withDeepseekBudget(input?.userId, () => evaluateMealRaw(input));
+      if (result?.usage) {
+        recordModelUsage(opsRef.observability, {
+          model: result.model || deepseekModel,
+          feature: "meal_evaluation",
+          provider: "deepseek",
+          usage: result.usage,
+          requests: 0,
+        }).catch(() => {});
+      }
+      return result;
+    }
     : null;
   const calculateNutritionPlanWithAi = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
     ? createDeepseekNutritionPlanService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
@@ -456,6 +589,19 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     aiAuthMode = "missing-credentials";
   }
   console.log(`[hunyuan] ai auth mode=${aiAuthMode} timeoutMs=${aiTimeoutMs} hasAmbientSecret=${Boolean(ambientSecretId && ambientSecretKey)}`);
+  const storageEnvId = String(env.TCB_ENV || env.SCF_NAMESPACE || "").trim();
+  const toCloudFileCandidates = (rawPath) => {
+    if (typeof rawPath !== "string") return [];
+    const path = rawPath.trim();
+    if (!path) return [];
+    if (path.startsWith("default:") || path.startsWith("data:") || /^https?:\/\//i.test(path)) return [];
+    if (/^cloud:\/\//i.test(path)) return [path];
+    // Vision upload race often persists relative cloudPath while the object exists under env prefix.
+    const cleaned = path.replace(/^\//, "");
+    if (!cleaned || cleaned.includes("://")) return [];
+    return storageEnvId ? [`cloud://${storageEnvId}/${cleaned}`] : [cleaned];
+  };
+  const storageClients = () => [storageRuntime, admin].filter(Boolean);
   const getTemporaryUrl = async (fileId) => {
     // Inline / sentinel avatar refs are already displayable — never resolve via Storage.
     if (typeof fileId === "string") {
@@ -463,13 +609,130 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       if (fileId.startsWith("data:")) return fileId;
       if (/^https?:\/\//i.test(fileId)) return fileId;
     }
-    try {
-      const result = await admin.getTempFileURL({ fileList: [fileId] });
-      return result?.fileList?.[0]?.tempFileURL ?? null;
-    } catch (error) {
-      console.error("[storage] getTempFileURL failed:", error?.message || error);
-      return null;
+    const candidates = toCloudFileCandidates(fileId);
+    const clients = storageClients();
+    for (const candidate of (candidates.length ? candidates : [fileId])) {
+      for (const client of clients) {
+        if (typeof client?.getTempFileURL !== "function") continue;
+        try {
+          const result = await client.getTempFileURL({ fileList: [candidate] });
+          const url = result?.fileList?.[0]?.tempFileURL ?? null;
+          if (url) return url;
+        } catch (error) {
+          console.error("[storage] getTempFileURL failed:", candidate, error?.message || error);
+        }
+      }
     }
+    return null;
+  };
+  const resolveTempFileUrls = async (fileIds = []) => {
+    const map = new Map();
+    const fileIdToOriginals = new Map();
+    for (const original of fileIds || []) {
+      if (typeof original !== "string" || !original) continue;
+      if (original.startsWith("data:") || original.startsWith("default:") || /^https?:\/\//i.test(original)) {
+        map.set(original, original);
+        continue;
+      }
+      for (const candidate of toCloudFileCandidates(original)) {
+        if (!fileIdToOriginals.has(candidate)) fileIdToOriginals.set(candidate, new Set());
+        fileIdToOriginals.get(candidate).add(original);
+      }
+    }
+    const unique = [...fileIdToOriginals.keys()];
+    if (!unique.length) return map;
+
+    const applyEntry = (fileId, tempFileURL) => {
+      if (!tempFileURL) return;
+      if (fileId) map.set(fileId, tempFileURL);
+      for (const original of fileIdToOriginals.get(fileId) || []) {
+        map.set(original, tempFileURL);
+      }
+    };
+
+    const clients = storageClients();
+    const ingestResult = (result) => {
+      for (const entry of result?.fileList || []) {
+        if (entry?.tempFileURL) {
+          applyEntry(entry.fileID, entry.tempFileURL);
+          if (entry.fileID && fileIdToOriginals.has(entry.fileID)) {
+            applyEntry(entry.fileID, entry.tempFileURL);
+          }
+        }
+      }
+      for (const entry of result?.fileList || []) {
+        if (!entry?.tempFileURL || !entry?.fileID) continue;
+        for (const [candidate, originals] of fileIdToOriginals.entries()) {
+          if (entry.fileID === candidate || entry.fileID.endsWith(candidate.replace(/^cloud:\/\/[^/]+\//, ""))) {
+            for (const original of originals) map.set(original, entry.tempFileURL);
+          }
+        }
+      }
+    };
+
+    for (const client of clients) {
+      if (typeof client?.getTempFileURL !== "function") continue;
+      const missing = unique.filter((candidate) => {
+        const originals = fileIdToOriginals.get(candidate) || new Set();
+        return !(map.has(candidate) || [...originals].some((original) => map.has(original)));
+      });
+      if (!missing.length) break;
+      try {
+        ingestResult(await client.getTempFileURL({ fileList: missing }));
+      } catch (error) {
+        console.error("[storage] batch getTempFileURL failed:", error?.message || error);
+      }
+    }
+
+    for (const [candidate, originals] of fileIdToOriginals.entries()) {
+      const resolved = map.has(candidate) || [...originals].some((original) => map.has(original));
+      if (resolved) continue;
+      for (const client of clients) {
+        if (typeof client?.getTempFileURL !== "function") continue;
+        try {
+          const result = await client.getTempFileURL({ fileList: [candidate] });
+          const entry = result?.fileList?.[0];
+          if (entry?.tempFileURL) {
+            applyEntry(candidate, entry.tempFileURL);
+            if (entry.fileID) applyEntry(entry.fileID, entry.tempFileURL);
+            for (const original of originals) map.set(original, entry.tempFileURL);
+            break;
+          }
+        } catch (error) {
+          console.error("[storage] getTempFileURL fallback failed:", candidate, error?.message || error);
+        }
+      }
+    }
+    return map;
+  };
+  const resolveAdminPreviewUrl = async (rawPath) => {
+    if (typeof rawPath !== "string" || !rawPath) return null;
+    if (rawPath.startsWith("data:") || /^https?:\/\//i.test(rawPath)) return rawPath;
+    const temp = await getTemporaryUrl(rawPath);
+    if (temp && /^https?:\/\//i.test(temp)) return temp;
+    const clients = storageClients();
+    for (const fileId of toCloudFileCandidates(rawPath)) {
+      for (const client of clients) {
+        if (typeof client?.downloadFile !== "function") continue;
+        try {
+          const downloaded = await client.downloadFile({ fileID: fileId });
+          const content = downloaded?.fileContent;
+          if (!content) continue;
+          const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+          // Match vision hard ceiling; previously 1.2MB skipped most phone food photos.
+          if (buffer.length < 24 || buffer.length > 4 * 1024 * 1024) continue;
+          const mime = buffer[0] === 0x89 && buffer[1] === 0x50
+            ? "image/png"
+            : buffer[0] === 0xff && buffer[1] === 0xd8
+              ? "image/jpeg"
+              : "image/jpeg";
+          return `data:${mime};base64,${buffer.toString("base64")}`;
+        } catch (error) {
+          console.warn("[storage] admin preview download failed:", fileId, error?.message || error);
+        }
+      }
+    }
+    return temp || null;
   };
   const data = createProductDataService({ db, resolveAvatarUrl: getTemporaryUrl });
   const avatar = createProfileAvatarService({
@@ -508,20 +771,48 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     }
   }
   const deepseekEnabled = typeof env.DEEPSEEK_API_KEY === "string" && Boolean(env.DEEPSEEK_API_KEY);
-  const generateMealInsight = deepseekEnabled
+  const generateMealInsightRaw = deepseekEnabled
     ? createDeepseekMealInsightService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
+    : null;
+  const generateMealInsight = generateMealInsightRaw
+    ? async (input) => {
+      const result = await withDeepseekBudget(input?.userId, () => generateMealInsightRaw(input));
+      if (result && typeof result === "object" && result.usage) {
+        recordModelUsage(opsRef.observability, {
+          model: result.model || deepseekModel,
+          feature: "meal_insight",
+          provider: "deepseek",
+          usage: result.usage,
+          requests: 0,
+        }).catch(() => {});
+      }
+      return result;
+    }
+    : null;
+  const analyzeMealRaw = deepseekEnabled
+    ? createDeepseekMealService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
+    : null;
+  const analyzeMeal = analyzeMealRaw
+    ? async (input) => {
+      const result = await withDeepseekBudget(input?.userId, () => analyzeMealRaw(input));
+      if (result?.usage) {
+        recordModelUsage(opsRef.observability, {
+          model: result.model || deepseekModel,
+          feature: "meal_analysis",
+          provider: "deepseek",
+          usage: result.usage,
+          requests: 0,
+        }).catch(() => {});
+      }
+      return result;
+    }
     : null;
   const meals = createMealDataService({
     db,
     model: deepseekModel,
-    analyze: deepseekEnabled
-      ? createDeepseekMealService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
-      : null,
+    analyze: analyzeMeal,
     generateMealInsight,
-    resolveImageUrl: async (fileID) => {
-      const temporary = await admin.getTempFileURL({ fileList: [fileID] });
-      return temporary?.fileList?.[0]?.tempFileURL || null;
-    },
+    resolveImageUrl: getTemporaryUrl,
   });
   const dailyInsightFactory = dependencies.dailyInsightFactory ?? createDailyInsightService;
   const dailyInsight = dailyInsightFactory({
@@ -537,14 +828,48 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     listMealsRange: meals.listMealsRange,
     getNutritionPlan: data.getNutritionPlan,
-    generateDailyInsight: dailyInsight,
-    generateWeeklyReview: weeklyReview,
+    generateDailyInsight: async (input) => {
+      const result = await withDeepseekBudget(input?.userId, () => dailyInsight(input));
+      recordModelUsage(opsRef.observability, {
+        model: result?.model,
+        feature: "daily_insight",
+        provider: result?.source === "deepseek" ? "deepseek" : result?.source || null,
+        usage: result?.usage || null,
+        requests: 0,
+      }).catch(() => {});
+      return result;
+    },
+    generateWeeklyReview: async (input) => {
+      const result = await withDeepseekBudget(input?.userId, () => weeklyReview(input));
+      recordModelUsage(opsRef.observability, {
+        model: result?.model,
+        feature: "weekly_review",
+        provider: result?.source === "deepseek" ? "deepseek" : null,
+        usage: result?.usage || null,
+        requests: 0,
+      }).catch(() => {});
+      return result;
+    },
   });
+  const translateQueryRaw = createFoodQueryTranslator({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel });
+  const translateQuery = async (query) => {
+    const result = await translateQueryRaw(query);
+    if (result?.usage && result?.model) {
+      recordModelUsage(opsRef.observability, {
+        model: result.model,
+        feature: "food_translate",
+        provider: "deepseek",
+        usage: result.usage,
+        requests: 0,
+      }).catch(() => {});
+    }
+    return result;
+  };
   const foodCatalog = typeof env.USDA_FDC_API_KEY === "string" && env.USDA_FDC_API_KEY.trim()
     ? createFoodCatalogService({
       db,
       apiKey: env.USDA_FDC_API_KEY,
-      translateQuery: createFoodQueryTranslator({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel }),
+      translateQuery,
       mirrorImage: async (imageUrl, foodKey) => {
         const content = await downloadImageBuffer(imageUrl);
         if (!content.length || content.length > 2 * 1024 * 1024) throw new Error("Food image mirror failed");
@@ -572,7 +897,21 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   // separate is_admin DB gate so operators no longer need a promoted WeChat user.
   foodRepository.isAdmin = async () => true;
   const foodInsight = createFoodInsightService({
-    requestCompletion: nutritionContentWorker ? (context) => nutritionContentWorker.generateInsight(context) : null,
+    requestCompletion: nutritionContentWorker
+      ? async (context) => {
+        const result = await nutritionContentWorker.generateInsight(context);
+        if (result?.model) {
+          recordModelUsage(opsRef.observability, {
+            model: result.model,
+            feature: "food_insight",
+            provider: "hunyuan",
+            usage: result.usage || null,
+            requests: 1,
+          }).catch(() => {});
+        }
+        return result;
+      }
+      : null,
     model: devTextModel,
     source: "hunyuan-exp",
     db,
@@ -724,6 +1063,89 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     dailyCap: Math.min(Number(env.HY_IMAGE_DAILY_LIMIT) || 500, 500),
   });
   let vision = null;
+  let assertImageSafe = null;
+  try {
+    require("sharp");
+    console.info("[vision] sharp available for storage + WeChat img_sec_check compress");
+  } catch (sharpLoadError) {
+    console.error(
+      "[vision] sharp missing — uploads over ~900KB will fail img_sec_check:",
+      sharpLoadError?.message || sharpLoadError,
+    );
+  }
+  try {
+    if (env.WX_APPID && env.WX_SECRET) {
+      assertImageSafe = createWechatImageSecurity({
+        appId: env.WX_APPID,
+        appSecret: env.WX_SECRET,
+      }).assertImageAllowed;
+    }
+  } catch (securityInitError) {
+    console.warn("[vision] image security init failed:", securityInitError?.message || securityInitError);
+  }
+  const uploadVisionImage = async ({ cloudPath, content, contentType }) => {
+    const toDataUrl = () => {
+      const mime = contentType || "image/jpeg";
+      return `data:${mime};base64,${content.toString("base64")}`;
+    };
+    // Same dual-client pattern as food-library uploads: ambient SCF identity first,
+    // API-key admin client only as fallback (API-key storage JWT is unreliable here).
+    const clients = [storageRuntime, admin].filter(Boolean);
+    const uploadOnce = async () => {
+      let lastError = null;
+      for (const client of clients) {
+        if (typeof client?.uploadFile !== "function") continue;
+        try {
+          const result = await client.uploadFile({ cloudPath, fileContent: content });
+          const fileID = result?.fileID;
+          if (!fileID) throw new Error("Vision upload failed");
+          let imageUrl = null;
+          try {
+            imageUrl = await getTemporaryUrl(fileID);
+          } catch (tempErr) {
+            console.warn("[vision] getTempFileURL after upload failed:", tempErr?.message || tempErr);
+          }
+          void contentType;
+          return { cloudPath: fileID, imageUrl: imageUrl || toDataUrl() };
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error("Vision upload failed");
+    };
+    try {
+      return await Promise.race([
+        uploadOnce(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Vision upload timed out")), 25_000)),
+      ]);
+    } catch (uploadErr) {
+      console.error("[vision] Storage upload failed, retrying once:", uploadErr?.message || uploadErr);
+      try {
+        return await uploadOnce();
+      } catch (retryErr) {
+        console.error("[vision] Storage retry failed, analyzing via data URL only:", retryErr?.message || retryErr);
+        // Do NOT invent cloud://env/path — that is not a valid fileID and breaks admin/meal previews.
+        return { cloudPath: null, imageUrl: toDataUrl() };
+      }
+    }
+  };
+  const uploadBlockedImage = async ({ userId, content, contentType }) => {
+    const extension = contentType === "image/png" ? "png" : contentType === "image/gif" ? "gif" : "jpg";
+    const cloudPath = `vision-blocked/${userId}/${crypto.randomUUID()}.${extension}`;
+    const clients = [storageRuntime, admin].filter(Boolean);
+    let lastError = null;
+    for (const client of clients) {
+      if (typeof client?.uploadFile !== "function") continue;
+      try {
+        const result = await client.uploadFile({ cloudPath, fileContent: content });
+        if (!result?.fileID) throw new Error("Blocked vision upload failed");
+        return { cloudPath: result.fileID };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error("Blocked vision upload failed");
+  };
   const qwenApiKey = typeof env.QWEN_API_KEY === "string" && env.QWEN_API_KEY.trim()
     ? env.QWEN_API_KEY
     : env.DASHSCOPE_API_KEY;
@@ -740,30 +1162,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       }),
       evaluateMeal,
       backfillNutrition,
-      uploadImage: async ({ cloudPath, content, contentType }) => {
-        const toDataUrl = () => {
-          const mime = contentType || "image/jpeg";
-          return { cloudPath: null, imageUrl: `data:${mime};base64,${content.toString("base64")}` };
-        };
-        try {
-          const uploaded = await Promise.race([
-            (async () => {
-              const result = await admin.uploadFile({ cloudPath, fileContent: content });
-              const fileID = result?.fileID;
-              if (!fileID) throw new Error("Vision upload failed");
-              const temporary = await admin.getTempFileURL({ fileList: [fileID] });
-              const imageUrl = temporary?.fileList?.[0]?.tempFileURL;
-              if (!imageUrl) throw new Error("Vision temporary URL failed");
-              return { cloudPath: fileID, imageUrl };
-            })(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Vision upload timed out")), 2_000)),
-          ]);
-          return uploaded;
-        } catch (uploadErr) {
-          console.error("[vision] Storage upload failed, using data URL fallback:", uploadErr?.message || uploadErr);
-          return toDataUrl();
-        }
-      },
+      assertImageSafe,
+      uploadBlockedImage,
+      uploadImage: uploadVisionImage,
     });
   } else if (typeof env.VITA_API_KEY === "string" && env.VITA_API_KEY) {
     vision = createVisionDataService({
@@ -772,54 +1173,81 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       analyze: createVitaVisionService({ apiKey: env.VITA_API_KEY, model: env.VITA_MODEL }),
       evaluateMeal,
       backfillNutrition,
-      uploadImage: async ({ cloudPath, content, contentType }) => {
-        const toDataUrl = () => {
-          const mime = contentType || "image/jpeg";
-          return { cloudPath: null, imageUrl: `data:${mime};base64,${content.toString("base64")}` };
-        };
-        try {
-          const uploaded = await Promise.race([
-            (async () => {
-              const result = await admin.uploadFile({ cloudPath, fileContent: content });
-              const fileID = result?.fileID;
-              if (!fileID) throw new Error("Vision upload failed");
-              const temporary = await admin.getTempFileURL({ fileList: [fileID] });
-              const imageUrl = temporary?.fileList?.[0]?.tempFileURL;
-              if (!imageUrl) throw new Error("Vision temporary URL failed");
-              return { cloudPath: fileID, imageUrl };
-            })(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Vision upload timed out")), 2_000)),
-          ]);
-          return uploaded;
-        } catch (uploadErr) {
-          console.error("[vision] Storage upload failed, using data URL fallback:", uploadErr?.message || uploadErr);
-          return toDataUrl();
-        }
-      },
+      assertImageSafe,
+      uploadBlockedImage,
+      uploadImage: uploadVisionImage,
     });
   }
-  const accountDeletion = createAccountDeletionService({
+  const operationGuard = typeof db?.from === "function" ? createOperationGuard({ db }) : null;
+  const observability = createObservabilityService({ db });
+  opsRef.observability = observability;
+  const contentModeration = createContentModerationService({ db });
+  const visionImageReview = createVisionImageReviewService({
     db,
-    operationGuard: typeof db.rpc === "function" ? createOperationGuard({ db }) : null,
-    deleteFiles: async ({ cloudPaths }) => {
-      const paths = Array.isArray(cloudPaths) ? cloudPaths.filter(Boolean) : [];
-      if (!paths.length) return;
-      const envId = String(env.TCB_ENV || env.SCF_NAMESPACE || "").trim();
-      for (const cloudPath of paths) {
-        const candidates = cloudPath.startsWith("cloud://")
-          ? [cloudPath]
-          : [cloudPath, envId ? `cloud://${envId}/${cloudPath}` : null].filter(Boolean);
-        let deleted = false;
+    resolveTempFileUrls,
+  });
+  const deleteStorageCloudFiles = async ({ cloudPaths, label = "storage" } = {}) => {
+    const paths = Array.isArray(cloudPaths) ? cloudPaths.filter(Boolean) : [];
+    if (!paths.length) return { deleted: 0, attempted: 0 };
+    const clients = [storageRuntime, admin].filter(Boolean);
+    const envId = String(env.TCB_ENV || env.SCF_NAMESPACE || "").trim();
+    let deleted = 0;
+    let lastError = null;
+    for (const cloudPath of paths) {
+      const candidates = cloudPath.startsWith("cloud://")
+        ? [cloudPath]
+        : [cloudPath, envId ? `cloud://${envId}/${cloudPath}` : null].filter(Boolean);
+      let ok = false;
+      for (const client of clients) {
+        if (typeof client?.deleteFile !== "function") continue;
         for (const fileId of candidates) {
           try {
-            await admin.deleteFile({ fileList: [fileId] });
-            deleted = true;
+            await client.deleteFile({ fileList: [fileId] });
+            ok = true;
             break;
           } catch (error) {
-            console.warn("[account-cancellation] storage delete retry:", fileId, error?.message || error);
+            lastError = error;
+            const msg = String(error?.message || error || "");
+            // Missing object is fine for admin / retention cleanup of orphan DB refs.
+            if (/STORAGE_FILE_NONEXIST|FILE_NOT_EXIST|STORAGE_NOT_EXIST|not\s*found|不存在/i.test(msg)) {
+              ok = true;
+              break;
+            }
           }
         }
-        if (!deleted) console.warn("[account-cancellation] storage object left in place:", cloudPath);
+        if (ok) break;
+      }
+      if (ok) deleted += 1;
+    }
+    if (deleted < paths.length && lastError) {
+      console.error(`[${label}] deleteFile incomplete:`, lastError?.message || lastError);
+      throw lastError;
+    }
+    return { deleted, attempted: paths.length };
+  };
+  const deleteVisionCloudFiles = async ({ cloudPaths }) =>
+    deleteStorageCloudFiles({ cloudPaths, label: "vision-storage" });
+  const visionImageRetention = createVisionImageRetentionService({
+    db,
+    deleteFiles: deleteVisionCloudFiles,
+  });
+  const userImageOps = typeof db?.from === "function"
+    ? createUserImageOpsService({
+      db,
+      resolveTempFileUrls,
+      resolveOneUrl: resolveAdminPreviewUrl,
+      deleteFiles: deleteVisionCloudFiles,
+    })
+    : null;
+  const accountDeletion = createAccountDeletionService({
+    db,
+    operationGuard,
+    deleteFiles: async ({ cloudPaths }) => {
+      try {
+        await deleteStorageCloudFiles({ cloudPaths, label: "account-cancellation" });
+      } catch (error) {
+        // Cancellation prefers best-effort storage cleanup; PG delete still proceeds upstream.
+        console.warn("[account-cancellation] storage delete incomplete:", error?.message || error);
       }
     },
   });
@@ -882,7 +1310,20 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodImageDispatchSecret: env.FOOD_IMAGE_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
     avatar,
     accountDeletion,
+    operationGuard,
+    observability,
+    contentModeration,
+    deepseekBudget,
+    visionImageReview,
+    visionImageRetention,
+    userImageOps,
     vision,
+    modelCatalog: buildModelCatalog({
+      env,
+      vision,
+      hunyuanModel: hunyuanImageService?.modelName || env.HY_IMAGE_MODEL || "HY-Image-3.0-Plus-4090-Tob-v1.0",
+      deepseekModel,
+    }),
     calculateNutritionPlan: calculateNutritionPlanWithAi,
   };
 }
@@ -918,6 +1359,7 @@ function getDataOperation(pathname) {
     "/onboarding": "saveOnboarding",
     "/account": "getAccount",
     "/account/cancel": "cancelAccount",
+    "/account/usage": "accountUsage",
     "/settings": "saveSettings",
     "/nutrition-plan": "nutritionPlan",
     "/nutrition-plan/preview": "previewNutritionPlan",
@@ -979,6 +1421,23 @@ function getAdminFoodRoute(pathname) {
   const path = stripped.replace(/^\/api\/admin/, "") || "/";
   if (path === "/users") return { operation: "listUsers" };
   if (path === "/login") return { operation: "adminLogin" };
+  if (path === "/ops/overview") return { operation: "opsOverview" };
+  if (path === "/ops/quota") return { operation: "opsQuota" };
+  if (path === "/ops/quota/model") return { operation: "opsQuotaModel" };
+  if (path === "/ops/deletion-log") return { operation: "opsDeletionLog" };
+  if (path === "/ops/moderation-flags") return { operation: "opsModerationFlags" };
+  if (path === "/ops/moderation-dashboard") return { operation: "opsModerationDashboard" };
+  if (path === "/ops/vision-images") return { operation: "opsVisionImages" };
+  if (path === "/ops/vision-images/purge") return { operation: "opsVisionImagesPurge" };
+  if (path === "/ops/user-images") return { operation: "opsUserImages" };
+  const userImageItemMatch = path.match(/^\/ops\/user-images\/(vision|blocked|avatar|asset)\/([0-9a-f-]{36})$/i);
+  if (userImageItemMatch) {
+    return { operation: "opsUserImageItem", kind: userImageItemMatch[1].toLowerCase(), itemId: userImageItemMatch[2] };
+  }
+  const visionAnalysisReviewMatch = path.match(/^\/ops\/vision-images\/([0-9a-f-]{36})$/i);
+  if (visionAnalysisReviewMatch) return { operation: "opsVisionImageItem", analysisId: visionAnalysisReviewMatch[1] };
+  const moderationFlagMatch = path.match(/^\/ops\/moderation-flags\/([0-9a-f-]{36})$/i);
+  if (moderationFlagMatch) return { operation: "opsModerationFlagItem", flagId: moderationFlagMatch[1] };
   if (path === "/feedback") return { operation: "listFeedback" };
   const feedbackMatch = path.match(/^\/feedback\/([0-9a-f-]{36})$/i);
   if (feedbackMatch) return { operation: "patchFeedback", feedbackId: feedbackMatch[1] };
@@ -1029,7 +1488,9 @@ function getAdminFoodRoute(pathname) {
 
 function getInternalFoodImageRoute(pathname) {
   const path = normalizeFoodImageDispatchPath(pathname);
-  return path === "/api/internal/food-image-batches/dispatch" ? { operation: "dispatchImageBatches" } : null;
+  if (path === "/api/internal/food-image-batches/dispatch") return { operation: "dispatchImageBatches" };
+  if (path === "/api/internal/vision-images/purge") return { operation: "purgeVisionImages" };
+  return null;
 }
 
 function normalizeFoodImageDispatchPath(pathname) {
@@ -1049,6 +1510,9 @@ function isAvatarRoute(pathname) {
 }
 
 function sendMealError(res, error) {
+  if (error instanceof PublicDeepseekBudgetError) {
+    return sendJson(res, 429, { code: error.code, message: error.message });
+  }
   if (error instanceof PublicMealDataError || error instanceof PublicMealAnalysisError) {
     const statusCode = error.code === "MEAL_DATA_INVALID" ? 400 : 503;
     sendJson(res, statusCode, { code: error.code, message: error.message || error.code });
@@ -1086,12 +1550,24 @@ function createHttpServer({ service }) {
       try {
         const payload = await readRawJsonBody(req);
         if (!verifyFoodImageDispatchSignature(service?.foodImageDispatchSecret, req, {
-          // The CloudBase service gateway strips the function prefix before
-          // forwarding, while local HTTP tests keep it.  HMAC only signs the
-          // stable route below the function prefix so both forms match.
           path: normalizeFoodImageDispatchPath(url.pathname),
           body: payload.raw,
         })) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+        if (internalFoodImageRoute.operation === "purgeVisionImages") {
+          if (!service?.visionImageRetention?.purgeExpiredVisionImages) {
+            return sendJson(res, 503, { code: "VISION_PURGE_UNAVAILABLE" });
+          }
+          const result = await service.visionImageRetention.purgeExpiredVisionImages({
+            limit: payload.body?.limit,
+          });
+          service.observability?.recordMetric?.("vision_purge_deleted", result.deleted || 0, {
+            feature: "vision_retention",
+          }).catch(() => {});
+          service.observability?.recordMetric?.("vision_purge_failed", result.failed || 0, {
+            feature: "vision_retention",
+          }).catch(() => {});
+          return sendJson(res, 200, result);
+        }
         if (!service?.foodImageBatches?.dispatchTrusted) return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_UNAVAILABLE" });
         let patrol;
         if (typeof service.foodImagePatrol?.runTrusted === "function") {
@@ -1212,10 +1688,14 @@ function createHttpServer({ service }) {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           const query = url.searchParams.get("query");
           const page = Number(url.searchParams.get("page") ?? "1");
-          const categoryCode = url.searchParams.get("category");
+          const categoryParam = url.searchParams.get("category") || "";
+          const categoryCodes = categoryParam.split(",").map((item) => item.trim()).filter(Boolean);
+          const tagsParam = url.searchParams.get("tags") || "";
+          const tagCodes = tagsParam.split(",").map((item) => item.trim()).filter(Boolean);
           return sendJson(res, 200, mapRepositoryCatalogResult(await service.foodRepository.listFoods({
             q: query,
-            categoryCode,
+            categoryCodes,
+            tagCodes,
             page,
             pageSize: 20,
             sort: "recommended",
@@ -1267,6 +1747,239 @@ function createHttpServer({ service }) {
             status: url.searchParams.get("status") || undefined,
             limit: url.searchParams.get("limit"),
           }));
+        }
+        if (adminFoodRoute.operation === "opsOverview") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.observability?.getOverview) return sendJson(res, 503, { code: "OPS_OVERVIEW_UNAVAILABLE" });
+          const hours = Number(url.searchParams.get("hours") ?? "24");
+          const overview = await service.observability.getOverview({ hours });
+          if (service.foodImageJobs?.getStats) {
+            try {
+              overview.foodImage = await service.foodImageJobs.getStats(session.sub);
+            } catch (error) {
+              console.warn("[ops-overview] food image stats unavailable:", error?.message || error);
+            }
+          }
+          return sendJson(res, 200, overview);
+        }
+        if (adminFoodRoute.operation === "opsQuota") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.observability?.getUsageReport) return sendJson(res, 503, { code: "OPS_QUOTA_UNAVAILABLE" });
+          const days = Number(url.searchParams.get("days") ?? "14");
+          const hours = Number(url.searchParams.get("hours") ?? "24");
+          const [usage, overview] = await Promise.all([
+            service.observability.getUsageReport({ days }),
+            service.observability.getOverview({ hours }),
+          ]);
+          let foodImage = null;
+          let foodImageQuota = null;
+          let foodImageSeries = [];
+          if (service.foodImageJobs?.getStats) {
+            try {
+              foodImage = await service.foodImageJobs.getStats(session.sub);
+            } catch (error) {
+              console.warn("[ops-quota] food image stats unavailable:", error?.message || error);
+            }
+          }
+          if (service.foodImagePatrol?.remainingQuota) {
+            try {
+              foodImageQuota = await service.foodImagePatrol.remainingQuota(session.sub);
+            } catch (error) {
+              console.warn("[ops-quota] food image patrol quota unavailable:", error?.message || error);
+            }
+          }
+          if (service.foodImageJobs?.listDailyUsage) {
+            try {
+              foodImageSeries = await service.foodImageJobs.listDailyUsage({ days });
+            } catch (error) {
+              console.warn("[ops-quota] food image series unavailable:", error?.message || error);
+            }
+          }
+          const foodToday = foodImageQuota?.usage ?? foodImage?.dailyGenerated ?? 0;
+          const foodTotal = foodImageSeries.reduce((sum, point) => sum + (Number(point.value) || 0), 0);
+          const catalog = service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision });
+          let modelBoard = { models: [] };
+          if (service.observability?.getModelBoard) {
+            try {
+              modelBoard = await service.observability.getModelBoard({
+                days,
+                catalog,
+                foodImageSeries,
+              });
+            } catch (error) {
+              console.warn("[ops-quota] model board unavailable:", error?.message || error);
+            }
+          }
+          return sendJson(res, 200, {
+            windowHours: overview.windowHours,
+            models: catalog,
+            modelBoard,
+            limits: {
+              visionDaily: VISION_DAILY_LIMIT,
+              visionBurst: VISION_BURST_LIMIT,
+              visionBurstWindowSeconds: VISION_BURST_WINDOW_SECONDS,
+              coachDaily: COACH_DAILY_MESSAGE_LIMIT,
+              foodImageDaily: Number(process.env.HY_IMAGE_DAILY_LIMIT) || service.foodImageJobs?.dailyLimit || 500,
+            },
+            metrics: {
+              rateLimited: overview.rateLimited ?? 0,
+              visionSuccess: overview.vision?.success ?? 0,
+              visionFailure: overview.vision?.failure ?? 0,
+              coachMessages: overview.coach?.messages ?? 0,
+              coachLimited: overview.coach?.limited ?? 0,
+            },
+            usage,
+            foodImage,
+            foodImageQuota,
+            foodImageUsage: {
+              today: foodToday,
+              windowTotal: foodTotal,
+              dailyLimit: foodImageQuota?.limit ?? foodImage?.dailyLimit ?? null,
+              remaining: foodImageQuota?.remaining ?? null,
+              series: foodImageSeries,
+            },
+          });
+        }
+        if (adminFoodRoute.operation === "opsQuotaModel") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.observability?.getModelDetail) return sendJson(res, 503, { code: "OPS_QUOTA_UNAVAILABLE" });
+          const model = url.searchParams.get("model");
+          if (!model) return sendJson(res, 400, { code: "MODEL_REQUIRED", message: "缺少 model 参数" });
+          const days = Number(url.searchParams.get("days") ?? "30");
+          let foodImageSeries = [];
+          if (service.foodImageJobs?.listDailyUsage) {
+            try {
+              foodImageSeries = await service.foodImageJobs.listDailyUsage({ days });
+            } catch (error) {
+              console.warn("[ops-quota-model] food image series unavailable:", error?.message || error);
+            }
+          }
+          return sendJson(res, 200, await service.observability.getModelDetail({
+            model,
+            days,
+            catalog: service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision }),
+            foodImageSeries,
+          }));
+        }
+        if (adminFoodRoute.operation === "opsDeletionLog") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.observability?.listDeletionLog) return sendJson(res, 503, { code: "OPS_DELETION_LOG_UNAVAILABLE" });
+          return sendJson(res, 200, {
+            items: await service.observability.listDeletionLog({
+              limit: url.searchParams.get("limit"),
+            }),
+          });
+        }
+        if (adminFoodRoute.operation === "opsModerationFlags") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.contentModeration?.listFlags) return sendJson(res, 503, { code: "OPS_MODERATION_UNAVAILABLE" });
+          const statusParam = url.searchParams.get("status");
+          const status = statusParam === null || statusParam === "all" ? "" : (statusParam || "open");
+          return sendJson(res, 200, {
+            items: await service.contentModeration.listFlags({
+              status,
+              limit: url.searchParams.get("limit"),
+            }),
+          });
+        }
+        if (adminFoodRoute.operation === "opsModerationDashboard") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.contentModeration?.getDashboard) return sendJson(res, 503, { code: "OPS_MODERATION_UNAVAILABLE" });
+          const statusParam = url.searchParams.get("status");
+          return sendJson(res, 200, await service.contentModeration.getDashboard({
+            days: Number(url.searchParams.get("days") ?? "14"),
+            status: statusParam === null ? "open" : statusParam,
+            limit: url.searchParams.get("limit") || 100,
+          }));
+        }
+        if (adminFoodRoute.operation === "opsModerationFlagItem") {
+          if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.contentModeration?.updateFlagStatus) return sendJson(res, 503, { code: "OPS_MODERATION_UNAVAILABLE" });
+          const body = await readJsonBody(req);
+          return sendJson(res, 200, await service.contentModeration.updateFlagStatus(adminFoodRoute.flagId, body?.status));
+        }
+        if (adminFoodRoute.operation === "opsVisionImages") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.visionImageReview) return sendJson(res, 503, { code: "OPS_VISION_REVIEW_UNAVAILABLE" });
+          const tab = String(url.searchParams.get("tab") || "blocked");
+          const limit = Number(url.searchParams.get("limit") || 40);
+          const status = String(url.searchParams.get("status") || "open");
+          if (tab === "all") {
+            return sendJson(res, 200, {
+              tab: "all",
+              items: await service.visionImageReview.listAll({ limit, days: 14 }),
+            });
+          }
+          return sendJson(res, 200, {
+            tab: "blocked",
+            items: await service.visionImageReview.listBlocked({ status, limit }),
+          });
+        }
+        if (adminFoodRoute.operation === "opsUserImages") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.userImageOps?.list) return sendJson(res, 503, { code: "OPS_USER_IMAGES_UNAVAILABLE" });
+          try {
+            return sendJson(res, 200, await service.userImageOps.list({
+              kind: url.searchParams.get("kind") || "all",
+              userId: url.searchParams.get("userId") || undefined,
+              page: Number(url.searchParams.get("page") || 1),
+              pageSize: Number(url.searchParams.get("pageSize") || 40),
+              status: url.searchParams.get("status") || "all",
+            }));
+          } catch (error) {
+            if (error instanceof PublicUserImageError) {
+              return sendJson(res, 400, { code: error.code, message: error.message });
+            }
+            console.error("[ops/user-images] list failed:", error?.message || error);
+            return sendJson(res, 503, {
+              code: "OPS_USER_IMAGES_FAILED",
+              message: error?.message || "用户图片列表加载失败",
+            });
+          }
+        }
+        if (adminFoodRoute.operation === "opsUserImageItem") {
+          if (req.method !== "DELETE") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.userImageOps?.delete) return sendJson(res, 503, { code: "OPS_USER_IMAGES_UNAVAILABLE" });
+          try {
+            return sendJson(res, 200, await service.userImageOps.delete({
+              kind: adminFoodRoute.kind,
+              id: adminFoodRoute.itemId,
+            }));
+          } catch (error) {
+            if (error instanceof PublicUserImageError) {
+              const statusCode = error.code === "USER_IMAGE_NOT_FOUND" ? 404 : 400;
+              return sendJson(res, statusCode, { code: error.code, message: error.message });
+            }
+            console.error("[ops/user-images] delete failed:", error?.message || error);
+            return sendJson(res, 503, {
+              code: "OPS_USER_IMAGES_FAILED",
+              message: error?.message || "用户图片删除失败",
+            });
+          }
+        }
+        if (adminFoodRoute.operation === "opsVisionImagesPurge") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.visionImageRetention?.purgeExpiredVisionImages) {
+            return sendJson(res, 503, { code: "VISION_PURGE_UNAVAILABLE" });
+          }
+          const body = await readJsonBody(req);
+          const result = await service.visionImageRetention.purgeExpiredVisionImages({ limit: body?.limit });
+          service.observability?.recordMetric?.("vision_purge_deleted", result.deleted || 0, {
+            feature: "vision_retention",
+            actor: session.sub,
+          }).catch(() => {});
+          return sendJson(res, 200, result);
+        }
+        if (adminFoodRoute.operation === "opsVisionImageItem") {
+          if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.visionImageReview?.updateAnalysisReview) {
+            return sendJson(res, 503, { code: "OPS_VISION_REVIEW_UNAVAILABLE" });
+          }
+          const body = await readJsonBody(req);
+          return sendJson(res, 200, await service.visionImageReview.updateAnalysisReview(
+            adminFoodRoute.analysisId,
+            body?.reviewStatus || body?.status,
+          ));
         }
         if (adminFoodRoute.operation === "patchFeedback") {
           if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -1584,7 +2297,14 @@ function createHttpServer({ service }) {
           return sendJson(res, 200, await service.meals.getMeal(session.sub, mealRoute.mealId, { hydrate: true }));
         }
         if (mealRoute.operation === "createAnalysis" && req.method === "POST") {
-          return sendJson(res, 200, await service.meals.createAnalysis(session.sub, await readJsonBody(req)));
+          try {
+            return sendJson(res, 200, await service.meals.createAnalysis(session.sub, await readJsonBody(req)));
+          } catch (error) {
+            if (error instanceof PublicDeepseekBudgetError) {
+              return sendJson(res, 429, { code: error.code, message: error.message });
+            }
+            throw error;
+          }
         }
         if (mealRoute.operation === "meals" && req.method === "POST") {
           return sendJson(res, 200, await service.meals.createMeal(session.sub, await readJsonBody(req)));
@@ -1619,6 +2339,9 @@ function createHttpServer({ service }) {
         return sendJson(res, 200, await service.insights[insightOperation](session.sub, date));
       } catch (error) {
         const code = error?.code || (String(error?.message || "").includes("Invalid date") ? "INSIGHT_DATA_INVALID" : "INSIGHT_SERVICE_UNAVAILABLE");
+        if (error instanceof PublicDeepseekBudgetError) {
+          return sendJson(res, 429, { code: error.code, message: error.message });
+        }
         const status = code === "INSIGHT_DATA_INVALID" || code === "MEAL_DATA_INVALID" ? 400 : 503;
         console.error("[insights] failed:", code, error?.message || error);
         return sendJson(res, status, { code, message: error?.message || code });
@@ -1641,16 +2364,90 @@ function createHttpServer({ service }) {
           const date = url.searchParams.get("date");
           if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
           const refresh = url.searchParams.get("refresh") === "1" || url.searchParams.get("refresh") === "true";
-          return sendJson(res, 200, await service.coach.getDailyTip(session.sub, date, { refresh }));
+          const tip = await service.coach.getDailyTip(session.sub, date, { refresh });
+          if (!tip?.cached && tip?.model && tip?.source && tip.source !== "rule_v2") {
+            recordModelUsage(service.observability, {
+              model: tip.model,
+              feature: "daily_tip",
+              provider: tip.source === "deepseek" ? "deepseek" : tip.source === "hunyuan-exp" ? "hunyuan" : tip.source || null,
+              usage: tip.usage || null,
+              requests: 1,
+            }).catch(() => {});
+          }
+          return sendJson(res, 200, tip);
         }
         if (coachOperation === "restartConversation" && req.method === "POST") {
           return sendJson(res, 200, await service.coach.restartConversation(session.sub));
         }
         if (coachOperation === "sendMessage" && req.method === "POST") {
-          return sendJson(res, 200, await service.coach.sendMessage(session.sub, await readJsonBody(req)));
+          const body = await readJsonBody(req);
+          try {
+            service.contentModeration?.assertTextAllowed?.(body?.prompt, { source: "coach" });
+          } catch (error) {
+            if (error instanceof PublicContentModerationError) {
+              const matchedTerm = service.contentModeration?.findBannedContentTerm?.(body?.prompt);
+              if (matchedTerm) {
+                service.contentModeration.flagViolation({
+                  userId: session.sub,
+                  source: "coach",
+                  snippet: body?.prompt,
+                  matchedTerm,
+                }).catch((flagError) => {
+                  console.warn("[content-moderation] coach flag failed:", flagError?.message || flagError);
+                });
+              }
+              return sendJson(res, 400, { code: error.code, message: error.message });
+            }
+            throw error;
+          }
+          if (service.deepseekBudget?.assertCanCall) {
+            await service.deepseekBudget.assertCanCall(session.sub);
+          }
+          const result = await service.coach.sendMessage(session.sub, body);
+          const coachModel = result?.model
+            || service.modelCatalog?.find((item) => item.feature === "coach")?.model
+            || null;
+          service.observability?.recordMetric?.("coach_message", 1, {
+            userId: session.sub,
+            feature: "coach",
+            model: coachModel,
+          }).catch(() => {});
+          recordModelUsage(service.observability, {
+            model: coachModel,
+            feature: "coach",
+            provider: "deepseek",
+            usage: result?.usage || null,
+            requests: 0,
+          }).catch(() => {});
+          if (result?.usage) {
+            service.deepseekBudget?.recordTokens?.(session.sub, result.usage).catch(() => {});
+          }
+          return sendJson(res, 200, result);
         }
         if (coachOperation === "streamMessage" && req.method === "POST") {
           const body = await readJsonBody(req);
+          try {
+            service.contentModeration?.assertTextAllowed?.(body?.prompt, { source: "coach" });
+          } catch (error) {
+            if (error instanceof PublicContentModerationError) {
+              const matchedTerm = service.contentModeration?.findBannedContentTerm?.(body?.prompt);
+              if (matchedTerm) {
+                service.contentModeration.flagViolation({
+                  userId: session.sub,
+                  source: "coach",
+                  snippet: body?.prompt,
+                  matchedTerm,
+                }).catch((flagError) => {
+                  console.warn("[content-moderation] coach flag failed:", flagError?.message || flagError);
+                });
+              }
+              return sendJson(res, 400, { code: error.code, message: error.message });
+            }
+            throw error;
+          }
+          if (service.deepseekBudget?.assertCanCall) {
+            await service.deepseekBudget.assertCanCall(session.sub);
+          }
           res.writeHead(200, {
             "Content-Type": "application/x-ndjson; charset=utf-8",
             "Cache-Control": "no-cache",
@@ -1658,11 +2455,31 @@ function createHttpServer({ service }) {
           });
           try {
             for await (const event of service.coach.streamMessage(session.sub, body)) {
+              if (event?.type === "complete") {
+                const coachModel = event?.model
+                  || service.modelCatalog?.find((item) => item.feature === "coach")?.model
+                  || null;
+                service.observability?.recordMetric?.("coach_message", 1, {
+                  userId: session.sub,
+                  feature: "coach",
+                  model: coachModel,
+                }).catch(() => {});
+                recordModelUsage(service.observability, {
+                  model: coachModel,
+                  feature: "coach",
+                  provider: "deepseek",
+                  usage: event?.usage || null,
+                  requests: 0,
+                }).catch(() => {});
+                if (event?.usage) {
+                  service.deepseekBudget?.recordTokens?.(session.sub, event.usage).catch(() => {});
+                }
+              }
               res.write(`${JSON.stringify(event)}\n`);
             }
           } catch (error) {
             const code = error instanceof PublicCoachDataError || typeof error?.code === "string" ? error.code : "COACH_SERVICE_UNAVAILABLE";
-            const message = error instanceof PublicCoachDataError ? error.message : undefined;
+            const message = error instanceof PublicCoachDataError || error instanceof PublicDeepseekBudgetError ? error.message : undefined;
             res.write(`${JSON.stringify({ type: "error", code, ...(message ? { message } : {}) })}\n`);
           }
           res.end();
@@ -1670,7 +2487,17 @@ function createHttpServer({ service }) {
         }
         return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       } catch (error) {
+        if (error instanceof PublicDeepseekBudgetError) {
+          return sendJson(res, 429, { code: error.code, message: error.message });
+        }
         if (error instanceof PublicCoachDataError) {
+          if (error.code === "COACH_DAILY_LIMIT_REACHED") {
+            service.observability?.recordMetric?.("coach_limited", 1, {
+              userId: session.sub,
+              feature: "coach",
+              model: service.modelCatalog?.find((item) => item.feature === "coach")?.model || null,
+            }).catch(() => {});
+          }
           const status = error.code === "SESSION_USER_MISSING" ? 401 : error.code === "COACH_DAILY_LIMIT_REACHED" ? 429 : 400;
           return sendJson(res, status, { code: error.code, message: error.message });
         }
@@ -1684,7 +2511,28 @@ function createHttpServer({ service }) {
       if (!service.feedback?.submitFeedback) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       try {
-        return sendJson(res, 200, await service.feedback.submitFeedback(session.sub, await readJsonBody(req)));
+        const body = await readJsonBody(req);
+        try {
+          service.contentModeration?.assertTextAllowed?.(body?.message ?? body?.content, { source: "feedback" });
+        } catch (error) {
+          if (error instanceof PublicContentModerationError) {
+            const snippet = body?.message ?? body?.content;
+            const matchedTerm = service.contentModeration?.findBannedContentTerm?.(snippet);
+            if (matchedTerm) {
+              service.contentModeration.flagViolation({
+                userId: session.sub,
+                source: "feedback",
+                snippet,
+                matchedTerm,
+              }).catch((flagError) => {
+                console.warn("[content-moderation] feedback flag failed:", flagError?.message || flagError);
+              });
+            }
+            return sendJson(res, 400, { code: error.code, message: error.message });
+          }
+          throw error;
+        }
+        return sendJson(res, 200, await service.feedback.submitFeedback(session.sub, body));
       } catch (error) {
         if (error instanceof PublicFeedbackError) return sendJson(res, 400, { code: error.code });
         return sendJson(res, 503, { code: "FEEDBACK_SAVE_FAILED" });
@@ -1695,11 +2543,86 @@ function createHttpServer({ service }) {
       if (!session) return;
       if (!service.vision?.analyzeImage) return sendJson(res, 503, { code: "VISION_SERVICE_NOT_CONFIGURED" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      const startedAt = Date.now();
       try {
-        return sendJson(res, 200, await service.vision.analyzeImage(session.sub, await readJsonBody(req, MAX_VISION_BODY_BYTES)));
+        if (service.operationGuard?.consumeQuota) {
+          await service.operationGuard.consumeQuota(session.sub, "vision_analysis_daily", {
+            limit: VISION_DAILY_LIMIT,
+            windowSeconds: VISION_DAILY_WINDOW_SECONDS,
+          });
+          await service.operationGuard.consumeQuota(session.sub, "vision_analysis_burst", {
+            limit: VISION_BURST_LIMIT,
+            windowSeconds: VISION_BURST_WINDOW_SECONDS,
+          });
+        }
+        const visionMeta = {
+          userId: session.sub,
+          feature: "vision",
+          model: service.vision?.model || service.modelCatalog?.find((item) => item.feature === "vision")?.model || null,
+          provider: service.vision?.provider || null,
+        };
+        const result = await service.vision.analyzeImage(session.sub, await readJsonBody(req, MAX_VISION_BODY_BYTES));
+        const visionModel = result?.model || visionMeta.model;
+        const resolvedVisionMeta = {
+          ...visionMeta,
+          model: visionModel,
+          provider: result?.provider || visionMeta.provider,
+          hops: Number(result?.modelHops) || 1,
+        };
+        const latencyMs = Date.now() - startedAt;
+        service.observability?.recordMetric?.("vision_success", 1, resolvedVisionMeta).catch(() => {});
+        service.observability?.recordMetric?.("vision_latency_ms", latencyMs, resolvedVisionMeta).catch(() => {});
+        service.observability?.recordMetric?.("vision_model_hops", Number(result?.modelHops) || 1, resolvedVisionMeta).catch(() => {});
+        recordModelUsage(service.observability, {
+          model: visionModel,
+          feature: "vision",
+          provider: result?.provider || visionMeta.provider || "qwen",
+          usage: result?.usage || null,
+          requests: 0,
+        }).catch(() => {});
+        return sendJson(res, 200, result);
       } catch (error) {
-        if (error instanceof PublicVisionDataError || error instanceof PublicVisionError || error instanceof PublicQwenVisionError) {
-          const statusCode = error.code === "VISION_IMAGE_INVALID" || error.code === "VISION_RESULT_INVALID" || error.code === "VISION_NON_FOOD" ? 400 : 503;
+        if (error instanceof PublicOperationError && error.code === "RATE_LIMITED") {
+          service.observability?.recordMetric?.("rate_limited", 1, {
+            userId: session.sub,
+            operation: "vision_analysis",
+            feature: "vision",
+          }).catch(() => {});
+          return sendJson(res, 429, { code: error.code, message: error.message });
+        }
+        if (error instanceof PublicDeepseekBudgetError) {
+          return sendJson(res, 429, { code: error.code, message: error.message });
+        }
+        service.observability?.recordMetric?.("vision_failure", 1, {
+          userId: session.sub,
+          feature: "vision",
+          model: service.vision?.model || null,
+          provider: service.vision?.provider || null,
+          latencyMs: Date.now() - startedAt,
+        }).catch(() => {});
+        if (
+          error instanceof PublicVisionDataError
+          || error instanceof PublicVisionError
+          || error instanceof PublicQwenVisionError
+          || error instanceof PublicImageSecurityError
+        ) {
+          if (error.code === "VISION_CONTENT_BLOCKED") {
+            service.contentModeration?.flagViolation?.({
+              userId: session.sub,
+              source: "vision",
+              snippet: "[image]",
+              matchedTerm: "img_sec_check",
+              imagePath: error.imagePath || null,
+            }).catch((flagError) => {
+              console.warn("[content-moderation] vision flag failed:", flagError?.message || flagError);
+            });
+          }
+          const statusCode = error.code === "VISION_IMAGE_INVALID"
+            || error.code === "VISION_RESULT_INVALID"
+            || error.code === "VISION_NON_FOOD"
+            || error.code === "VISION_CONTENT_BLOCKED"
+            ? 400
+            : 503;
           console.error("[vision] known error:", error.code, error.message);
           return sendJson(res, statusCode, { code: error.code, message: error.message });
         }
@@ -1713,14 +2636,66 @@ function createHttpServer({ service }) {
       if (!service.data?.getAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try { return sendJson(res, 200, await service.data.getAccount(session.sub)); } catch { return sendJson(res, 503, { code: "ACCOUNT_READ_FAILED" }); }
     }
+    if (dataOperation === "accountUsage" && req.method === "GET") {
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      try {
+        let coach = { used: 0, limit: COACH_DAILY_MESSAGE_LIMIT, remaining: COACH_DAILY_MESSAGE_LIMIT };
+        if (typeof service.coach?.getDailyUsage === "function") {
+          coach = await service.coach.getDailyUsage(session.sub);
+        } else if (typeof service.operationGuard?.getQuotaUsage === "function") {
+          coach = await service.operationGuard.getQuotaUsage(session.sub, "coach_daily_message", {
+            limit: COACH_DAILY_MESSAGE_LIMIT,
+            windowSeconds: VISION_DAILY_WINDOW_SECONDS,
+          });
+        }
+        const vision = service.operationGuard?.getQuotaUsage
+          ? await service.operationGuard.getQuotaUsage(session.sub, "vision_analysis_daily", {
+            limit: VISION_DAILY_LIMIT,
+            windowSeconds: VISION_DAILY_WINDOW_SECONDS,
+          })
+          : { used: 0, limit: VISION_DAILY_LIMIT, remaining: VISION_DAILY_LIMIT };
+        const deepseek = typeof service.deepseekBudget?.getUsage === "function"
+          ? await service.deepseekBudget.getUsage(session.sub)
+          : null;
+        return sendJson(res, 200, { vision, coach, deepseek });
+      } catch (error) {
+        console.error("[account-usage] failed:", error?.message || error);
+        return sendJson(res, 503, { code: "ACCOUNT_USAGE_UNAVAILABLE" });
+      }
+    }
     if (dataOperation === "cancelAccount") {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service?.accountDeletion?.cancelAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      let clientRequestId = null;
       try {
-        return sendJson(res, 200, await service.accountDeletion.cancelAccount(session.sub, await readJsonBody(req)));
+        const body = await readJsonBody(req);
+        clientRequestId = body?.clientRequestId ?? null;
+        service.observability?.recordDeletion?.({
+          userId: session.sub,
+          clientRequestId,
+          outcome: "started",
+        });
+        const result = await service.accountDeletion.cancelAccount(session.sub, body);
+        service.observability?.recordMetric?.("account_cancel_success", 1, { userId: session.sub }).catch(() => {});
+        service.observability?.recordDeletion?.({
+          userId: session.sub,
+          clientRequestId,
+          outcome: "succeeded",
+        });
+        return sendJson(res, 200, result);
       } catch (error) {
+        service.observability?.recordMetric?.("account_cancel_failure", 1, { userId: session.sub }).catch(() => {});
+        if (clientRequestId) {
+          service.observability?.recordDeletion?.({
+            userId: session.sub,
+            clientRequestId,
+            outcome: "failed",
+            errorCode: error?.code || "ACCOUNT_CANCELLATION_FAILED",
+          });
+        }
         if (error instanceof PublicAccountDeletionError || error instanceof PublicOperationError) {
           return sendJson(res, error instanceof PublicOperationError ? 409 : 400, { code: error.code });
         }
@@ -1753,11 +2728,27 @@ function createHttpServer({ service }) {
         const body = await readJsonBody(req);
         let plan = null;
         if (typeof service.calculateNutritionPlan === "function") {
+          if (service.deepseekBudget?.assertCanCall) {
+            await service.deepseekBudget.assertCanCall(session.sub);
+          }
           plan = await service.calculateNutritionPlan(body);
         }
         if (!plan) plan = formulaNutritionPlanFallback(body);
+        if (plan?.usage && plan?.model) {
+          recordModelUsage(service.observability, {
+            model: plan.model,
+            feature: "nutrition_plan",
+            provider: "deepseek",
+            usage: plan.usage,
+            requests: 0,
+          }).catch(() => {});
+          service.deepseekBudget?.recordTokens?.(session.sub, plan.usage).catch(() => {});
+        }
         return sendJson(res, 200, plan);
       } catch (error) {
+        if (error instanceof PublicDeepseekBudgetError) {
+          return sendJson(res, 429, { code: error.code, message: error.message });
+        }
         console.error("[nutrition-plan/preview] failed:", error?.message || error);
         return sendJson(res, 503, { code: "NUTRITION_PLAN_PREVIEW_FAILED" });
       }

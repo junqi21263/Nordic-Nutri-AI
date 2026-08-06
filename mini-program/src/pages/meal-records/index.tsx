@@ -7,8 +7,14 @@ import { BottomSheet, bottomSheetExitDuration } from "../../components/bottom-sh
 import { NordicIcon, type NordicIconName } from "../../components/nordic-icon";
 import { EmptyState } from "../../components/empty-state";
 import { ErrorState } from "../../components/error-state";
+import { FirstRunTip } from "../../components/first-run-tip";
 import { SearchBar } from "../../components/search-bar";
 import { getFoodVisualFallback } from "../../features/food-catalog/food-visuals";
+import {
+  hasSeenFirstRunTip,
+  markFirstRunTipSeen,
+  retireFirstRunTipsIfRecordedMeals,
+} from "../../features/first-run-tips/first-run-tips";
 import {
   clampProgress,
   formatTargetStatus,
@@ -154,6 +160,12 @@ export default function MealRecordsPage() {
   const [remoteSummary, setRemoteSummary] = useState<ProductDailySummary | null>(null);
   const [recordedDates, setRecordedDates] = useState<Set<string>>(new Set());
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [showRecordsTip, setShowRecordsTip] = useState(() => {
+    if (retireFirstRunTipsIfRecordedMeals(useMealStore.getState().meals, useMealStore.getState().dataSource)) {
+      return false;
+    }
+    return !hasSeenFirstRunTip("meal-records-review");
+  });
   const today = getLocalDateString();
   const localSummary = store.getDailySummary();
   const summary = resolveHomeDailySummary(
@@ -195,6 +207,13 @@ export default function MealRecordsPage() {
 
   useDidShow(() => {
     setRefreshVersion((version) => version + 1);
+    if (retireFirstRunTipsIfRecordedMeals(store.meals, store.dataSource)) {
+      setShowRecordsTip(false);
+    } else if (hasSeenFirstRunTip("meal-records-review")) {
+      setShowRecordsTip(false);
+    } else {
+      setShowRecordsTip(true);
+    }
   });
 
   useEffect(() => {
@@ -212,6 +231,7 @@ export default function MealRecordsPage() {
     void getProductDailySummary(store.selectedDate)
       .then(async (dailySummary) => {
         setRemoteSummary(dailySummary);
+        store.setDailyTargets(dailySummary.targets);
         if (Array.isArray(dailySummary.meals)) {
           store.replaceRemoteMeals(dailySummary.meals.map(mapProductMeal), store.selectedDate);
           return;
@@ -256,6 +276,22 @@ export default function MealRecordsPage() {
       className="page-layout--meal-records"
     >
       <View className="meal-records-page">
+        {showRecordsTip ? (
+          <FirstRunTip
+            tipId="meal-records-review"
+            step="3/3"
+            title="在这里回看今天的饮食"
+            body="拍完并保存后，每一餐都会出现在这里。也可以点「去添加」先手动补录。"
+            actionLabel="去添加"
+            onAction={() => {
+              void Taro.navigateTo({ url: "/pages/manual-meal/index" });
+            }}
+            onClose={() => {
+              markFirstRunTipSeen("meal-records-review");
+              setShowRecordsTip(false);
+            }}
+          />
+        ) : null}
         <View className="meal-records-page__toolbar">
           <SearchBar
             value={store.searchKeyword}
@@ -428,7 +464,8 @@ export default function MealRecordsPage() {
                   ? "未来日期还没有餐次"
                   : "当天没有记录"
             }
-            description={hasFilters ? "换个关键词或清除筛选再试试。" : "可以从新增餐次开始。"}
+            description={hasFilters ? "换个关键词或清除筛选再试试。" : null}
+            showMark={hasFilters}
             actionLabel={hasFilters ? "清除筛选" : "新增餐次"}
             onAction={hasFilters ? clearFilters : addMeal}
           />

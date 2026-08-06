@@ -45,6 +45,7 @@ function cleanTranslation(value) {
 }
 
 function requestDeepSeekTranslation({ apiKey, query, model }) {
+  const { extractContentAndUsage } = require("./model-usage.cjs");
   const requestBody = JSON.stringify({
     model,
     temperature: 0,
@@ -69,7 +70,14 @@ function requestDeepSeekTranslation({ apiKey, query, model }) {
       response.on("data", (chunk) => { raw += chunk; });
       response.on("end", () => {
         if (response.statusCode !== 200) return reject(new Error("Food translation request failed"));
-        try { resolve(cleanTranslation(JSON.parse(raw)?.choices?.[0]?.message?.content)); } catch { reject(new Error("Food translation response was invalid")); }
+        try {
+          const parsed = extractContentAndUsage(JSON.parse(raw));
+          resolve({
+            translation: cleanTranslation(parsed.content),
+            usage: parsed.usage,
+            model,
+          });
+        } catch { reject(new Error("Food translation response was invalid")); }
       });
     });
     request.on("timeout", () => request.destroy(new Error("Food translation timed out")));
@@ -81,9 +89,15 @@ function requestDeepSeekTranslation({ apiKey, query, model }) {
 function createFoodQueryTranslator({ apiKey, model = "deepseek-v4-flash", translate = requestDeepSeekTranslation }) {
   return async (query) => {
     const common = matchCommonFoodTerm(query);
-    if (common) return common;
-    if (typeof apiKey !== "string" || !apiKey) return null;
-    return translate({ apiKey, query, model });
+    if (common) return { translation: common, usage: null, model: null };
+    if (typeof apiKey !== "string" || !apiKey) return { translation: null, usage: null, model: null };
+    const result = await translate({ apiKey, query, model });
+    if (typeof result === "string") return { translation: result, usage: null, model };
+    return {
+      translation: result?.translation ?? null,
+      usage: result?.usage || null,
+      model: result?.model || model,
+    };
   };
 }
 

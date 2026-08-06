@@ -25,6 +25,8 @@ function mockDb(tables = {}) {
       select(cols, opts) { if (opts?.count) this._count = true; calls.push({ t: "select", table, cols }); return this; },
       eq(col, val) { this._filters.push(["eq", col, val]); return this; },
       in(col, vals) { this._filters.push(["in", col, vals]); return this; },
+      gte(col, val) { this._filters.push(["gte", col, val]); return this; },
+      lte(col, val) { this._filters.push(["lte", col, val]); return this; },
       ilike(col, val) { this._filters.push(["ilike", col, val]); return this; },
       is(col, val) { this._filters.push(["is", col, val]); return this; },
       or(expr) { this._or = expr; return this; },
@@ -41,6 +43,8 @@ function mockDb(tables = {}) {
         for (const [op, col, val] of this._filters) {
           if (op === "eq") rows = rows.filter((r) => col === "is_primary_variant" && r[col] === undefined ? true : r[col] === val);
           if (op === "in") rows = rows.filter((r) => Array.isArray(val) && val.includes(r[col]));
+          if (op === "gte") rows = rows.filter((r) => Number(r[col]) >= Number(val));
+          if (op === "lte") rows = rows.filter((r) => Number(r[col]) <= Number(val));
           if (op === "is") rows = rows.filter((r) => (val ? r[col] != null : r[col] == null));
           if (op === "ilike") {
             const pat = String(val).replace(/[\*%]/g, "").toLowerCase();
@@ -53,12 +57,21 @@ function mockDb(tables = {}) {
             if (m) return { op: "ilike", col: m[1], val: m[2] };
             const isNull = c.match(/^(\w+)\.is\.null$/);
             if (isNull) return { op: "isNull", col: isNull[1] };
+            const gte = c.match(/^(\w+)\.gte\.([^,]+)$/);
+            if (gte) return { op: "gte", col: gte[1], val: Number(gte[2]) };
+            const lte = c.match(/^(\w+)\.lte\.([^,]+)$/);
+            if (lte) return { op: "lte", col: lte[1], val: Number(lte[2]) };
+            const inn = c.match(/^(\w+)\.in\.\(([^)]+)\)$/);
+            if (inn) return { op: "in", col: inn[1], vals: inn[2].split(",") };
             const equals = c.match(/^(\w+)\.eq\.([^,]+)$/);
             return equals ? { op: "eq", col: equals[1], val: equals[2] } : null;
           }).filter(Boolean);
           rows = rows.filter((r) => clauses.some((c) => {
             if (c.op === "isNull") return r[c.col] == null;
             if (c.op === "eq") return String(r[c.col]) === c.val;
+            if (c.op === "gte") return Number(r[c.col]) >= c.val;
+            if (c.op === "lte") return Number(r[c.col]) <= c.val;
+            if (c.op === "in") return c.vals.includes(String(r[c.col]));
             return String(r[c.col] ?? "").toLowerCase().includes(c.val);
           }));
         }
@@ -358,6 +371,30 @@ test("listFoods expands a standard root category to descendant categories", asyn
   const result = await repo.listFoods({ categoryCode: "meat_poultry", page: 1, pageSize: 20 });
   assert.deepEqual(result.items.map((item) => item.id), ["f-root", "f-leaf"]);
   assert.equal(result.pagination.total, 2);
+});
+
+test("listFoods filters by nutrition tags and multiple category codes", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-oat", name_en: "Oats", category_id: "c-grain", is_active: true, publish_status: "published", popularity_score: 3, fiber_g: 10.1, protein_g: 13, carbs_g: 60, fat_g: 7, calories: 380 },
+      { id: "f-tofu", name_en: "Tofu", category_id: "c-soy", is_active: true, publish_status: "published", popularity_score: 2, fiber_g: 1, protein_g: 12, carbs_g: 2, fat_g: 6, calories: 120 },
+      { id: "f-chicken", name_en: "Chicken", category_id: "c-meat", is_active: true, publish_status: "published", popularity_score: 1, fiber_g: 0, protein_g: 31, carbs_g: 0, fat_g: 3.6, calories: 165 },
+    ],
+    food_categories: [
+      { id: "c-grain", code: "grains_tubers", name_zh: "谷物与薯类", is_active: true },
+      { id: "c-soy", code: "plant_protein", name_zh: "豆类与植物蛋白", is_active: true },
+      { id: "c-meat", code: "meat_poultry", name_zh: "肉禽", is_active: true },
+    ],
+    food_tag_relations: [],
+    food_images: [],
+  });
+  const repo = createFoodRepository({ db });
+  const byFiber = await repo.listFoods({ tagCodes: ["high_fiber"], page: 1, pageSize: 20 });
+  assert.deepEqual(byFiber.items.map((item) => item.id), ["f-oat"]);
+  const byPlant = await repo.listFoods({ tagCodes: ["plant_protein"], page: 1, pageSize: 20 });
+  assert.deepEqual(byPlant.items.map((item) => item.id).sort(), ["f-oat", "f-tofu"]);
+  const multiCategory = await repo.listFoods({ categoryCodes: ["plant_protein", "grains_tubers"], page: 1, pageSize: 20 });
+  assert.deepEqual(multiCategory.items.map((item) => item.id).sort(), ["f-oat", "f-tofu"]);
 });
 
 test("listFoods resolves regional lenses through memberships without changing the primary category", async () => {

@@ -17,6 +17,16 @@ describe("份量调整交互", () => {
     expect(source).toContain("恢复原始份量");
   });
 
+  it("编辑时可重选早午晚加餐次，并在保存时提交 mealType", () => {
+    const source = read("pages/portion-adjustment/index.tsx");
+    const store = read("stores/portion-draft-store.ts");
+    expect(source).toContain("这是哪一餐？");
+    expect(source).toContain("mealTypeOptions");
+    expect(source).toContain("portion.setMealType");
+    expect(source).toContain("mealType: draftMeal.mealType");
+    expect(store).toContain("setMealType:");
+  });
+
   it("保存后先跳转餐食详情再清空草稿，避免卡在草稿不存在页", () => {
     const source = read("pages/portion-adjustment/index.tsx");
     const redirectIndex = source.indexOf("Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` })");

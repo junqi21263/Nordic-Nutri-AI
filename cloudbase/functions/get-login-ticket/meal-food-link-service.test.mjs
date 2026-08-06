@@ -16,21 +16,22 @@ test("classify service returns a known category code", async () => {
   const classify = createDeepseekFoodClassifyService({
     requestCompletion: async () => ({ categoryCode: "egg" }),
   });
-  assert.equal(await classify({ name: "炒蛋", macros: {} }), "egg");
+  assert.equal((await classify({ name: "炒蛋", macros: {} })).categoryCode, "egg");
 });
 
 test("classify service falls back to other on invalid codes", async () => {
   const classify = createDeepseekFoodClassifyService({
     requestCompletion: async () => ({ categoryCode: "dessert" }),
   });
-  assert.equal(await classify({ name: "甜品", macros: {} }), "other");
+  assert.equal((await classify({ name: "甜品", macros: {} })).categoryCode, "other");
 });
 
 test("meal insight service returns trimmed insight text", async () => {
   const insight = createDeepseekMealInsightService({
     requestCompletion: async () => ({ insight: " 蛋白质充足，下一餐可补充蔬菜。 " }),
   });
-  assert.equal(await insight({ mealName: "英式早餐", items: [] }), "蛋白质充足，下一餐可补充蔬菜。");
+  const result = await insight({ mealName: "英式早餐", items: [] });
+  assert.equal(result.insight, "蛋白质充足，下一餐可补充蔬菜。");
 });
 
 test("resolveItems reuses an existing food by normalized name", async () => {

@@ -69,6 +69,8 @@ function shouldEscalate(result) {
   return result.needsEscalation === true || result.confidence < 0.55 || result.portionConfidence < 0.5;
 }
 
+const { extractContentAndUsage } = require("./model-usage.cjs");
+
 function createQwenRequestCompletion({ apiKey, workspaceId, model, timeoutMs = 18_000, fetchImpl = globalThis.fetch }) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("QWEN_API_KEY configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
@@ -99,7 +101,8 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, timeoutMs = 1
         throw new PublicQwenVisionError("VISION_RETRYABLE", `Qwen API ${response.status}: ${errBody.slice(0, 200)}`);
       }
       const data = await response.json();
-      return data?.choices?.[0]?.message?.content;
+      const parsed = extractContentAndUsage(data);
+      return { content: parsed.content, usage: parsed.usage, model: selectedModel };
     } catch (error) {
       if (error instanceof PublicQwenVisionError) throw error;
       console.error("[qwen] request error:", error?.message || error, error?.stack || "");
@@ -108,17 +111,44 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, timeoutMs = 1
   };
 }
 
+function mergeUsage(left, right) {
+  if (!left && !right) return null;
+  return {
+    promptTokens: (left?.promptTokens || 0) + (right?.promptTokens || 0),
+    completionTokens: (left?.completionTokens || 0) + (right?.completionTokens || 0),
+    totalTokens: (left?.totalTokens || 0) + (right?.totalTokens || 0),
+  };
+}
+
+function unwrapVisionCompletion(raw) {
+  if (typeof raw === "string") return { content: raw, usage: null };
+  if (raw && typeof raw === "object") {
+    if ("content" in raw && !("mealName" in raw) && !("isFood" in raw) && !("items" in raw)) {
+      return { content: raw.content, usage: raw.usage || null };
+    }
+    return { content: raw, usage: raw.usage || null };
+  }
+  return { content: raw, usage: null };
+}
+
 function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-flash", plusModel = "qwen3-vl-plus", requestCompletion, fetchImpl } = {}) {
   const complete = requestCompletion ?? createQwenRequestCompletion({ apiKey, workspaceId, model: flashModel, timeoutMs: 18_000, fetchImpl });
-  const plusComplete = requestCompletion ? requestCompletion : createQwenRequestCompletion({ apiKey, workspaceId, model: plusModel, timeoutMs: 12_000, fetchImpl });
+  const plusComplete = requestCompletion ? requestCompletion : createQwenRequestCompletion({ apiKey, workspaceId, model: plusModel, timeoutMs: 10_000, fetchImpl });
   return async ({ imageUrl }) => {
     if (typeof imageUrl !== "string" || imageUrl.length > 30_000_000) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
     if (!/^https:\/\//i.test(imageUrl) && !/^data:image\//i.test(imageUrl)) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
-    const first = validateResult(await complete({ imageUrl, model: flashModel }));
+    const firstRaw = unwrapVisionCompletion(await complete({ imageUrl, model: flashModel }));
+    const first = validateResult(firstRaw.content);
+    let usage = firstRaw.usage;
     // Data-URL payloads are already large; a second plus pass often exceeds the cloud timeout.
     const canEscalate = !/^data:image\//i.test(imageUrl) && shouldEscalate(first);
-    const selected = canEscalate ? validateResult(await plusComplete({ imageUrl, model: plusModel })) : first;
-    return { ...selected, provider: "qwen", model: canEscalate ? plusModel : flashModel };
+    let selected = first;
+    if (canEscalate) {
+      const plusRaw = unwrapVisionCompletion(await plusComplete({ imageUrl, model: plusModel }));
+      selected = validateResult(plusRaw.content);
+      usage = mergeUsage(usage, plusRaw.usage);
+    }
+    return { ...selected, provider: "qwen", model: canEscalate ? plusModel : flashModel, usage, modelHops: canEscalate ? 2 : 1 };
   };
 }
 

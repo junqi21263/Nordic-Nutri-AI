@@ -89,6 +89,8 @@ function pickCoachQuickPrompt(random) {
   return fallbackCoachQuickPrompts[index];
 }
 
+const { extractContentAndUsage } = require("./model-usage.cjs");
+
 function createDeepseekDailyTipCompletion({ apiKey, model, fetchImpl = globalThis.fetch } = {}) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("DeepSeek configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
@@ -116,7 +118,8 @@ function createDeepseekDailyTipCompletion({ apiKey, model, fetchImpl = globalThi
       });
       if (!response.ok) throw dailyTipError();
       const data = await response.json();
-      return data?.choices?.[0]?.message?.content;
+      const parsed = extractContentAndUsage(data);
+      return { content: parsed.content, usage: parsed.usage };
     } catch (error) {
       if (error?.message === "DAILY_TIP_RETRYABLE") throw error;
       throw dailyTipError();
@@ -124,6 +127,14 @@ function createDeepseekDailyTipCompletion({ apiKey, model, fetchImpl = globalThi
       clearTimeout(timer);
     }
   };
+}
+
+function unwrapCompletion(raw) {
+  if (typeof raw === "string") return { payload: raw, usage: null };
+  if (raw && typeof raw === "object" && typeof raw.content === "string" && !raw.type && !raw.headline && !raw.prompt) {
+    return { payload: raw.content, usage: raw.usage || null };
+  }
+  return { payload: raw, usage: raw && typeof raw === "object" ? raw.usage || null : null };
 }
 
 function createDailyTipService({ apiKey, model, requestCompletion, contextProvider, random = Math.random, source = "deepseek" } = {}) {
@@ -134,24 +145,26 @@ function createDailyTipService({ apiKey, model, requestCompletion, contextProvid
     const nutritionContext = context ?? (typeof contextProvider === "function" ? await contextProvider(date) : {});
     const types = ["nutrition_tip", "food_function", "food_knowledge"];
     const type = types[Math.min(types.length - 1, Math.floor(random() * types.length))];
-    if (!complete) return { ...pickFallback(type, random), source: "rule_v2", model: null };
+    if (!complete) return { ...pickFallback(type, random), source: "rule_v2", model: null, usage: null };
     try {
-      const tip = validateDailyTip(await complete({ date, type, context: nutritionContext }));
-      return { ...tip, source, model: selectedModel };
+      const raw = unwrapCompletion(await complete({ date, type, context: nutritionContext }));
+      const tip = validateDailyTip(raw.payload);
+      return { ...tip, source, model: selectedModel, usage: raw.usage };
     } catch {
-      return { ...pickFallback(type, random), source: "rule_v2", model: null };
+      return { ...pickFallback(type, random), source: "rule_v2", model: null, usage: null };
     }
   };
 
   getDailyTip.getQuickPrompt = async ({ date, context } = {}) => {
     if (typeof date !== "string" || !datePattern.test(date)) throw dailyTipError("DAILY_TIP_INPUT_INVALID");
     const nutritionContext = context ?? (typeof contextProvider === "function" ? await contextProvider(date) : {});
-    if (!complete) return { prompt: pickCoachQuickPrompt(random), source: "rule_v2", model: null };
+    if (!complete) return { prompt: pickCoachQuickPrompt(random), source: "rule_v2", model: null, usage: null };
     try {
-      const prompt = validateCoachQuickPrompt(await complete({ purpose: "coach_quick_prompt", context: nutritionContext }));
-      return { prompt, source, model: selectedModel };
+      const raw = unwrapCompletion(await complete({ purpose: "coach_quick_prompt", context: nutritionContext }));
+      const prompt = validateCoachQuickPrompt(raw.payload);
+      return { prompt, source, model: selectedModel, usage: raw.usage };
     } catch {
-      return { prompt: pickCoachQuickPrompt(random), source: "rule_v2", model: null };
+      return { prompt: pickCoachQuickPrompt(random), source: "rule_v2", model: null, usage: null };
     }
   };
 

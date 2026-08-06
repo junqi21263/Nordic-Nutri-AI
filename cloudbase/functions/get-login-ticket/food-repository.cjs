@@ -313,6 +313,66 @@ function sanitizeCategoryCode(raw) {
   return /^[a-z0-9_]+(?:\.[a-z0-9_]+)*$/.test(value) ? value : "";
 }
 
+function normalizeCategoryCodes(categoryCode, categoryCodes) {
+  const raw = [];
+  if (Array.isArray(categoryCodes)) raw.push(...categoryCodes);
+  if (typeof categoryCode === "string" && categoryCode.includes(",")) {
+    raw.push(...categoryCode.split(","));
+  } else if (categoryCode) {
+    raw.push(categoryCode);
+  }
+  return Array.from(new Set(raw.map(sanitizeCategoryCode).filter(Boolean)));
+}
+
+function normalizeTagCodes(tagCodes) {
+  if (!Array.isArray(tagCodes)) return [];
+  return Array.from(new Set(tagCodes.map((code) => String(code || "").trim().toLowerCase()).filter(Boolean)));
+}
+
+const PLANT_PROTEIN_TAG_CATEGORY_ROOTS = ["plant_protein", "grains_tubers", "soy", "grain"];
+
+async function buildTagFilterPlan(db, tagCodes) {
+  const wanted = normalizeTagCodes(tagCodes);
+  if (!wanted.length) return null;
+
+  const nutritionParts = [];
+  if (wanted.includes("high_protein")) nutritionParts.push("protein_g.gte.15");
+  if (wanted.includes("low_fat")) nutritionParts.push("fat_g.lte.3");
+  if (wanted.includes("high_carb")) nutritionParts.push("carbs_g.gte.30");
+  if (wanted.includes("low_calorie")) nutritionParts.push("calories.lte.100");
+  if (wanted.includes("high_fiber")) nutritionParts.push("fiber_g.gte.5");
+
+  let plantCategoryIds = null;
+  if (wanted.includes("plant_protein")) {
+    const categoryIds = [];
+    for (const root of PLANT_PROTEIN_TAG_CATEGORY_ROOTS) {
+      categoryIds.push(...await resolveCategoryTreeIdsByRootCode(db, root));
+    }
+    plantCategoryIds = Array.from(new Set(categoryIds.filter(Boolean)));
+  }
+
+  return { nutritionParts, plantCategoryIds };
+}
+
+function applyTagFilterPlan(query, plan) {
+  if (!plan) return query;
+  const { nutritionParts, plantCategoryIds } = plan;
+  if (nutritionParts.length && plantCategoryIds?.length) {
+    return query.or(`${nutritionParts.join(",")},category_id.in.(${plantCategoryIds.join(",")})`);
+  }
+  if (nutritionParts.length === 1) {
+    const expression = nutritionParts[0];
+    const gte = expression.match(/^(\w+)\.gte\.(.+)$/);
+    if (gte && typeof query.gte === "function") return query.gte(gte[1], Number(gte[2]));
+    const lte = expression.match(/^(\w+)\.lte\.(.+)$/);
+    if (lte && typeof query.lte === "function") return query.lte(lte[1], Number(lte[2]));
+    return query.or(expression);
+  }
+  if (nutritionParts.length > 1) return query.or(nutritionParts.join(","));
+  if (plantCategoryIds?.length) return query.in("category_id", plantCategoryIds);
+  return query;
+}
+
 const REGIONAL_CATEGORY_CODES = new Set(["nordic_staples", "north_american_staples"]);
 
 async function resolveRegionalMembershipPage(db, regionCode, { offset, size }) {
@@ -535,7 +595,7 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       return (result.data ?? []).map(mapTagRow).filter(Boolean);
     },
 
-    async listFoods({ q, categoryCode, tagCodes, source, featured, sort, page, pageSize } = {}) {
+    async listFoods({ q, categoryCode, categoryCodes, tagCodes, source, featured, sort, page, pageSize } = {}) {
       const p = clampPage(page);
       const size = clampPageSize(pageSize);
       const offset = (p - 1) * size;
@@ -550,27 +610,58 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
       if (filter) query = query.or(filter.slice(4, -1)); // strip "or=(" wrapper -> `.or()` accepts comma-separated clauses
       if (featured) query = query.eq("is_featured", true);
       if (source) query = query.eq("source", source);
-      if (categoryCode) {
-        const code = sanitizeCategoryCode(categoryCode);
-        if (!code) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
-        if (REGIONAL_CATEGORY_CODES.has(code)) {
-          const { total, foodIds } = await resolveRegionalMembershipPage(db, code, { offset, size });
-          regionalTotal = total;
-          regionalPageIds = foodIds;
-          if (!regionalPageIds.length) return {
-            items: [],
-            pagination: { page: p, pageSize: size, total: regionalTotal, hasMore: false },
-          };
-          query = query.in("id", regionalPageIds);
-        } else {
-          const categoryIds = await resolveCategoryTreeIdsByRootCode(db, code);
-          if (!categoryIds.length) return {
-            items: [],
-            pagination: { page: p, pageSize: size, total: 0, hasMore: false },
-          };
-          query = query.in("category_id", categoryIds);
+
+      const selectedCategoryCodes = normalizeCategoryCodes(categoryCode, categoryCodes);
+      if (selectedCategoryCodes.length) {
+        const standardCodes = selectedCategoryCodes.filter((code) => !REGIONAL_CATEGORY_CODES.has(code));
+        const regionalCodes = selectedCategoryCodes.filter((code) => REGIONAL_CATEGORY_CODES.has(code));
+        const categoryIds = [];
+        for (const code of standardCodes) {
+          categoryIds.push(...await resolveCategoryTreeIdsByRootCode(db, code));
+        }
+        const uniqueCategoryIds = Array.from(new Set(categoryIds.filter(Boolean)));
+
+        if (regionalCodes.length && !standardCodes.length) {
+          // Single regional lens keeps pagination through memberships.
+          if (regionalCodes.length === 1) {
+            const { total, foodIds } = await resolveRegionalMembershipPage(db, regionalCodes[0], { offset, size });
+            regionalTotal = total;
+            regionalPageIds = foodIds;
+            if (!regionalPageIds.length) {
+              return { items: [], pagination: { page: p, pageSize: size, total: regionalTotal, hasMore: false } };
+            }
+            query = query.in("id", regionalPageIds);
+          } else {
+            const membershipRows = [];
+            for (const code of regionalCodes) {
+              const page = await db.from("food_region_memberships").select("food_id").eq("region_code", code);
+              if (page.error) throw new FoodRepositoryError("FOOD_CATEGORY_INVALID");
+              membershipRows.push(...(page.data ?? []));
+            }
+            const foodIds = Array.from(new Set(membershipRows.map((row) => row.food_id).filter(Boolean)));
+            if (!foodIds.length) {
+              return { items: [], pagination: { page: p, pageSize: size, total: 0, hasMore: false } };
+            }
+            regionalTotal = foodIds.length;
+            regionalPageIds = foodIds.slice(offset, offset + size);
+            if (!regionalPageIds.length) {
+              return { items: [], pagination: { page: p, pageSize: size, total: regionalTotal, hasMore: false } };
+            }
+            query = query.in("id", regionalPageIds);
+          }
+        } else if (uniqueCategoryIds.length) {
+          query = query.in("category_id", uniqueCategoryIds);
+        } else if (!regionalCodes.length) {
+          return { items: [], pagination: { page: p, pageSize: size, total: 0, hasMore: false } };
         }
       }
+
+      const tagCodesNormalized = normalizeTagCodes(tagCodes);
+      if (tagCodesNormalized.length) {
+        const tagPlan = await buildTagFilterPlan(db, tagCodesNormalized);
+        query = applyTagFilterPlan(query, tagPlan);
+      }
+
       const order = sortClause(sort);
       query = query
         .range(regionalPageIds ? 0 : offset, regionalPageIds ? size - 1 : offset + size - 1)
@@ -585,16 +676,11 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
         loadTagsForFoods(db, foodIds),
         loadPrimaryImagesForFoods(db, rows, imageUrlResolver),
       ]);
-      // Tag filter (AND: food must have all tagCodes).
-      let items = rows.map((r) => mapFoodRow(r, {
+      const items = rows.map((r) => mapFoodRow(r, {
         category: r.category_id ? catMap.get(r.category_id) : null,
         tags: tagMap.get(r.id) ?? [],
         image: imageMap.get(r.id) ?? null,
       }));
-      if (Array.isArray(tagCodes) && tagCodes.length) {
-        const wanted = new Set(tagCodes);
-        items = items.filter((f) => wanted.size === 0 || wanted.size <= f.tags.length && f.tags.some((t) => wanted.has(t.code)));
-      }
       const total = regionalTotal ?? Number(result.count ?? items.length);
       return {
         items,

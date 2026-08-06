@@ -31,13 +31,23 @@ function validateInsight(value) {
   const content = typeof value.content === "string" ? value.content.trim() : "";
   if (!headline || headline.length > 28 || !content || content.length > 180 || forbiddenPresentationWording.test(`${headline}\n${content}`)) return null;
   if (value.source !== "hunyuan-exp" || typeof value.model !== "string" || !value.model.trim()) return null;
-  return { headline, content, source: value.source, model: value.model.trim() };
+  return {
+    headline,
+    content,
+    source: value.source,
+    model: value.model.trim(),
+    usage: value.usage && typeof value.usage === "object" ? value.usage : null,
+  };
 }
 
 function validateWorkerMetadata(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   if (value.source !== "hunyuan-exp" || typeof value.model !== "string" || !value.model.trim()) return null;
-  return { source: value.source, model: value.model.trim() };
+  return {
+    source: value.source,
+    model: value.model.trim(),
+    usage: value.usage && typeof value.usage === "object" ? value.usage : null,
+  };
 }
 
 function validateDailyInsight(value) {

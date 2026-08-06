@@ -7,7 +7,8 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const medicalRiskPattern = /疾病|诊断|治疗|药物|吃药|处方|孕产|怀孕|哺乳|未成年|进食障碍|厌食|暴食/i;
 const urgentRiskPattern = /自杀|昏厥|胸痛|呼吸困难|严重过敏|急诊|急救/i;
-const nutritionScopePattern = /营养|营养素|营养成分|营养价值|健康成分|好处|益处|饮食|食谱|食物|吃|喝|餐|蛋白|热量|卡路里|碳水|脂肪|纤维|膳食纤维|维生素|矿物质|微量元素|抗氧化|蔬菜|水果|主食|食材|加餐|早餐|午餐|晚餐|增肌|减脂|体重|饱腹|恢复|训练|运动|今日进度/i;
+const nutritionScopePattern = /营养|营养素|营养成分|营养价值|健康成分|好处|益处|饮食|食谱|食物|吃|喝|餐|蛋白|热量|卡路里|碳水|脂肪|纤维|膳食纤维|维生素|矿物质|微量元素|抗氧化|蔬菜|水果|主食|食材|加餐|早餐|午餐|晚餐|增肌|减脂|体重|饱腹|恢复|训练|运动|今日进度|适不适合|能不能吃|可以吃吗|热量高|多少蛋白|多少卡|鸡胸|猪肉|牛肉|羊肉|排骨|鱼肉|三文鱼|虾|鸡蛋|牛奶|酸奶|奶酪|豆腐|豆浆|米饭|面条|燕麦|蓝莓|草莓|苹果|香蕉|橙子|葡萄|西瓜|番茄|西红柿|西兰花|菠菜|黄瓜|土豆|红薯|坚果|杏仁|核桃|花生|面包|馒头|包子|饺子|沙拉|粥|咖啡|绿茶|果汁|藜麦|玉米|紫菜|海带|木耳|蘑菇|茄子|青椒|胡萝卜|芹菜|生菜|豆芽|黑豆|红豆|绿豆|鸡腿|鸭肉|鹅肉|蟹|贝|酸奶油|黄油|橄榄油|牛油果|猕猴桃|樱桃|芒果|火龙果|梨|桃子|李子|柚子|柠檬|椰子|芝麻|瓜子|腰果|开心果|鹰嘴豆|扁豆|毛豆|四季豆|秋葵|芦笋|花菜|卷心菜|大白菜|小白菜|油麦菜|空心菜|海带结|紫薯|山药|芋头|南瓜|冬瓜|丝瓜|苦瓜|藕|萝卜|洋葱|大蒜|生姜|香菇|金针菇|杏鲍菇|平菇|金枪鱼|带鱼|鲈鱼|鳕鱼|虾仁|扇贝|蛤蜊|鱿鱼|墨鱼|皮蛋|鸭蛋|鹌鹑蛋|羊奶|豆干|腐竹|油条|全麦|意面|方便面|粉丝|米粉|年糕|粽子|馄饨|烧麦|寿司|三明治|汉堡|披萨|薯条|炸鸡|烤肉|火锅|麻辣烫|冒菜|凉皮|凉面|拌面|盖浇饭|盒饭|便当|外卖|零食|坚果包|能量棒|蛋白粉|乳清|胶原|益生菌/i;
+const foodFollowUpPattern = /(?:呢|怎么样|如何|可以吗|适合吗|行吗|好吗|怎样)[？?]?$/;
 const foodNutrientQuestionPattern = /富含|含有|营养素|营养成分|营养价值|健康成分|好处|益处|维生素|矿物质|微量元素|抗氧化|膳食纤维/i;
 const unsafeStreamTextPattern = /诊断|治疗|处方|药物|用药|孕期|怀孕|哺乳|厌食|暴食/i;
 const streamPresentationPattern = /```|[`*#]|^\s*(?:回复|答复|回答|建议|说明)\s*[:：]/m;
@@ -136,13 +137,22 @@ function isNutritionQuestion(prompt) {
   return nutritionScopePattern.test(prompt);
 }
 
-function isNutritionFollowUp(prompt, history) {
+function looksLikeFoodFollowUp(prompt) {
   const text = typeof prompt === "string" ? prompt.trim() : "";
-  if (!text || text.length > 20 || !/(?:呢|怎么样|如何|可以吗)[？?]?$/.test(text)) return false;
-  const priorUserMessage = [...(Array.isArray(history) ? history : [])]
+  return Boolean(text && text.length <= 24 && foodFollowUpPattern.test(text));
+}
+
+function isNutritionFollowUp(prompt, history) {
+  if (!looksLikeFoodFollowUp(prompt)) return false;
+  const recentUsers = [...(Array.isArray(history) ? history : [])]
     .reverse()
-    .find((message) => message?.role === "user" && typeof message.content === "string");
-  return Boolean(priorUserMessage && isNutritionQuestion(priorUserMessage.content));
+    .filter((message) => message?.role === "user" && typeof message.content === "string")
+    .slice(0, 8);
+  for (const message of recentUsers) {
+    if (isNutritionQuestion(message.content)) return true;
+    if (!looksLikeFoodFollowUp(message.content)) return false;
+  }
+  return false;
 }
 
 function isFoodNutrientQuestion(prompt) {
@@ -263,7 +273,7 @@ function quickPromptsForContext(context) {
   return mergeQuickPrompts(preferred, fallback);
 }
 
-function createRuleReply(prompt, context) {
+function createRuleReply(prompt, context, options = {}) {
   const safety = safetyForPrompt(prompt);
   if (safety !== "none") {
     const urgent = safety === "urgent_care";
@@ -276,12 +286,13 @@ function createRuleReply(prompt, context) {
     };
   }
 
-  if (!isNutritionQuestion(prompt)) {
+  const inScope = options.inScope === true || isNutritionQuestion(prompt);
+  if (!inScope) {
     return {
       priority: "regularity",
-      headline: "我只提供日常营养建议",
-      actions: [{ label: "可以这样问", detail: "请咨询营养、饮食、食谱或训练恢复相关问题，例如：晚餐怎么补蛋白？" }],
-      rationale: "为了让建议保持准确、安全和可执行，我不会回答与日常营养无关的话题。",
+      headline: "我更擅长日常饮食建议",
+      actions: [{ label: "可以这样问", detail: "例如：蓝莓营养怎么样？晚餐怎么补蛋白？某样食物适不适合加餐？" }],
+      rationale: "聊聊具体食物、餐次搭配或今日营养进度，我能结合你的记录给出更实用的建议。",
       safety: "none",
     };
   }
@@ -523,16 +534,23 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     const userMessage = await createUserMessage(userId, conversationId, request);
     const questionInScope = isNutritionQuestion(request.prompt) || isNutritionFollowUp(request.prompt, history);
     let source = "rule_v2";
-    let reply = createRuleReply(request.prompt, context);
+    let reply = createRuleReply(request.prompt, context, { inScope: questionInScope });
+    let usage = null;
+    let usedModel = null;
     if (reply.safety === "none" && questionInScope && typeof answer === "function") {
       try {
-        reply = await answer({ prompt: request.prompt, context, history });
+        const answered = await answer({ prompt: request.prompt, context, history });
+        usage = answered?.usage || null;
+        usedModel = typeof answered?.model === "string" ? answered.model : null;
+        const { usage: _usage, model: _model, ...cleanReply } = answered && typeof answered === "object" ? answered : { ...answered };
+        reply = cleanReply;
         source = "deepseek";
       } catch {
         // The deterministic reply remains available if the optional provider is unavailable.
       }
     }
-    return persistResponse({ userId, conversationId, userMessage, request, context, reply, source, dailyUsage });
+    const persisted = await persistResponse({ userId, conversationId, userMessage, request, context, reply, source, dailyUsage });
+    return { ...persisted, usage, model: usedModel || (source === "deepseek" ? model : null) };
   }
 
   async function* streamMessage(userId, input) {
@@ -547,7 +565,9 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     const conversationId = await getConversation(userId);
     const [context, history] = await Promise.all([buildContext(userId, request.date), getMessages(userId, 10)]);
     const userMessage = await createUserMessage(userId, conversationId, request);
-    const fallback = createRuleReply(request.prompt, context);
+    const fallback = createRuleReply(request.prompt, context, {
+      inScope: isNutritionQuestion(request.prompt) || isNutritionFollowUp(request.prompt, history),
+    });
     const questionInScope = isNutritionQuestion(request.prompt) || isNutritionFollowUp(request.prompt, history);
     if (fallback.safety !== "none" || !questionInScope || typeof streamAnswer !== "function") {
       yield { type: "complete", ...await persistResponse({ userId, conversationId, userMessage, request, context, reply: fallback, source: "rule_v2", dailyUsage }) };
@@ -556,8 +576,16 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
 
     let content = "";
     let pending = "";
+    let usage = null;
+    let usedModel = null;
     try {
       for await (const chunk of streamAnswer({ prompt: request.prompt, context, history })) {
+        if (chunk && typeof chunk === "object" && chunk.type === "usage") {
+          usage = chunk.usage || null;
+          usedModel = typeof chunk.model === "string" ? chunk.model : usedModel;
+          continue;
+        }
+        if (typeof chunk !== "string") continue;
         pending += chunk;
         const sentence = takeCompleteSentences(pending);
         pending = sentence.rest;
@@ -583,7 +611,12 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
         content,
         dailyUsage,
       });
-      yield { type: "complete", ...result };
+      yield {
+        type: "complete",
+        ...result,
+        usage,
+        model: usedModel || model,
+      };
     } catch {
       yield { type: "complete", ...await persistResponse({ userId, conversationId, userMessage, request, context, reply: fallback, source: "rule_v2", dailyUsage }) };
     }
@@ -687,7 +720,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     if (persisted.error) throw new Error("Coach daily tip cache write failed");
   }
 
-  return { getMessages, sendMessage, streamMessage, getBrief, restartConversation, getDailyTip };
+  return { getMessages, sendMessage, streamMessage, getBrief, restartConversation, getDailyTip, getDailyUsage };
 }
 
 module.exports = {
@@ -697,6 +730,8 @@ module.exports = {
   createCoachDataService,
   createContext,
   createRuleReply,
+  isNutritionFollowUp,
+  isNutritionQuestion,
   proteinFoodSuggestions,
   quickPromptsForContext,
 };

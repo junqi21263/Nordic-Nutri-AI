@@ -171,7 +171,7 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
       try {
         let generated;
         try {
-          generated = await generate({ date, context });
+          generated = await generate({ date, context, userId });
         } catch {
           return;
         }
@@ -212,7 +212,7 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
 
     let generated;
     try {
-      generated = await generate({ date, context });
+      generated = await generate({ date, context, userId });
     } catch {
       generated = { ...createRuleInsight(context), source: "rule_v3", model: null };
     }
@@ -288,7 +288,7 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
 
     let insight = createFallbackWeeklyReview(context);
     if (shouldGenerateWeeklyAi(context) && typeof generateWeeklyReview === "function") {
-      try { insight = await generateWeeklyReview({ date: endDate, context }); } catch {}
+      try { insight = await generateWeeklyReview({ date: endDate, context, userId }); } catch {}
     }
     const provider = insight?.source === "deepseek" ? "deepseek" : "rule_v1";
     const payload = {

@@ -68,7 +68,8 @@ export default function AnalysisResultPage() {
       mealType: meal.mealType,
       favorite: false,
       imageKey: meal.imageKey,
-      imageUrl: meal.imagePath || meal.imageUrl || scanner.previewPath || null,
+      // Only durable refs — local wxfile preview is not restorable after save.
+      imageUrl: meal.imagePath || meal.imageUrl || null,
       items: adjusted.items,
       insight: meal.insight,
     };

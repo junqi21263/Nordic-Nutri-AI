@@ -1,14 +1,14 @@
-const chinaHourFormatter = new Intl.DateTimeFormat("en-GB", {
-  hour: "2-digit",
-  hourCycle: "h23",
-  timeZone: "Asia/Shanghai",
-});
+/** Asia/Shanghai is fixed UTC+8 (no DST). Avoid `Intl` — missing on many WeChat runtimes. */
+function getShanghaiHour(date: Date): number {
+  const shanghai = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  return shanghai.getUTCHours();
+}
 
 export function getCoachGreeting(serverTime: string | null): string {
   if (!serverTime) return "你好";
   const date = new Date(serverTime);
   if (Number.isNaN(date.getTime())) return "你好";
-  const hour = Number(chinaHourFormatter.format(date));
+  const hour = getShanghaiHour(date);
   if (hour >= 5 && hour < 11) return "上午好";
   if (hour < 14) return "中午好";
   if (hour < 18) return "下午好";

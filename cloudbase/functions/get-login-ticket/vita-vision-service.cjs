@@ -42,6 +42,7 @@ function validateResult(payload) {
 function createVitaRequestCompletion({ apiKey, model, fetchImpl = globalThis.fetch }) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("VITA configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
+  const { extractContentAndUsage } = require("./model-usage.cjs");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "vita-video-3.0";
   return async ({ imageUrl }) => {
     const controller = new AbortController();
@@ -65,7 +66,8 @@ function createVitaRequestCompletion({ apiKey, model, fetchImpl = globalThis.fet
       });
       if (!response.ok) throw new PublicVisionError("VISION_RETRYABLE");
       const data = await response.json();
-      return data?.choices?.[0]?.message?.content;
+      const parsed = extractContentAndUsage(data);
+      return { content: parsed.content, usage: parsed.usage, model: selectedModel };
     } catch (error) {
       if (error instanceof PublicVisionError) throw error;
       throw new PublicVisionError("VISION_RETRYABLE");
@@ -76,12 +78,16 @@ function createVitaRequestCompletion({ apiKey, model, fetchImpl = globalThis.fet
 }
 
 function createVitaVisionService({ apiKey, model, requestCompletion, fetchImpl } = {}) {
-  const complete = requestCompletion ?? createVitaRequestCompletion({ apiKey, model, fetchImpl });
+  const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "vita-video-3.0";
+  const complete = requestCompletion ?? createVitaRequestCompletion({ apiKey, model: selectedModel, fetchImpl });
   return async (input) => {
     if (typeof input?.imageUrl !== "string" || !/^https:\/\//i.test(input.imageUrl) || input.imageUrl.length > 2048) {
       throw new PublicVisionError("VISION_IMAGE_INVALID", "图片无效");
     }
-    return validateResult(await complete({ imageUrl: input.imageUrl }));
+    const raw = await complete({ imageUrl: input.imageUrl });
+    const content = typeof raw === "string" ? raw : raw?.content;
+    const usage = typeof raw === "object" && raw ? raw.usage : null;
+    return { ...validateResult(content), provider: "vita", model: selectedModel, usage };
   };
 }
 

@@ -18,6 +18,7 @@ export interface PortionDraftStore {
   multiplier: number;
   start: (meal: ScannerMealFixture) => void;
   startMealEdit: (meal: Meal) => void;
+  setMealType: (mealType: Meal["mealType"]) => void;
   setMultiplier: (multiplier: number) => void;
   adjustBy: (delta: number) => void;
   getAdjusted: () => ReturnType<typeof getAdjustedAnalysis> | null;
@@ -31,6 +32,8 @@ export const createPortionDraftStore = () =>
     start: (meal) => set({ meal, editingMealId: null, multiplier: 1 }),
     startMealEdit: (meal) =>
       set({ meal: toScannerFixture(meal), editingMealId: meal.id, multiplier: 1 }),
+    setMealType: (mealType) =>
+      set((state) => (state.meal ? { meal: { ...state.meal, mealType } } : state)),
     setMultiplier: (multiplier) => set({ multiplier: Math.min(2, Math.max(0.25, multiplier)) }),
     adjustBy: (delta) =>
       set((state) => ({ multiplier: Math.min(2, Math.max(0.25, state.multiplier + delta)) })),

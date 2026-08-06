@@ -3,6 +3,8 @@
  * Generates a short Chinese evaluation headline for a recognized meal.
  */
 
+const { extractContentAndUsage } = require("./model-usage.cjs");
+
 function createDeepseekEvaluationService({ apiKey, model, fetchImpl = globalThis.fetch } = {}) {
   if (typeof apiKey !== "string" || !apiKey.trim()) return null;
   if (typeof fetchImpl !== "function") return null;
@@ -32,10 +34,11 @@ function createDeepseekEvaluationService({ apiKey, model, fetchImpl = globalThis
       });
       if (!response.ok) return null;
       const data = await response.json();
-      const content = data?.choices?.[0]?.message?.content;
-      if (typeof content !== "string") return null;
-      const evaluation = content.trim().replace(/^["'""]|["'""]$/g, "").slice(0, 20);
-      return evaluation || null;
+      const parsed = extractContentAndUsage(data);
+      if (typeof parsed.content !== "string") return null;
+      const evaluation = parsed.content.trim().replace(/^["'""]|["'""]$/g, "").slice(0, 20);
+      if (!evaluation) return null;
+      return { evaluation, usage: parsed.usage, model: selectedModel };
     } catch {
       return null;
     } finally {

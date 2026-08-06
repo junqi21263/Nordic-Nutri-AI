@@ -45,7 +45,17 @@ test("attaches DeepSeek evaluation when evaluateMeal is provided", async () => {
 });
 
 test("falls back to local evaluation and omits data-URL imageUrl", async () => {
-  const db = { from() { return { insert() { return { select: () => ({ single: async () => ({ data: { id: "a-1" }, error: null }) }) }; } }; } };
+  const writes = [];
+  const db = {
+    from(table) {
+      return {
+        insert(payload) {
+          writes.push({ table, payload });
+          return { select: () => ({ single: async () => ({ data: { id: "a-1", ...payload }, error: null }) }) };
+        },
+      };
+    },
+  };
   const service = createVisionDataService({
     db,
     uploadImage: async () => ({ cloudPath: null, imageUrl: "data:image/jpeg;base64,/9j/aa" }),
@@ -61,28 +71,71 @@ test("falls back to local evaluation and omits data-URL imageUrl", async () => {
 
   assert.equal(result.evaluation, "这餐吃得不错");
   assert.equal(result.imageUrl, null);
+  assert.equal(result.imagePath, null);
+  assert.equal(writes.some((write) => write.table === "uploaded_assets"), false);
+  assert.equal(writes.find((write) => write.table === "ai_analysis")?.payload.image_path, null);
 });
 
-test("accepts GIF and WebP content types", async () => {
+test("accepts WebP content type and rejects GIF", async () => {
   const db = { from() { return { insert() { return { select: () => ({ single: async () => ({ data: { id: "a-1" }, error: null }) }) }; } }; } };
   const service = createVisionDataService({
     db,
-    uploadImage: async () => ({ cloudPath: "x.gif", imageUrl: "https://example.com/x.gif" }),
+    uploadImage: async () => ({ cloudPath: "cloud://env/x.webp", imageUrl: "https://example.com/x.webp" }),
     analyze: async () => ({ mealName: "test", mealType: "snack", confidence: 0.8, advice: "ok", items: [{ name: "x", quantityG: 50, caloriesPer100g: 100, proteinPer100g: 5, carbsPer100g: 20, fatPer100g: 2 }] }),
   });
 
   const result = await service.analyzeImage("user-1", {
     clientRequestId: "11111111-1111-4111-8111-111111111111",
-    contentType: "image/gif",
-    imageBase64: Buffer.from("GIF89a").toString("base64"),
+    contentType: "image/webp",
+    imageBase64: Buffer.from("RIFF....WEBP").toString("base64"),
   });
-
   assert.equal(result.mealName, "test");
+
+  await assert.rejects(
+    () => service.analyzeImage("user-1", {
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      contentType: "image/gif",
+      imageBase64: Buffer.from("GIF89a").toString("base64"),
+    }),
+    (error) => error.code === "VISION_IMAGE_INVALID",
+  );
 });
 
 test("fails explicitly when a visual provider is not configured", async () => {
   const service = createVisionDataService({ db: { from() {} }, uploadImage: async () => ({}), analyze: null });
   await assert.rejects(() => service.analyzeImage("user-1", {}), (error) => error.code === "VISION_SERVICE_NOT_CONFIGURED");
+});
+
+test("skips upload and analyze when assertImageSafe rejects", async () => {
+  let uploaded = 0;
+  let analyzed = 0;
+  const service = createVisionDataService({
+    db: { from() { return { insert() { return { select: () => ({ single: async () => ({ data: { id: "a-1" }, error: null }) }) }; } }; } },
+    uploadImage: async () => {
+      uploaded += 1;
+      return { cloudPath: "x.jpg", imageUrl: "https://example.com/x.jpg" };
+    },
+    analyze: async () => {
+      analyzed += 1;
+      return { mealName: "x", mealType: "lunch", confidence: 0.9, advice: "ok", items: [] };
+    },
+    assertImageSafe: async () => {
+      const error = new Error("图片含有违规内容，请更换后重试");
+      error.code = "VISION_CONTENT_BLOCKED";
+      throw error;
+    },
+  });
+
+  await assert.rejects(
+    () => service.analyzeImage("user-1", {
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      contentType: "image/jpeg",
+      imageBase64: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString("base64"),
+    }),
+    (error) => error.code === "VISION_CONTENT_BLOCKED",
+  );
+  assert.equal(uploaded, 0);
+  assert.equal(analyzed, 0);
 });
 
 test("backfills per-100g nutrition from USDA catalog when backfillNutrition is provided", async () => {

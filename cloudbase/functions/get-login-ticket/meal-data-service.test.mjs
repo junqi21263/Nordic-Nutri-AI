@@ -7,6 +7,8 @@ test("rejects oversized HTTPS temp URLs for image_path storage", () => {
   assert.equal(normalizeStoredImagePath("cloud://env/food-images/a.jpg"), "cloud://env/food-images/a.jpg");
   assert.equal(normalizeStoredImagePath(`https://example.com/${"x".repeat(500)}`), null);
   assert.equal(normalizeStoredImagePath("https://cdn.example.com/meal.jpg"), "https://cdn.example.com/meal.jpg");
+  assert.equal(normalizeStoredImagePath("wxfile://tmp_abc.jpg"), null);
+  assert.equal(normalizeStoredImagePath("http://tmp/local.jpg"), null);
 });
 
 function createDb({ meals = [], items = [] } = {}) {

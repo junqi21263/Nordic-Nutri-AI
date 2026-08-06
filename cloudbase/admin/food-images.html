@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <title>Nordic Nutri · 管理后台</title>
-  <!-- admin-ui-build: 2026-08-03-regen-v2 -->
+  <!-- admin-ui-build: 2026-08-05-ops-v7 -->
   <style>
     :root {
       --ink: #173d2a;
@@ -216,6 +216,33 @@
     .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
     .stat { padding: 10px; border-radius: 9px; background: var(--paper); color: var(--muted); font-size: 11px; }
     .stat b { display: block; margin-top: 3px; color: var(--ink); font-size: 19px; }
+    .ops-overview-stats { display: flex; gap: 7px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 2px; }
+    .ops-patrol-card { margin-bottom: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
+    .ops-patrol-card__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 11px; }
+    .ops-patrol-card__head h3 { font-family: inherit; font-size: 14px; }
+    .ops-table-block { margin-bottom: 16px; }
+    .ops-table-block h3 { margin-bottom: 8px; font-size: 14px; }
+    .ops-chart { min-height: 180px; padding: 4px 0; position: relative; }
+    .ops-chart svg { display: block; width: 100%; max-width: none; height: auto; }
+    .ops-chart-tip { position: absolute; z-index: 3; pointer-events: none; padding: 6px 8px; border-radius: 8px; background: rgba(20,24,28,.92); color: #fff; font-size: 11px; white-space: nowrap; transform: translate(-50%, -120%); }
+    .quota-model-board { display: grid; gap: 12px; margin-bottom: 18px; }
+    .quota-model-section { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
+    .quota-model-section__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; cursor: pointer; user-select: none; }
+    .quota-model-section__title { margin: 0; font-size: 15px; font-weight: 800; color: var(--ink); font-family: "SFMono-Regular", Consolas, monospace; }
+    .quota-model-section__title:hover { color: var(--green); }
+    .quota-model-section__meta { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .quota-model-section__chevron { flex: 0 0 auto; margin-top: 2px; color: var(--muted); font-size: 12px; transition: transform .18s ease; }
+    .quota-model-section.is-open .quota-model-section__chevron { transform: rotate(90deg); }
+    .quota-model-cards { display: none; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .quota-model-section.is-open .quota-model-cards { display: grid; }
+    .quota-model-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px 14px 10px; background: #f7f8f4; color: var(--ink); box-shadow: none; }
+    .quota-model-card__label { margin: 0; font-size: 12px; color: var(--muted); font-weight: 700; }
+    .quota-model-card__total { margin: 4px 0 8px; font-size: 28px; font-weight: 800; color: var(--ink); letter-spacing: -.02em; }
+    .quota-model-card .ops-chart { min-height: 170px; }
+    .quota-model-link { color: var(--ink); text-decoration: none; border: 0; background: transparent; padding: 0; cursor: pointer; border-bottom: 1px dashed transparent; font: inherit; }
+    .quota-model-link:hover { color: var(--green); border-bottom-color: var(--green); }
+    .quota-model-link code { font: inherit; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+    @media (max-width: 900px) { .quota-model-cards { grid-template-columns: 1fr; } }
     .admin-layout { max-width: 1540px; margin: 0 auto; display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: start; }
     .admin-nav { position: sticky; top: 16px; display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
     .admin-nav__item { border: 1px solid transparent; border-radius: 10px; padding: 10px 12px; background: transparent; color: var(--ink); font-size: 13px; font-weight: 700; text-align: left; }
@@ -227,11 +254,42 @@
     .module-toolbar input, .module-toolbar select { height: 40px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; background: var(--paper); color: var(--text); min-width: 180px; }
     .data-table { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
     .data-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .data-table th, .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-    .data-table th { background: var(--linen); color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .data-table th, .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+    .data-table th { background: var(--linen); color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
     .data-table tr:last-child td { border-bottom: 0; }
     .data-table select { height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: var(--paper); font-size: 12px; }
     .data-table code { font: 11px/1.4 "SFMono-Regular", Consolas, monospace; word-break: break-all; }
+    .user-image-thumb {
+      display: block; width: 56px; height: 56px; padding: 0; border: 1px solid var(--line);
+      border-radius: 10px; overflow: hidden; background: var(--linen); cursor: zoom-in;
+    }
+    .user-image-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .user-image-thumb:disabled { cursor: default; opacity: .72; }
+    .user-image-thumb__empty {
+      display: grid; place-items: center; width: 100%; height: 100%; color: var(--muted);
+      font-size: 10px; text-align: center; padding: 4px; line-height: 1.2;
+    }
+    .user-image-protect { color: var(--danger); font-size: 12px; margin-top: 4px; }
+    .user-image-lightbox { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 18px; }
+    .user-image-lightbox[hidden] { display: none !important; }
+    .user-image-lightbox__backdrop { position: absolute; inset: 0; border: 0; padding: 0; background: rgba(17, 24, 20, .72); cursor: pointer; }
+    .user-image-lightbox__panel {
+      position: relative; z-index: 1; width: min(920px, 100%); max-height: min(90vh, 880px);
+      display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 16px;
+      background: var(--paper); box-shadow: 0 28px 56px rgba(23, 61, 42, .28);
+    }
+    .user-image-lightbox__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .user-image-lightbox__title { font-size: 16px; font-weight: 700; color: var(--ink); }
+    .user-image-lightbox__meta { margin-top: 4px; color: var(--muted); font-size: 12px; word-break: break-all; }
+    .user-image-lightbox__close {
+      flex: 0 0 auto; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 10px;
+      background: var(--linen); color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer;
+    }
+    .user-image-lightbox__figure {
+      margin: 0; overflow: auto; max-height: min(72vh, 720px); border-radius: 12px; background: #111;
+      display: grid; place-items: center;
+    }
+    .user-image-lightbox__figure img { max-width: 100%; max-height: min(72vh, 720px); object-fit: contain; display: block; }
     .admin-main .workflow-guide, .admin-main .utility-drawer, .admin-main .composer-deck, .admin-main .batch-controller, .admin-main .ops-workspace { max-width: none; margin-left: 0; margin-right: 0; }
     .food-admin-bulk { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--mist); }
     .food-admin-bulk[hidden] { display: none !important; }
@@ -305,7 +363,7 @@
       .header-actions { justify-content: flex-end; }
       h1 { font-size: 20px; }
       .admin-layout { grid-template-columns: 1fr; }
-      .admin-nav { position: static; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .admin-nav { position: static; grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .food-admin-editor__grid { grid-template-columns: 1fr; }
       .food-admin-editor__grid label.span-2 { grid-column: auto; }
       .composer-card, .batch-controller { padding: 15px; }
@@ -355,6 +413,10 @@
         <button type="button" class="admin-nav__item" data-module="feedback">问题反馈</button>
         <button type="button" class="admin-nav__item" data-module="foods">食材管理</button>
         <button type="button" class="admin-nav__item active" data-module="images">食材生图</button>
+        <button type="button" class="admin-nav__item" data-module="ops">运营总览</button>
+        <button type="button" class="admin-nav__item" data-module="quota">额度管理</button>
+        <button type="button" class="admin-nav__item" data-module="user-images">用户图片</button>
+        <button type="button" class="admin-nav__item" data-module="moderation">内容安全</button>
         <button type="button" class="admin-nav__item" data-module="system">系统配置</button>
       </nav>
 
@@ -417,7 +479,7 @@
         <section id="moduleImages" class="admin-module">
           <details id="workflowGuide" class="workflow-guide">
             <summary>操作流程与状态说明</summary>
-            <div class="workflow-steps"><div class="workflow-step"><b>1. 连接后台</b><span>进入页面前先用帐号密码登录。</span></div><div class="workflow-step"><b>2. 选择视觉状态</b><span>默认按食物自动判断；仅外观不同才选生鲜、熟制等。</span></div><div class="workflow-step"><b>3. 预览选材</b><span>点击食材可取消或恢复本批生成范围。</span></div><div class="workflow-step"><b>4. 创建、启动、审核</b><span>候选图可单张或批量通过并设为该视觉状态主图。</span></div><div class="workflow-step"><b>5. 处理异常</b><span>拒绝理由会写入提示词并立即重试。</span></div></div>
+            <div class="workflow-steps"><div class="workflow-step"><b>1. 自动巡检</b><span>选分类 → 添加规则或点「立即巡检」；云端自动建批生图。</span></div><div class="workflow-step"><b>2. 审核候选图</b><span>在下方队列通过/拒绝；拒绝会自动重试。</span></div><div class="workflow-step"><b>3. 必要时手工建批</b><span>展开「手工建批」预览选材后一键创建并启动。</span></div></div>
           </details>
 
           <div class="composer-deck" aria-label="生图批次配置">
@@ -426,7 +488,7 @@
                 <div class="composer-card__copy">
                   <p class="eyebrow">Auto patrol</p>
                   <h2>分类自动巡检</h2>
-                  <p class="muted">设置分类、每批数量与巡检间隔后，云端按间隔自动建批生图；跳过已有通过主图的食物。日上限 500 张，你只需统一审核。</p>
+                  <p class="muted">推荐路径：选分类 → 添加规则（或立即巡检）→ 下方审核。日上限 500，已有主图会自动跳过。</p>
                 </div>
                 <div id="patrolQuotaNote" class="composer-quota" aria-live="polite"><b>今日额度</b>—</div>
               </div>
@@ -444,21 +506,21 @@
               <div id="patrolRulesPanel" class="composer-rules" aria-live="polite"><p class="muted">连接后台后显示巡检规则。</p></div>
             </section>
 
-            <section class="batch-controller composer-card" aria-label="创建图片批次">
-              <div class="composer-card__head">
+            <details class="batch-controller composer-card" aria-label="手工创建图片批次">
+              <summary class="composer-card__head" style="cursor:pointer;list-style:none">
                 <div class="composer-card__copy">
-                  <p class="eyebrow">Batch composer</p>
-                  <h2>按分类创建图片批次</h2>
-                  <p class="muted">营养版本不重复生图。默认按食物判断主视觉；外观明显不同时再选额外视觉状态。每次最多 100 条。</p>
+                  <p class="eyebrow">Manual batch</p>
+                  <h2>手工建批（可选）</h2>
+                  <p class="muted">大多数情况用上面的自动巡检即可。需要指定数量或视觉状态时再展开。</p>
                 </div>
-              </div>
-              <div class="composer-form composer-form--with-actions">
+              </summary>
+              <div class="composer-form composer-form--with-actions" style="margin-top:12px">
                 <label class="batch-control-field" for="batchCategory">食物分类<select id="batchCategory"><option value="">连接后台后加载分类</option></select></label>
                 <label class="batch-control-field" for="visualProfileKey">视觉状态<select id="visualProfileKey"><option value="auto">自动（推荐）</option><option value="raw">生鲜原料</option><option value="cooked_plain">清淡熟制</option><option value="cooked_grilled">轻烤熟制</option><option value="fresh">新鲜食材</option><option value="dry">干制原料</option></select></label>
                 <label class="batch-control-field" for="batchCountInput">生成数量<input id="batchCountInput" type="number" value="20" min="1" max="100" /></label>
                 <div class="composer-actions">
                   <button id="previewCategory" class="button secondary" type="button">预览选材</button>
-                  <button id="createCategoryBatch" class="button" type="button">创建草稿</button>
+                  <button id="createCategoryBatch" class="button" type="button">创建并启动</button>
                 </div>
               </div>
               <p id="selectionPreview" class="batch-selection-note">选择分类后可预览可生成食物数量。</p>
@@ -469,7 +531,7 @@
                 <button id="resumeBatch" class="button secondary" disabled type="button">继续</button>
                 <button id="cancelBatch" class="button secondary" disabled type="button">取消</button>
               </div>
-            </section>
+            </details>
           </div>
 
           <section class="ops-workspace" aria-label="食物图片审核工作台">
@@ -503,6 +565,114 @@
           </section>
         </section>
 
+        <section id="moduleOps" class="admin-module" hidden>
+          <div class="module-toolbar">
+            <h2>运营总览</h2>
+            <span class="muted">近 24 小时指标与巡检节奏</span>
+            <button id="refreshOps" class="button secondary" type="button">刷新</button>
+          </div>
+          <div id="opsOverviewStats" class="ops-overview-stats status-metrics"><span class="status-metric">加载中<b>…</b></span></div>
+          <section class="ops-patrol-card" aria-label="生图巡检节奏">
+            <div class="ops-patrol-card__head">
+              <div>
+                <p class="eyebrow">Patrol rhythm</p>
+                <h3>缺图与审核节奏</h3>
+              </div>
+              <button id="runOpsPatrol" class="button secondary" type="button">立即巡检一次</button>
+            </div>
+            <div id="opsPatrolMetrics" class="status-metrics">
+              <span class="status-metric">缺主图<b>—</b></span>
+              <span class="status-metric">待审核<b>—</b></span>
+              <span class="status-metric">今日额度<b>—</b></span>
+            </div>
+          </section>
+          <div class="ops-table-block">
+            <h3>账号注销审计</h3>
+            <div id="opsDeletionTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+          </div>
+        </section>
+
+        <section id="moduleQuota" class="admin-module" hidden>
+          <div class="module-toolbar">
+            <h2>额度管理</h2>
+            <span class="muted">按模型查看请求次数与 Token 趋势 · 每 15 分钟自动刷新</span>
+            <select id="quotaDaysFilter" aria-label="时间范围">
+              <option value="7">近 7 天</option>
+              <option value="14">近 14 天</option>
+              <option value="30" selected>近 30 天</option>
+            </select>
+            <button id="refreshQuota" class="button secondary" type="button">刷新</button>
+          </div>
+          <div id="quotaFeatureStats" class="ops-overview-stats status-metrics"><span class="status-metric">加载中<b>…</b></span></div>
+          <div id="quotaModelBoard" class="quota-model-board"><p class="muted">加载中…</p></div>
+          <div class="ops-table-block">
+            <h3>模型限额配置</h3>
+            <div id="quotaModelTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+            <p class="muted" style="margin-top:10px">识别日限额 10 次、10 分钟突发 3 次；教练日对话 20 次。调整需改云函数环境变量后重新部署。</p>
+          </div>
+        </section>
+
+        <section id="moduleUserImages" class="admin-module" hidden>
+          <div class="module-toolbar">
+            <h2>用户图片</h2>
+            <select id="userImageKindFilter" aria-label="图片类型">
+              <option value="all">全部</option>
+              <option value="vision">识图</option>
+              <option value="blocked">违规隔离</option>
+              <option value="avatar">自定义头像</option>
+              <option value="asset">上传资产</option>
+            </select>
+            <select id="userImageBlockedStatus" aria-label="违规状态">
+              <option value="all">违规状态·全部</option>
+              <option value="open">待处理</option>
+              <option value="reviewed">已审</option>
+              <option value="dismissed">已忽略</option>
+            </select>
+            <input id="userImageUserId" type="search" placeholder="按用户 UUID 筛选" autocomplete="off" style="min-width:220px" />
+            <button id="refreshUserImages" class="button secondary" type="button">刷新</button>
+            <button id="userImagesPrevPage" class="button secondary" type="button">上一页</button>
+            <button id="userImagesNextPage" class="button secondary" type="button">下一页</button>
+            <button id="purgeVisionImages" class="button secondary" type="button">清理过期识图</button>
+          </div>
+          <p id="userImagesPagerMeta" class="muted" style="margin:0 0 12px">连接后显示分页信息</p>
+          <div id="userImagesGrid" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+        </section>
+
+        <section id="moduleModeration" class="admin-module" hidden>
+          <div class="module-toolbar">
+            <h2>内容安全</h2>
+            <select id="moderationStatusFilter">
+              <option value="open">open</option>
+              <option value="reviewed">reviewed</option>
+              <option value="dismissed">dismissed</option>
+              <option value="all">全部</option>
+            </select>
+            <button id="refreshModeration" class="button secondary" type="button">刷新</button>
+          </div>
+          <div id="moderationSummaryStats" class="ops-overview-stats status-metrics"><span class="status-metric">加载中<b>…</b></span></div>
+          <div class="ops-table-block">
+            <h3>覆盖范围</h3>
+            <div id="moderationCoverage" class="status-metrics"><span class="status-metric">加载中<b>…</b></span></div>
+          </div>
+          <div class="ops-table-block">
+            <h3>标记趋势</h3>
+            <div id="moderationChart" class="ops-chart"><p class="muted">加载中…</p></div>
+          </div>
+          <div class="ops-table-block">
+            <h3>来源分布</h3>
+            <div id="moderationSourceTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+          </div>
+          <div class="ops-table-block">
+            <h3>高频命中词</h3>
+            <div id="moderationTermTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+          </div>
+          <div class="ops-table-block">
+            <h3>标记队列</h3>
+            <p class="muted" style="margin:0 0 12px">反馈、教练等文本命中写入此队列。用户上传图片请到「用户图片」管理（含违规隔离与识图审核）。</p>
+            <div id="moderationTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+          </div>
+        </section>
+
         <section id="moduleSystem" class="admin-module" hidden>
           <details id="utilityDrawer" class="utility-drawer" open>
             <summary>会话与诊断</summary>
@@ -516,6 +686,22 @@
       </div>
     </div>
   </main>
+  <div id="userImageLightbox" class="user-image-lightbox" hidden>
+    <button type="button" class="user-image-lightbox__backdrop" id="userImageLightboxBackdrop" aria-label="关闭大图"></button>
+    <section class="user-image-lightbox__panel" role="dialog" aria-modal="true" aria-labelledby="userImageLightboxTitle">
+      <header class="user-image-lightbox__head">
+        <div>
+          <div id="userImageLightboxTitle" class="user-image-lightbox__title">用户图片</div>
+          <p id="userImageLightboxMeta" class="user-image-lightbox__meta"></p>
+        </div>
+        <button id="userImageLightboxClose" class="user-image-lightbox__close" type="button" aria-label="关闭">×</button>
+      </header>
+      <figure class="user-image-lightbox__figure">
+        <img id="userImageLightboxImg" alt="用户上传图片大图" />
+      </figure>
+    </section>
+  </div>
+
   <div id="rejectReasonModal" class="food-admin-modal" hidden>
     <button type="button" class="food-admin-modal__backdrop" id="rejectReasonBackdrop" aria-label="关闭拒绝原因"></button>
     <section class="food-admin-modal__panel reject-modal__panel" role="dialog" aria-modal="true" aria-labelledby="rejectReasonTitle">
@@ -629,7 +815,13 @@
     $("baseUrl").value = storedCredentials.baseUrl || DEFAULT_API_BASE;
     if (storedCredentials.username) $("adminUsername").value = storedCredentials.username;
     sessionToken = storedCredentials.token || "";
-    const state = { activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, batchRailCollapsed: false };
+    const MODULE_CACHE_TTL_MS = 60_000;
+    const moduleCache = { users: null, feedback: null, foods: null };
+    function moduleCacheFresh(key) {
+      const entry = moduleCache[key];
+      return Boolean(entry && Date.now() - entry.at < MODULE_CACHE_TTL_MS);
+    }
+    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, batchRailCollapsed: false };
     try { state.batchRailCollapsed = localStorage.getItem(CREDENTIAL_KEYS.batchRailCollapsed) === "1"; } catch { /* ignore */ }
     // Same root taxonomy as mini-program food library chips (STANDARD_FOOD_CATEGORY_ROOT_CODES).
     const FOOD_LIBRARY_ROOT_CODES = ["meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables", "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples", "nordic_staples", "north_american_staples"];
@@ -669,6 +861,13 @@
       HY_IMAGE_DAILY_LIMIT: "今日生图额度已用尽，请明天再试或提高日限额",
       FORBIDDEN: "当前账号不是管理员",
       UNAUTHORIZED: "登录已失效，请重新登录后台",
+      USER_IMAGE_PROTECTED: "图片受保护，无法删除",
+      USER_IMAGE_NOT_FOUND: "图片记录不存在",
+      USER_IMAGE_USER_ID_INVALID: "用户 ID 无效",
+      RETRY_BATCH_NOT_RUNNING: "批次未在运行，已尝试恢复失败，请先点「继续」或「启动批次」",
+      RETRY_ITEM_NOT_READY: "该条目当前不可重试",
+      OPS_USER_IMAGES_FAILED: "用户图片加载失败",
+      OPS_USER_IMAGES_UNAVAILABLE: "用户图片服务未就绪",
     };
     const apiErrorMessage = (error) => {
       const code = error?.json?.code || error?.code;
@@ -676,6 +875,8 @@
       if (/bad gateway/i.test(String(raw)) || /bad gateway/i.test(String(code))) {
         return "云函数网关超时或崩溃（BAD_GATEWAY）。已优化预览查询，请刷新页面后缩小数量再试；若仍失败请查看云函数日志。";
       }
+      if (code === "OPS_USER_IMAGES_FAILED" && raw) return raw;
+      if (code === "FOOD_ADMIN_UNAVAILABLE" && raw && raw !== "FOOD_ADMIN_UNAVAILABLE") return raw;
       if (code && ADMIN_ERROR_LABELS[code]) return ADMIN_ERROR_LABELS[code];
       return raw || code || "接口请求失败";
     };
@@ -1189,7 +1390,17 @@
         const count = foodIds.length; const visualProfileKey = selectedVisualProfileKey(); const profileLabel = visualProfileLabel(visualProfileKey); const body = { foodIds, name: `${category.nameZh || category.name} · ${profileLabel} · ${count} 条`, concurrency: 2, maxAttempts: 3, visualProfileKey, selectionSource: "category", selectionMeta: { categoryId: category.id, requestedCount: state.previewRequestedCount, selectableCount: state.previewSelectableCount, previewSelectedCount: count, excludedReadyCount: state.previewExcludedReadyCount, visualProfileKey } };
         const data = await api("/food-image-batches", { method: "POST", body });
         out(data); state.activeBatchId = data.id || data.batch?.id || ""; state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; state.jobs.clear();
-        await refreshBatches(); toast("批次草稿已创建，可点击“启动批次”交由云端生成");
+        if (state.activeBatchId) {
+          try {
+            await api(`/food-image-batches/${state.activeBatchId}/start`, { method: "POST", body: {} });
+            toast("批次已创建并启动");
+          } catch (startError) {
+            toast(`草稿已创建，但启动失败：${apiErrorMessage(startError)}`, true);
+          }
+        } else {
+          toast("批次草稿已创建");
+        }
+        await refreshBatches();
       } catch (error) { out(error.json || { error: error.message }); toast(error.message, true); }
     }
     function batchItemMarkup(batch) {
@@ -1229,8 +1440,29 @@
       if (!state.activeBatchId || !state.batches.some((batch) => batch.id === state.activeBatchId)) state.activeBatchId = next?.id || "";
       renderBatches(); if (state.activeBatchId) await loadBatchDetail(); else renderQueue();
     }
-    async function selectBatch(batchId) { state.activeBatchId = batchId; state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; state.jobs.clear(); renderBatches(); await loadBatchDetail(); }
-    async function loadBatchDetail() { const data = await api(`/food-image-batches/${state.activeBatchId}?page=1&pageSize=100`); state.batchDetail = data; renderBatches(); await renderQueue(); }
+    async function selectBatch(batchId) {
+      if (!batchId || batchId === state.activeBatchId && state.batchDetail?.batch?.id === batchId) {
+        await loadBatchDetail({ soft: true });
+        return;
+      }
+      state.activeBatchId = batchId; state.selectedItemId = ""; state.selectedJobId = ""; state.selectedImageId = ""; state.jobs.clear();
+      renderBatches();
+      await loadBatchDetail();
+    }
+    function syncActiveBatchSummary(batch) {
+      if (!batch?.id) return;
+      const index = state.batches.findIndex((entry) => entry.id === batch.id);
+      if (index >= 0) state.batches[index] = { ...state.batches[index], ...batch };
+      else state.batches.unshift(batch);
+    }
+    async function loadBatchDetail({ soft = false } = {}) {
+      if (!state.activeBatchId) return;
+      const data = await api(`/food-image-batches/${state.activeBatchId}?page=1&pageSize=100`, { quiet: soft });
+      state.batchDetail = data;
+      syncActiveBatchSummary(data.batch);
+      renderBatches();
+      await renderQueue();
+    }
     function filteredItems() { const items = state.batchDetail?.items || []; return state.activeFilter === "all" ? items : items.filter((item) => item.status === state.activeFilter); }
     async function loadJobCandidates(jobId) { if (!jobId) return null; if (state.jobs.has(jobId)) return state.jobs.get(jobId); const data = await api(`/food-image-jobs/${jobId}`, { quiet: true }); state.jobs.set(jobId, data); return data; }
     async function hydrateQueue(items) { const result = new Map(); let cursor = 0; const workers = Array.from({ length: Math.min(4, items.length) }, async () => { while (cursor < items.length) { const item = items[cursor++]; if (!item.jobId) continue; try { result.set(item.jobId, await loadJobCandidates(item.jobId)); } catch { result.set(item.jobId, null); } } }); await Promise.all(workers); return result; }
@@ -1246,7 +1478,17 @@
       const batch = selectedBatch(); const items = filteredItems(); $("queueTitle").textContent = batch ? batch.name : "待审核候选图"; $("reviewCopy").textContent = batch ? `总数 ${batch.totalCount || 0} · 已完成 ${progress(batch).terminal} · 失败 ${batch.failedCount || 0}` : "连接后显示批次进度";
       renderBatchStatusPanel(); const host = $("reviewGrid"); if (!batch) { host.className = "empty-state"; host.innerHTML = "<div><strong>尚未选择批次</strong><p>连接后台后可在左侧选择一个批次。</p></div>"; syncBulkControls(); renderInspector(); return; }
       if (!items.length) { host.className = "empty-state"; host.innerHTML = `<div><strong>${state.activeFilter === "needs_review" ? "当前批次已审核完" : "没有匹配项目"}</strong><p>可切换筛选或在左侧选择其他批次。</p></div>`; syncBulkControls(); renderInspector(); return; }
-      host.className = "queue-loading"; host.textContent = "正在加载候选图…"; const jobs = await hydrateQueue(items.filter((item) => item.jobId));
+      // Progressive: paint cards first; only hydrate image jobs for review-related filters.
+      const hydrateTargets = items.filter((item) => item.jobId && (state.activeFilter === "needs_review" || state.activeFilter === "all" || item.status === "needs_review"));
+      let jobs = new Map();
+      for (const item of items) {
+        if (item.jobId && state.jobs.has(item.jobId)) jobs.set(item.jobId, state.jobs.get(item.jobId));
+      }
+      const missing = hydrateTargets.filter((item) => item.jobId && !jobs.has(item.jobId));
+      if (missing.length) {
+        host.className = "queue-loading"; host.textContent = "正在加载候选图…";
+        jobs = new Map([...jobs, ...(await hydrateQueue(missing))]);
+      }
       const queue = items.map((item) => { const job = item.jobId ? jobs.get(item.jobId) : null; const candidate = job?.candidates?.find((entry) => (entry.reviewStatus || entry.status) === "pending") || job?.candidates?.[0]; return { item, candidate }; });
       const selectableIds = queue.filter(({ item, candidate }) => item.status === "needs_review" && candidate?.id).map(({ candidate }) => candidate.id);
       host.className = "review-grid"; host.innerHTML = queue.map(({ item, candidate }) => {
@@ -1261,14 +1503,34 @@
         const retryControl = canRetry
           ? `<button class="button secondary" data-retry-item-id="${escapeHtml(item.id)}" data-retry-job-id="${escapeHtml(item.jobId || "")}" data-food-name="${escapeHtml(name)}">${retryLabel}</button>`
           : "";
-        return `<article class="food-card ${selected ? "selected" : ""}"><button class="food-card-select" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}"><span class="food-card-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" />` : "<span class=\"food-card-placeholder\">N</span>"}<span class="image-status ${statusTone(item.status)}">${statusLabel(item.status)}</span></span><span class="food-card-body"><span class="food-card-title">${escapeHtml(name)}</span><span class="food-card-meta"><span>${escapeHtml(item.visualProfileLabelZh || visualProfileLabel(item.visualProfileKey))}</span><span>${item.attemptCount || 0} 次尝试</span></span>${exception}</span></button><div class="food-card-toolbar">${selectControl}${retryControl || (selectControl ? "" : "<span></span>")}<button class="button secondary" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}">${item.jobId ? "查看详情" : "查看异常"}</button></div></article>`;
+        return `<article class="food-card ${selected ? "selected" : ""}"><button class="food-card-select" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}"><span class="food-card-image">${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" loading="lazy" decoding="async" />` : "<span class=\"food-card-placeholder\">N</span>"}<span class="image-status ${statusTone(item.status)}">${statusLabel(item.status)}</span></span><span class="food-card-body"><span class="food-card-title">${escapeHtml(name)}</span><span class="food-card-meta"><span>${escapeHtml(item.visualProfileLabelZh || visualProfileLabel(item.visualProfileKey))}</span><span>${item.attemptCount || 0} 次尝试</span></span>${exception}</span></button><div class="food-card-toolbar">${selectControl}${retryControl || (selectControl ? "" : "<span></span>")}<button class="button secondary" data-item-id="${item.id}" data-food-name="${escapeHtml(name)}">${item.jobId ? "查看详情" : "查看异常"}</button></div></article>`;
       }).join("");
       host.querySelectorAll("button[data-item-id]").forEach((button) => { button.onclick = () => selectItem(button.dataset.itemId, button.dataset.foodName); });
       host.querySelectorAll("button[data-retry-item-id]").forEach((button) => { button.onclick = (event) => { event.stopPropagation(); retryItemNow(button.dataset.retryItemId, button.dataset.foodName, button.dataset.retryJobId); }; });
       host.querySelectorAll("input[data-candidate-select]").forEach((input) => { input.onchange = () => { if (input.checked) state.selectedImageIds.add(input.dataset.candidateSelect); else state.selectedImageIds.delete(input.dataset.candidateSelect); syncBulkControls(selectableIds); }; });
       syncBulkControls(selectableIds); renderInspector();
     }
-    async function selectItem(itemId, foodName) { const item = (state.batchDetail?.items || []).find((entry) => entry.id === itemId); if (!item) return; state.selectedItemId = itemId; state.selectedFoodName = foodName || foodLabel(item); state.selectedJobId = item.jobId || ""; state.selectedImageId = ""; if (item.jobId) { const job = await loadJobCandidates(item.jobId); const candidate = job?.candidates?.find((entry) => (entry.reviewStatus || entry.status) === "pending") || job?.candidates?.[0]; state.selectedImageId = candidate?.id || ""; } await renderQueue(); renderInspector(); }
+    async function selectItem(itemId, foodName) {
+      const item = (state.batchDetail?.items || []).find((entry) => entry.id === itemId);
+      if (!item) return;
+      state.selectedItemId = itemId;
+      state.selectedFoodName = foodName || foodLabel(item);
+      state.selectedJobId = item.jobId || "";
+      state.selectedImageId = "";
+      if (item.jobId) {
+        const job = await loadJobCandidates(item.jobId);
+        const candidate = job?.candidates?.find((entry) => (entry.reviewStatus || entry.status) === "pending") || job?.candidates?.[0];
+        state.selectedImageId = candidate?.id || "";
+      }
+      // Selection should not rebuild the whole grid (was the main tab/click lag source).
+      const host = $("reviewGrid");
+      if (host) {
+        host.querySelectorAll(".food-card.selected").forEach((card) => card.classList.remove("selected"));
+        const activeBtn = [...host.querySelectorAll("button.food-card-select")].find((btn) => btn.dataset.itemId === itemId);
+        activeBtn?.closest(".food-card")?.classList.add("selected");
+      }
+      renderInspector();
+    }
     async function retryItemNow(itemId, foodName = "食物", jobId = "") {
       if (!itemId && !jobId) return;
       try {
@@ -1421,7 +1683,13 @@
           await loginAdmin();
         }
         showAdminApp();
-        await loadCategories(); await refreshBatches(); await loadPatrolRules(); saveCredentials(); await loadStats();
+        await loadCategories();
+        await Promise.all([
+          refreshBatches().catch((error) => toast(apiErrorMessage(error), true)),
+          loadPatrolRules().catch((error) => toast(apiErrorMessage(error), true)),
+          loadStats().catch((error) => toast(apiErrorMessage(error), true)),
+        ]);
+        saveCredentials();
         recordOperation({ title: "后台已登录", detail: "分类、批次、巡检与生图统计已刷新" });
         toast("后台已登录");
       } catch (error) {
@@ -1433,36 +1701,664 @@
     }
     function hasToken() { return Boolean($("baseUrl").value.trim() && sessionToken.trim()); }
     const feedbackCategoryLabel = (category) => ({ product: "产品", bug: "缺陷", feature: "功能", support: "支持" }[category] || category || "—");
-    async function loadUsers() {
+    async function loadUsers({ force = false } = {}) {
       const host = $("userTable");
       if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
+      const q = ($("userSearch").value || "").trim();
+      const cacheKey = `users:${q}`;
+      if (!force && moduleCache.users?.key === cacheKey && moduleCacheFresh("users")) {
+        host.innerHTML = moduleCache.users.html;
+        return;
+      }
       try {
-        const q = encodeURIComponent(($("userSearch").value || "").trim());
-        const data = await api(`/users?q=${q}&limit=50`);
+        const data = await api(`/users?q=${encodeURIComponent(q)}&limit=50`);
         const items = data.items || [];
-        if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">未找到匹配用户</p>"; return; }
+        if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">未找到匹配用户</p>"; moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() }; return; }
         host.innerHTML = `<table><thead><tr><th>昵称</th><th>最近登录</th><th>管理员</th><th>注册时间</th><th>用户 ID</th></tr></thead><tbody>${items.map((user) => `<tr><td>${escapeHtml(user.nickname || "—")}</td><td>${escapeHtml(formatTime(user.lastLoginAt))}</td><td>${user.isAdmin ? "是" : "否"}</td><td>${escapeHtml(formatTime(user.createdAt))}</td><td><code>${escapeHtml(user.id)}</code></td></tr>`).join("")}</tbody></table>`;
+        moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() };
       } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
     }
-    async function loadFeedback() {
+    async function loadFeedback({ force = false } = {}) {
       const host = $("feedbackTable");
       if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
-      try {
-        const status = $("feedbackStatusFilter").value;
-        const qs = status ? `?status=${encodeURIComponent(status)}&limit=50` : "?limit=50";
-        const data = await api(`/feedback${qs}`);
-        const items = data.items || [];
-        if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无反馈记录</p>"; return; }
-        const statusOptions = ["new", "reviewing", "resolved", "closed"];
-        host.innerHTML = `<table><thead><tr><th>用户</th><th>分类</th><th>内容</th><th>状态</th><th>提交时间</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.nickname || item.userId || "—")}</td><td>${escapeHtml(feedbackCategoryLabel(item.category))}</td><td>${escapeHtml(item.content)}</td><td><select data-feedback-id="${escapeHtml(item.id)}">${statusOptions.map((entry) => `<option value="${entry}" ${item.status === entry ? "selected" : ""}>${entry}</option>`).join("")}</select></td><td>${escapeHtml(formatTime(item.createdAt))}</td></tr>`).join("")}</tbody></table>`;
+      const status = $("feedbackStatusFilter").value;
+      const cacheKey = `feedback:${status}`;
+      if (!force && moduleCache.feedback?.key === cacheKey && moduleCacheFresh("feedback")) {
+        host.innerHTML = moduleCache.feedback.html;
         host.querySelectorAll("select[data-feedback-id]").forEach((select) => {
           select.onchange = async () => {
             const id = select.dataset.feedbackId; const nextStatus = select.value;
-            try { await api(`/feedback/${id}`, { method: "PATCH", body: { status: nextStatus } }); toast("反馈状态已更新"); }
-            catch (error) { toast(apiErrorMessage(error), true); loadFeedback().catch(() => {}); }
+            try { await api(`/feedback/${id}`, { method: "PATCH", body: { status: nextStatus } }); moduleCache.feedback = null; toast("反馈状态已更新"); }
+            catch (error) { toast(apiErrorMessage(error), true); loadFeedback({ force: true }).catch(() => {}); }
+          };
+        });
+        return;
+      }
+      try {
+        const qs = status ? `?status=${encodeURIComponent(status)}&limit=50` : "?limit=50";
+        const data = await api(`/feedback${qs}`);
+        const items = data.items || [];
+        if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无反馈记录</p>"; moduleCache.feedback = { key: cacheKey, html: host.innerHTML, at: Date.now() }; return; }
+        const statusOptions = ["new", "reviewing", "resolved", "closed"];
+        host.innerHTML = `<table><thead><tr><th>用户</th><th>分类</th><th>内容</th><th>状态</th><th>提交时间</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.nickname || item.userId || "—")}</td><td>${escapeHtml(feedbackCategoryLabel(item.category))}</td><td>${escapeHtml(item.content)}</td><td><select data-feedback-id="${escapeHtml(item.id)}">${statusOptions.map((entry) => `<option value="${entry}" ${item.status === entry ? "selected" : ""}>${entry}</option>`).join("")}</select></td><td>${escapeHtml(formatTime(item.createdAt))}</td></tr>`).join("")}</tbody></table>`;
+        moduleCache.feedback = { key: cacheKey, html: host.innerHTML, at: Date.now() };
+        host.querySelectorAll("select[data-feedback-id]").forEach((select) => {
+          select.onchange = async () => {
+            const id = select.dataset.feedbackId; const nextStatus = select.value;
+            try { await api(`/feedback/${id}`, { method: "PATCH", body: { status: nextStatus } }); moduleCache.feedback = null; toast("反馈状态已更新"); }
+            catch (error) { toast(apiErrorMessage(error), true); loadFeedback({ force: true }).catch(() => {}); }
           };
         });
       } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
+    }
+    function renderOpsPatrolMetrics(foodImage = {}) {
+      const host = $("opsPatrolMetrics");
+      if (!host) return;
+      host.innerHTML = [
+        ["缺主图", foodImage.missingImages ?? "—"],
+        ["待审核", foodImage.pendingReviewImages ?? "—"],
+        ["今日额度", foodImage.dailyLimit != null ? `${foodImage.dailyGenerated ?? 0}/${foodImage.dailyLimit}` : "—"],
+      ].map(([label, value]) => `<span class="status-metric">${label}<b>${escapeHtml(value)}</b></span>`).join("");
+    }
+    function renderSparkline(host, seriesPoints, { color = "#2e6046" } = {}) {
+      if (!host) return;
+      const points = Array.isArray(seriesPoints) ? seriesPoints : [];
+      const values = points.map((point) => Number(point?.value ?? point) || 0);
+      if (!values.length || values.every((value) => value === 0)) {
+        host.innerHTML = "<p class=\"muted\">暂无数据</p>";
+        return;
+      }
+      const width = 640;
+      const height = 160;
+      const pad = { top: 12, right: 12, bottom: 24, left: 36 };
+      const innerW = width - pad.left - pad.right;
+      const innerH = height - pad.top - pad.bottom;
+      const max = Math.max(...values, 1);
+      const step = values.length > 1 ? innerW / (values.length - 1) : innerW;
+      const coords = values.map((value, index) => {
+        const x = pad.left + index * step;
+        const y = pad.top + innerH - (value / max) * innerH;
+        return `${x},${y}`;
+      });
+      const linePath = coords.join(" ");
+      const lastX = pad.left + (values.length - 1) * step;
+      const areaPath = `${pad.left},${pad.top + innerH} ${linePath} ${lastX},${pad.top + innerH}`;
+      host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="趋势图"><polygon fill="${color}" fill-opacity="0.12" points="${areaPath}"/><polyline fill="none" stroke="${color}" stroke-width="2" points="${linePath}"/></svg>`;
+    }
+    function renderMultiLineChart(host, seriesMap, colors = {}) {
+      if (!host) return;
+      const entries = Object.entries(seriesMap || {}).filter(([, points]) => Array.isArray(points) && points.length);
+      if (!entries.length) {
+        host.innerHTML = "<p class=\"muted\">暂无数据</p>";
+        return;
+      }
+      const defaultColors = { vision: "#2e6046", coach: "#4a7c59", rateLimited: "#c4a962", visionFailure: "#b64a3b", ...colors };
+      const labelMap = { vision: "识别", coach: "教练", rateLimited: "限流", visionFailure: "识别失败" };
+      const allDates = [...new Set(entries.flatMap(([, points]) => points.map((point) => point.date).filter(Boolean)))].sort();
+      const allValues = entries.flatMap(([, points]) => points.map((point) => Number(point.value) || 0));
+      if (!allValues.some((value) => value > 0)) {
+        host.innerHTML = "<p class=\"muted\">暂无数据</p>";
+        return;
+      }
+      const width = 640;
+      const height = 160;
+      const pad = { top: 12, right: 12, bottom: 24, left: 36 };
+      const innerW = width - pad.left - pad.right;
+      const innerH = height - pad.top - pad.bottom;
+      const max = Math.max(...allValues, 1);
+      const step = allDates.length > 1 ? innerW / (allDates.length - 1) : innerW;
+      const lines = entries.map(([key, points]) => {
+        const byDate = Object.fromEntries(points.map((point) => [point.date, Number(point.value) || 0]));
+        const coords = allDates.map((date, index) => {
+          const x = pad.left + index * step;
+          const y = pad.top + innerH - ((byDate[date] || 0) / max) * innerH;
+          return `${x},${y}`;
+        }).join(" ");
+        const color = defaultColors[key] || "#66746c";
+        return `<polyline fill="none" stroke="${color}" stroke-width="2" points="${coords}"/>`;
+      }).join("");
+      const legend = entries.map(([key]) => {
+        const color = defaultColors[key] || "#66746c";
+        return `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:11px;color:var(--muted)"><i style="width:10px;height:2px;background:${color};display:inline-block"></i>${escapeHtml(labelMap[key] || key)}</span>`;
+      }).join("");
+      host.innerHTML = `<div style="margin-bottom:6px">${legend}</div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="多系列趋势图">${lines}</svg>`;
+    }
+    function bindModerationSelects(host, onChanged) {
+      host.querySelectorAll("select[data-moderation-id]").forEach((select) => {
+        select.onchange = async () => {
+          const id = select.dataset.moderationId;
+          const nextStatus = select.value;
+          try {
+            await api(`/ops/moderation-flags/${id}`, { method: "PATCH", body: { status: nextStatus } });
+            toast("标记状态已更新");
+            await onChanged();
+          } catch (error) {
+            toast(apiErrorMessage(error), true);
+            await onChanged();
+          }
+        };
+      });
+    }
+    async function loadOpsOverview() {
+      const statsHost = $("opsOverviewStats");
+      const deletionHost = $("opsDeletionTable");
+      if (!statsHost || !deletionHost) return;
+      statsHost.innerHTML = "<span class=\"status-metric\">加载中<b>…</b></span>";
+      deletionHost.innerHTML = "<p class=\"muted\" style=\"padding:18px\">加载中…</p>";
+      try {
+        const [overview, deletionData] = await Promise.all([
+          api("/ops/overview?hours=24"),
+          api("/ops/deletion-log?limit=50"),
+        ]);
+        const vision = overview.vision || {};
+        const cancel = overview.accountCancel || {};
+        const coach = overview.coach || {};
+        const foodImage = overview.foodImage || {};
+        const failureRatePct = vision.failureRate != null ? `${(vision.failureRate * 100).toFixed(1)}%` : "—";
+        const p95 = vision.p95Ms != null ? `${vision.p95Ms} ms` : "—";
+        statsHost.innerHTML = [
+          ["识别失败率", failureRatePct, vision.failure > 0 ? "warning" : ""],
+          ["识别 P95", p95, ""],
+          ["限流次数", overview.rateLimited ?? 0, overview.rateLimited > 0 ? "warning" : ""],
+          ["注销成功", cancel.succeeded ?? 0, ""],
+          ["注销失败", cancel.failed ?? 0, cancel.failed > 0 ? "danger" : ""],
+          ["教练限流", coach.limited ?? 0, coach.limited > 0 ? "warning" : ""],
+          ["今日生图", foodImage.dailyLimit != null ? `${foodImage.dailyGenerated ?? 0}/${foodImage.dailyLimit}` : "—", ""],
+          ["缺主图", foodImage.missingImages ?? "—", foodImage.missingImages > 0 ? "warning" : ""],
+        ].map(([label, value, tone]) => `<span class="status-metric ${tone}">${label}<b>${escapeHtml(value)}</b></span>`).join("");
+        renderOpsPatrolMetrics(foodImage);
+        const deletionItems = deletionData.items || [];
+        if (!deletionItems.length) {
+          deletionHost.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无注销审计记录</p>";
+        } else {
+          deletionHost.innerHTML = `<table><thead><tr><th>用户 ID</th><th>结果</th><th>错误码</th><th>请求 ID</th><th>时间</th></tr></thead><tbody>${deletionItems.map((item) => `<tr><td><code>${escapeHtml(item.user_id || item.userId || "—")}</code></td><td>${escapeHtml(item.outcome || "—")}</td><td>${escapeHtml(item.error_code || item.errorCode || "—")}</td><td><code>${escapeHtml(item.client_request_id || item.clientRequestId || "—")}</code></td><td>${escapeHtml(formatTime(item.created_at || item.createdAt))}</td></tr>`).join("")}</tbody></table>`;
+        }
+      } catch (error) {
+        const message = escapeHtml(apiErrorMessage(error));
+        statsHost.innerHTML = `<span class="status-metric danger">加载失败<b>—</b></span>`;
+        deletionHost.innerHTML = `<p class="muted" style="padding:18px">${message}</p>`;
+        renderOpsPatrolMetrics();
+      }
+    }
+    function formatQuotaLimit(model) {
+      const limitParts = [];
+      if (model.dailyLimit != null) limitParts.push(`日 ${model.dailyLimit}`);
+      if (model.burstLimit != null) {
+        const windowMinutes = model.burstWindowSeconds ? Math.round(model.burstWindowSeconds / 60) : 10;
+        limitParts.push(`突发 ${model.burstLimit}/${windowMinutes} 分钟`);
+      }
+      return limitParts.length ? limitParts.join(" · ") : "—";
+    }
+    function formatCompactNumber(value) {
+      const number = Number(value) || 0;
+      return number.toLocaleString("zh-CN");
+    }
+    function shortDateLabel(date) {
+      if (!date || date.length < 10) return date || "";
+      return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+    }
+    function bindChartHover(host, svg, points) {
+      if (!host || !svg || !points?.length) return;
+      let tip = host.querySelector(".ops-chart-tip");
+      if (!tip) {
+        tip = document.createElement("div");
+        tip.className = "ops-chart-tip";
+        tip.hidden = true;
+        host.appendChild(tip);
+      }
+      svg.onmousemove = (event) => {
+        const rect = svg.getBoundingClientRect();
+        const ratio = rect.width ? (event.clientX - rect.left) / rect.width : 0;
+        const index = Math.min(points.length - 1, Math.max(0, Math.round(ratio * (points.length - 1))));
+        const point = points[index];
+        tip.hidden = false;
+        tip.textContent = `${point.date}  ${point.label || "数值"} ${formatCompactNumber(point.value)}`;
+        tip.style.left = `${((index / Math.max(points.length - 1, 1)) * 100)}%`;
+        tip.style.top = "18px";
+      };
+      svg.onmouseleave = () => { tip.hidden = true; };
+    }
+    function renderAreaChart(host, seriesPoints, { color = "#4ea1ff", label = "请求次数", dark = true } = {}) {
+      if (!host) return;
+      const points = Array.isArray(seriesPoints) ? seriesPoints : [];
+      const values = points.map((point) => Number(point.value) || 0);
+      const width = 640;
+      const height = 180;
+      const pad = { top: 16, right: 14, bottom: 28, left: 42 };
+      const innerW = width - pad.left - pad.right;
+      const innerH = height - pad.top - pad.bottom;
+      const max = Math.max(...values, 1);
+      const count = Math.max(points.length, 2);
+      const step = innerW / (count - 1);
+      const coords = (points.length ? points : [{ date: "", value: 0 }, { date: "", value: 0 }]).map((point, index) => {
+        const value = Number(point.value) || 0;
+        const x = pad.left + index * step;
+        const y = pad.top + innerH - (value / max) * innerH;
+        return { x, y, value, date: point.date || "" };
+      });
+      const linePath = coords.map((point) => `${point.x},${point.y}`).join(" ");
+      const areaPath = `${pad.left},${pad.top + innerH} ${linePath} ${coords[coords.length - 1].x},${pad.top + innerH}`;
+      const grid = [0, 0.5, 1].map((ratio) => {
+        const y = pad.top + innerH * (1 - ratio);
+        const tick = Math.round(max * ratio);
+        return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="${dark ? "#2f363d" : "#d7ded5"}" stroke-width="1"/><text x="8" y="${y + 4}" fill="${dark ? "#8b949c" : "#66746c"}" font-size="10">${tick}</text>`;
+      }).join("");
+      const xLabels = [0, Math.floor((coords.length - 1) / 2), coords.length - 1]
+        .filter((value, index, arr) => arr.indexOf(value) === index)
+        .map((index) => {
+          const point = coords[index];
+          return `<text x="${point.x}" y="${height - 8}" text-anchor="middle" fill="${dark ? "#8b949c" : "#66746c"}" font-size="10">${escapeHtml(shortDateLabel(point.date))}</text>`;
+        }).join("");
+      host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(label)}">${grid}<polygon fill="${color}" fill-opacity="0.22" points="${areaPath}"/><polyline fill="none" stroke="${color}" stroke-width="2.2" points="${linePath}"/>${xLabels}</svg>`;
+      bindChartHover(host, host.querySelector("svg"), coords.map((point) => ({ date: shortDateLabel(point.date) || point.date, value: point.value, label })));
+    }
+    function renderStackedTokenChart(host, series, { dark = true } = {}) {
+      if (!host) return;
+      const points = Array.isArray(series) ? series : [];
+      const width = 640;
+      const height = 180;
+      const pad = { top: 16, right: 14, bottom: 28, left: 42 };
+      const innerW = width - pad.left - pad.right;
+      const innerH = height - pad.top - pad.bottom;
+      const totals = points.map((point) => Math.max(Number(point.value) || 0, (Number(point.input) || 0) + (Number(point.output) || 0)));
+      const max = Math.max(...totals, 1);
+      const slot = innerW / Math.max(points.length || 1, 1);
+      const barW = Math.max(3, slot * 0.55);
+      const bars = (points.length ? points : [{ date: "", input: 0, output: 0, value: 0 }]).map((point, index) => {
+        const input = Number(point.input) || 0;
+        const output = Number(point.output) || Math.max(0, (Number(point.value) || 0) - input);
+        const x = pad.left + slot * index + (slot - barW) / 2;
+        const inputH = (input / max) * innerH;
+        const outputH = (output / max) * innerH;
+        const yOutput = pad.top + innerH - outputH;
+        const yInput = yOutput - inputH;
+        return `<rect x="${x}" y="${yOutput}" width="${barW}" height="${Math.max(outputH, 0)}" fill="#3d7cff"></rect><rect x="${x}" y="${yInput}" width="${barW}" height="${Math.max(inputH, 0)}" fill="#79a7ff"></rect>`;
+      }).join("");
+      const grid = [0, 0.5, 1].map((ratio) => {
+        const y = pad.top + innerH * (1 - ratio);
+        const tick = Math.round(max * ratio);
+        return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="${dark ? "#2f363d" : "#d7ded5"}" stroke-width="1"/><text x="8" y="${y + 4}" fill="${dark ? "#8b949c" : "#66746c"}" font-size="10">${tick}</text>`;
+      }).join("");
+      const first = points[0]?.date || "";
+      const mid = points[Math.floor((points.length || 1) / 2)]?.date || "";
+      const last = points[points.length - 1]?.date || "";
+      const xLabels = [
+        [pad.left, first],
+        [pad.left + innerW / 2, mid],
+        [width - pad.right, last],
+      ].map(([x, date]) => `<text x="${x}" y="${height - 8}" text-anchor="middle" fill="${dark ? "#8b949c" : "#66746c"}" font-size="10">${escapeHtml(shortDateLabel(date))}</text>`).join("");
+      host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Tokens">${grid}${bars}${xLabels}</svg>`;
+      bindChartHover(host, host.querySelector("svg"), (points.length ? points : [{ date: "", value: 0 }]).map((point) => ({
+        date: shortDateLabel(point.date) || point.date,
+        value: Number(point.value) || ((Number(point.input) || 0) + (Number(point.output) || 0)),
+        label: "Tokens",
+      })));
+    }
+    function renderModelBoard(host, boards) {
+      if (!host) return;
+      const models = Array.isArray(boards) ? boards : [];
+      if (!models.length) {
+        host.innerHTML = "<p class=\"muted\">暂无模型配置</p>";
+        return;
+      }
+      host.innerHTML = models.map((board, index) => {
+        const features = (board.features || []).map((item) => item.featureLabel || item.feature).filter(Boolean);
+        const meta = [board.provider ? `提供商 ${board.provider}` : "", features.length ? `用于 ${features.join("、")}` : ""].filter(Boolean).join(" · ");
+        const modelKey = escapeHtml(board.model || "");
+        return `<section class="quota-model-section" data-model-board="${index}" data-model-name="${modelKey}">
+          <div class="quota-model-section__head" data-model-toggle="${index}" role="button" tabindex="0" aria-expanded="false">
+            <div>
+              <h3 class="quota-model-section__title">${escapeHtml(board.model || "—")}</h3>
+              <p class="quota-model-section__meta">${escapeHtml(meta || "近窗消耗")} · 点击展开图表</p>
+            </div>
+            <span class="quota-model-section__chevron" aria-hidden="true">▸</span>
+          </div>
+          <div class="quota-model-cards">
+            <article class="quota-model-card">
+              <p class="quota-model-card__label">API 请求次数</p>
+              <div class="quota-model-card__total">${escapeHtml(formatCompactNumber(board.requests?.total ?? 0))}</div>
+              <div class="ops-chart" data-request-chart="${index}"></div>
+            </article>
+            <article class="quota-model-card">
+              <p class="quota-model-card__label">Tokens</p>
+              <div class="quota-model-card__total">${escapeHtml(
+                board.tokens?.applicable === false
+                  ? "不适用"
+                  : formatCompactNumber(board.tokens?.total ?? 0),
+              )}</div>
+              <div class="ops-chart" data-token-chart="${index}"></div>
+            </article>
+          </div>
+        </section>`;
+      }).join("");
+      const chartDrawn = new Set();
+      function drawCharts(index) {
+        if (chartDrawn.has(index)) return;
+        const board = models[index];
+        if (!board) return;
+        renderAreaChart(host.querySelector(`[data-request-chart="${index}"]`), board.requests?.series || [], {
+          color: "#3b82c4",
+          label: "请求次数",
+          dark: false,
+        });
+        renderStackedTokenChart(host.querySelector(`[data-token-chart="${index}"]`), board.tokens?.series || [], { dark: false });
+        chartDrawn.add(index);
+      }
+      function setOpen(index, open) {
+        host.querySelectorAll(".quota-model-section").forEach((section) => {
+          const sectionIndex = Number(section.getAttribute("data-model-board"));
+          const shouldOpen = open && sectionIndex === index;
+          section.classList.toggle("is-open", shouldOpen);
+          const toggle = section.querySelector("[data-model-toggle]");
+          if (toggle) toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+          if (shouldOpen) drawCharts(sectionIndex);
+        });
+      }
+      host.querySelectorAll("[data-model-toggle]").forEach((toggle) => {
+        const index = Number(toggle.getAttribute("data-model-toggle"));
+        const activate = () => {
+          const section = host.querySelector(`[data-model-board="${index}"]`);
+          const isOpen = section?.classList.contains("is-open");
+          setOpen(index, !isOpen);
+        };
+        toggle.addEventListener("click", activate);
+        toggle.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            activate();
+          }
+        });
+      });
+      host._openQuotaModel = (modelName) => {
+        const index = models.findIndex((board) => board.model === modelName);
+        if (index < 0) return false;
+        setOpen(index, true);
+        const section = host.querySelector(`[data-model-board="${index}"]`);
+        section?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return true;
+      };
+    }
+    async function loadQuotaManagement() {
+      const boardHost = $("quotaModelBoard");
+      const modelHost = $("quotaModelTable");
+      const featureHost = $("quotaFeatureStats");
+      if (!boardHost || !modelHost || !featureHost) return;
+      boardHost.innerHTML = "<p class=\"muted\">加载中…</p>";
+      modelHost.innerHTML = "<p class=\"muted\" style=\"padding:18px\">加载中…</p>";
+      featureHost.innerHTML = "<span class=\"status-metric\">加载中<b>…</b></span>";
+      try {
+        const days = $("quotaDaysFilter")?.value || "30";
+        const data = await api(`/ops/quota?days=${encodeURIComponent(days)}`);
+        const models = data.models || [];
+        const boards = data.modelBoard?.models || [];
+        const features = data.usage?.features || [];
+        const foodUsage = data.foodImageUsage || {};
+        const vision = features.find((item) => item.key === "vision");
+        const coach = features.find((item) => item.key === "coach");
+        const featureCards = [];
+        if (vision) featureCards.push(["识别", vision.today ?? 0, vision.windowTotal ?? 0, vision.total ?? 0]);
+        if (coach) featureCards.push(["教练", coach.today ?? 0, coach.windowTotal ?? 0, coach.total ?? 0]);
+        const foodTotal = foodUsage.windowTotal ?? (foodUsage.series || []).reduce((sum, point) => sum + (Number(point.value) || 0), 0);
+        featureCards.push(["生图", foodUsage.today ?? 0, foodTotal, foodTotal]);
+        featureHost.innerHTML = featureCards.map(([label, today, windowTotal, total]) => `<span class="status-metric">${label}<b>今日 ${escapeHtml(today)} · 窗口 ${escapeHtml(windowTotal)} · 总量 ${escapeHtml(total)}</b></span>`).join("");
+        renderModelBoard(boardHost, boards);
+        if (!models.length) {
+          modelHost.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无模型配置</p>";
+        } else {
+          modelHost.innerHTML = `<table><thead><tr><th>功能</th><th>提供商</th><th>模型</th><th>限额</th></tr></thead><tbody>${models.map((model) => `<tr><td>${escapeHtml(model.featureLabel || model.feature || "—")}</td><td>${escapeHtml(model.provider || "—")}</td><td><button type="button" class="quota-model-link" data-open-model="${escapeHtml(model.model || "")}"><code>${escapeHtml(model.model || "—")}</code></button></td><td>${escapeHtml(formatQuotaLimit(model))}</td></tr>`).join("")}</tbody></table>`;
+          modelHost.querySelectorAll("[data-open-model]").forEach((button) => {
+            button.addEventListener("click", () => {
+              boardHost._openQuotaModel?.(button.getAttribute("data-open-model"));
+            });
+          });
+        }
+      } catch (error) {
+        const message = escapeHtml(apiErrorMessage(error));
+        boardHost.innerHTML = `<p class="muted">${message}</p>`;
+        modelHost.innerHTML = `<p class="muted" style="padding:18px">${message}</p>`;
+        featureHost.innerHTML = `<span class="status-metric danger">加载失败<b>${message}</b></span>`;
+      }
+    }
+    const userImagesState = { page: 1, pageSize: 40, total: 0 };
+
+    function userImageKindLabel(kind) {
+      return ({ all: "全部", vision: "识图", blocked: "违规", avatar: "头像", asset: "资产" }[kind] || kind || "—");
+    }
+    function userImageReviewLabel(status) {
+      return ({ pending: "待审", reviewed: "已审", flagged: "已标记", open: "待处理", dismissed: "已忽略" }[status] || status || "—");
+    }
+    function userImageStatusLabel(item) {
+      if (item.kind === "vision") return userImageReviewLabel(item.reviewStatus || "pending");
+      if (item.kind === "blocked") return userImageReviewLabel(item.status || "open");
+      if (item.kind === "asset") return item.status || "—";
+      return item.status || "—";
+    }
+    function shortId(value) {
+      const text = String(value || "");
+      if (text.length <= 12) return text || "—";
+      return `${text.slice(0, 8)}…${text.slice(-4)}`;
+    }
+    function closeUserImageLightbox() {
+      const modal = $("userImageLightbox");
+      if (!modal) return;
+      modal.hidden = true;
+      const img = $("userImageLightboxImg");
+      if (img) img.removeAttribute("src");
+    }
+    function openUserImageLightbox({ url, title, meta }) {
+      if (!url) return;
+      const modal = $("userImageLightbox");
+      const img = $("userImageLightboxImg");
+      const titleEl = $("userImageLightboxTitle");
+      const metaEl = $("userImageLightboxMeta");
+      if (!modal || !img) return;
+      if (titleEl) titleEl.textContent = title || "用户图片";
+      if (metaEl) metaEl.textContent = meta || "";
+      img.src = url;
+      modal.hidden = false;
+    }
+
+    async function loadUserImagesModule() {
+      const grid = $("userImagesGrid");
+      const meta = $("userImagesPagerMeta");
+      if (!grid) return;
+      grid.innerHTML = "<p class=\"muted\" style=\"padding:18px\">加载中…</p>";
+      try {
+        const kind = $("userImageKindFilter")?.value || "all";
+        const userId = String($("userImageUserId")?.value || "").trim();
+        const status = $("userImageBlockedStatus")?.value || "all";
+        const params = new URLSearchParams({
+          kind,
+          page: String(userImagesState.page),
+          pageSize: String(userImagesState.pageSize),
+        });
+        if (userId) params.set("userId", userId);
+        if (kind === "blocked" || kind === "all") params.set("status", status);
+        const data = await api(`/ops/user-images?${params.toString()}`);
+        const items = data.items || [];
+        userImagesState.total = Number(data.total) || 0;
+        userImagesState.page = Number(data.page) || userImagesState.page;
+        userImagesState.pageSize = Number(data.pageSize) || userImagesState.pageSize;
+        const totalPages = Math.max(1, Math.ceil(userImagesState.total / userImagesState.pageSize) || 1);
+        if (meta) {
+          const approx = data.totalApproximate ? "约 " : "";
+          meta.textContent = `${userImageKindLabel(kind)} · 第 ${userImagesState.page}/${totalPages} 页 · ${approx}${userImagesState.total} 条`;
+        }
+        if ($("userImagesPrevPage")) $("userImagesPrevPage").disabled = userImagesState.page <= 1;
+        if ($("userImagesNextPage")) {
+          $("userImagesNextPage").disabled = userImagesState.page >= totalPages || items.length === 0;
+        }
+        if (!items.length) {
+          grid.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无图片</p>";
+          return;
+        }
+        grid.innerHTML = `<table>
+          <thead>
+            <tr>
+              <th>用户 UUID</th>
+              <th>记录 ID</th>
+              <th>识别名 / 标题</th>
+              <th>类型</th>
+              <th>缩略图</th>
+              <th>上传时间</th>
+              <th>审核状态</th>
+              <th>关联餐食</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>${items.map((item) => {
+            const title = item.mealName || item.status || "—";
+            const hasPreview = Boolean(item.imageUrl);
+            const thumb = hasPreview
+              ? `<button type="button" class="user-image-thumb" data-user-image-preview="${escapeHtml(item.imageUrl)}" data-preview-title="${escapeHtml(`${userImageKindLabel(item.kind)} · ${title}`)}" data-preview-meta="${escapeHtml(`用户 ${item.userId || "—"} · ${formatTime(item.createdAt)}`)}" title="点击查看大图"><img src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy" decoding="async" /></button>`
+              : `<button type="button" class="user-image-thumb" disabled title="${item.imagePath ? "暂无预览" : "无图片"}"><span class="user-image-thumb__empty">${item.imagePath ? "暂无预览" : "无图片"}</span></button>`;
+            let reviewControl = "—";
+            if (item.kind === "vision") {
+              const statuses = ["pending", "reviewed", "flagged"];
+              reviewControl = `<select data-vision-analysis-id="${escapeHtml(item.id)}">${statuses.map((entry) => `<option value="${entry}" ${item.reviewStatus === entry ? "selected" : ""}>${userImageReviewLabel(entry)}</option>`).join("")}</select>`;
+            } else if (item.kind === "blocked") {
+              const statuses = ["open", "reviewed", "dismissed"];
+              reviewControl = `<select data-moderation-id="${escapeHtml(item.id)}">${statuses.map((entry) => `<option value="${entry}" ${item.status === entry ? "selected" : ""}>${userImageReviewLabel(entry)}</option>`).join("")}</select>`;
+            } else {
+              reviewControl = escapeHtml(userImageStatusLabel(item));
+            }
+            const deleteDisabled = item.protected ? "disabled" : "";
+            const protectNote = item.protected
+              ? `<div class="user-image-protect">${escapeHtml(item.protectReason || "受保护")}</div>`
+              : `<span class="muted">未关联</span>`;
+            return `<tr>
+              <td><code title="${escapeHtml(item.userId || "")}">${escapeHtml(shortId(item.userId))}</code></td>
+              <td><code title="${escapeHtml(item.id || "")}">${escapeHtml(shortId(item.id))}</code></td>
+              <td>${escapeHtml(title)}</td>
+              <td>${escapeHtml(userImageKindLabel(item.kind))}</td>
+              <td>${thumb}</td>
+              <td>${escapeHtml(formatTime(item.createdAt))}</td>
+              <td>${reviewControl}</td>
+              <td>${protectNote}</td>
+              <td>
+                <button type="button" class="button secondary" data-user-image-delete="${escapeHtml(item.kind)}:${escapeHtml(item.id)}" ${deleteDisabled}>删除</button>
+              </td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>`;
+        bindModerationSelects(grid, () => loadUserImagesModule());
+        grid.querySelectorAll("select[data-vision-analysis-id]").forEach((select) => {
+          select.onchange = async () => {
+            try {
+              await api(`/ops/vision-images/${select.dataset.visionAnalysisId}`, {
+                method: "PATCH",
+                body: { reviewStatus: select.value },
+              });
+              toast("已更新审核状态");
+            } catch (error) {
+              toast(apiErrorMessage(error), true);
+              loadUserImagesModule().catch(() => undefined);
+            }
+          };
+        });
+        grid.querySelectorAll("button[data-user-image-preview]").forEach((button) => {
+          button.onclick = () => openUserImageLightbox({
+            url: button.getAttribute("data-user-image-preview"),
+            title: button.getAttribute("data-preview-title"),
+            meta: button.getAttribute("data-preview-meta"),
+          });
+        });
+        grid.querySelectorAll("button[data-user-image-delete]").forEach((button) => {
+          button.onclick = async () => {
+            const raw = button.getAttribute("data-user-image-delete") || "";
+            const sep = raw.indexOf(":");
+            const kind = raw.slice(0, sep);
+            const id = raw.slice(sep + 1);
+            if (!kind || !id) return;
+            if (!window.confirm(`确认删除这张${userImageKindLabel(kind)}图片？此操作不可恢复。`)) return;
+            try {
+              await api(`/ops/user-images/${kind}/${id}`, { method: "DELETE" });
+              toast("已删除");
+              await loadUserImagesModule();
+            } catch (error) {
+              toast(apiErrorMessage(error), true);
+            }
+          };
+        });
+      } catch (error) {
+        grid.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`;
+        if (meta) meta.textContent = "加载失败";
+      }
+    }
+
+    async function loadModerationModule() {
+      const summaryHost = $("moderationSummaryStats");
+      const coverageHost = $("moderationCoverage");
+      const chartHost = $("moderationChart");
+      const sourceHost = $("moderationSourceTable");
+      const termHost = $("moderationTermTable");
+      const tableHost = $("moderationTable");
+      if (!summaryHost || !coverageHost || !chartHost || !sourceHost || !termHost || !tableHost) return;
+      summaryHost.innerHTML = "<span class=\"status-metric\">加载中<b>…</b></span>";
+      coverageHost.innerHTML = "<span class=\"status-metric\">加载中<b>…</b></span>";
+      chartHost.innerHTML = "<p class=\"muted\">加载中…</p>";
+      sourceHost.innerHTML = "<p class=\"muted\" style=\"padding:18px\">加载中…</p>";
+      termHost.innerHTML = "<p class=\"muted\" style=\"padding:18px\">加载中…</p>";
+      tableHost.innerHTML = "<p class=\"muted\" style=\"padding:18px\">加载中…</p>";
+      try {
+        const status = $("moderationStatusFilter")?.value || "open";
+        const data = await api(`/ops/moderation-dashboard?days=14&status=${encodeURIComponent(status)}`);
+        const summary = data.summary || {};
+        summaryHost.innerHTML = [
+          ["待处理", summary.open ?? 0, summary.open > 0 ? "warning" : ""],
+          ["已复核", summary.reviewed ?? 0, ""],
+          ["已忽略", summary.dismissed ?? 0, ""],
+          ["今日新增", summary.today ?? 0, ""],
+          ["窗口合计", summary.windowTotal ?? 0, ""],
+          ["词库规模", data.bannedTermCount ?? "—", ""],
+        ].map(([label, value, tone]) => `<span class="status-metric ${tone}">${label}<b>${escapeHtml(value)}</b></span>`).join("");
+        const coverage = data.coverage || [];
+        coverageHost.innerHTML = coverage.length
+          ? coverage.map((item) => `<span class="status-metric">${escapeHtml(item.label || item.source || "—")}<b>已覆盖</b></span>`).join("")
+          : "<span class=\"status-metric\">覆盖范围<b>—</b></span>";
+        renderSparkline(chartHost, data.series || [], { color: "#b64a3b" });
+        const bySource = data.bySource || [];
+        sourceHost.innerHTML = bySource.length
+          ? `<table><thead><tr><th>来源</th><th>次数</th></tr></thead><tbody>${bySource.map((item) => `<tr><td>${escapeHtml(item.source || "—")}</td><td>${escapeHtml(item.count ?? 0)}</td></tr>`).join("")}</tbody></table>`
+          : "<p class=\"muted\" style=\"padding:18px\">暂无来源统计</p>";
+        const topTerms = data.topTerms || [];
+        termHost.innerHTML = topTerms.length
+          ? `<table><thead><tr><th>命中词</th><th>次数</th></tr></thead><tbody>${topTerms.map((item) => `<tr><td>${escapeHtml(item.term || "—")}</td><td>${escapeHtml(item.count ?? 0)}</td></tr>`).join("")}</tbody></table>`
+          : "<p class=\"muted\" style=\"padding:18px\">暂无命中词统计</p>";
+        const items = data.items || [];
+        const statuses = ["open", "reviewed", "dismissed"];
+        if (!items.length) {
+          tableHost.innerHTML = `<p class="muted" style="padding:18px">暂无${status === "all" ? "" : ` ${status} 状态的`}内容标记</p>`;
+          return;
+        }
+        tableHost.innerHTML = `<table><thead><tr><th>来源</th><th>用户</th><th>片段</th><th>命中词</th><th>状态</th><th>时间</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.source || "—")}</td><td><code>${escapeHtml(item.user_id || item.userId || "—")}</code></td><td>${escapeHtml(item.snippet || "—")}</td><td>${escapeHtml(item.matched_term || item.matchedTerm || "—")}</td><td><select data-moderation-id="${escapeHtml(item.id)}">${statuses.map((entry) => `<option value="${entry}" ${item.status === entry ? "selected" : ""}>${entry}</option>`).join("")}</select></td><td>${escapeHtml(formatTime(item.created_at || item.createdAt))}</td></tr>`).join("")}</tbody></table>`;
+        bindModerationSelects(tableHost, () => loadModerationModule());
+      } catch (error) {
+        const message = escapeHtml(apiErrorMessage(error));
+        summaryHost.innerHTML = `<span class="status-metric danger">加载失败<b>${message}</b></span>`;
+        coverageHost.innerHTML = `<span class="status-metric danger">加载失败<b>—</b></span>`;
+        chartHost.innerHTML = `<p class="muted">${message}</p>`;
+        sourceHost.innerHTML = `<p class="muted" style="padding:18px">${message}</p>`;
+        termHost.innerHTML = `<p class="muted" style="padding:18px">${message}</p>`;
+        tableHost.innerHTML = `<p class="muted" style="padding:18px">${message}</p>`;
+      }
+    }
+    async function runOpsPatrolFromOverview() {
+      try {
+        const data = await api("/food-image-patrol/run", { method: "POST", body: {} });
+        const created = data.created?.length || 0;
+        const remaining = data.quota?.remaining;
+        recordOperation({
+          title: "运营总览 · 自动巡检已执行",
+          detail: created
+            ? `新建 ${created} 个批次；今日剩余 ${remaining ?? "—"}`
+            : `未新建批次；今日剩余 ${remaining ?? "—"}`,
+        });
+        toast(created ? `已创建 ${created} 个批次` : patrolSkipSummary(data.skipped));
+        await loadOpsOverview();
+      } catch (error) {
+        toast(apiErrorMessage(error), true);
+      }
     }
     function setModule(name) {
       document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.classList.toggle("active", btn.dataset.module === name); });
@@ -1470,16 +2366,101 @@
       $("moduleFeedback").hidden = name !== "feedback";
       $("moduleFoods").hidden = name !== "foods";
       $("moduleImages").hidden = name !== "images";
+      $("moduleOps").hidden = name !== "ops";
+      $("moduleQuota").hidden = name !== "quota";
+      if ($("moduleUserImages")) $("moduleUserImages").hidden = name !== "user-images";
+      $("moduleModeration").hidden = name !== "moderation";
       $("moduleSystem").hidden = name !== "system";
       if (name === "users") loadUsers().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "feedback") loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "foods") loadFoodAdminList().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "ops") loadOpsOverview().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "quota") loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "user-images") loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "moderation") loadModerationModule().catch((error) => toast(apiErrorMessage(error), true));
+      syncQuotaAutoRefresh(name === "quota");
+    }
+    const QUOTA_AUTO_REFRESH_MS = 15 * 60 * 1000;
+    let quotaAutoRefreshTimer = null;
+    function syncQuotaAutoRefresh(enabled) {
+      if (quotaAutoRefreshTimer) {
+        clearInterval(quotaAutoRefreshTimer);
+        quotaAutoRefreshTimer = null;
+      }
+      if (!enabled) return;
+      quotaAutoRefreshTimer = setInterval(() => {
+        if ($("moduleQuota")?.hidden) return;
+        loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
+      }, QUOTA_AUTO_REFRESH_MS);
     }
     document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.onclick = () => setModule(btn.dataset.module); });
-    $("refreshUsers").onclick = () => loadUsers().catch((error) => toast(apiErrorMessage(error), true));
-    $("userSearch").onkeydown = (event) => { if (event.key === "Enter") loadUsers().catch((error) => toast(apiErrorMessage(error), true)); };
-    $("refreshFeedback").onclick = () => loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
-    $("feedbackStatusFilter").onchange = () => loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshUsers").onclick = () => loadUsers({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("userSearch").onkeydown = (event) => { if (event.key === "Enter") loadUsers({ force: true }).catch((error) => toast(apiErrorMessage(error), true)); };
+    $("refreshFeedback").onclick = () => loadFeedback({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("feedbackStatusFilter").onchange = () => loadFeedback({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshOps").onclick = () => loadOpsOverview().catch((error) => toast(apiErrorMessage(error), true));
+    $("runOpsPatrol").onclick = () => runOpsPatrolFromOverview().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshQuota").onclick = () => loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
+    $("quotaDaysFilter").onchange = () => loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshModeration").onclick = () => loadModerationModule().catch((error) => toast(apiErrorMessage(error), true));
+    $("moderationStatusFilter").onchange = () => loadModerationModule().catch((error) => toast(apiErrorMessage(error), true));
+    if ($("refreshUserImages")) {
+      $("refreshUserImages").onclick = () => {
+        userImagesState.page = 1;
+        loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
+      };
+    }
+    if ($("userImageKindFilter")) {
+      $("userImageKindFilter").onchange = () => {
+        userImagesState.page = 1;
+        loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
+      };
+    }
+    if ($("userImageBlockedStatus")) {
+      $("userImageBlockedStatus").onchange = () => {
+        userImagesState.page = 1;
+        loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
+      };
+    }
+    if ($("userImageUserId")) {
+      $("userImageUserId").onkeydown = (event) => {
+        if (event.key === "Enter") {
+          userImagesState.page = 1;
+          loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
+        }
+      };
+    }
+    if ($("userImagesPrevPage")) {
+      $("userImagesPrevPage").onclick = () => {
+        if (userImagesState.page <= 1) return;
+        userImagesState.page -= 1;
+        loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
+      };
+    }
+    if ($("userImageLightboxClose")) $("userImageLightboxClose").onclick = () => closeUserImageLightbox();
+    if ($("userImageLightboxBackdrop")) $("userImageLightboxBackdrop").onclick = () => closeUserImageLightbox();
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && $("userImageLightbox") && !$("userImageLightbox").hidden) {
+        closeUserImageLightbox();
+      }
+    });
+    if ($("userImagesNextPage")) {
+      $("userImagesNextPage").onclick = () => {
+        userImagesState.page += 1;
+        loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
+      };
+    }
+    if ($("purgeVisionImages")) {
+      $("purgeVisionImages").onclick = async () => {
+        try {
+          const result = await api("/ops/vision-images/purge", { method: "POST", body: { limit: 200 } });
+          toast(`清理完成：删除 ${result.deleted || 0}，保护 ${result.skippedProtected || 0}，失败 ${result.failed || 0}`);
+          loadUserImagesModule().catch(() => undefined);
+        } catch (error) {
+          toast(apiErrorMessage(error), true);
+        }
+      };
+    }
     $("refreshFoodAdmin").onclick = () => loadFoodAdminList().catch((error) => toast(apiErrorMessage(error), true));
     $("createFoodAdmin").onclick = () => openFoodEditor().catch((error) => toast(apiErrorMessage(error), true));
     $("foodAdminSearch").onkeydown = (event) => { if (event.key === "Enter") loadFoodAdminList(1).catch((error) => toast(apiErrorMessage(error), true)); };
@@ -1520,7 +2501,7 @@
     $("refreshAll").onclick = () => connect().catch(() => {});
     $("logoutBtn").onclick = clearStoredCredentials;
     $("clearCredentials").onclick = clearStoredCredentials;
-    $("refreshQueue").onclick = () => loadBatchDetail().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshQueue").onclick = () => refreshBatches().catch((error) => toast(apiErrorMessage(error), true));
     $("loadStats").onclick = loadStats;
     $("runDiagnose").onclick = async () => { try { out(await api("/food-image-jobs/diagnose", { method: "POST", body: {} })); recordOperation({ title: "生图诊断完成", detail: "已获取当前服务端诊断结果" }); toast("诊断完成"); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } };
     $("previewCategory").onclick = previewCategory; $("createCategoryBatch").onclick = createCategoryBatch; $("batchCategory").onchange = previewCategory; $("batchCountInput").onchange = previewCategory; $("visualProfileKey").onchange = previewCategory;
@@ -1536,7 +2517,13 @@
     $("openTools").onclick = () => { setModule("system"); $("utilityDrawer").open = true; $("utilityDrawer").scrollIntoView({ behavior: "smooth", block: "start" }); };
     $("clearOperationFeed").onclick = () => { state.operations = []; renderOperationFeed(); };
     $("filterRow").querySelectorAll("button[data-filter]").forEach((button) => { button.onclick = async () => { state.activeFilter = button.dataset.filter; $("filterRow").querySelectorAll(".filter").forEach((item) => item.classList.toggle("active", item === button)); await renderQueue(); }; });
-    $("selectAllReview").onchange = () => { const candidateIds = [...document.querySelectorAll("input[data-candidate-select]")].map((input) => input.dataset.candidateSelect); state.selectedImageIds = new Set($("selectAllReview").checked ? candidateIds : []); renderQueue(); };
+    $("selectAllReview").onchange = () => {
+      const inputs = [...document.querySelectorAll("input[data-candidate-select]")];
+      const candidateIds = inputs.map((input) => input.dataset.candidateSelect);
+      state.selectedImageIds = new Set($("selectAllReview").checked ? candidateIds : []);
+      inputs.forEach((input) => { input.checked = state.selectedImageIds.has(input.dataset.candidateSelect); });
+      syncBulkControls(candidateIds);
+    };
     $("approveSelected").onclick = approveSelectedImages;
     showLoginGate();
     if (hasToken()) connect().catch(() => {});

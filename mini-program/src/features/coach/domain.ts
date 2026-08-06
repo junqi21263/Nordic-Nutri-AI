@@ -1,4 +1,4 @@
-import { getDailySummary, type Meal } from "../meals/domain";
+import { getDailySummary, type DailyTargets, type Meal } from "../meals/domain";
 import { getAchievementRequirement } from "./achievement-catalog";
 export interface CoachAdvice {
   id: string;
@@ -20,8 +20,12 @@ export interface Achievement {
   requirement?: string;
   unlockedAt?: string | null;
 }
-export function createCoachAdvice(meals: Meal[], date: string): CoachAdvice[] {
-  const summary = getDailySummary(meals, date);
+export function createCoachAdvice(
+  meals: Meal[],
+  date: string,
+  targets?: DailyTargets,
+): CoachAdvice[] {
+  const summary = getDailySummary(meals, date, targets);
   const proteinLeft = Math.max(0, summary.protein - summary.consumed.protein);
   return [
     {

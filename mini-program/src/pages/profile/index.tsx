@@ -242,7 +242,7 @@ export default function ProfilePage() {
             <ListItem
               icon={<NordicIcon name="check" size={20} ariaLabel="隐私政策与免责声明" />}
               title="隐私政策与免责声明"
-              description="数据说明与健康提示"
+              description="数据说明与账号注销"
             />
           </View>
           <View onClick={() => setActiveModal("feedback")}>

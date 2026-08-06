@@ -2,7 +2,9 @@ import { create } from "zustand";
 import {
   createMealFixtures,
   getDailySummary,
+  localDailyTargets,
   type DailySummary,
+  type DailyTargets,
   type Meal,
   type MealLoadingState,
   type MealType,
@@ -13,10 +15,27 @@ export type MealTypeFilter = MealType | "all" | "favorite";
 let idCounter = 0;
 const createLocalId = () => `local-meal-${Date.now()}-${++idCounter}`;
 
+export function normalizeDailyTargets(
+  input: Partial<DailyTargets> | null | undefined,
+): DailyTargets | null {
+  if (!input) return null;
+  const calories = Number(input.calories);
+  const protein = Number(input.protein);
+  const carbs = Number(input.carbs);
+  const fat = Number(input.fat);
+  if (![calories, protein, carbs, fat].every((value) => Number.isFinite(value) && value >= 0)) {
+    return null;
+  }
+  if (calories <= 0) return null;
+  return { calories, protein, carbs, fat };
+}
+
 export interface MealStore {
   meals: Meal[];
   fixtureMeals: Meal[];
   dataSource: "fixture" | "remote";
+  /** Shared daily nutrition targets (home / coach / records). Synced from cloud plan. */
+  dailyTargets: DailyTargets;
   initialDate: string;
   selectedDate: string;
   searchKeyword: string;
@@ -38,6 +57,7 @@ export interface MealStore {
   searchMeals: (keyword: string) => Meal[];
   filterMeals: () => Meal[];
   getDailySummary: (date?: string) => DailySummary;
+  setDailyTargets: (targets: Partial<DailyTargets> | null | undefined) => void;
   resetFixtures: () => void;
   replaceRemoteMeals: (meals: Meal[], selectedDate?: string) => void;
   setSelectedDate: (date: string) => void;
@@ -108,6 +128,7 @@ export function createMealStore(
     meals: initialMeals,
     fixtureMeals: initialFixtures,
     dataSource: "fixture",
+    dailyTargets: { ...localDailyTargets },
     initialDate,
     selectedDate: initialDate,
     searchKeyword: "",
@@ -181,11 +202,18 @@ export function createMealStore(
             : searched.filter((meal) => meal.mealType === state.mealTypeFilter);
       return filtered.slice(0, state.visibleLimit);
     },
-    getDailySummary: (date = get().selectedDate) => getDailySummary(get().meals, date),
+    getDailySummary: (date = get().selectedDate) =>
+      getDailySummary(get().meals, date, get().dailyTargets),
+    setDailyTargets: (targets) => {
+      const next = normalizeDailyTargets(targets);
+      if (!next) return;
+      set({ dailyTargets: next });
+    },
     resetFixtures: () => {
       storage?.clear();
       set((state) => ({
         meals: cloneMeals(state.fixtureMeals),
+        dailyTargets: { ...localDailyTargets },
         selectedDate: state.initialDate,
         searchKeyword: "",
         mealTypeFilter: "all",
@@ -197,8 +225,7 @@ export function createMealStore(
         hasMore: false,
         requestGeneration: state.requestGeneration + 1,
       }));
-    },
-    replaceRemoteMeals: (meals, selectedDate = get().selectedDate) => {
+    },    replaceRemoteMeals: (meals, selectedDate = get().selectedDate) => {
       const nextMeals = cloneMeals(meals);
       persistMeals(nextMeals);
       set({
@@ -245,6 +272,7 @@ export function createMealStore(
       storage?.clear();
       set((state) => ({
         meals: cloneMeals(state.fixtureMeals),
+        dailyTargets: { ...localDailyTargets },
         selectedDate: state.initialDate,
         searchKeyword: "",
         mealTypeFilter: "all",

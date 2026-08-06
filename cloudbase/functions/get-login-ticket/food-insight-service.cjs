@@ -92,6 +92,7 @@ function createRuleFoodInsight(context) {
 function createCloudbaseFoodInsightCompletion({ ai, model, groupName = "cloudbase" } = {}) {
   if (!ai || typeof ai.createModel !== "function") throw new Error("CloudBase AI client is unavailable");
   if (groupName !== "cloudbase") throw new Error("CloudBase AI group is unavailable");
+  const { extractUsageFromAny } = require("./model-usage.cjs");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "hy3";
   return async (context) => {
     try {
@@ -106,7 +107,7 @@ function createCloudbaseFoodInsightCompletion({ ai, model, groupName = "cloudbas
         ],
       });
       if (typeof response?.text !== "string") throw foodInsightError();
-      return response.text;
+      return { content: response.text, usage: extractUsageFromAny(response), model: selectedModel };
     } catch (error) {
       if (error?.message === "FOOD_INSIGHT_RETRYABLE") throw error;
       throw foodInsightError();
@@ -173,14 +174,22 @@ function createFoodInsightService({ ai, model, requestCompletion, source = "clou
 
       let generated;
       if (!complete) {
-        generated = { ...createRuleFoodInsight(context), source: "rule_v1", model: null };
+        generated = { ...createRuleFoodInsight(context), source: "rule_v1", model: null, usage: null };
       } else if (preferFast) {
         // Fast path for product reads: rule now, LLM upgrade in background.
-        generated = { ...createRuleFoodInsight(context), source: "rule_v1", model: null };
+        generated = { ...createRuleFoodInsight(context), source: "rule_v1", model: null, usage: null };
         void (async () => {
           try {
-            const insight = validateFoodInsight(await complete(context));
-            const upgraded = { ...insight, source, model: selectedModel };
+            const raw = await complete(context);
+            const content = typeof raw === "string" ? raw : raw?.content ?? raw;
+            const usage = typeof raw === "object" && raw ? raw.usage || null : null;
+            const insight = validateFoodInsight(content);
+            const upgraded = {
+              ...insight,
+              source: typeof raw === "object" && raw?.source ? raw.source : source,
+              model: typeof raw === "object" && raw?.model ? raw.model : selectedModel,
+              usage,
+            };
             await writeCachedInsight(foodId, contextHash, upgraded);
           } catch (error) {
             console.warn("[food-insight] background generation failed:", error?.message || error);
@@ -188,10 +197,18 @@ function createFoodInsightService({ ai, model, requestCompletion, source = "clou
         })();
       } else {
         try {
-          const insight = validateFoodInsight(await complete(context));
-          generated = { ...insight, source, model: selectedModel };
+          const raw = await complete(context);
+          const content = typeof raw === "string" ? raw : raw?.content ?? raw;
+          const usage = typeof raw === "object" && raw ? raw.usage || null : null;
+          const insight = validateFoodInsight(content);
+          generated = {
+            ...insight,
+            source: typeof raw === "object" && raw?.source ? raw.source : source,
+            model: typeof raw === "object" && raw?.model ? raw.model : selectedModel,
+            usage,
+          };
         } catch {
-          generated = { ...createRuleFoodInsight(context), source: "rule_v1", model: null };
+          generated = { ...createRuleFoodInsight(context), source: "rule_v1", model: null, usage: null };
         }
       }
 

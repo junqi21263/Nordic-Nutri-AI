@@ -28,6 +28,8 @@ describe("MVP polish foundation", () => {
     store.getState().startMealEdit(meal);
     expect(store.getState().editingMealId).toBe(meal.id);
     expect(store.getState().getAdjusted()?.items).toHaveLength(meal.items.length);
+    store.getState().setMealType("dinner");
+    expect(store.getState().meal?.mealType).toBe("dinner");
   });
 
   it("keeps direct-entry back actions inside the mini-program", () => {

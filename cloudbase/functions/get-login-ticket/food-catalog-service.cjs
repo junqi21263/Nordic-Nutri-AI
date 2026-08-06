@@ -443,7 +443,8 @@ function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : n
       if (HAN_PATTERN.test(normalizedQuery) && typeof translateQuery === "function") {
         try {
           const translated = await translateQuery(normalizedQuery);
-          if (typeof translated === "string" && translated.trim().length >= 2) resolvedQuery = translated;
+          const text = typeof translated === "string" ? translated : translated?.translation;
+          if (typeof text === "string" && text.trim().length >= 2) resolvedQuery = text;
         } catch {
           // The generic fallback below still supports a usable Chinese search.
         }
@@ -533,7 +534,8 @@ function createFoodCatalogService({ db, cache = db ? createDatabaseCache(db) : n
       if (HAN_PATTERN.test(normalizedQuery) && typeof translateQuery === "function") {
         try {
           const translated = await translateQuery(normalizedQuery);
-          if (typeof translated === "string" && translated.trim().length >= 2) resolvedQuery = translated;
+          const text = typeof translated === "string" ? translated : translated?.translation;
+          if (typeof text === "string" && text.trim().length >= 2) resolvedQuery = text;
         } catch {
           // Fall through to search with the original query.
         }

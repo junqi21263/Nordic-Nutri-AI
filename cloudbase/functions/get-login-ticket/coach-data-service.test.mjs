@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   createCoachDataService,
   createRuleReply,
+  isNutritionFollowUp,
+  isNutritionQuestion,
   proteinFoodSuggestions,
   quickPromptsForContext,
 } from "./coach-data-service.cjs";
@@ -213,7 +215,7 @@ test("keeps unrelated questions inside the nutrition-coach boundary without call
 
   assert.equal(calls, 0);
   assert.equal(result.reply.source, "rule_v2");
-  assert.match(result.messages[1].content, /营养、饮食、食谱或训练恢复/);
+  assert.match(result.messages[1].content, /更擅长日常饮食建议|蓝莓营养怎么样|晚餐怎么补蛋白/);
 });
 
 test("treats a food's daily nutrition value as an in-scope coach question", async () => {
@@ -630,4 +632,45 @@ test("logging day still surfaces diet preference and avoidance prompts", () => {
   assert.equal(prompts[0], "素食为主下一餐怎么搭？");
   assert.ok(prompts.some((prompt) => prompt.includes("辛辣食物")));
   assert.ok(prompts.some((prompt) => prompt.includes("4餐")));
+});
+
+test("nutrition scope accepts common food names and nutrient ask patterns", () => {
+  assert.equal(isNutritionQuestion("蓝莓"), true);
+  assert.equal(isNutritionQuestion("鸡胸肉怎么样"), true);
+  assert.equal(isNutritionQuestion("蓝莓适不适合加餐"), true);
+  assert.equal(isNutritionQuestion("今天股市怎么样"), false);
+});
+
+test("nutrition follow-up chains across multiple food prompts", () => {
+  const history = [
+    { role: "user", content: "晚餐怎么补蛋白？" },
+    { role: "assistant", content: "可以安排鸡胸肉。" },
+    { role: "user", content: "猪肉呢" },
+    { role: "assistant", content: "瘦猪肉也可以。" },
+  ];
+  assert.equal(isNutritionFollowUp("蓝莓呢", history), true);
+  assert.equal(isNutritionFollowUp("蓝莓呢", [{ role: "user", content: "你好吗" }]), false);
+});
+
+test("rule reply accepts in-scope follow-ups without keyword match", () => {
+  const reply = createRuleReply("那个怎么样", {
+    goalType: "maintenance",
+    daily: {
+      targets: {},
+      consumed: {},
+      remaining: { calories: 500, protein: 20, carbs: 50, fat: 15 },
+      completion: 60,
+      mealCount: 2,
+    },
+    weekly: { recordedDays: 3, proteinCompletion: 70, score: 70 },
+    preferences: {
+      dietaryPattern: "none",
+      dietaryPatternLabel: "无特殊",
+      foodAvoidances: [],
+      foodAvoidanceLabels: [],
+      mealsPerDay: 3,
+    },
+  }, { inScope: true });
+  assert.notEqual(reply.headline, "我更擅长日常饮食建议");
+  assert.notEqual(reply.headline, "我只提供日常营养建议");
 });

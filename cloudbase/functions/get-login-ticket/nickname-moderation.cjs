@@ -85,6 +85,7 @@ function assertNicknameAllowed(nickname) {
 }
 
 module.exports = {
+  BANNED_NICKNAME_TERMS,
   NICKNAME_MODERATION_MESSAGE,
   normalizeNicknameForModeration,
   findBannedNicknameTerm,

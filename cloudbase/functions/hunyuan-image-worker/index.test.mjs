@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
 
-import { createWorkerHttpServer, readWorkerConfig } from "./index.js";
+import { createWorkerHttpServer, extractWorkerUsage, readWorkerConfig } from "./index.js";
 
 async function withServer(server, run) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -22,6 +22,13 @@ function signedHeaders(secret, body, timestamp = Date.now()) {
     "x-nordic-worker-signature": createHmac("sha256", secret).update(`${value}.${body}`).digest("hex"),
   };
 }
+
+test("extractWorkerUsage reads nested rawResponses when top-level usage is zero", () => {
+  assert.deepEqual(extractWorkerUsage({
+    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    rawResponses: [{ usage: { prompt_tokens: 9, completion_tokens: 4, total_tokens: 13 } }],
+  }), { promptTokens: 9, completionTokens: 4, totalTokens: 13 });
+});
 
 test("requires the worker environment id and shared secret", () => {
   assert.throws(

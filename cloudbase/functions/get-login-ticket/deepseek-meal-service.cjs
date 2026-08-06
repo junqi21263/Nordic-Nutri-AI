@@ -59,6 +59,7 @@ function validateCompletion(payload) {
 function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis.fetch }) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("DeepSeek configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
+  const { extractContentAndUsage } = require("./model-usage.cjs");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
   return async ({ items }) => {
     const controller = new AbortController();
@@ -81,8 +82,8 @@ function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis
       });
       if (!response.ok) throw new PublicMealAnalysisError("MEAL_ANALYSIS_RETRYABLE");
       const data = await response.json();
-      const content = data?.choices?.[0]?.message?.content;
-      return parseCompletionPayload(content);
+      const parsed = extractContentAndUsage(data);
+      return { payload: parseCompletionPayload(parsed.content), usage: parsed.usage, model: selectedModel };
     } catch (error) {
       if (error instanceof PublicMealAnalysisError) throw error;
       throw new PublicMealAnalysisError("MEAL_ANALYSIS_RETRYABLE");
@@ -93,11 +94,15 @@ function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis
 }
 
 function createDeepseekMealService({ apiKey, model, requestCompletion, fetchImpl } = {}) {
-  const complete = requestCompletion ?? createDeepseekRequestCompletion({ apiKey, model, fetchImpl });
+  const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
+  const complete = requestCompletion ?? createDeepseekRequestCompletion({ apiKey, model: selectedModel, fetchImpl });
   return async (input) => {
     const items = assertRequestedItems(input);
     const response = await complete({ items });
-    return validateCompletion(response);
+    if (response && typeof response === "object" && "payload" in response) {
+      return { ...validateCompletion(response.payload), usage: response.usage || null, model: response.model || selectedModel };
+    }
+    return { ...validateCompletion(response), usage: null, model: selectedModel };
   };
 }
 

@@ -34,9 +34,12 @@ test("batch progress is a fixed-height block instead of an inline control", asyn
   assert.match(source, /\.mini-progress > i \{ display: block; height: 5px;/);
 });
 
-test("approved batch items are labelled as approved in the all-items view", async () => {
+test("review queue selection does not rebuild the whole grid", async () => {
   const source = await pageSource();
-  assert.match(source, /completed: "已通过"/);
+  assert.match(source, /Selection should not rebuild the whole grid/);
+  assert.match(source, /loading="lazy"/);
+  assert.match(source, /MODULE_CACHE_TTL_MS/);
+  assert.match(source, /Promise\.all\(\[\s*refreshBatches/);
 });
 
 test("category-based batch creation replaces manual food and job identifiers", async () => {
@@ -44,6 +47,12 @@ test("category-based batch creation replaces manual food and job identifiers", a
   assert.match(source, /id="batchCategory"/);
   assert.match(source, /id="batchCountInput"/);
   assert.match(source, /id="createCategoryBatch"/);
+  assert.match(source, /创建并启动|创建草稿/);
+  assert.match(source, /手工建批/);
+  assert.match(source, /function syncActiveBatchSummary\(/);
+  assert.match(source, /userImageReviewLabel/);
+  assert.match(source, /待审/);
+  assert.match(source, /refreshBatches\(\)\.catch/);
   assert.match(source, /\/food-image-batches\/preview/);
   assert.doesNotMatch(source, /id="foodId"/);
   assert.doesNotMatch(source, /id="jobId"/);
@@ -211,14 +220,103 @@ test("admin console shell uses left nav modules and renames the page", async () 
   assert.match(source, /data-module="feedback"/);
   assert.match(source, /data-module="foods"/);
   assert.match(source, /data-module="images"/);
+  assert.match(source, /data-module="ops"/);
+  assert.match(source, /data-module="quota"/);
+  assert.match(source, /data-module="user-images"/);
+  assert.match(source, /data-module="moderation"/);
   assert.match(source, /data-module="system"/);
   assert.match(source, /id="moduleUsers"/);
   assert.match(source, /id="moduleFeedback"/);
   assert.match(source, /id="moduleFoods"/);
   assert.match(source, /id="moduleImages"/);
+  assert.match(source, /id="moduleOps"/);
+  assert.match(source, /id="moduleQuota"/);
+  assert.match(source, /id="moduleUserImages"/);
+  assert.match(source, /id="moduleModeration"/);
   assert.match(source, /id="moduleSystem"/);
   assert.match(source, /食材管理/);
   assert.match(source, /食材生图/);
+  assert.match(source, /运营总览/);
+  assert.match(source, /额度管理/);
+  assert.match(source, /用户图片/);
+  assert.match(source, /内容安全/);
+});
+
+test("user images module wires list delete and purge APIs", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="userImageKindFilter"/);
+  assert.match(source, /id="userImageUserId"/);
+  assert.match(source, /id="userImagesGrid"/);
+  assert.match(source, /function loadUserImagesModule\(/);
+  assert.match(source, /\/ops\/user-images\?/);
+  assert.match(source, /\/ops\/user-images\/\$\{kind\}\/\$\{id\}/);
+  assert.match(source, /\/ops\/vision-images\/purge/);
+  assert.match(source, /name === "user-images"/);
+  assert.match(source, /id="userImageLightbox"/);
+  assert.match(source, /data-user-image-preview/);
+  assert.match(source, /openUserImageLightbox/);
+  assert.match(
+    source,
+    /<th>用户 UUID<\/th>\s*<th>记录 ID<\/th>\s*<th>识别名 \/ 标题<\/th>\s*<th>类型<\/th>\s*<th>缩略图<\/th>\s*<th>上传时间<\/th>\s*<th>审核状态<\/th>\s*<th>关联餐食<\/th>\s*<th>操作<\/th>/,
+  );
+  assert.match(source, /关联餐食/);
+  assert.doesNotMatch(source, /id="moderationViewTab"/);
+  assert.doesNotMatch(source, /id="moderationVisionGrid"/);
+});
+
+test("ops overview module loads metrics and deletion log", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="moduleOps"/);
+  assert.match(source, /id="opsOverviewStats"/);
+  assert.match(source, /id="opsDeletionTable"/);
+  assert.doesNotMatch(source, /id="opsModerationTable"/);
+  assert.match(source, /id="refreshOps"/);
+  assert.match(source, /id="runOpsPatrol"/);
+  assert.match(source, /function loadOpsOverview\(/);
+  assert.match(source, /\/ops\/overview\?hours=24/);
+  assert.match(source, /\/ops\/deletion-log\?limit=50/);
+  assert.match(source, /name === "ops"/);
+  assert.match(source, /loadOpsOverview\(\)/);
+  assert.match(source, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+});
+
+test("quota and moderation admin modules wire dedicated APIs", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="moduleQuota"/);
+  assert.match(source, /id="quotaModelBoard"/);
+  assert.match(source, /id="quotaModelTable"/);
+  assert.match(source, /id="quotaFeatureStats"/);
+  assert.match(source, /id="quotaDaysFilter"/);
+  assert.match(source, /function loadQuotaManagement\(/);
+  assert.match(source, /function renderModelBoard\(/);
+  assert.match(source, /tokens\?\.applicable === false/);
+  assert.match(source, /不适用/);
+  assert.match(source, /function renderAreaChart\(/);
+  assert.match(source, /modelBoard/);
+  assert.match(source, /\/ops\/quota\?days=/);
+  assert.match(source, /id="moduleModeration"/);
+  assert.match(source, /id="moderationSummaryStats"/);
+  assert.match(source, /id="moderationCoverage"/);
+  assert.match(source, /id="moderationChart"/);
+  assert.match(source, /id="moderationSourceTable"/);
+  assert.match(source, /id="moderationTermTable"/);
+  assert.match(source, /id="moderationTable"/);
+  assert.match(source, /id="moderationStatusFilter"/);
+  assert.match(source, /function loadModerationModule\(/);
+  assert.match(source, /\/ops\/moderation-dashboard/);
+  assert.match(source, /\/ops\/moderation-flags\/\$\{id\}/);
+  assert.match(source, /name === "quota"/);
+  assert.match(source, /name === "moderation"/);
+  assert.match(source, /2026-08-05-ops-v7/);
+  assert.match(source, /quota-model-section__head/);
+  assert.match(source, /data-model-toggle/);
+  assert.match(source, /_openQuotaModel/);
+  assert.match(source, /background:\s*#f7f8f4/);
+  assert.match(source, /dark:\s*false/);
+  assert.match(source, /QUOTA_AUTO_REFRESH_MS/);
+  assert.match(source, /15 \* 60 \* 1000/);
+  assert.match(source, /syncQuotaAutoRefresh/);
+  assert.doesNotMatch(source, /background:\s*#1b1f24/);
 });
 
 test("foods admin module supports CRUD UI and image batch linkage", async () => {

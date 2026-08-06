@@ -8,6 +8,7 @@ const {
   dietaryPatternLabel,
   foodAvoidanceLabels,
 } = require("./diet-preference-labels.cjs");
+const { extractContentAndUsage } = require("./model-usage.cjs");
 
 class PublicNutritionPlanError extends Error {
   constructor(code, message) {
@@ -127,9 +128,12 @@ function createDeepseekNutritionPlanService({ apiKey, model, fetchImpl = globalT
       });
       if (!response.ok) return null;
       const data = await response.json();
-      const parsed = extractJson(data?.choices?.[0]?.message?.content);
-      if (!parsed) return null;
-      return normalizePlan(parsed);
+      const parsed = extractContentAndUsage(data);
+      const rawPlan = extractJson(parsed.content);
+      if (!rawPlan) return null;
+      const plan = normalizePlan(rawPlan);
+      if (!plan) return null;
+      return { ...plan, usage: parsed.usage, model: selectedModel };
     } catch {
       return null;
     } finally {

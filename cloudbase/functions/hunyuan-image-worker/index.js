@@ -15,6 +15,34 @@ const COACH_QUICK_PROMPT_SYSTEM_PROMPT = "你是 Nordic Nutri 的营养教练。
 const DAILY_TIP_TYPES = new Set(["nutrition_tip", "food_function", "food_knowledge"]);
 const FORBIDDEN_PRESENTATION_PATTERN = /```|[`*#]|^\s*(?:回复|答复|回答|建议|说明)\s*[:：]/m;
 
+function extractWorkerUsage(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const usage = payload.usage;
+  if (usage && typeof usage === "object") {
+    const promptTokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.inputTokens) || 0;
+    const completionTokens = Number(usage.completion_tokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.outputTokens) || 0;
+    const totalTokens = Number(usage.total_tokens ?? usage.totalTokens) || (promptTokens + completionTokens);
+    if (promptTokens || completionTokens || totalTokens) {
+      return { promptTokens, completionTokens, totalTokens };
+    }
+  }
+  if (payload.rawResponse && typeof payload.rawResponse === "object") {
+    const nested = extractWorkerUsage(payload.rawResponse);
+    if (nested) return nested;
+  }
+  if (Array.isArray(payload.rawResponses)) {
+    for (let i = payload.rawResponses.length - 1; i >= 0; i -= 1) {
+      const nested = extractWorkerUsage(payload.rawResponses[i]);
+      if (nested) return nested;
+    }
+  }
+  const promptTokens = Number(payload.promptTokens ?? payload.prompt_tokens) || 0;
+  const completionTokens = Number(payload.completionTokens ?? payload.completion_tokens) || 0;
+  const totalTokens = Number(payload.totalTokens ?? payload.total_tokens) || (promptTokens + completionTokens);
+  if (!promptTokens && !completionTokens && !totalTokens) return null;
+  return { promptTokens, completionTokens, totalTokens };
+}
+
 function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -184,7 +212,8 @@ function createWorkerService(env = process.env, dependencies = {}) {
     const parsed = parseStructuredText(result?.text);
     const serialized = JSON.stringify(parsed);
     if (FORBIDDEN_PRESENTATION_PATTERN.test(serialized)) throw new Error("WORKER_GENERATION_FAILED");
-    return { ...parsed, source: "hunyuan-exp", model: config.textModelName };
+    const usage = extractWorkerUsage(result);
+    return { ...parsed, source: "hunyuan-exp", model: config.textModelName, usage };
   };
 
   return {
@@ -213,7 +242,7 @@ function createWorkerService(env = process.env, dependencies = {}) {
     async generateInsight(input) {
       const foodContext = normalizeFoodContext(input);
       const result = await generateStructuredText({ system: FOOD_INSIGHT_SYSTEM_PROMPT, payload: { foodContext } });
-      return { ...validateInsight(result), source: result.source, model: result.model };
+      return { ...validateInsight(result), source: result.source, model: result.model, usage: result.usage || null };
     },
     async generateDailyInsight(input) {
       const payload = normalizeDailyInsightInput(input);
@@ -296,4 +325,5 @@ module.exports = {
   readWorkerConfig,
   hasValidSignature,
   normalizeFoodContext,
+  extractWorkerUsage,
 };

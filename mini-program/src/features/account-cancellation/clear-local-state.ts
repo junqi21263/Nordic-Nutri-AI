@@ -2,6 +2,7 @@ import { useMealStore } from "../../stores/meal-store";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { clearOnboardingCompleted } from "../../utils/local-experience";
+import { clearFirstRunTips } from "../first-run-tips/first-run-tips";
 
 /**
  * Wipe device-local product state after account cancellation (or forced
@@ -26,4 +27,5 @@ export function clearProductLocalState() {
     // Onboarding draft is best-effort.
   }
   clearOnboardingCompleted();
+  clearFirstRunTips();
 }

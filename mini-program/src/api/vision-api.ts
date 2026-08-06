@@ -4,6 +4,7 @@ import {
   formatImageTooLargeMessage,
   MAX_PICK_IMAGE_BYTES,
   MAX_UPLOAD_IMAGE_BYTES,
+  assertImageWithinUploadHardLimit,
 } from "../features/media/image-upload-limits";
 import { inferMealTypeFromTime } from "../features/meals/meal-type";
 import type { ScannerMealFixture } from "../features/scanner/domain";
@@ -52,7 +53,6 @@ function detectImageContentType(imageBase64: string, filePath?: string): string 
   if (imageBase64.startsWith("/9j/")) return "image/jpeg";
   if (imageBase64.startsWith("iVBOR")) return "image/png";
   if (imageBase64.startsWith("UklGR")) return "image/webp";
-  if (imageBase64.startsWith("R0lGOD")) return "image/gif";
   if (imageBase64.startsWith("Qk")) return "image/bmp";
   // HEIC/HEIF (Apple default since iOS 11) — ftyp box at byte 4
   if (imageBase64.startsWith("AAAA") && /AAAA[A-Za-z0-9+/]{0,4}GZ0eXB/i.test(imageBase64.slice(0, 24))) return "image/heic";
@@ -61,7 +61,7 @@ function detectImageContentType(imageBase64: string, filePath?: string): string 
     const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
     const extMap: Record<string, string> = {
       jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
-      gif: "image/gif", bmp: "image/bmp", heic: "image/heic", heif: "image/heic",
+      bmp: "image/bmp", heic: "image/heic", heif: "image/heic",
     };
     if (extMap[ext]) return extMap[ext];
   }
@@ -113,17 +113,47 @@ async function fileSizeOf(filePath: string) {
   }
 }
 
+async function compressOnce(
+  src: string,
+  quality: number,
+  compressedWidth?: number,
+): Promise<string> {
+  try {
+    const options = {
+      src,
+      quality,
+      ...(typeof compressedWidth === "number" ? { compressedWidth } : {}),
+    } as Parameters<typeof Taro.compressImage>[0];
+    const result = await Taro.compressImage(options);
+    return result.tempFilePath || src;
+  } catch {
+    if (typeof compressedWidth === "number") {
+      try {
+        const fallback = await Taro.compressImage({ src, quality });
+        return fallback.tempFilePath || src;
+      } catch {
+        return src;
+      }
+    }
+    return src;
+  }
+}
+
 async function prepareImagePath(sourcePath: string) {
-  let path: string;
+  let path = sourcePath;
   try {
     const originalSize = await fileSizeOf(sourcePath);
-    // Compress aggressively for scan upload; recognition quality stays fine at ~1MB JPEG.
-    const firstQuality = originalSize > 8 * 1024 * 1024 ? 40 : originalSize > 3 * 1024 * 1024 ? 50 : 60;
-    const first = await Taro.compressImage({ src: sourcePath, quality: firstQuality });
-    path = first.tempFilePath || sourcePath;
-    if ((await fileSizeOf(path)) > targetUploadBytes) {
-      const second = await Taro.compressImage({ src: path, quality: 35 });
-      path = second.tempFilePath || path;
+    // Aim ≤2MB soft target. Quality-only often stalls on phone JPEGs; also shrink the long edge.
+    const firstQuality = originalSize > 8 * 1024 * 1024 ? 40 : originalSize > 3 * 1024 * 1024 ? 48 : 58;
+    const passes: Array<{ quality: number; width: number }> = [
+      { quality: firstQuality, width: 1920 },
+      { quality: 40, width: 1600 },
+      { quality: 32, width: 1280 },
+      { quality: 28, width: 1024 },
+    ];
+    for (const pass of passes) {
+      path = await compressOnce(path, pass.quality, pass.width);
+      if ((await fileSizeOf(path)) <= targetUploadBytes) break;
     }
   } catch {
     return sourcePath;
@@ -146,6 +176,7 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
     throw createVisionError("无法读取图片文件，请重新选择", err);
   }
   if (!("size" in info) || info.size > maxImageBytes) throw new Error(formatImageTooLargeMessage());
+  assertImageWithinUploadHardLimit("size" in info ? info.size : null);
   let imageBase64;
   try {
     imageBase64 = await readBase64(filePath);
@@ -196,10 +227,15 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
       response.statusCode === 504 ||
       response.statusCode === 408 ||
       /timeout|timed out|超时/i.test(backendMessage);
+    const messageByCode: Record<string, string> = {
+      VISION_CONTENT_BLOCKED: "图片未通过安全审核，请更换后重试",
+      VISION_NON_FOOD: "上传的图片为非食物，请重新上传食物图片",
+    };
     const error = new Error(
       timedOut
         ? "识别超时，请换一张更清晰、更近的餐盘照片后重试"
-        : backendMessage ||
+        : messageByCode[errorCode] ||
+            backendMessage ||
             (response.statusCode === 503 ? "图片识别服务暂不可用" : "图片识别失败，请重新拍摄"),
     );
     error.name = errorCode;

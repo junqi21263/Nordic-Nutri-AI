@@ -12,6 +12,7 @@ import {
   type ProductCoachDailyUsage,
   type ProductCoachMessage,
 } from "../../api/coach-api";
+import { getProductDailySummary } from "../../api/insight-api";
 import { analyzeProductImage } from "../../api/vision-api";
 import { AnimatedProgressBar } from "../../components/animated-progress-bar";
 import { CoachAvatar } from "../../components/coach-avatar";
@@ -103,7 +104,9 @@ export default function CoachPage() {
   const feedback = useFeedbackStore();
   const date = getLocalDateString();
   const summary = meals.getDailySummary(date);
-  const advice = coach.advice.length ? coach.advice : createCoachAdvice(meals.meals, date);
+  const advice = coach.advice.length
+    ? coach.advice
+    : createCoachAdvice(meals.meals, date, meals.dailyTargets);
   const proteinLeft = Math.max(0, summary.protein - summary.consumed.protein);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -228,6 +231,12 @@ export default function CoachPage() {
     // Tab pages stay mounted; re-fetch brief/tip so diet preference edits show up.
     void refreshCoachBrief();
     void loadDailyTip();
+    // Keep nutrition rhythm targets in sync with home / cloud plan.
+    void getProductDailySummary(date)
+      .then((dailySummary) => {
+        meals.setDailyTargets(dailySummary.targets);
+      })
+      .catch(() => undefined);
   });
 
   useEffect(() => {
@@ -634,6 +643,12 @@ export default function CoachPage() {
           </View>
         </MovableView>
       </MovableArea>
+
+      {dailyUsage.remaining <= 3 ? (
+        <Text className="usage-quota-tip usage-quota-tip--coach">
+          今日教练对话剩余 {dailyUsage.remaining} 次
+        </Text>
+      ) : null}
 
       <CoachComposer
         value={draft}

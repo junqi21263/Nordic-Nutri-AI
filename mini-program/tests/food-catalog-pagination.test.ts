@@ -104,7 +104,8 @@ describe("food catalog pagination and category presentation", () => {
     expect(page).toContain('label: "全部"');
     expect(page).toContain('code: "nordic_staples"');
     expect(page).toContain('code: "north_american_staples"');
-    expect(page).toContain("activeCategoryCode");
+    expect(page).toContain("activeCategoryCodes");
+    expect(page).toContain("selectedTagCodes");
     expect(page).toContain("loadMoreLockRef");
   });
 
