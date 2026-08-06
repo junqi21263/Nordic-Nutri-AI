@@ -11,6 +11,8 @@ const { FOOD_VISUAL_TYPES, resolveFoodProcessingLevel } = require("./food-image-
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
+const DEFAULT_AUDIT_IMAGE_PAGE_SIZE = 50;
+const MAX_AUDIT_IMAGE_PAGE_SIZE = 100;
 /** Keep preview/create scans bounded — large `.in(uuid…)` lists trip CloudBase BAD_GATEWAY. */
 const MAX_BATCH_CANDIDATE_SCAN = 800;
 const IN_QUERY_CHUNK_SIZE = 80;
@@ -595,6 +597,58 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
         candidateCount: foods.length,
         excludedReadyCount: foods.length - selectable.length,
       };
+    },
+
+    async listExistingPrimaryImagesForAudit({ limit = DEFAULT_AUDIT_IMAGE_PAGE_SIZE, cursor } = {}) {
+      const size = Math.min(Math.max(Number(limit) || DEFAULT_AUDIT_IMAGE_PAGE_SIZE, 1), MAX_AUDIT_IMAGE_PAGE_SIZE);
+      const parsedCursor = Number(cursor);
+      const offset = Number.isInteger(parsedCursor) && parsedCursor >= 0 ? parsedCursor : 0;
+      // Fetch one extra row so callers can continue with an opaque offset
+      // cursor, while all returned candidates remain bounded by `size`.
+      const imageResult = await db.from("food_images").select("*")
+        .eq("is_primary", true)
+        .eq("status", "ready")
+        .order("id", { ascending: true })
+        .range(offset, offset + size);
+      if (imageResult.error) {
+        throw new FoodRepositoryError("FOOD_IMAGE_AUDIT_CANDIDATES_FAILED", imageResult.error.message || "旧图审计候选查询失败");
+      }
+
+      const scannedImages = imageResult.data ?? [];
+      const pageImages = scannedImages.slice(0, size)
+        .filter((image) => image.review_status == null || image.review_status === "approved");
+      const foodIds = Array.from(new Set(pageImages.map((image) => image.food_id).filter(Boolean)));
+      if (!foodIds.length) {
+        return { items: [], nextCursor: scannedImages.length > size ? String(offset + size) : null };
+      }
+
+      const foodResult = await db.from("foods").select("*")
+        .in("id", foodIds)
+        .eq("is_active", true)
+        .eq("publish_status", "published");
+      if (foodResult.error) {
+        throw new FoodRepositoryError("FOOD_IMAGE_AUDIT_CANDIDATES_FAILED", foodResult.error.message || "旧图审计食物查询失败");
+      }
+
+      const foods = foodResult.data ?? [];
+      const foodById = new Map(foods.map((food) => [food.id, food]));
+      const categoryIds = Array.from(new Set(foods.map((food) => food.category_id).filter(Boolean)));
+      const [categoryMap, tagMap] = await Promise.all([
+        loadCategoriesByIds(db, categoryIds),
+        loadTagsForFoods(db, foods.map((food) => food.id)),
+      ]);
+      const items = pageImages.flatMap((image) => {
+        const food = foodById.get(image.food_id);
+        if (!food) return [];
+        return [{
+          food: mapFoodRow(food, {
+            category: food.category_id ? categoryMap.get(food.category_id) : null,
+            tags: tagMap.get(food.id) ?? [],
+          }),
+          image: mapImageRow(image, { imageUrlResolver }),
+        }];
+      });
+      return { items, nextCursor: scannedImages.length > size ? String(offset + size) : null };
     },
 
     async listTags() {

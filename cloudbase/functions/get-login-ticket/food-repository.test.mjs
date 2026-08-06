@@ -202,6 +202,41 @@ test("listBatchImageCandidates selects published primary foods from one category
   assert.equal(result.total, 2);
 });
 
+test("listExistingPrimaryImagesForAudit returns only approved ready primary images with audit metadata", async () => {
+  const db = mockDb({
+    foods: [
+      { id: "f-powder", name_zh: "低热量水果味饮料粉", category_id: "c-drinks", is_active: true, publish_status: "published", is_primary_variant: true },
+      { id: "f-wine", name_zh: "仙粉黛红葡萄酒", category_id: "c-drinks", is_active: true, publish_status: "published", is_primary_variant: true },
+      { id: "f-draft", name_zh: "草莓味蛋白粉", category_id: "c-drinks", is_active: true, publish_status: "draft", is_primary_variant: true },
+      { id: "f-inactive", name_zh: "苹果醋", category_id: "c-drinks", is_active: false, publish_status: "published", is_primary_variant: true },
+    ],
+    food_categories: [{ id: "c-drinks", code: "beverages", name_zh: "饮品", is_active: true }],
+    food_tag_relations: [{ food_id: "f-powder", tag_id: "t-processed" }],
+    food_tags: [{ id: "t-processed", code: "processed", name_zh: "加工食品", is_active: true }],
+    food_images: [
+      { id: "image-approved", food_id: "f-powder", storage_path: "generated/f-powder/image.webp", is_primary: true, status: "ready", review_status: "approved" },
+      { id: "image-legacy-approved", food_id: "f-wine", storage_path: "generated/f-wine/image.webp", is_primary: true, status: "ready", review_status: null },
+      { id: "image-pending", food_id: "f-powder", is_primary: true, status: "ready", review_status: "pending" },
+      { id: "image-empty-review", food_id: "f-powder", is_primary: true, status: "ready", review_status: "" },
+      { id: "image-non-primary", food_id: "f-powder", is_primary: false, status: "ready", review_status: "approved" },
+      { id: "image-draft", food_id: "f-draft", is_primary: true, status: "ready", review_status: "approved" },
+      { id: "image-inactive", food_id: "f-inactive", is_primary: true, status: "ready", review_status: "approved" },
+    ],
+  });
+  const repo = createFoodRepository({ db, imageCdnBaseUrl: "https://images.example" });
+
+  const result = await repo.listExistingPrimaryImagesForAudit({ limit: 999, cursor: "0" });
+
+  assert.deepEqual(result.items.map((item) => item.image.id), ["image-approved", "image-legacy-approved"]);
+  assert.equal(result.items[0].food.nameZh, "低热量水果味饮料粉");
+  assert.equal(result.items[0].food.category.code, "beverages");
+  assert.deepEqual(result.items[0].food.tags.map((tag) => tag.code), ["processed"]);
+  assert.equal(result.items[0].image.detailUrl, "https://images.example/generated/f-powder/detail.webp");
+  assert.equal(result.nextCursor, null);
+  assert.ok(db._calls.some((call) => call.t === "select" && call.table === "food_images"));
+  assert.ok(db._calls.some((call) => call.t === "select" && call.table === "foods"));
+});
+
 test("listBatchImageCandidates expands a selected parent category to all descendant categories", async () => {
   const db = mockDb({
     foods: [
