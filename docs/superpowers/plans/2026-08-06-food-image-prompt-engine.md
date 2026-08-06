@@ -78,8 +78,8 @@ Expected: PASS。
 ### Task 4: 增加兼容迁移与后台人工覆盖/诊断展示
 
 **Files:**
-- Create: `cloudbase/pg/migrations/0031_food_visual_type.sql`
-- Create: `cloudbase/pg/migrations/0031_food_visual_type.test.mjs`
+- Create: `cloudbase/pg/migrations/0037_food_visual_type.sql`
+- Create: `cloudbase/pg/migrations/0037_food_visual_type.test.mjs`
 - Modify: `cloudbase/functions/get-login-ticket/index.js`
 - Modify: `cloudbase/admin/food-images.html`
 - Modify: `cloudbase/admin/food-images.test.mjs`
@@ -98,7 +98,7 @@ Expected: PASS。
 
 - [ ] **Step 4: 验证静态管理台契约**
 
-Run: `node --test cloudbase/admin/food-images.test.mjs cloudbase/pg/migrations/0031_food_visual_type.test.mjs`
+Run: `node --test cloudbase/admin/food-images.test.mjs cloudbase/pg/migrations/0037_food_visual_type.test.mjs`
 
 Expected: PASS。
 

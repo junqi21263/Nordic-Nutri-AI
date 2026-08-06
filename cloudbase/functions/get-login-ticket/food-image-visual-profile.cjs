@@ -1,6 +1,7 @@
 // A nutrition variant describes nutrition data. A visual profile describes the
 // appearance that needs a photograph. They deliberately have different keys:
 // many nutrition variants can share one food image.
+const { resolveFoodVisualType } = require("./food-image-visual-type.cjs");
 
 const VISUAL_PROFILES = Object.freeze({
   standard: { key: "standard", labelZh: "默认食材", promptHint: "按该食材最常见、最容易辨识的可食用形态呈现，不制作成复杂菜肴" },
@@ -37,6 +38,10 @@ function profileEvidence(food = {}) {
 
 function inferVisualProfileKey(food = {}) {
   const evidence = profileEvidence(food);
+  const visualType = resolveFoodVisualType(food).visualType;
+  // A fruit flavour must never turn a powder, beverage, sauce or alcohol item
+  // into the UI's “新鲜食材” state.
+  if (["drink_powder", "coffee_powder", "flour_powder", "dry_spice", "beverage_liquid", "alcohol_bottle", "non_alcohol_wine", "condiment_liquid", "sauce_paste", "canned_food", "packaged_snack", "prepared_dish", "dairy_liquid", "dairy_solid"].includes(visualType)) return "standard";
   if (/(烤|煎烤|烘烤|roasted|grilled|baked)/i.test(evidence)) return "cooked_grilled";
   if (/(熟制|熟食|水煮|白灼|清蒸|蒸制|炖煮|煮熟|cooked|boiled|steamed)/i.test(evidence)) return "cooked_plain";
   if (/(干制|干货|风干|晒干|dried|dehydrated)/i.test(evidence)) return "dry";
@@ -48,8 +53,12 @@ function inferVisualProfileKey(food = {}) {
 
 function resolveVisualProfile(food = {}, requestedKey = "auto") {
   const requested = normalizeVisualProfileKey(requestedKey);
+  const detectedType = resolveFoodVisualType(food).visualType;
+  const processed = ["drink_powder", "coffee_powder", "flour_powder", "dry_spice", "beverage_liquid", "alcohol_bottle", "non_alcohol_wine", "condiment_liquid", "sauce_paste", "canned_food", "packaged_snack", "prepared_dish", "dairy_liquid", "dairy_solid"].includes(detectedType);
+  const stored = normalizeVisualProfileKey(food.visualProfileKey || food.visual_profile_key || "auto");
+  if (requested === "auto" && processed && (stored === "auto" || stored === "fresh")) return getVisualProfileDefinition("standard");
   const key = requested === "auto"
-    ? normalizeVisualProfileKey(food.visualProfileKey || food.visual_profile_key || inferVisualProfileKey(food))
+    ? normalizeVisualProfileKey(stored === "auto" ? inferVisualProfileKey(food) : stored)
     : requested;
   return getVisualProfileDefinition(key);
 }

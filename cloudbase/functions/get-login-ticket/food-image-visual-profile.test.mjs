@@ -48,3 +48,12 @@ test("an explicit batch profile overrides automatic inference and exposes a safe
   assert.match(profile.promptHint, /清淡熟制/);
   assert.equal(getVisualProfileDefinition("not-real").key, "standard");
 });
+
+test("processed drink powder never resolves to the fresh visual state from fruit flavor words", () => {
+  const profile = resolveVisualProfile({
+    nameZh: "低热量水果味饮料粉",
+    category: { nameZh: "水果", code: "fruit" },
+    visualProfileKey: "fresh",
+  });
+  assert.equal(profile.key, "standard");
+});

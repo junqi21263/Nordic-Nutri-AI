@@ -5,6 +5,15 @@
 
 const MAX_PROMPT_CHARS = 500;
 const { resolveVisualProfile } = require("./food-image-visual-profile.cjs");
+const {
+  FOOD_VISUAL_TYPES,
+  FOOD_VISUAL_TYPE_OPTIONS,
+  resolveFoodVisualType,
+  resolveFlavorColor,
+  resolveFoodProcessingLevel,
+  buildBasePhotographyPrompt,
+  buildPromptByVisualType,
+} = require("./food-image-visual-type.cjs");
 
 const STYLE_SLOT = "北欧自然光，浅米白桌面，浅木色餐具，低饱和，主体居中，轻微虚化，4:3";
 
@@ -302,6 +311,15 @@ function buildFoodImagePromptPlan(input = {}) {
   const reasonCode = normalizeReasonCode(input.reasonCode);
   const retryReason = clampText(input.retryReason, 180);
   const correction = formatRejectCorrection(reasonCode, [input.extraPrompt, retryReason].filter(Boolean).join("；"));
+  const visualResolution = resolveFoodVisualType({
+    nameZh,
+    nameEn,
+    category: input.category ? { nameZh: input.category, code: categoryCode } : { code: categoryCode },
+    tags: input.tags,
+    foodForm: input.foodForm,
+    visualType: input.visualType,
+  });
+  const visualTemplate = buildPromptByVisualType({ nameZh, nameEn }, visualResolution.visualType);
   const template = resolveFoodPhotoTemplate({
     foodNameZh: nameZh,
     foodNameEn: nameEn,
@@ -316,10 +334,22 @@ function buildFoodImagePromptPlan(input = {}) {
     visualProfileKey: input.visualProfileKey,
   }, input.visualProfileKey);
   const presentation = resolveVisualPresentation(template, visualProfile, cook);
-  const subject = clampText(input.subject, 180) || imageSubjectZh || presentation.subject;
+  const legacySpecializedTypes = new Set(["raw_meat", "shellfish", "egg", "unknown"]);
+  const useVisualTemplate = !legacySpecializedTypes.has(visualResolution.visualType);
+  // A verified per-food subject remains the strongest visual correction.  For
+  // Visual-form templates beat every broad category/name template. The few
+  // legacy-specialized types keep their verified cooked/raw logic.
+  const subject = clampText(input.subject, 180) || imageSubjectZh || (useVisualTemplate ? visualTemplate.subject : presentation.subject);
   const cookingHint = clampText(input.cookingHint, 150) || presentation.cookingHint;
-  const negative = clampText(input.negativePrompt, 180) || template.negative || GENERAL_TEMPLATE.negative;
-  const categoryLabel = clampText(template.categoryLabel || cat, 32);
+  const negative = clampText(input.negativePrompt, 260) || (useVisualTemplate
+    ? visualTemplate.negativePrompt
+    : (template.negative || visualTemplate.negativePrompt || GENERAL_TEMPLATE.negative));
+  const categoryLabel = clampText(
+    useVisualTemplate
+      ? FOOD_VISUAL_TYPE_OPTIONS[visualResolution.visualType]
+      : (template.categoryLabel || cat),
+    32,
+  );
 
   const assembled = assemblePromptSlots({
     identity: [`真实可食用健康食物摄影，主体：${nameZh}`, nameEn ? `英文：${nameEn}` : ""].filter(Boolean).join("，"),
@@ -327,13 +357,23 @@ function buildFoodImagePromptPlan(input = {}) {
     subject,
     state: cookingHint || "",
     correction: correction ? `根据审核反馈修正：${clampText(correction, 140)}` : "",
-    negatives: `仅此食物，无人手无文字无包装无水印无插画无3D。${negative}`,
+    // Hunyuan's current Node SDK invocation only accepts a positive `prompt`.
+    // Keep the independently-auditable negative list, then render it as an
+    // explicit prohibition in that supported prompt field.
+    negatives: `仅此食物，无人手无文字无包装无水印无插画无3D。禁止生成：${negative}`,
     serving: serving ? `份量：${serving}` : "",
-    style: STYLE_SLOT,
+    style: buildBasePhotographyPrompt(),
   }, { forceOverflow: Boolean(input.forceOverflow) });
 
   return {
-    template: template.id,
+    template: useVisualTemplate ? visualResolution.visualType : template.id,
+    templateName: useVisualTemplate ? visualTemplate.templateName : template.id,
+    visualType: visualResolution.visualType,
+    visualTypeLabelZh: FOOD_VISUAL_TYPE_OPTIONS[visualResolution.visualType],
+    decisionSource: visualResolution.source,
+    matchedKeywords: visualResolution.matchedKeywords,
+    flavorColor: resolveFlavorColor({ nameZh, nameEn }),
+    foodProcessingLevel: resolveFoodProcessingLevel({ nameZh, nameEn, category: input.category ? { nameZh: input.category, code: categoryCode } : { code: categoryCode }, tags: input.tags, foodForm: input.foodForm, visualType: input.visualType }),
     foodNameZh: nameZh,
     foodNameEn: nameEn,
     category: cat,
@@ -349,6 +389,7 @@ function buildFoodImagePromptPlan(input = {}) {
     visualProfileKey: visualProfile.key,
     visualProfileLabelZh: visualProfile.labelZh,
     trimmedSlots: assembled.trimmedSlots,
+    positivePrompt: assembled.prompt,
     prompt: assembled.prompt,
   };
 }
@@ -368,6 +409,12 @@ module.exports = {
   REJECT_REASON_CODES,
   STYLE_SLOT,
   CATEGORY_CODE_TEMPLATE,
+  FOOD_VISUAL_TYPES,
+  FOOD_VISUAL_TYPE_OPTIONS,
+  resolveFoodVisualType,
+  resolveFlavorColor,
+  buildBasePhotographyPrompt,
+  buildPromptByVisualType,
   resolveFoodPhotoTemplate,
   buildFoodImagePromptPlan,
   buildFoodImagePrompt,

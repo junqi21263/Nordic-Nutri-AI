@@ -28,7 +28,13 @@ Prompt max length is **500 characters** — templates live in `food-image-prompt
 ### Prompt assembly (P0/P1)
 
 Slots in order: identity → class → subject → state → correction → negatives → serving → style.  
-Over budget, drop from the end (style first). Template resolution: name-specific (shellfish etc.) → `category.code` → name/category regex.
+Over budget, drop from the end (style first). `food-image-prompts.cjs` remains the single builder, but now delegates visual-form resolution to `food-image-visual-type.cjs` before selecting the subject template.
+
+Visual-form priority is: manual `foods.visual_type` override → controlled visual-type tag → tag wording → Chinese name → English name → category → fallback. Within a source, rules are ordered by literal keyword length first and processed-form priority second. Thus `饮料粉` / `蛋白粉` / `葡萄酒` / `苹果醋` win over fruit flavour or ingredient terms such as `橙` / `葡萄` / `苹果`.
+
+The builder snapshots `visualType`, `decisionSource`, `matchedKeywords`, `templateName`, `flavorColor`, `positivePrompt`, and `negativePrompt` in batch `prompt_plan_json`. The admin inspector exposes these values and can save `foods.visual_type`; blank means automatic resolution. Regenerate and rejected-batch retry rebuild using the latest rules and that override.
+
+Hunyuan's current Node image API call accepts one `prompt` field, not a separate `negative_prompt`. The negative list is therefore stored independently for review and rendered as `禁止生成：…` inside the supported positive prompt.
 
 Reject body may include `reasonCode`:
 
@@ -106,6 +112,7 @@ If a custom HTTPS domain is added later, replace only
 ```bash
 # plan / apply via CloudBase MCP or console SQL
 cloudbase/pg/migrations/0013_food_image_generation.sql
+cloudbase/pg/migrations/0037_food_visual_type.sql
 ```
 
 ## Console checklist

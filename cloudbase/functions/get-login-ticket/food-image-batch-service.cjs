@@ -157,7 +157,11 @@ function mapBatchItemRow(row, food = null) {
     food: food ? {
       id: food.id,
       nameZh: getFoodDisplayName(food),
+      nameEn: food.nameEn || null,
       category: food.category?.nameZh || null,
+      tags: food.tags || [],
+      visualType: food.visualType || null,
+      foodProcessingLevel: food.foodProcessingLevel || null,
     } : null,
   };
 }
@@ -282,6 +286,9 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
           foodNameEn: food.nameEn,
           category: food.category?.nameZh || food.category?.code,
           categoryCode: food.category?.code,
+          tags: food.tags,
+          foodForm: food.foodForm,
+          visualType: food.visualType,
           cookingMethod: food.defaultCookingMethod,
           imageSubjectZh: food.imageSubjectZh,
           visualProfileKey: profile?.key,
@@ -414,6 +421,9 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
         foodNameEn: food.nameEn,
         category: food.category?.nameZh || food.category?.code,
         categoryCode: food.category?.code,
+        tags: food.tags,
+        foodForm: food.foodForm,
+        visualType: food.visualType,
         cookingMethod: food.defaultCookingMethod,
         imageSubjectZh: food.imageSubjectZh,
         retryReason: locked.data.retry_reason,

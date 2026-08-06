@@ -129,6 +129,14 @@ test("mapFoodRow maps food group metadata", () => {
   assert.equal(food.variantLabelZh, "熟制版本");
 });
 
+test("mapFoodRow exposes an automatic processing level for flavored drink powder", () => {
+  const food = mapFoodRow({ id: "powder", name_zh: "低热量水果味饮料粉", visual_type: null }, {
+    category: { code: "fruit", nameZh: "水果" }, tags: [], image: null,
+  });
+  assert.equal(food.visualType, null);
+  assert.equal(food.foodProcessingLevel, "ultra_processed");
+});
+
 test("mapFoodRow localizes common variant preparation labels", () => {
   const food = mapFoodRow({ id: "f1", variant_label_zh: "raw" });
   assert.equal(food.variantLabelZh, "生食");

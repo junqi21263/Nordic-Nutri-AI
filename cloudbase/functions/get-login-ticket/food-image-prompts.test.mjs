@@ -6,10 +6,68 @@ import promptModule from "./food-image-prompts.cjs";
 const {
   buildFoodImagePrompt,
   buildFoodImagePromptPlan,
+  resolveFoodVisualType,
   MAX_PROMPT_CHARS,
   REJECT_REASON_CODES,
   formatRejectCorrection,
 } = promptModule;
+
+test("processed form keywords beat fruit flavor and category keywords", () => {
+  const cases = [
+    ["低热量水果味饮料粉", "Low-calorie fruit flavored drink powder", "fruit", "drink_powder", "饮料粉", "浅黄色或浅橙色"],
+    ["低热量橙味早餐饮料粉", "Low-calorie orange breakfast drink powder", "fruit", "drink_powder", "早餐饮料粉", "浅橙黄色"],
+    ["仙粉黛红葡萄酒", "Zinfandel red wine", "fruit", "alcohol_bottle", "红葡萄酒", null],
+    ["草莓味蛋白粉", "Strawberry protein powder", "fruit", "drink_powder", "蛋白粉", "淡粉色"],
+    ["苹果醋", "Apple cider vinegar", "fruit", "condiment_liquid", "苹果醋", null],
+    ["番茄酱", "Tomato ketchup", "vegetable", "sauce_paste", "番茄酱", null],
+  ];
+
+  for (const [foodNameZh, foodNameEn, categoryCode, visualType, keyword, flavorColor] of cases) {
+    const plan = buildFoodImagePromptPlan({ foodNameZh, foodNameEn, categoryCode, category: "水果" });
+    assert.equal(plan.visualType, visualType, foodNameZh);
+    assert.ok(plan.matchedKeywords.includes(keyword), foodNameZh);
+    assert.equal(plan.flavorColor, flavorColor, foodNameZh);
+  }
+});
+
+test("drink powder plan is a powder instead of fruit and has dedicated negatives", () => {
+  const plan = buildFoodImagePromptPlan({ foodNameZh: "低热量水果味饮料粉", category: "水果" });
+  assert.match(plan.subject, /饮料粉|粉末/);
+  assert.match(plan.negativePrompt, /完整水果/);
+  assert.match(plan.negativePrompt, /已冲泡液体/);
+  assert.doesNotMatch(plan.subject, /表皮|叶片|果肉切面/);
+  assert.doesNotMatch(plan.prompt, /视觉分类：水果/);
+});
+
+test("manual visual type override has the highest priority", () => {
+  const resolved = resolveFoodVisualType({
+    nameZh: "橙味饮料粉",
+    category: { code: "fruit", nameZh: "水果" },
+    visualType: "sauce_paste",
+  });
+  assert.equal(resolved.visualType, "sauce_paste");
+  assert.equal(resolved.source, "manual");
+});
+
+test("a visual-type tag outranks food-name inference", () => {
+  const resolved = resolveFoodVisualType({
+    nameZh: "橙子",
+    tags: [{ code: "drink_powder", nameZh: "冲调类" }],
+    category: { code: "fruit", nameZh: "水果" },
+  });
+  assert.equal(resolved.visualType, "drink_powder");
+  assert.equal(resolved.source, "tags");
+});
+
+test("visual types use their own prompt templates instead of a shared seafood or fruit template", () => {
+  const fish = buildFoodImagePromptPlan({ foodNameZh: "鳕鱼片", category: "海鲜" });
+  const fruit = buildFoodImagePromptPlan({ foodNameZh: "橙子", category: "水果" });
+  assert.equal(fish.visualType, "fish_fillet");
+  assert.equal(fish.template, "fish_fillet");
+  assert.match(fish.subject, /鱼片/);
+  assert.equal(fruit.visualType, "whole_fruit");
+  assert.equal(fruit.template, "whole_fruit");
+});
 
 test("budget trim drops style before identity and correction", () => {
   const plan = buildFoodImagePromptPlan({

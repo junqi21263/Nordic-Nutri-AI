@@ -106,6 +106,18 @@ test("reject modal exposes structured reason codes and missing image-subject fil
   assert.match(source, /missingImageSubject/);
 });
 
+test("prompt inspector exposes visual type diagnostics and a manual override", async () => {
+  const source = await pageSource();
+  assert.match(source, /FOOD_VISUAL_TYPE_OPTIONS/);
+  assert.match(source, /识别视觉类型/);
+  assert.match(source, /命中的关键词/);
+  assert.match(source, /最终正向提示词/);
+  assert.match(source, /最终负向提示词/);
+  assert.match(source, /id="visualTypeOverride"/);
+  assert.match(source, /saveVisualTypeOverride/);
+  assert.match(source, /visualType/);
+});
+
 test("auto patrol panel configures category watches under a 500 daily cap", async () => {
   const source = await pageSource();
   assert.match(source, /分类自动巡检/);

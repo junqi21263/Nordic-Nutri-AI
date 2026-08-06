@@ -7,6 +7,7 @@ const crypto = require("node:crypto");
 
 const { createFoodStorageUrlResolver } = require("./food-storage-url-service.cjs");
 const { normalizeVisualProfileKey } = require("./food-image-visual-profile.cjs");
+const { FOOD_VISUAL_TYPES, resolveFoodProcessingLevel } = require("./food-image-visual-type.cjs");
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
@@ -188,6 +189,12 @@ function mapFoodRow(row, { category, tags, image } = {}) {
     defaultCookingMethod: row.default_cooking_method ?? null,
     imagePolicy: row.image_policy ?? "none",
     imageSubjectZh: row.image_subject_zh ?? null,
+    // Null means automatic Food Image Prompt Engine classification.
+    visualType: row.visual_type ?? null,
+    foodProcessingLevel: resolveFoodProcessingLevel({
+      nameZh: row.name_zh, nameEn: row.name_en, category, tags,
+      foodForm: row.food_form, visualType: row.visual_type,
+    }),
     catalogVersion: row.catalog_version ?? null,
     foodGroupId: row.food_group_id ?? null,
     imageOwnerFoodId: row.image_owner_food_id ?? row.id,
@@ -1044,9 +1051,16 @@ function createFoodRepository({ db, imageCdnBaseUrl } = {}) {
         "name_zh", "name_en", "brand_name", "description", "category_id",
         "serving_size", "serving_unit", "calories", "protein_g", "carbs_g", "fat_g",
         "fiber_g", "sugar_g", "sodium_mg", "is_featured", "is_verified", "is_active",
-        "publish_status", "image_subject_zh", "default_cooking_method", "normalized_name",
+        "publish_status", "image_subject_zh", "default_cooking_method", "normalized_name", "visual_type",
       ]) {
         if (k in patch) allowed[k] = patch[k];
+      }
+      if ("visualType" in patch || "visual_type" in patch) {
+        const value = patch.visualType ?? patch.visual_type ?? null;
+        if (value !== null && !FOOD_VISUAL_TYPES.includes(value)) {
+          throw new FoodRepositoryError("FOOD_VISUAL_TYPE_INVALID");
+        }
+        allowed.visual_type = value;
       }
       if (Object.keys(allowed).length) await db.from("foods").update(allowed).eq("id", id);
     },
