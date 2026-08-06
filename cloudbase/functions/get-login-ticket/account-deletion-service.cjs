@@ -37,7 +37,7 @@ function appendPaths(target, rows, key) {
   }
 }
 
-function createAccountDeletionService({ db, deleteFiles, operationGuard = null }) {
+function createAccountDeletionService({ db, deleteFiles, operationGuard = null, onStorageCleanupFailed = null }) {
   if (!db || typeof db.from !== "function" || typeof deleteFiles !== "function") {
     throw new Error("Account deletion dependencies are unavailable");
   }
@@ -99,6 +99,7 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null }
         appendPaths(paths, profiles, "avatar_path");
         appendPaths(paths, analyses, "image_path");
         appendPaths(paths, meals, "image_path");
+        let storageCleanupSkipped = false;
         if (paths.size) {
           try {
             await withTimeout(
@@ -110,12 +111,25 @@ function createAccountDeletionService({ db, deleteFiles, operationGuard = null }
             // Prefer completing product-account deletion over failing closed on
             // orphaned private objects; cascade deletes already remove PG rows.
             console.error("[account-cancellation] storage cleanup skipped:", error?.message || error);
+            if (typeof onStorageCleanupFailed === "function") {
+              try {
+                await onStorageCleanupFailed({
+                  userId,
+                  clientRequestId: input.clientRequestId,
+                  pathCount: paths.size,
+                  reason: error?.message || String(error),
+                });
+              } catch (auditError) {
+                console.error("[account-cancellation] storage cleanup audit failed:", auditError?.message || auditError);
+              }
+            }
+            storageCleanupSkipped = true;
           }
         }
 
         const deleted = await db.from("app_users").delete().eq("id", userId);
         if (deleted?.error) throw new Error("Account deletion database removal failed");
-        return { deleted: true };
+        return { deleted: true, ...(storageCleanupSkipped ? { storageCleanupSkipped: true } : {}) };
       } catch (error) {
         if (operationGuard) {
           try {

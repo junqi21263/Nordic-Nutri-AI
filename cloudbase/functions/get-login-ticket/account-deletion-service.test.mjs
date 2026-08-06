@@ -119,3 +119,31 @@ test("does not delete files again when the idempotency guard has a completed can
     clientRequestId: "11111111-1111-4111-8111-111111111111",
   }), { deleted: true });
 });
+
+test("continues account deletion and audits when storage cleanup fails", async () => {
+  const events = [];
+  const audits = [];
+  const service = createAccountDeletionService({
+    db: {
+      from(table) {
+        if (table === "uploaded_assets") return { select: () => ({ eq: async () => ({ data: [{ object_path: "food-images/user-a/scan.jpg" }], error: null }) }) };
+        if (table === "profiles") return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+        if (table === "ai_analysis") return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+        if (table === "meal_records") return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+        if (table === "app_users") return { delete: () => ({ eq: async () => { events.push("deleted"); return { error: null }; } }) };
+        throw new Error(`unexpected table ${table}`);
+      },
+    },
+    deleteFiles: async () => { throw new Error("storage unavailable"); },
+    onStorageCleanupFailed: async (payload) => { audits.push(payload); },
+  });
+
+  assert.deepEqual(await service.cancelAccount("user-a", {
+    confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT",
+    clientRequestId: "11111111-1111-4111-8111-111111111111",
+  }), { deleted: true, storageCleanupSkipped: true });
+  assert.deepEqual(events, ["deleted"]);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].pathCount, 1);
+  assert.match(audits[0].reason, /storage unavailable/);
+});

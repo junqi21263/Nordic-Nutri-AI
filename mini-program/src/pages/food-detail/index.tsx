@@ -123,21 +123,18 @@ export default function FoodDetailPage() {
     setPortionG(150);
   };
 
-  const onTouchStart = (event: {
-    touches?: Array<{ clientX: number; clientY: number }>;
-    changedTouches?: Array<{ clientX: number; clientY: number }>;
-  }) => {
-    const touch = event.touches?.[0] ?? event.changedTouches?.[0];
+  // Taro View types touch handlers as CommonEventFunction (BaseEventOrig), while
+  // runtime events include touches — keep a narrow structural read without fighting JSX types.
+  const onTouchStart = (event: any) => {
+    const touch = event?.touches?.[0] ?? event?.changedTouches?.[0];
     if (!touch) return;
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
   };
 
-  const onTouchEnd = (event: {
-    changedTouches?: Array<{ clientX: number; clientY: number }>;
-  }) => {
+  const onTouchEnd = (event: any) => {
     const start = touchStartRef.current;
     touchStartRef.current = null;
-    const touch = event.changedTouches?.[0];
+    const touch = event?.changedTouches?.[0];
     if (!start || !touch || queue.length <= 1) return;
     if (Date.now() < ignoreSwipeUntilRef.current) return;
     const direction = resolveHorizontalSwipe(touch.clientX - start.x, touch.clientY - start.y);

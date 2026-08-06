@@ -91,7 +91,9 @@ test("daily insight uses the enabled CloudBase text model without exposing a ven
   assert.equal(calls[0].groupName, "cloudbase");
   assert.equal(calls[1].model, "hy3");
   assert.equal(calls[1].messages[0].role, "system");
-  assert.equal(typeof result, "string");
+  assert.equal(typeof result, "object");
+  assert.equal(typeof result.content, "string");
+  assert.match(result.content, /晚餐优先补蛋白/);
 });
 
 test("daily insight falls back to an exact record-aware recommendation when the provider fails", async () => {

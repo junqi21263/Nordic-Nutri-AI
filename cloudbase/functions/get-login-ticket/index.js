@@ -1243,12 +1243,16 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     operationGuard,
     deleteFiles: async ({ cloudPaths }) => {
-      try {
-        await deleteStorageCloudFiles({ cloudPaths, label: "account-cancellation" });
-      } catch (error) {
-        // Cancellation prefers best-effort storage cleanup; PG delete still proceeds upstream.
-        console.warn("[account-cancellation] storage delete incomplete:", error?.message || error);
-      }
+      await deleteStorageCloudFiles({ cloudPaths, label: "account-cancellation" });
+    },
+    onStorageCleanupFailed: async ({ userId, clientRequestId, pathCount, reason }) => {
+      console.error("[account-cancellation] storage cleanup skipped:", { userId, clientRequestId, pathCount, reason });
+      await observability?.recordMetric?.("account_storage_cleanup_skipped", 1, {
+        userId,
+        clientRequestId,
+        pathCount,
+        reason: String(reason || "").slice(0, 200),
+      });
     },
   });
   const productUserExists = createProductUserExists(db);

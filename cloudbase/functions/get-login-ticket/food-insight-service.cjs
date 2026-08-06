@@ -115,6 +115,18 @@ function createCloudbaseFoodInsightCompletion({ ai, model, groupName = "cloudbas
   };
 }
 
+function unwrapCompletionPayload(raw) {
+  if (typeof raw === "string") return { content: raw, usage: null, source: null, model: null };
+  if (!raw || typeof raw !== "object") return { content: null, usage: null, source: null, model: null };
+  const structured = raw.headline && raw.content ? raw : null;
+  return {
+    content: structured || raw.content || null,
+    usage: raw.usage || null,
+    source: typeof raw.source === "string" ? raw.source : null,
+    model: typeof raw.model === "string" ? raw.model : null,
+  };
+}
+
 function createFoodInsightService({ ai, model, requestCompletion, source = "cloudbase", db = null } = {}) {
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "hy3";
   const complete = requestCompletion ?? (ai ? createCloudbaseFoodInsightCompletion({ ai, model: selectedModel }) : null);
@@ -181,14 +193,13 @@ function createFoodInsightService({ ai, model, requestCompletion, source = "clou
         void (async () => {
           try {
             const raw = await complete(context);
-            const content = typeof raw === "string" ? raw : raw?.content ?? raw;
-            const usage = typeof raw === "object" && raw ? raw.usage || null : null;
-            const insight = validateFoodInsight(content);
+            const unwrapped = unwrapCompletionPayload(raw);
+            const insight = validateFoodInsight(unwrapped.content);
             const upgraded = {
               ...insight,
-              source: typeof raw === "object" && raw?.source ? raw.source : source,
-              model: typeof raw === "object" && raw?.model ? raw.model : selectedModel,
-              usage,
+              source: unwrapped.source || source,
+              model: unwrapped.model || selectedModel,
+              usage: unwrapped.usage,
             };
             await writeCachedInsight(foodId, contextHash, upgraded);
           } catch (error) {
@@ -198,14 +209,13 @@ function createFoodInsightService({ ai, model, requestCompletion, source = "clou
       } else {
         try {
           const raw = await complete(context);
-          const content = typeof raw === "string" ? raw : raw?.content ?? raw;
-          const usage = typeof raw === "object" && raw ? raw.usage || null : null;
-          const insight = validateFoodInsight(content);
+          const unwrapped = unwrapCompletionPayload(raw);
+          const insight = validateFoodInsight(unwrapped.content);
           generated = {
             ...insight,
-            source: typeof raw === "object" && raw?.source ? raw.source : source,
-            model: typeof raw === "object" && raw?.model ? raw.model : selectedModel,
-            usage,
+            source: unwrapped.source || source,
+            model: unwrapped.model || selectedModel,
+            usage: unwrapped.usage,
           };
         } catch {
           generated = { ...createRuleFoodInsight(context), source: "rule_v1", model: null, usage: null };

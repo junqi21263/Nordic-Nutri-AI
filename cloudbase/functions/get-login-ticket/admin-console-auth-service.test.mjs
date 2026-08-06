@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ADMIN_TOKEN_TTL_SECONDS,
   createAdminAccessToken,
   createAdminConsoleAuthService,
+  createLoginAttemptTracker,
   PublicAdminAuthError,
 } from "./admin-console-auth-service.cjs";
 import { verifyAccessToken } from "./product-session-service.cjs";
@@ -49,6 +51,7 @@ test("issues an admin_console role token after username/password login", async (
   assert.equal(session.sub, "admin-user-1");
   assert.equal(session.role, "admin_console");
   assert.equal(writes[0].is_admin, true);
+  assert.equal(session.exp, Math.floor(nowMs / 1000) + ADMIN_TOKEN_TTL_SECONDS);
 });
 
 test("rejects wrong password without revealing timing shape differences beyond equal length", async () => {
@@ -72,6 +75,46 @@ test("createAdminAccessToken is verifiable by the shared session verifier", () =
     sub: "u1",
     role: "admin_console",
     iat: Math.floor(nowMs / 1000),
-    exp: Math.floor(nowMs / 1000) + 60 * 60 * 24 * 7,
+    exp: Math.floor(nowMs / 1000) + ADMIN_TOKEN_TTL_SECONDS,
   });
+  assert.equal(ADMIN_TOKEN_TTL_SECONDS, 60 * 60 * 12);
+});
+
+test("rate-limits repeated admin login failures within the window", async () => {
+  let nowMs = 1_000_000;
+  const tracker = createLoginAttemptTracker({
+    windowMs: 60_000,
+    maxFailures: 3,
+    now: () => nowMs,
+  });
+  const service = createAdminConsoleAuthService({
+    sessionSecret: "session-secret",
+    identityPepper: "pepper",
+    username: "ops",
+    password: "secret-pass",
+    now: () => nowMs,
+    loginAttemptTracker: tracker,
+    db: { from: () => { throw new Error("must not touch db"); } },
+  });
+
+  for (let i = 0; i < 3; i += 1) {
+    await assert.rejects(
+      () => service.login({ username: "ops", password: "wrong" }),
+      (error) => error instanceof PublicAdminAuthError && error.code === "ADMIN_AUTH_INVALID",
+    );
+  }
+  await assert.rejects(
+    () => service.login({ username: "ops", password: "wrong" }),
+    (error) => error instanceof PublicAdminAuthError && error.code === "ADMIN_AUTH_RATE_LIMITED",
+  );
+  await assert.rejects(
+    () => service.login({ username: "ops", password: "secret-pass" }),
+    (error) => error instanceof PublicAdminAuthError && error.code === "ADMIN_AUTH_RATE_LIMITED",
+  );
+
+  nowMs += 61_000;
+  await assert.rejects(
+    () => service.login({ username: "ops", password: "wrong" }),
+    (error) => error instanceof PublicAdminAuthError && error.code === "ADMIN_AUTH_INVALID",
+  );
 });

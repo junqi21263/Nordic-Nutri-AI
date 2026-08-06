@@ -33,7 +33,8 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("getProductFoodTags");
     expect(page).toContain("getProductFoodSuggestions");
     expect(page).toContain("STANDARD_FOOD_CATEGORY_ROOT_CODES");
-    expect(page).toContain('await loadCatalogPage({ query: "", categoryCode, page: 1, replace: true });');
+    expect(page).toContain("categoryCodes: nextCodes");
+    expect(page).toContain("categoryCodes: activeCategoryCodes");
     expect(page).toContain("searchProductFoodCatalog");
     expect(page).toMatch(/didBootstrapRef|hasBootstrappedRef|catalogBootstrappedRef/);
     expect(page).toContain("void loadTaxonomy()");

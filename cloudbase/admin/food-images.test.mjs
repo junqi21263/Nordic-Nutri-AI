@@ -136,10 +136,13 @@ test("API failures are retained in the visible operation feed with request metad
   assert.match(source, /endpoint, method/);
 });
 
-test("admin connection defaults to the primary CloudBase HTTP function", async () => {
+test("admin connection defaults to the primary CloudBase HTTP function without exposing API Base on login", async () => {
   const source = await pageSource();
   assert.match(source, /const DEFAULT_API_BASE = "https:\/\/lewis-healthy-d4glgqqzv73a5bc10\.service\.tcloudbase\.com\/get-login-ticket"/);
-  assert.match(source, /\$\("baseUrl"\)\.value = DEFAULT_API_BASE/);
+  assert.match(source, /function apiBase\(\)/);
+  assert.doesNotMatch(source, /高级：API Base/);
+  assert.doesNotMatch(source, /id="baseUrl"/);
+  assert.doesNotMatch(source, /id="systemBaseUrlNote"/);
 });
 
 test("review queue supports selectable batch approval and an operator workflow guide", async () => {

@@ -394,10 +394,6 @@
       <label for="adminUsername">后台帐号<input id="adminUsername" name="username" autocomplete="username" placeholder="输入后台帐号" required /></label>
       <label for="adminPassword">后台密码<input id="adminPassword" name="password" type="password" autocomplete="current-password" placeholder="输入后台密码" required /></label>
       <div class="action-row"><button id="connect" class="button" type="submit">登录</button></div>
-      <details>
-        <summary>高级：API Base</summary>
-        <label for="baseUrl" style="margin-top:10px">API Base（含 /get-login-ticket）<input id="baseUrl" placeholder="https://xxx.service.tcloudbase.com/get-login-ticket" autocomplete="off" /></label>
-      </details>
     </form>
   </section>
 
@@ -677,7 +673,7 @@
           <details id="utilityDrawer" class="utility-drawer" open>
             <summary>会话与诊断</summary>
             <div class="utility-body">
-              <section class="utility-panel"><h3>会话与诊断</h3><p class="muted">当前已登录后台。API Base 可在登录页「高级」中修改；退出后需重新登录。</p><p class="muted" id="systemBaseUrlNote" style="margin-top:8px"></p><div class="action-row" style="margin-top:12px"><button id="loadStats" class="button secondary" type="button">刷新统计</button><button id="runDiagnose" class="button secondary" type="button">诊断生图</button><button id="clearCredentials" class="button secondary" type="button">退出登录</button></div><div id="stats" class="stats" style="margin-top:12px"></div></section>
+              <section class="utility-panel"><h3>会话与诊断</h3><p class="muted">当前已登录后台。退出后需重新登录。</p><div class="action-row" style="margin-top:12px"><button id="loadStats" class="button secondary" type="button">刷新统计</button><button id="runDiagnose" class="button secondary" type="button">诊断生图</button><button id="clearCredentials" class="button secondary" type="button">退出登录</button></div><div id="stats" class="stats" style="margin-top:12px"></div></section>
               <section class="utility-panel"><h3>运行说明</h3><p class="muted">创建草稿后，在「食材生图」点击“启动批次”交由云端调度器持续生成。审核拒绝的候选图会携带原因进入下一次重试，最多三次。</p><p class="muted" style="margin-top:12px">本页不再支持手动录入 foodId、jobId 或浏览器端消费任务，避免绕开批次和审核链路。</p></section>
               <section class="utility-panel"><h3>响应与排障</h3><p class="muted">仅显示最近一次后台操作响应，不保存密钥或任务标识。</p><pre id="out">{}</pre></section>
             </div>
@@ -761,21 +757,22 @@
     const $ = (id) => document.getElementById(id);
     const DEFAULT_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
     const CREDENTIAL_KEYS = {
-      baseUrl: "nordic-admin-base-url",
       token: "nordic-admin-session-token",
       username: "nordic-admin-username",
       batchRailCollapsed: "nordic-admin-batch-rail-collapsed",
     };
     let sessionToken = "";
+    function apiBase() {
+      return DEFAULT_API_BASE.replace(/\/$/, "");
+    }
     function readStoredCredentials() {
       try {
         return {
-          baseUrl: localStorage.getItem(CREDENTIAL_KEYS.baseUrl) || "",
           token: localStorage.getItem(CREDENTIAL_KEYS.token) || "",
           username: localStorage.getItem(CREDENTIAL_KEYS.username) || "",
         };
       } catch {
-        return { baseUrl: "", token: "", username: "" };
+        return { token: "", username: "" };
       }
     }
     function showLoginGate(message = "") {
@@ -787,32 +784,27 @@
     function showAdminApp() {
       $("loginGate").hidden = true;
       $("adminApp").hidden = false;
-      const base = $("baseUrl").value.trim() || DEFAULT_API_BASE;
-      if ($("systemBaseUrlNote")) $("systemBaseUrlNote").textContent = `API Base：${base}`;
       setConnected(true);
     }
     function saveCredentials() {
       try {
-        localStorage.setItem(CREDENTIAL_KEYS.baseUrl, $("baseUrl").value.trim());
         localStorage.setItem(CREDENTIAL_KEYS.username, $("adminUsername").value.trim());
         if (sessionToken) localStorage.setItem(CREDENTIAL_KEYS.token, sessionToken);
       } catch { /* private mode / blocked storage */ }
     }
     function clearStoredCredentials() {
       try {
-        localStorage.removeItem(CREDENTIAL_KEYS.baseUrl);
+        localStorage.removeItem("nordic-admin-base-url");
         localStorage.removeItem(CREDENTIAL_KEYS.token);
         localStorage.removeItem(CREDENTIAL_KEYS.username);
       } catch { /* ignore */ }
       sessionToken = "";
       $("adminUsername").value = "";
       $("adminPassword").value = "";
-      $("baseUrl").value = DEFAULT_API_BASE;
       showLoginGate();
       toast("已退出登录");
     }
     const storedCredentials = readStoredCredentials();
-    $("baseUrl").value = storedCredentials.baseUrl || DEFAULT_API_BASE;
     if (storedCredentials.username) $("adminUsername").value = storedCredentials.username;
     sessionToken = storedCredentials.token || "";
     const MODULE_CACHE_TTL_MS = 60_000;
@@ -894,9 +886,9 @@
     }
 
     async function api(path, { method = "GET", body, quiet = false } = {}) {
-      const base = $("baseUrl").value.trim().replace(/\/$/, "");
+      const base = apiBase();
       const token = sessionToken.trim();
-      if (!base || !token) throw new Error("请先使用帐号密码登录后台");
+      if (!token) throw new Error("请先使用帐号密码登录后台");
       const endpoint = `/api/admin${path}`; let response;
       try { response = await fetch(`${base}${endpoint}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
       catch (cause) { const error = createApiError({ endpoint, method, cause }); if (!quiet) recordOperation({ title: "接口连接失败", detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
@@ -906,9 +898,9 @@
       return json;
     }
     async function foodApi(path, { method = "GET", body } = {}) {
-      const base = $("baseUrl").value.trim().replace(/\/$/, "");
+      const base = apiBase();
       const token = sessionToken.trim();
-      if (!base || !token) throw new Error("请先使用帐号密码登录后台");
+      if (!token) throw new Error("请先使用帐号密码登录后台");
       const endpoint = path; let response;
       try { response = await fetch(`${base}${endpoint}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
       catch (cause) { const error = createApiError({ endpoint, method, cause }); recordOperation({ title: "接口连接失败", detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
@@ -1645,10 +1637,9 @@
     async function rejectSelected() { if (!state.selectedImageId) return; showRejectReasonModal(); }
     async function mutateBatch(action) { if (!state.activeBatchId) return; try { const data = await api(`/food-image-batches/${state.activeBatchId}/${action}`, { method: "POST", body: {} }); const message = { start: "批次已启动，云端将持续处理", pause: "批次已暂停", resume: "批次已继续", cancel: "批次已取消" }[action] || "批次状态已更新"; out(data); recordOperation({ title: "批次状态已变化", detail: message }); toast(message); await refreshBatches(); } catch (error) { out(error.json || { error: error.message }); toast(apiErrorMessage(error), true); } }
     async function loginAdmin() {
-      const base = $("baseUrl").value.trim().replace(/\/$/, "");
+      const base = apiBase();
       const username = $("adminUsername").value.trim();
       const password = $("adminPassword").value;
-      if (!base) throw new Error("请填写 API Base");
       if (!username || !password) throw new Error("请输入后台帐号和密码");
       const endpoint = "/api/admin/login";
       let response;
@@ -1699,7 +1690,7 @@
         toast(apiErrorMessage(error), true);
       }
     }
-    function hasToken() { return Boolean($("baseUrl").value.trim() && sessionToken.trim()); }
+    function hasToken() { return Boolean(sessionToken.trim()); }
     const feedbackCategoryLabel = (category) => ({ product: "产品", bug: "缺陷", feature: "功能", support: "支持" }[category] || category || "—");
     async function loadUsers({ force = false } = {}) {
       const host = $("userTable");

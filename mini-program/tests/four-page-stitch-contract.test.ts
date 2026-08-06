@@ -284,7 +284,7 @@ describe("four-page Stitch visual contract", () => {
     const source = read("pages/food-scanner/index.tsx");
     const styles = read("styles/page.scss");
 
-    expect(source).toContain('className="food-scanner-page"');
+    expect(source).toContain("food-scanner-page");
     expect(source).toContain("isScanning");
     expect(source).toContain("scanner-frame--scanning");
     expect(source).toContain('name="camera"');

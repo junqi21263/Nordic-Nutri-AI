@@ -432,7 +432,7 @@ test("serves food catalog searches only through the authenticated product sessio
     assert.equal(body.source, "standard_food_v1");
     assert.equal(body.page, 2);
     assert.equal(body.items[0].description, "Chicken breast");
-    assert.deepEqual(calls, [{ q: "chicken", categoryCode: null, page: 2, pageSize: 20, sort: "recommended" }]);
+    assert.deepEqual(calls, [{ q: "chicken", categoryCodes: [], tagCodes: [], page: 2, pageSize: 20, sort: "recommended" }]);
   });
 });
 

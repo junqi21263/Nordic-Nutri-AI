@@ -7,6 +7,11 @@ class PublicAdminAuthError extends Error {
   }
 }
 
+/** 12 hours — long enough for ops shifts, short enough to limit stolen-token window. */
+const ADMIN_TOKEN_TTL_SECONDS = 60 * 60 * 12;
+const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_LOGIN_MAX_FAILURES = 5;
+
 function safeEqualText(left, right) {
   const a = Buffer.from(String(left || ""), "utf8");
   const b = Buffer.from(String(right || ""), "utf8");
@@ -20,10 +25,45 @@ function createAdminAccessToken(userId, sessionSecret, now = Date.now) {
     sub: userId,
     role: "admin_console",
     iat: issuedAt,
-    exp: issuedAt + 60 * 60 * 24 * 7,
+    exp: issuedAt + ADMIN_TOKEN_TTL_SECONDS,
   })).toString("base64url");
   const signature = createHmac("sha256", sessionSecret).update(payload).digest("base64url");
   return `${payload}.${signature}`;
+}
+
+function createLoginAttemptTracker({
+  windowMs = ADMIN_LOGIN_WINDOW_MS,
+  maxFailures = ADMIN_LOGIN_MAX_FAILURES,
+  now = Date.now,
+} = {}) {
+  const failuresByKey = new Map();
+
+  function prune(key, nowMs) {
+    const entries = (failuresByKey.get(key) || []).filter((ts) => nowMs - ts < windowMs);
+    if (entries.length) failuresByKey.set(key, entries);
+    else failuresByKey.delete(key);
+    return entries;
+  }
+
+  return {
+    assertAllowed(key) {
+      const nowMs = now();
+      const entries = prune(String(key || "unknown"), nowMs);
+      if (entries.length >= maxFailures) {
+        throw new PublicAdminAuthError("ADMIN_AUTH_RATE_LIMITED", "登录失败次数过多，请稍后再试");
+      }
+    },
+    recordFailure(key) {
+      const nowMs = now();
+      const normalized = String(key || "unknown");
+      const entries = prune(normalized, nowMs);
+      entries.push(nowMs);
+      failuresByKey.set(normalized, entries);
+    },
+    clear(key) {
+      failuresByKey.delete(String(key || "unknown"));
+    },
+  };
 }
 
 function createAdminConsoleAuthService({
@@ -33,10 +73,12 @@ function createAdminConsoleAuthService({
   username,
   password,
   now = Date.now,
+  loginAttemptTracker = null,
 }) {
   const configuredUser = typeof username === "string" ? username.trim() : "";
   const configuredPass = typeof password === "string" ? password : "";
   if (!sessionSecret || !identityPepper) throw new Error("Admin console auth dependencies are unavailable");
+  const attempts = loginAttemptTracker || createLoginAttemptTracker({ now });
 
   async function ensureActor() {
     if (!db || typeof db.from !== "function") throw new Error("Admin console database is unavailable");
@@ -67,16 +109,21 @@ function createAdminConsoleAuthService({
       }
       const inputUser = typeof input?.username === "string" ? input.username.trim() : "";
       const inputPass = typeof input?.password === "string" ? input.password : "";
+      const attemptKey = inputUser || configuredUser || "admin";
+      attempts.assertAllowed(attemptKey);
       if (!safeEqualText(inputUser, configuredUser) || !safeEqualText(inputPass, configuredPass)) {
+        attempts.recordFailure(attemptKey);
         throw new PublicAdminAuthError("ADMIN_AUTH_INVALID", "帐号或密码错误");
       }
       try {
         const userId = await ensureActor();
+        attempts.clear(attemptKey);
         return {
           user: { id: userId },
           session: { accessToken: createAdminAccessToken(userId, sessionSecret, now) },
         };
       } catch (error) {
+        if (error instanceof PublicAdminAuthError) throw error;
         console.error("[admin-auth] actor bootstrap failed:", error?.message || error);
         throw new PublicAdminAuthError("ADMIN_AUTH_FAILED", "管理员会话创建失败");
       }
@@ -86,6 +133,8 @@ function createAdminConsoleAuthService({
 
 module.exports = {
   PublicAdminAuthError,
+  ADMIN_TOKEN_TTL_SECONDS,
   createAdminAccessToken,
+  createLoginAttemptTracker,
   createAdminConsoleAuthService,
 };

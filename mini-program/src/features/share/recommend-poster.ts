@@ -41,9 +41,11 @@ export async function shareRecommendPosterToWechat(): Promise<void> {
     if (/cancel|取消/i.test(errMsg)) throw error;
     // DevTools often rejects showShareImageMenu; fall back to album save prompt path.
     if (/not support|fail|undefined|simulate/i.test(errMsg) || !errMsg) {
-      throw new Error("请在真机上使用微信分享，或改用「保存」后转发图片");
+      throw Object.assign(new Error("请在真机上使用微信分享，或改用「保存」后转发图片"), { cause: error });
     }
-    throw error instanceof Error ? error : new Error(errMsg || "分享失败，请稍后重试");
+    throw error instanceof Error
+      ? error
+      : Object.assign(new Error(errMsg || "分享失败，请稍后重试"), { cause: error });
   }
 }
 

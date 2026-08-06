@@ -85,7 +85,9 @@ function createVitaVisionService({ apiKey, model, requestCompletion, fetchImpl }
       throw new PublicVisionError("VISION_IMAGE_INVALID", "图片无效");
     }
     const raw = await complete({ imageUrl: input.imageUrl });
-    const content = typeof raw === "string" ? raw : raw?.content;
+    const content = typeof raw === "string"
+      ? raw
+      : (raw?.content ?? (raw && typeof raw === "object" && raw.mealName ? raw : null));
     const usage = typeof raw === "object" && raw ? raw.usage : null;
     return { ...validateResult(content), provider: "vita", model: selectedModel, usage };
   };
