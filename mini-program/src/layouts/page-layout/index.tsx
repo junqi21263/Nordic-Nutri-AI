@@ -4,11 +4,14 @@ import { useEffect, type PropsWithChildren } from "react";
 import { AppSafeArea } from "../../components/app-safe-area";
 import { AppTopBar } from "../../components/app-top-bar";
 import { AchievementUnlockOverlay } from "../../components/achievement-unlock-overlay";
+import { acknowledgeProductAchievementCelebration } from "../../api/insight-api";
 import { BottomTabBar } from "../../components/bottom-tab-bar";
 import { PullDownRefreshIndicator } from "../../components/pull-down-refresh-indicator";
 import { TopNavigation } from "../../components/top-navigation";
 import { useSystemLayout } from "../../hooks/useSystemLayout";
 import { useTabBarStore } from "../../stores/tab-bar-store";
+import { useAchievementStore } from "../../stores/achievement-store";
+import Taro from "@tarojs/taro";
 
 export interface PageLayoutProps extends PropsWithChildren {
   title: string;
@@ -63,7 +66,26 @@ export function PageLayout({
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
   const activeKey = useTabBarStore((state) => state.activeKey);
   const tabbarVisible = useTabBarStore((state) => state.visible);
+  const achievementUnlocked = useAchievementStore((state) => state.achievementUnlocked);
+  const achievements = useAchievementStore((state) => state.achievements);
+  const dismissAchievementUnlocked = useAchievementStore((state) => state.dismissAchievementUnlocked);
+  const markAchievementCelebrated = useAchievementStore((state) => state.markAchievementCelebrated);
   const layout = useSystemLayout();
+  const activeAchievement = achievementUnlocked
+    ? achievements.find((item) => item.id === achievementUnlocked.achievementId) ?? null
+    : null;
+  const dismissAchievementCelebration = async () => {
+    if (!activeAchievement) return false;
+    try {
+      await acknowledgeProductAchievementCelebration(activeAchievement.id);
+      markAchievementCelebrated(activeAchievement.id);
+      dismissAchievementUnlocked();
+      return true;
+    } catch {
+      Taro.showToast({ title: "庆祝确认失败，请稍后重试", icon: "none" });
+      return false;
+    }
+  };
 
   // Tab pages stay mounted under switchTab; sync highlight on show, not only mount.
   useDidShow(() => {
@@ -128,7 +150,11 @@ export function PageLayout({
         </View>
       </View>
       {showTabs && tabbarVisible ? <BottomTabBar activeKey={activeKey} /> : null}
-      <AchievementUnlockOverlay />
+      <AchievementUnlockOverlay
+        achievement={activeAchievement}
+        achievements={achievements}
+        onDismiss={dismissAchievementCelebration}
+      />
     </AppSafeArea>
   );
 }

@@ -2,44 +2,32 @@ import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { getAchievementRequirement } from "../../features/coach/achievement-catalog";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
+import type { Achievement } from "../../features/coach/domain";
 import { NordicIcon } from "../nordic-icon";
-import { useAchievementStore } from "../../stores/achievement-store";
-import { acknowledgeProductAchievementCelebration } from "../../api/insight-api";
 
 const particleIndexes = [0, 1, 2, 3, 4, 5];
 
-export function AchievementUnlockOverlay() {
-  const achievementUnlocked = useAchievementStore((state) => state.achievementUnlocked);
-  const achievements = useAchievementStore((state) => state.achievements);
-  const dismissAchievementUnlocked = useAchievementStore((state) => state.dismissAchievementUnlocked);
-  const markAchievementCelebrated = useAchievementStore((state) => state.markAchievementCelebrated);
-  const achievement = achievementUnlocked
-    ? achievements.find((item) => item.id === achievementUnlocked.achievementId)
-    : null;
-
+export function AchievementUnlockOverlay({
+  achievement,
+  achievements,
+  onDismiss,
+}: {
+  achievement: Achievement | null;
+  achievements: Achievement[];
+  onDismiss: () => Promise<boolean>;
+}) {
   if (!achievement) return null;
 
   const unlockedCount = achievements.filter((item) => item.unlocked).length;
   const requirement = achievement.requirement || getAchievementRequirement(achievement.title);
-  const dismiss = async () => {
-    try {
-      await acknowledgeProductAchievementCelebration(achievement.id);
-      markAchievementCelebrated(achievement.id);
-      dismissAchievementUnlocked();
-      return true;
-    } catch {
-      Taro.showToast({ title: "庆祝确认失败，请稍后重试", icon: "none" });
-      return false;
-    }
-  };
   const openAchievements = async () => {
-    if (!await dismiss()) return;
+    if (!await onDismiss()) return;
     void Taro.navigateTo({ url: "/pages/achievements/index" });
   };
 
   return (
     <View className="achievement-unlock-overlay" ariaLabel="成就已解锁">
-      <View className="achievement-unlock-overlay__backdrop" onClick={() => { void dismiss(); }} />
+      <View className="achievement-unlock-overlay__backdrop" onClick={() => { void onDismiss(); }} />
       <View className="achievement-unlock-overlay__card">
         {particleIndexes.map((index) => (
           <View
@@ -65,7 +53,7 @@ export function AchievementUnlockOverlay() {
             />
           </View>
         </View>
-        <View className="achievement-unlock-overlay__primary-action" onClick={() => { void dismiss(); }}>
+        <View className="achievement-unlock-overlay__primary-action" onClick={() => { void onDismiss(); }}>
           <Text>继续记录</Text>
         </View>
         <Text className="achievement-unlock-overlay__secondary-action" onClick={() => { void openAchievements(); }}>

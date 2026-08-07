@@ -10,18 +10,20 @@ describe("achievement unlock overlay", () => {
     const app = readFileSync(resolve(srcRoot, "app.tsx"), "utf8");
     const pageLayout = readFileSync(resolve(srcRoot, "layouts/page-layout/index.tsx"), "utf8");
 
-    expect(overlay).toContain("achievementUnlocked");
+    expect(pageLayout).toContain("achievementUnlocked");
     expect(overlay).toContain("achievement-unlock-overlay");
     expect(overlay).toContain("achievement-unlock-overlay__card");
     expect(overlay).toContain("achievement-unlock-overlay__particle");
-    expect(overlay).toContain("acknowledgeProductAchievementCelebration");
-    expect(overlay).toContain("markAchievementCelebrated");
+    expect(pageLayout).toContain("acknowledgeProductAchievementCelebration");
+    expect(overlay).not.toContain("useAchievementStore");
     expect(overlay).toContain("成就已解锁");
     expect(overlay).toContain("继续记录");
     expect(overlay).toContain("查看成长里程");
     expect(overlay).toContain('Taro.navigateTo({ url: "/pages/achievements/index" })');
     expect(pageLayout).toContain("AchievementUnlockOverlay");
-    expect(pageLayout).toContain("<AchievementUnlockOverlay />");
+    expect(pageLayout).toContain("<AchievementUnlockOverlay");
+    expect(pageLayout).toContain("useAchievementStore((state) => state.achievementUnlocked)");
+    expect(pageLayout).toContain("activeAchievement");
     expect(app).not.toContain("AchievementUnlockOverlay");
   });
 });
