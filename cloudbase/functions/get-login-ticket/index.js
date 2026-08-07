@@ -18,6 +18,7 @@ const { createFoodInsightService } = require("./food-insight-service.cjs");
 const { createNutritionInsightWorkerClient } = require("./nutrition-insight-worker-client.cjs");
 const { createDeepseekCoachService, createDeepseekCoachStreamService } = require("./deepseek-coach-service.cjs");
 const { createDailyTipService } = require("./daily-tip-service.cjs");
+const { createProactiveDailyBriefService } = require("./proactive-daily-brief-service.cjs");
 const { createCoachDataService, PublicCoachDataError } = require("./coach-data-service.cjs");
 const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-data-service.cjs");
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
@@ -367,6 +368,12 @@ function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = nu
       featureLabel: "每日小贴士",
       provider: "hunyuan",
       model: textModel,
+    },
+    {
+      feature: "proactive_daily_brief",
+      featureLabel: "NOVA 每日提醒",
+      provider: "deepseek",
+      model: resolvedDeepseek,
     },
     {
       feature: "food_image",
@@ -1301,6 +1308,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
         model: devTextModel,
         source: "hunyuan-exp",
       }),
+      proactiveDailyBrief: createProactiveDailyBriefService({
+        apiKey: env.DEEPSEEK_API_KEY,
+        model: deepseekModel,
+      }),
     }),
     feedback: createFeedbackDataService({ db }),
     foodCatalog,
@@ -1414,6 +1425,7 @@ function getCoachRoute(pathname) {
   if (path === "/coach-answer/stream") return "streamMessage";
   if (path === "/coach/restart") return "restartConversation";
   if (path === "/coach/daily-tip") return "getDailyTip";
+  if (path === "/coach/daily-brief") return "getDailyBrief";
   return null;
 }
 
@@ -2466,6 +2478,21 @@ function createHttpServer({ service }) {
           }
           return sendJson(res, 200, tip);
         }
+        if (coachOperation === "getDailyBrief" && req.method === "GET") {
+          const date = url.searchParams.get("date");
+          if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
+          const brief = await service.coach.getDailyBrief(session.sub, date);
+          if (!brief?.cached && brief?.model && brief?.source === "deepseek") {
+            recordModelUsage(service.observability, {
+              model: brief.model,
+              feature: "proactive_daily_brief",
+              provider: "deepseek",
+              usage: brief.usage || null,
+              requests: 1,
+            }).catch(() => {});
+          }
+          return sendJson(res, 200, brief);
+        }
         if (coachOperation === "restartConversation" && req.method === "POST") {
           return sendJson(res, 200, await service.coach.restartConversation(session.sub));
         }
@@ -2913,6 +2940,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  buildModelCatalog,
   createHttpServer,
   createHunyuanGenerationService,
   createRuntimeService,

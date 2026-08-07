@@ -55,7 +55,7 @@ describe("local coach and profile", () => {
       "utf8",
     );
 
-    expect(source).toContain("今日还差");
+    expect(source).toContain("NOVA · 今日提醒");
     expect(composer).toContain("问问营养教练");
     expect(source).toContain('className="coach-chat__status-badge"');
     expect(source).not.toContain('className="coach-chat__suggestion-product"');

@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import {
   getProductCoachMessages,
   getProductCoachBrief,
+  getProductCoachDailyBrief,
   getProductCoachDailyTip,
   restartProductCoachConversation,
   sendProductCoachMessage,
   streamProductCoachMessage,
   type ProductCoachDailyTip,
+  type ProductCoachDailyBrief,
   type ProductCoachDailyUsage,
   type ProductCoachMessage,
 } from "../../api/coach-api";
@@ -51,6 +53,17 @@ const defaultDailyTip: ProductCoachDailyTip = {
   headline: "下一餐加一份深色蔬菜",
   content: "西兰花、菠菜等能帮助补充膳食纤维；搭配蛋白质和适量主食更均衡。",
   food: null,
+  source: "rule_v2",
+  model: null,
+};
+const defaultDailyBrief: ProductCoachDailyBrief = {
+  greeting: "你好 👋",
+  summary: "今天从记录一餐开始，让 NOVA 更懂你的饮食节奏。",
+  mealLabel: "早餐建议",
+  suggestion: "选择一份蛋白质、蔬菜和适量主食",
+  reason: "稳定记录能帮助你接近每日营养目标。",
+  theme: "starter",
+  action: "先完成今天第一餐记录",
   source: "rule_v2",
   model: null,
 };
@@ -116,6 +129,7 @@ export default function CoachPage() {
   const [serverTime, setServerTime] = useState<string | null>(null);
   const [dailyTip, setDailyTip] = useState<ProductCoachDailyTip | null>(null);
   const [dailyTipLoading, setDailyTipLoading] = useState(false);
+  const [dailyBrief, setDailyBrief] = useState<ProductCoachDailyBrief>(defaultDailyBrief);
   const [selectedImagePath, setSelectedImagePath] = useState<string | null>(null);
   const [dailyUsage, setDailyUsage] = useState<ProductCoachDailyUsage>(defaultDailyUsage);
   const [completedReplyVersion, setCompletedReplyVersion] = useState(0);
@@ -195,6 +209,14 @@ export default function CoachPage() {
     }
   };
 
+  const loadDailyBrief = async () => {
+    try {
+      setDailyBrief(await getProductCoachDailyBrief(date));
+    } catch {
+      // Keep a contextual local starter fallback when the product API is unavailable.
+    }
+  };
+
   const createProactiveMessage = (): ChatMessage => ({
     id: "proactive-message-" + Date.now(),
     role: "coach",
@@ -218,7 +240,7 @@ export default function CoachPage() {
       setMessages([createProactiveMessage()]);
       setDraft("");
       setSelectedImagePath(null);
-      await Promise.all([refreshCoachBrief(), loadDailyTip()]);
+      await Promise.all([refreshCoachBrief(), loadDailyBrief(), loadDailyTip()]);
       feedback.show({ message: "已开启新的营养教练对话", tone: "success" });
     } catch {
       feedback.show({ message: "重启对话失败，请稍后重试", tone: "error" });
@@ -228,8 +250,9 @@ export default function CoachPage() {
   };
 
   useDidShow(() => {
-    // Tab pages stay mounted; re-fetch brief/tip so diet preference edits show up.
+    // Tab pages stay mounted; re-fetch reminder/brief/tip so profile edits show up.
     void refreshCoachBrief();
+    void loadDailyBrief();
     void loadDailyTip();
     // Keep nutrition rhythm targets in sync with home / cloud plan.
     void getProductDailySummary(date)
@@ -418,7 +441,7 @@ export default function CoachPage() {
         <View className="coach-chat__hero">
           <View className="coach-chat__hero-copy">
             <View className="coach-chat__hero-toolbar">
-              <Text className="coach-chat__hero-kicker">NOVA · 今日营养陪伴</Text>
+              <Text className="coach-chat__hero-kicker">NOVA · 今日提醒</Text>
               <View
                 className="coach-chat__restart-action"
                 ariaLabel="重启对话"
@@ -428,11 +451,13 @@ export default function CoachPage() {
                 <Text>重启对话</Text>
               </View>
             </View>
-            <Text className="coach-chat__hero-title">{greeting}，{"\n"}有什么营养建议随时来问我</Text>
+            <Text className="coach-chat__hero-title">{dailyBrief.greeting}{"\n"}{dailyBrief.summary}</Text>
             <View className="coach-chat__status-badge">
               <NordicIcon name="zap" size={15} ariaLabel="今日营养状态" />
-              <Text>增肌目标 · 今日还差 {proteinLeft}g 蛋白质</Text>
+              <Text>{dailyBrief.mealLabel} · {dailyBrief.suggestion}</Text>
             </View>
+            <Text className="coach-chat__hero-reason">{dailyBrief.reason}</Text>
+            <Text className="coach-chat__hero-action">{dailyBrief.action}</Text>
           </View>
         </View>
 

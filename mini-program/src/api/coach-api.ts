@@ -66,6 +66,19 @@ export interface ProductCoachDailyTip {
   cached?: boolean;
 }
 
+export interface ProductCoachDailyBrief {
+  greeting: string;
+  summary: string;
+  mealLabel: "早餐建议" | "午餐建议" | "晚餐建议" | "加餐建议";
+  suggestion: string;
+  reason: string;
+  theme: "starter" | "protein_gap" | "energy_gap" | "meal_rhythm" | "dietary_balance" | "progress" | "consistency";
+  action: string;
+  source: "deepseek" | "hunyuan-exp" | "rule_v2";
+  model: string | null;
+  cached?: boolean;
+}
+
 export type ProductCoachStreamEvent =
   | { type: "delta"; text: string }
   | {
@@ -200,6 +213,16 @@ export function getProductCoachDailyTip(date: string, options?: { refresh?: bool
     requestProductApi<ProductCoachDailyTip>(`/coach/daily-tip?${params.toString()}`, {
       method: "GET",
       fallbackMessage: "今日营养建议暂时无法读取，请稍后重试",
+      timeout: 20_000,
+    }),
+  );
+}
+
+export function getProductCoachDailyBrief(date: string) {
+  return coalesceRequest(`coach-daily-brief:${date}`, () =>
+    requestProductApi<ProductCoachDailyBrief>(`/coach/daily-brief?date=${encodeURIComponent(date)}`, {
+      method: "GET",
+      fallbackMessage: "NOVA 今日提醒暂时无法读取，请稍后重试",
       timeout: 20_000,
     }),
   );

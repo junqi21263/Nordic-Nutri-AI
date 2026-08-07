@@ -127,6 +127,48 @@ function tipContextHash(context) {
   return crypto.createHash("sha256").update(JSON.stringify(context)).digest("hex");
 }
 
+function previousDate(date) {
+  return shiftDate(date, -1);
+}
+
+function shiftDate(date, days) {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function percentage(consumed, target) {
+  const targetValue = Number(target);
+  if (!Number.isFinite(targetValue) || targetValue <= 0) return 0;
+  return Math.max(0, Math.round((safeNumber(consumed) / targetValue) * 100));
+}
+
+function dayDifference(from, to) {
+  const start = new Date(`${from}T00:00:00.000Z`).getTime();
+  const end = new Date(`${to}T00:00:00.000Z`).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
+  return Math.max(0, Math.floor((end - start) / 86_400_000));
+}
+
+function journeyStage(account, date, weekly) {
+  const createdAt = account?.createdAt || account?.created_at || account?.profile?.createdAt || account?.profile?.created_at;
+  const ageInDays = typeof createdAt === "string" ? dayDifference(createdAt.slice(0, 10), date) : 0;
+  const recordedDays = safeNumber(weekly?.recordedDays);
+  if (!recordedDays && ageInDays === 0) return "first_day";
+  if (ageInDays <= 7 || recordedDays <= 6) return "first_week";
+  if (recordedDays < 14) return "habit_building";
+  if (safeNumber(weekly?.proteinCompletion) >= 80) return "goal_progress";
+  return "stable_tracking";
+}
+
+function dayPeriod(date, clock) {
+  const hour = clock().getUTCHours() + 8;
+  if (hour < 11) return "morning";
+  if (hour < 15) return "noon";
+  if (hour < 21) return "evening";
+  return "snack";
+}
+
 function safetyForPrompt(prompt) {
   if (urgentRiskPattern.test(prompt)) return "urgent_care";
   if (medicalRiskPattern.test(prompt)) return "professional_consultation";
@@ -394,12 +436,13 @@ function takeCompleteSentences(value) {
   return match ? { text: match[1], rest: value.slice(match[1].length) } : { text: "", rest: value };
 }
 
-function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccount, answer, streamAnswer, dailyTip, clock = () => new Date(), model = "deepseek-v4-flash" }) {
+function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccount, answer, streamAnswer, dailyTip, proactiveDailyBrief, clock = () => new Date(), model = "deepseek-v4-flash" }) {
   if (!db || typeof db.from !== "function" || typeof getDailySummary !== "function" || typeof getWeeklyReview !== "function" || typeof getAccount !== "function") {
     throw new Error("Coach dependencies are unavailable");
   }
 
   const contextInflight = new Map();
+  const proactiveContextInflight = new Map();
 
   function normalizeDailyUsage(value) {
     const used = Math.min(DAILY_MESSAGE_LIMIT, safeNumber(value?.used_count ?? value?.usedCount));
@@ -480,6 +523,84 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
         setTimeout(() => contextInflight.delete(key), 1500);
       });
     contextInflight.set(key, promise);
+    return promise;
+  }
+
+  async function readRecentBriefThemes(userId) {
+    const result = await db.from("nova_daily_briefs").select("payload").eq("user_id", userId)
+      .order("brief_date", { ascending: false }).limit(3);
+    if (result.error) throw new Error("NOVA daily brief history read failed");
+    return (result.data ?? [])
+      .map((row) => typeof row?.payload?.theme === "string" ? row.payload.theme : null)
+      .filter(Boolean);
+  }
+
+  async function buildProactiveBriefContext(userId, date) {
+    const key = `${userId}:${date}`;
+    const pending = proactiveContextInflight.get(key);
+    if (pending) return pending;
+    const promise = Promise.all([
+      getDailySummary(userId, date),
+      getDailySummary(userId, previousDate(date)),
+      getWeeklyReview(userId, date, { preferFast: true }),
+      getWeeklyReview(userId, shiftDate(date, -7), { preferFast: true }),
+      getAccount(userId),
+      readRecentBriefThemes(userId).catch(() => []),
+    ]).then(([today, yesterday, weekly, previousWeek, account, recentThemes]) => {
+      const profile = account?.profile ?? {};
+      const preferences = createContext(today, weekly, account).preferences;
+      return {
+        userJourneyStage: journeyStage(account, date, weekly),
+        user: {
+          name: profile.nickname || account?.nickname || "",
+          age: Number(profile.age) || null,
+          gender: profile.gender || null,
+          height: Number(profile.heightCm ?? profile.height_cm) || null,
+          weight: Number(profile.weightKg ?? profile.weight_kg) || null,
+          goal: account?.goalType || null,
+          activity: profile.activityLevel || profile.activity_level || null,
+        },
+        nutritionGoal: {
+          calories: safeNumber(today?.targets?.calories),
+          protein: safeNumber(today?.targets?.protein),
+          carbs: safeNumber(today?.targets?.carbs),
+          fat: safeNumber(today?.targets?.fat),
+        },
+        preference: {
+          dietaryPattern: preferences.dietaryPattern,
+          avoidances: preferences.foodAvoidances,
+          mealsPerDay: preferences.mealsPerDay,
+        },
+        today: {
+          period: dayPeriod(date, clock),
+          caloriesConsumed: safeNumber(today?.consumed?.calories),
+          proteinConsumed: safeNumber(today?.consumed?.protein),
+          hasMealRecord: Boolean(today?.meals?.length),
+          recordedMeals: Array.isArray(today?.meals) ? today.meals.length : 0,
+        },
+        yesterday: {
+          recorded: Boolean(yesterday?.meals?.length),
+          caloriesRate: percentage(yesterday?.consumed?.calories, yesterday?.targets?.calories),
+          proteinRate: percentage(yesterday?.consumed?.protein, yesterday?.targets?.protein),
+          carbsRate: percentage(yesterday?.consumed?.carbs, yesterday?.targets?.carbs),
+          fatRate: percentage(yesterday?.consumed?.fat, yesterday?.targets?.fat),
+          mealCount: Array.isArray(yesterday?.meals) ? yesterday.meals.length : 0,
+        },
+        habit: {
+          continuousDays: safeNumber(weekly?.recordedDays),
+          weeklyRecordRate: Math.min(100, Math.round((safeNumber(weekly?.recordedDays) / 7) * 100)),
+          proteinCompletionTrend: safeNumber(weekly?.proteinCompletion),
+        },
+        recentTrend: {
+          proteinCompletionChange: safeNumber(weekly?.proteinCompletion) - safeNumber(previousWeek?.proteinCompletion),
+          recordedDaysChange: safeNumber(weekly?.recordedDays) - safeNumber(previousWeek?.recordedDays),
+        },
+        recentThemes,
+      };
+    }).finally(() => {
+      setTimeout(() => proactiveContextInflight.delete(key), 1500);
+    });
+    proactiveContextInflight.set(key, promise);
     return promise;
   }
 
@@ -675,6 +796,38 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     return { ...generated, cached: false };
   }
 
+  async function getDailyBrief(userId, date) {
+    const safeDate = normalizeDate(date);
+    const context = await buildProactiveBriefContext(userId, safeDate);
+    const contextHash = tipContextHash(context);
+    try {
+      const cached = await readCachedDailyBrief(userId, safeDate, contextHash);
+      if (cached) return cached;
+    } catch {
+      // Cache schema lag must never block the reminder.
+    }
+    const generated = typeof proactiveDailyBrief === "function"
+      ? await proactiveDailyBrief({ date: safeDate, context })
+      : {
+          greeting: "你好 👋",
+          summary: "今天从记录一餐开始，让营养反馈更贴合你。",
+          mealLabel: "早餐建议",
+          suggestion: "选择一份蛋白质、蔬菜和适量主食",
+          reason: "稳定记录能帮助你接近每日营养目标。",
+          theme: "starter",
+          action: "先完成今天第一餐记录",
+          source: "rule_v2",
+          model: null,
+          usage: null,
+        };
+    try {
+      await writeCachedDailyBrief(userId, safeDate, contextHash, generated);
+    } catch {
+      // The generated reminder stays usable if the optional cache write fails.
+    }
+    return { ...generated, cached: false };
+  }
+
   async function readCachedDailyTip(userId, tipDate, contextHash) {
     const lookup = await db.from("coach_daily_tips")
       .select("context_hash,payload,provider,model")
@@ -720,7 +873,41 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     if (persisted.error) throw new Error("Coach daily tip cache write failed");
   }
 
-  return { getMessages, sendMessage, streamMessage, getBrief, restartConversation, getDailyTip, getDailyUsage };
+  async function readCachedDailyBrief(userId, briefDate, contextHash) {
+    const lookup = await db.from("nova_daily_briefs")
+      .select("context_hash,payload,provider,model")
+      .eq("user_id", userId)
+      .eq("brief_date", briefDate)
+      .maybeSingle();
+    if (lookup.error) throw new Error("NOVA daily brief cache read failed");
+    const row = lookup.data;
+    if (!row || row.context_hash !== contextHash || !row.payload || typeof row.payload !== "object" || Array.isArray(row.payload)) return null;
+    const fields = ["greeting", "summary", "mealLabel", "suggestion", "reason", "theme", "action"];
+    if (fields.some((field) => typeof row.payload[field] !== "string" || !row.payload[field].trim())) return null;
+    return {
+      ...fields.reduce((result, field) => ({ ...result, [field]: row.payload[field].trim() }), {}),
+      source: row.provider ?? "rule_v2",
+      model: row.model ?? null,
+      cached: true,
+    };
+  }
+
+  async function writeCachedDailyBrief(userId, briefDate, contextHash, brief) {
+    const provider = ["deepseek", "hunyuan-exp", "rule_v2"].includes(brief?.source) ? brief.source : "rule_v2";
+    const payload = (({ greeting, summary, mealLabel, suggestion, reason, theme, action }) => ({ greeting, summary, mealLabel, suggestion, reason, theme, action }))(brief);
+    const persisted = await db.from("nova_daily_briefs").upsert({
+      user_id: userId,
+      brief_date: briefDate,
+      context_hash: contextHash,
+      payload,
+      provider,
+      model: brief.model ?? null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,brief_date" });
+    if (persisted.error) throw new Error("NOVA daily brief cache write failed");
+  }
+
+  return { getMessages, sendMessage, streamMessage, getBrief, restartConversation, getDailyTip, getDailyBrief, getDailyUsage };
 }
 
 module.exports = {

@@ -30,6 +30,7 @@ function createDb() {
     coach_conversations: [{ id: "conversation-1", user_id: "user-1", archived_at: null }],
     coach_messages: [{ id: "old-message", user_id: "user-1", conversation_id: "conversation-1", role: "assistant", content: "历史消息", created_at: "2026-07-20T10:00:00.000Z" }],
     coach_daily_tips: [],
+    nova_daily_briefs: [],
   };
   const db = {
     async rpc(name, input) {
@@ -79,7 +80,7 @@ function createDb() {
         async upsert(payload) {
           const values = Array.isArray(payload) ? payload : [payload];
           for (const value of values) {
-            const existing = rows[table].find((row) => row.user_id === value.user_id && row.tip_date === value.tip_date);
+            const existing = rows[table].find((row) => row.user_id === value.user_id && (row.tip_date === value.tip_date || row.brief_date === value.brief_date));
             if (existing) Object.assign(existing, value);
             else rows[table].push({ id: `${table}-${rows[table].length + 1}`, ...value });
           }
@@ -519,6 +520,70 @@ test("reuses a cached daily tip for the same nutrition context", async () => {
   assert.equal(second.cached, true);
   assert.equal(second.headline, "下一餐加鸡蛋");
   assert.equal(refreshed.cached, false);
+});
+
+test("builds a cached proactive brief from yesterday, habit, stage and preferences", async () => {
+  const { db } = createDb();
+  const calls = [];
+  const service = createCoachDataService({
+    db,
+    ...dependencies({
+      getDailySummary: async (_userId, date) => date === "2026-07-19"
+        ? {
+            targets: { calories: 2400, protein: 150, carbs: 280, fat: 70 },
+            consumed: { calories: 2064, protein: 104, carbs: 250, fat: 60 },
+            remaining: { calories: 336, protein: 46, carbs: 30, fat: 10 },
+            completion: 86,
+            meals: [{ id: "breakfast" }, { id: "lunch" }, { id: "dinner" }],
+          }
+        : {
+            targets: { calories: 2400, protein: 150, carbs: 280, fat: 70 },
+            consumed: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+            remaining: { calories: 2400, protein: 150, carbs: 280, fat: 70 },
+            completion: 0,
+            meals: [],
+          },
+      getWeeklyReview: async (_userId, endDate) => endDate === "2026-07-13"
+        ? { recordedDays: 4, proteinCompletion: 70, score: 70 }
+        : { recordedDays: 6, proteinCompletion: 85, score: 84 },
+      getAccount: async () => ({
+        createdAt: "2026-07-14T00:00:00.000Z",
+        profile: { nickname: "Lewis", age: 30, gender: "male", heightCm: 178, weightKg: 68, activityLevel: "medium" },
+        goalType: "muscle_gain",
+        settings: { dietaryPattern: "balanced", foodAvoidances: ["dairy"], mealsPerDay: 3 },
+      }),
+    }),
+    answer: null,
+    proactiveDailyBrief: async ({ context }) => {
+      calls.push(context);
+      return {
+        greeting: "早上好，Lewis 👋",
+        summary: "昨天蛋白完成 69%，今天早餐先补起来。",
+        mealLabel: "早餐建议",
+        suggestion: "鸡蛋 + 燕麦 + 无糖豆浆",
+        reason: "帮助接近今天的蛋白目标。",
+        theme: "protein_gap",
+        action: "早餐优先补足蛋白",
+        source: "deepseek",
+        model: "deepseek-v4-flash",
+        usage: { promptTokens: 40, completionTokens: 20, totalTokens: 60 },
+      };
+    },
+    clock: () => new Date("2026-08-07T01:00:00.000Z"),
+  });
+
+  const first = await service.getDailyBrief("user-1", "2026-07-20");
+  const second = await service.getDailyBrief("user-1", "2026-07-20");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].userJourneyStage, "first_week");
+  assert.equal(calls[0].today.period, "morning");
+  assert.equal(calls[0].yesterday.proteinRate, 69);
+  assert.deepEqual(calls[0].recentTrend, { proteinCompletionChange: 15, recordedDaysChange: 2 });
+  assert.deepEqual(calls[0].preference.avoidances, ["dairy"]);
+  assert.equal(first.cached, false);
+  assert.equal(second.cached, true);
+  assert.equal(second.theme, "protein_gap");
 });
 
 test("shares one context build across concurrent brief and tip requests", async () => {

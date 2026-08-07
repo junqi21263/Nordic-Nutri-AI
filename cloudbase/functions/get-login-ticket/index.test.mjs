@@ -4,6 +4,7 @@ import test from "node:test";
 import { PublicOperationError } from "./operation-guard.cjs";
 
 import {
+  buildModelCatalog,
   createHttpServer,
   createHunyuanGenerationService,
   createRuntimeService,
@@ -189,6 +190,18 @@ test("maps deprecated DeepSeek aliases to the supported V4 Flash model", () => {
   assert.equal(selectDeepseekModel("deepseek-chat"), "deepseek-v4-flash");
   assert.equal(selectDeepseekModel("deepseek-reasoner"), "deepseek-v4-flash");
   assert.equal(selectDeepseekModel("deepseek-v4-pro"), "deepseek-v4-pro");
+});
+
+test("lists NOVA proactive reminders separately in the admin model quota catalog", () => {
+  const entry = buildModelCatalog({ env: { DEEPSEEK_MODEL: "deepseek-v4-flash" } })
+    .find((item) => item.feature === "proactive_daily_brief");
+
+  assert.deepEqual(entry, {
+    feature: "proactive_daily_brief",
+    featureLabel: "NOVA 每日提醒",
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+  });
 });
 
 test("routes Hunyuan generation through the signed worker when configured", async () => {
@@ -626,6 +639,7 @@ test("reads, writes, and summarizes coach data only for the signed-in user", asy
         getMessages: async (userId) => { calls.push(["read", userId]); return []; },
         sendMessage: async (userId, body) => { calls.push(["write", userId, body]); return { messages: [] }; },
         getBrief: async (userId, date) => { calls.push(["brief", userId, date]); return { date, priority: "protein" }; },
+        getDailyBrief: async (userId, date) => { calls.push(["daily-brief", userId, date]); return { greeting: "早上好", theme: "starter" }; },
         restartConversation: async (userId) => { calls.push(["restart", userId]); return { conversationId: "conversation-2", messages: [] }; },
         getDailyTip: async (userId, date) => { calls.push(["daily-tip", userId, date]); return { type: "food_knowledge", headline: "看营养成分表", content: "先看每份含量。" }; },
       },
@@ -642,6 +656,8 @@ test("reads, writes, and summarizes coach data only for the signed-in user", asy
     })).status, 200);
     assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/brief?date=2026-07-20`, { headers })).status, 200);
     assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/brief?date=2026-07-20`, { method: "POST", headers })).status, 405);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/daily-brief?date=2026-07-20`, { headers })).status, 200);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/daily-brief`, { headers })).status, 400);
     assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/daily-tip?date=2026-07-20`, { headers })).status, 200);
     assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/daily-tip`, { headers })).status, 400);
     assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/restart`, { method: "POST", headers })).status, 200);
@@ -649,7 +665,7 @@ test("reads, writes, and summarizes coach data only for the signed-in user", asy
     assert.equal((await fetch(`${baseUrl}/get-login-ticket/coach/brief?date=2026-07-20`)).status, 401);
   });
 
-  assert.deepEqual(calls.map((call) => call.slice(0, 2)), [["read", "user-1"], ["write", "user-1"], ["brief", "user-1"], ["daily-tip", "user-1"], ["restart", "user-1"]]);
+  assert.deepEqual(calls.map((call) => call.slice(0, 2)), [["read", "user-1"], ["write", "user-1"], ["brief", "user-1"], ["daily-brief", "user-1"], ["daily-tip", "user-1"], ["restart", "user-1"]]);
 });
 
 test("streams coach events only for the authenticated product user", async () => {
