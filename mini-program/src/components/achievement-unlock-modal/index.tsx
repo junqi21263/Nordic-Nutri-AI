@@ -39,6 +39,11 @@ interface ParticleSeed {
   duration: number;
   rotation: number;
   drift: number;
+  mid: number;
+  end: number;
+  rise: number;
+  entryRise: number;
+  fall: number;
 }
 
 function createRandom(seed: string) {
@@ -53,14 +58,23 @@ function createRandom(seed: string) {
 
 function createParticleSeeds(seed: string, side: "left" | "right"): ParticleSeed[] {
   const random = createRandom(`${seed}:${side}`);
+  const direction = side === "left" ? 1 : -1;
   return Array.from({ length: particleCount }, (_, index) => ({
     type: particleTypes[index % particleTypes.length]!,
     size: particleSizes[Math.floor(random() * particleSizes.length)]!,
-    top: 8 + random() * 84,
-    delay: Math.round(random() * 720),
-    duration: Math.round(2850 + random() * 650),
+    // Stitch launches from each edge around the vertical midpoint, not from
+    // arbitrary page coordinates. The later values keep the two streams from
+    // collapsing into a single center column after they collide.
+    top: 35 + random() * 30,
+    delay: Math.round(random() * 480),
+    duration: Math.round(2700 + random() * 700),
     rotation: Math.round(-35 + random() * 70),
     drift: Math.round((random() - 0.5) * 7 * 10) / 10,
+    mid: direction * Math.round((40 + random() * 22) * 10) / 10,
+    end: direction * Math.round((22 + random() * 70) * 10) / 10,
+    rise: -(Math.round((4 + random() * 14) * 10) / 10),
+    entryRise: -(Math.round((4 + random() * 14) * 4.5) / 10),
+    fall: Math.round((38 + random() * 36) * 10) / 10,
   }));
 }
 
@@ -91,6 +105,11 @@ export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUn
         animationDuration: `${particle.duration}ms`,
         "--particle-drift": `${particle.drift}vw`,
         "--particle-rotation": `${particle.rotation}deg`,
+        "--particle-mid": `${particle.mid}vw`,
+        "--particle-end": `${particle.end}vw`,
+        "--particle-rise": `${particle.rise}vh`,
+        "--particle-entry-rise": `${particle.entryRise}vh`,
+        "--particle-fall": `${particle.fall}vh`,
       } as Record<string, string>}
     />
   ));
