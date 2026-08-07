@@ -15,6 +15,7 @@ describe("achievement unlock overlay", () => {
     expect(overlay).toContain("achievement-unlock-overlay");
     expect(overlay).toContain("achievement-unlock-overlay__card");
     expect(overlay).toContain("achievement-unlock-overlay__particle");
+    expect(overlay).toContain("particleSizes");
     expect(overlay).toContain("achievement-unlock-overlay__sparkle");
     expect(overlay).toContain('size={44}');
     expect(overlay).toContain("achievement-unlock-overlay__burst");
@@ -31,6 +32,9 @@ describe("achievement unlock overlay", () => {
     expect(pageLayout).toContain("<AchievementUnlockOverlay");
     expect(pageLayout).toContain("useAchievementStore((state) => state.achievementUnlocked)");
     expect(pageLayout).toContain("activeAchievement");
+    expect(pageLayout).toContain("useDidHide");
+    expect(pageLayout).toContain("pageVisible");
+    expect(pageLayout).toContain("{pageVisible ?");
     expect(app).not.toContain("AchievementUnlockOverlay");
     expect(pageStyles).toContain(".achievement-unlock-overlay__burst");
     expect(pageStyles).toContain("achievement-unlock-burst-left");
@@ -38,6 +42,9 @@ describe("achievement unlock overlay", () => {
     expect(pageStyles).toContain("backdrop-filter: blur(3px)");
     expect(pageStyles).toContain("#d8a94b");
     expect(pageStyles).toContain(".achievement-unlock-overlay__particle--spark");
+    expect(pageStyles).toContain("border-radius: 0;");
+    expect(pageStyles).toContain("52% {");
+    expect(pageStyles).toContain("translate3d(50vw");
     expect(pageStyles).toContain(" 500ms both");
     expect(pageStyles).toContain("animation: achievement-unlock-icon-glow");
   });

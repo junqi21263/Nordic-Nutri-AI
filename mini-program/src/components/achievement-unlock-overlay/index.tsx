@@ -7,6 +7,7 @@ import { NordicIcon } from "../nordic-icon";
 
 const particleIndexes = Array.from({ length: 32 }, (_, index) => index);
 const particleTypes = ["fragment", "leaf", "spark", "dot"] as const;
+const particleSizes = ["small", "medium", "large", "medium", "small", "large"] as const;
 
 export function AchievementUnlockOverlay({
   achievement,
@@ -30,7 +31,7 @@ export function AchievementUnlockOverlay({
         {particleIndexes.map((index) => (
           <View
             key={index}
-            className={`achievement-unlock-overlay__particle achievement-unlock-overlay__particle--${index} achievement-unlock-overlay__particle--${particleTypes[index % particleTypes.length]}`}
+            className={`achievement-unlock-overlay__particle achievement-unlock-overlay__particle--${index} achievement-unlock-overlay__particle--${particleTypes[index % particleTypes.length]} achievement-unlock-overlay__particle--${particleSizes[index % particleSizes.length]}`}
           />
         ))}
       </View>
@@ -38,7 +39,7 @@ export function AchievementUnlockOverlay({
         {particleIndexes.map((index) => (
           <View
             key={index}
-            className={`achievement-unlock-overlay__particle achievement-unlock-overlay__particle--${index} achievement-unlock-overlay__particle--${particleTypes[index % particleTypes.length]}`}
+            className={`achievement-unlock-overlay__particle achievement-unlock-overlay__particle--${index} achievement-unlock-overlay__particle--${particleTypes[index % particleTypes.length]} achievement-unlock-overlay__particle--${particleSizes[index % particleSizes.length]}`}
           />
         ))}
       </View>

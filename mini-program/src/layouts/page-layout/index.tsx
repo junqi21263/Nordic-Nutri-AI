@@ -1,6 +1,6 @@
 import { View } from "@tarojs/components";
-import { useDidShow } from "@tarojs/taro";
-import { useEffect, type PropsWithChildren } from "react";
+import { useDidHide, useDidShow } from "@tarojs/taro";
+import { useEffect, useState, type PropsWithChildren } from "react";
 import { AppSafeArea } from "../../components/app-safe-area";
 import { AppTopBar } from "../../components/app-top-bar";
 import { AchievementUnlockOverlay } from "../../components/achievement-unlock-overlay";
@@ -70,6 +70,7 @@ export function PageLayout({
   const achievements = useAchievementStore((state) => state.achievements);
   const dismissAchievementUnlocked = useAchievementStore((state) => state.dismissAchievementUnlocked);
   const markAchievementCelebrated = useAchievementStore((state) => state.markAchievementCelebrated);
+  const [pageVisible, setPageVisible] = useState(false);
   const layout = useSystemLayout();
   const activeAchievement = achievementUnlocked
     ? achievements.find((item) => item.id === achievementUnlocked.achievementId) ?? null
@@ -89,8 +90,10 @@ export function PageLayout({
 
   // Tab pages stay mounted under switchTab; sync highlight on show, not only mount.
   useDidShow(() => {
+    setPageVisible(true);
     if (showTabs) setActiveKey(activeTab ?? "home");
   });
+  useDidHide(() => setPageVisible(false));
   useEffect(() => {
     if (showTabs) setActiveKey(activeTab ?? "home");
   }, [activeTab, setActiveKey, showTabs]);
@@ -150,10 +153,12 @@ export function PageLayout({
         </View>
       </View>
       {showTabs && tabbarVisible ? <BottomTabBar activeKey={activeKey} /> : null}
-      <AchievementUnlockOverlay
-        achievement={activeAchievement}
-        onDismiss={dismissAchievementCelebration}
-      />
+      {pageVisible ? (
+        <AchievementUnlockOverlay
+          achievement={activeAchievement}
+          onDismiss={dismissAchievementCelebration}
+        />
+      ) : null}
     </AppSafeArea>
   );
 }

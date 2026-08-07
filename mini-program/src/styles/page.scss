@@ -2445,16 +2445,16 @@
   overflow: hidden;
   pointer-events: none;
   position: absolute;
+  left: 0;
+  right: 0;
   top: 0;
-  z-index: 1;
+  z-index: 3;
 }
 .achievement-unlock-overlay__burst--left {
-  left: 0;
-  right: 50%;
+  transform: translateZ(0);
 }
 .achievement-unlock-overlay__burst--right {
-  left: 50%;
-  right: 0;
+  transform: translateZ(0);
 }
 .achievement-unlock-overlay__icon {
   align-items: center;
@@ -2538,40 +2538,45 @@
   animation-timing-function: cubic-bezier(0.18, 0.72, 0.32, 1);
   opacity: 0;
   position: absolute;
+  border-radius: 0;
 }
 .achievement-unlock-overlay__burst--left .achievement-unlock-overlay__particle {
   animation-name: achievement-unlock-burst-left;
-  left: -20px;
+  left: -24px;
 }
 .achievement-unlock-overlay__burst--right .achievement-unlock-overlay__particle {
   animation-name: achievement-unlock-burst-right;
-  right: -20px;
+  right: -24px;
 }
 .achievement-unlock-overlay__particle--fragment {
   background: $color-warm-white;
-  border-radius: 3px 10px 3px 10px;
   height: 8px;
   width: 16px;
 }
 .achievement-unlock-overlay__particle--leaf {
   background: #b9e8c7;
-  border-radius: 100% 0 100% 0;
   height: 16px;
   width: 9px;
 }
 .achievement-unlock-overlay__particle--spark {
   background: #d8a94b;
-  border-radius: $radius-full;
   box-shadow: 0 0 10px rgba(#d8a94b, 0.7);
   height: 6px;
   width: 6px;
 }
 .achievement-unlock-overlay__particle--dot {
   background: rgba($color-warm-white, 0.56);
-  border-radius: $radius-full;
   height: 11px;
   width: 11px;
 }
+.achievement-unlock-overlay__particle--small.achievement-unlock-overlay__particle--fragment { height: 5px; width: 10px; }
+.achievement-unlock-overlay__particle--small.achievement-unlock-overlay__particle--leaf { height: 10px; width: 6px; }
+.achievement-unlock-overlay__particle--small.achievement-unlock-overlay__particle--spark { height: 4px; width: 4px; }
+.achievement-unlock-overlay__particle--small.achievement-unlock-overlay__particle--dot { height: 7px; width: 7px; }
+.achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--fragment { height: 12px; width: 25px; }
+.achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--leaf { height: 23px; width: 13px; }
+.achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--spark { height: 8px; width: 8px; }
+.achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--dot { height: 16px; width: 16px; }
 .achievement-unlock-overlay__particle--0 { animation-delay: 0ms; top: 12%; }
 .achievement-unlock-overlay__particle--1 { animation-delay: 90ms; top: 18%; }
 .achievement-unlock-overlay__particle--2 { animation-delay: 180ms; top: 24%; }
@@ -2628,15 +2633,17 @@
 }
 @keyframes achievement-unlock-burst-left {
   0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.65); }
-  12% { opacity: 0.96; }
-  72% { opacity: 0.8; }
-  100% { opacity: 0; transform: translate3d(46vw, -10vh, 0) rotate(220deg) scale(1.08); }
+  18% { opacity: 0.96; transform: translate3d(22vw, -4vh, 0) rotate(75deg) scale(0.96); }
+  52% { opacity: 0.98; transform: translate3d(50vw, 0, 0) rotate(165deg) scale(1.08); }
+  68% { opacity: 0.82; transform: translate3d(50vw, 7vh, 0) rotate(210deg) scale(1.04); }
+  100% { opacity: 0; transform: translate3d(48vw, 38vh, 0) rotate(320deg) scale(0.92); }
 }
 @keyframes achievement-unlock-burst-right {
   0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.65); }
-  12% { opacity: 0.96; }
-  72% { opacity: 0.8; }
-  100% { opacity: 0; transform: translate3d(-46vw, 10vh, 0) rotate(-220deg) scale(1.08); }
+  18% { opacity: 0.96; transform: translate3d(-22vw, 4vh, 0) rotate(-75deg) scale(0.96); }
+  52% { opacity: 0.98; transform: translate3d(-50vw, 0, 0) rotate(-165deg) scale(1.08); }
+  68% { opacity: 0.82; transform: translate3d(-50vw, 7vh, 0) rotate(-210deg) scale(1.04); }
+  100% { opacity: 0; transform: translate3d(-48vw, 38vh, 0) rotate(-320deg) scale(0.92); }
 }
 .weekly-review__hero {
   align-items: center;
