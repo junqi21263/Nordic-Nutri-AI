@@ -281,9 +281,9 @@ export default function ProfilePage() {
           <View onClick={openFeedback}>
             <ListItem
               icon={<NordicIcon name="heart" size={20} ariaLabel="反馈与帮助" />}
-              title={<View className="profile-feedback-title"><Text>反馈与帮助</Text><Text className="profile-feedback-title__arrow">›</Text>{unreadReplyCount > 0 ? <View className="profile-feedback-title__bell"><NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" /></View> : null}</View>}
+              title={<View className="profile-feedback-title"><Text>反馈与帮助</Text>{unreadReplyCount > 0 ? <View className="profile-feedback-title__bell"><NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" /></View> : null}</View>}
               description="告诉我们你的想法"
-              trailing={null}
+              trailing="›"
             />
           </View>
           <View onClick={() => setActiveModal("about")}>

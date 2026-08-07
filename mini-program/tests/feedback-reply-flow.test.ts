@@ -15,7 +15,7 @@ describe("feedback reply flow", () => {
     expect(page).toContain("useDidShow(() =>");
     expect(page).toContain('className="profile-feedback-title"');
     expect(page).toContain('className="profile-feedback-title__bell"');
-    expect(page).toContain('className="profile-feedback-title__arrow"');
+    expect(page).toContain('trailing="›"');
     expect(page).toContain("我们的回复");
     expect(page).toContain('className="profile-feedback-empty"');
     expect(page).toContain("暂无反馈记录");
