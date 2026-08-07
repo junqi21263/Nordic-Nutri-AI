@@ -2,11 +2,12 @@ import { Canvas } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useMemo } from "react";
 
-const particleCountPerSide = 40;
+const particleCountPerSide = 60;
 const colors = ["#0B3B24", "#bdeecc", "#e3e3de", "#F9F8F3"];
 const confettiDelayMs = 300;
 const gravity = 0.5;
 const drag = 0.95;
+const motionRate = 0.66;
 
 type ParticleSide = "left" | "right";
 
@@ -159,11 +160,11 @@ export function AchievementConfettiCanvas({ seed }: AchievementConfettiCanvasPro
 
               for (let index = particles.length - 1; index >= 0; index -= 1) {
                 const particle = particles[index]!;
-                particle.vx *= drag;
-                particle.vy += gravity;
-                particle.x += particle.vx;
-                particle.y += particle.vy;
-                particle.rotation += particle.rotationSpeed;
+                particle.vx *= Math.pow(drag, motionRate);
+                particle.vy += gravity * motionRate;
+                particle.x += particle.vx * motionRate;
+                particle.y += particle.vy * motionRate;
+                particle.rotation += particle.rotationSpeed * motionRate;
 
                 if (particle.y > height - 100) {
                   particle.opacity -= 0.05;

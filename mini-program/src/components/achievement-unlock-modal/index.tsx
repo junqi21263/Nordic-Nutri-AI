@@ -2,7 +2,6 @@ import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { getAchievementRequirement } from "../../features/coach/achievement-catalog";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
-import { useDeferredProgress } from "../../hooks/useAnimatedProgress";
 import { AchievementConfettiCanvas } from "../achievement-confetti-canvas";
 import { NordicIcon, type NordicIconName } from "../nordic-icon";
 
@@ -27,14 +26,9 @@ export interface AchievementUnlockModalProps {
 }
 
 export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUnlockModalProps) {
-  const progressWidth = useDeferredProgress(5, 1500);
-
   if (!achievement) return null;
 
   const requirement = achievement.description || achievement.requirement || getAchievementRequirement(achievement.title);
-  const unlockCopy = achievement.title === "第一餐记录"
-    ? "成功记录第一餐，开启你的营养记录旅程。"
-    : requirement;
   const icon = achievement.icon || getAchievementIcon({
     id: achievement.id || "",
     title: achievement.title,
@@ -55,7 +49,7 @@ export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUn
           <NordicIcon name="x" size={22} ariaLabel="关闭" />
         </View>
         <View className="achievement-unlock-overlay__icon">
-          <NordicIcon name={icon} size={32} ariaLabel={achievement.title} />
+          <NordicIcon name={icon} size={52} ariaLabel={achievement.title} />
           <View className="achievement-unlock-overlay__sparkle achievement-unlock-overlay__sparkle--top-right">
             <NordicIcon name="sparkles" size={20} ariaLabel="解锁闪光" />
           </View>
@@ -63,23 +57,14 @@ export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUn
             <NordicIcon name="sparkles" size={18} ariaLabel="解锁闪光" />
           </View>
         </View>
-        <Text className="achievement-unlock-overlay__eyebrow">🎉 已解锁成就</Text>
+        <Text className="achievement-unlock-overlay__eyebrow">成就已解锁</Text>
         <Text className="achievement-unlock-overlay__title">{achievement.title}</Text>
-        <Text className="achievement-unlock-overlay__copy">{unlockCopy}</Text>
-        <View className="achievement-unlock-overlay__progress">
-          <View className="achievement-unlock-overlay__progress-heading">
-            <Text>进度</Text>
-            <Text>1 / 20</Text>
-          </View>
-          <View className="achievement-unlock-overlay__progress-track">
-            <View className="achievement-unlock-overlay__progress-fill" style={{ width: `${progressWidth}%` }} />
-          </View>
-        </View>
+        <Text className="achievement-unlock-overlay__copy">{requirement}</Text>
         <View className="achievement-unlock-overlay__primary-action" onClick={() => { void onDismiss(); }}>
-          <Text>继续记录</Text>
+          <Text>收下这份成就</Text>
         </View>
         <View className="achievement-unlock-overlay__secondary-action" onClick={() => { void openAchievements(); }}>
-          <Text>查看成就</Text>
+          <Text>查看全部成就</Text>
         </View>
       </View>
       <AchievementConfettiCanvas seed={achievement.id || achievement.title} />
