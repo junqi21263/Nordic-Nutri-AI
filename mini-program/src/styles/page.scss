@@ -2407,7 +2407,7 @@
   display: flex;
   justify-content: center;
   left: 0;
-  padding: $space-12;
+  padding: 20px;
   position: fixed;
   right: 0;
   top: 0;
@@ -2415,9 +2415,9 @@
 }
 .achievement-unlock-overlay__backdrop {
   animation: achievement-unlock-backdrop-in 300ms ease-out both;
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-  background: rgba(20, 42, 29, 0.38);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.4);
   bottom: 0;
   left: 0;
   position: absolute;
@@ -2428,222 +2428,180 @@
 .achievement-unlock-overlay__card {
   align-items: center;
   animation: achievement-unlock-card-in 600ms cubic-bezier(0.175, 0.885, 0.32, 1.275) 500ms both;
-  background: $color-surface;
-  border-radius: $radius-24;
-  box-shadow: 0 22px 48px rgba($color-forest-green, 0.22);
+  background: #faf9f4;
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  max-width: 620px;
-  overflow: hidden;
-  padding: $space-28 $space-24 $space-24;
+  max-width: 448px;
+  padding: 24px;
   position: relative;
   text-align: center;
-  width: 88%;
+  width: 100%;
   z-index: 2;
 }
 .achievement-unlock-overlay__close {
   align-items: center;
   color: $color-text-secondary;
   display: flex;
-  height: 64px;
+  height: 40px;
   justify-content: center;
   position: absolute;
-  right: $space-8;
-  top: $space-8;
-  width: 64px;
+  right: 16px;
+  top: 16px;
+  width: 40px;
   z-index: 4;
 }
 .achievement-unlock-overlay__close:active {
   opacity: 0.68;
   transform: scale(0.94);
 }
-.achievement-unlock-overlay__burst {
+.achievement-unlock-overlay__canvas {
   bottom: 0;
-  overflow: hidden;
+  height: 100%;
+  left: 0;
   pointer-events: none;
   position: absolute;
-  left: 0;
   right: 0;
   top: 0;
   z-index: 3;
-}
-.achievement-unlock-overlay__burst--left {
-  transform: translateZ(0);
-}
-.achievement-unlock-overlay__burst--right {
-  transform: translateZ(0);
+  width: 100%;
 }
 .achievement-unlock-overlay__icon {
   align-items: center;
-  animation: achievement-unlock-icon-in 520ms cubic-bezier(0.175, 0.885, 0.32, 1.275) 800ms both,
-    achievement-unlock-icon-glow 2s ease-in-out 1.25s infinite alternate;
-  background: $color-sage-light;
-  border: 2px solid rgba($color-sage, 0.3);
+  animation: achievement-unlock-icon-glow 2s ease-in-out 800ms infinite alternate;
+  background: #cee6c8;
   border-radius: $radius-full;
   display: flex;
-  height: 104px;
+  height: 80px;
   justify-content: center;
-  margin-bottom: $space-12;
+  margin-bottom: 16px;
   position: relative;
-  width: 104px;
+  width: 80px;
 }
 .achievement-unlock-overlay__icon > .nordic-icon {
-  height: 52px !important;
-  width: 52px !important;
+  height: 32px !important;
+  width: 32px !important;
 }
 .achievement-unlock-overlay__sparkle {
-  animation: achievement-unlock-sparkle-in 520ms ease-out 950ms both, achievement-unlock-sparkle-pulse 2.2s ease-in-out 1.5s infinite alternate;
+  animation: achievement-unlock-sparkle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   position: absolute;
 }
 .achievement-unlock-overlay__sparkle .nordic-icon {
   opacity: 0.72;
 }
 .achievement-unlock-overlay__sparkle--top-right {
-  right: -16px;
-  top: -12px;
+  right: -8px;
+  top: -8px;
 }
 .achievement-unlock-overlay__sparkle--bottom-left {
-  bottom: -10px;
-  left: -16px;
+  bottom: -4px;
+  left: -8px;
 }
 .achievement-unlock-overlay__eyebrow {
-  animation: achievement-unlock-copy-in 420ms ease-out 1.15s both;
+  animation: achievement-unlock-copy-in 500ms ease-out 1200ms both;
   color: $color-forest-green;
-  font-size: $font-body;
+  font-size: 12px;
   font-weight: $font-weight-semibold;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
+  letter-spacing: 0.05em;
+  line-height: 16px;
 }
 .achievement-unlock-overlay__title {
-  animation: achievement-unlock-copy-in 420ms ease-out 1.2s both;
+  animation: achievement-unlock-copy-in 500ms ease-out 1200ms both;
   color: $color-forest-green;
-  font-size: $font-h2;
+  font-size: 28px;
   font-weight: $font-weight-semibold;
-  margin-top: $space-8;
+  line-height: 34px;
+  margin-top: 8px;
 }
 .achievement-unlock-overlay__copy {
-  animation: achievement-unlock-copy-in 420ms ease-out 1.25s both;
+  animation: achievement-unlock-copy-in 500ms ease-out 1200ms both;
   color: $color-text-secondary;
-  font-size: $font-body;
-  line-height: $line-body;
-  margin-top: $space-8;
-  max-width: 460px;
+  font-size: 16px;
+  line-height: 24px;
+  margin-top: 8px;
+  max-width: 260px;
+}
+.achievement-unlock-overlay__progress {
+  animation: achievement-unlock-copy-in 500ms ease-out 1300ms both;
+  margin-top: 24px;
+  width: 100%;
+}
+.achievement-unlock-overlay__progress-heading {
+  align-items: flex-end;
+  color: $color-text-secondary;
+  display: flex;
+  font-size: 12px;
+  justify-content: space-between;
+  line-height: 16px;
+  margin-bottom: 4px;
+}
+.achievement-unlock-overlay__progress-heading > Text:last-child {
+  color: $color-forest-green;
+  font-size: 14px;
+  font-weight: $font-weight-semibold;
+  line-height: 20px;
+}
+.achievement-unlock-overlay__progress-track {
+  background: #e3e3de;
+  border-radius: $radius-full;
+  height: 8px;
+  overflow: hidden;
+  width: 100%;
+}
+.achievement-unlock-overlay__progress-fill {
+  background: #a1d2b1;
+  border-radius: $radius-full;
+  height: 100%;
+  transition: width 1000ms ease-out;
 }
 .achievement-unlock-overlay__primary-action {
   align-items: center;
-  background: $color-forest-green;
+  background: #002413;
   border-radius: $radius-12;
   color: $color-warm-white;
   display: flex;
-  font-size: $font-body;
+  font-size: 16px;
   font-weight: $font-weight-semibold;
   justify-content: center;
-  animation: achievement-unlock-copy-in 420ms ease-out 1.35s both;
-  margin-top: $space-20;
-  min-height: 84rpx;
-  max-width: 520px;
-  width: 88%;
+  animation: achievement-unlock-copy-in 500ms ease-out 1400ms both;
+  margin-top: 32px;
+  min-height: 44px;
+  width: 100%;
 }
 .achievement-unlock-overlay__secondary-action {
-  animation: achievement-unlock-copy-in 420ms ease-out 1.45s both;
+  align-items: center;
+  animation: achievement-unlock-copy-in 500ms ease-out 1400ms both;
+  border: 1px solid #c1c9c0;
+  border-radius: $radius-12;
   color: $color-forest-green;
-  display: block;
-  font-size: $font-caption;
+  display: flex;
+  font-size: 16px;
   font-weight: $font-weight-semibold;
-  max-width: 520px;
-  margin-top: $space-16;
-  text-align: center;
-  width: 88%;
+  justify-content: center;
+  margin-top: 8px;
+  min-height: 44px;
+  width: 100%;
 }
-.achievement-unlock-overlay__particle {
-  animation-duration: 3200ms;
-  animation-fill-mode: both;
-  animation-timing-function: cubic-bezier(0.15, 0.8, 0.25, 1);
-  opacity: 0;
-  position: absolute;
-  border-radius: 0;
-}
-.achievement-unlock-overlay__burst--left .achievement-unlock-overlay__particle {
-  animation-name: achievement-unlock-burst-left;
-  left: -24px;
-}
-.achievement-unlock-overlay__burst--right .achievement-unlock-overlay__particle {
-  animation-name: achievement-unlock-burst-right;
-  right: -24px;
-}
-.achievement-unlock-overlay__particle--fragment {
-  background: $color-warm-white;
-  height: 8px;
-  width: 16px;
-}
-.achievement-unlock-overlay__particle--leaf {
-  background: #b9e8c7;
-  height: 16px;
-  width: 9px;
-}
-.achievement-unlock-overlay__particle--spark {
-  background: #d8a94b;
-  box-shadow: 0 0 10px rgba(#d8a94b, 0.7);
-  height: 6px;
-  width: 6px;
-}
-.achievement-unlock-overlay__particle--dot {
-  background: rgba($color-warm-white, 0.56);
-  height: 11px;
-  width: 11px;
-}
-.achievement-unlock-overlay__particle--small.achievement-unlock-overlay__particle--fragment { height: 5px; width: 10px; }
-.achievement-unlock-overlay__particle--small.achievement-unlock-overlay__particle--leaf { height: 10px; width: 6px; }
-.achievement-unlock-overlay__particle--small.achievement-unlock-overlay__particle--spark { height: 4px; width: 4px; }
-.achievement-unlock-overlay__particle--small.achievement-unlock-overlay__particle--dot { height: 7px; width: 7px; }
-.achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--fragment { height: 12px; width: 25px; }
-.achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--leaf { height: 23px; width: 13px; }
-.achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--spark { height: 8px; width: 8px; }
-.achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--dot { height: 16px; width: 16px; }
 @keyframes achievement-unlock-card-in {
-  0% { opacity: 0; transform: translateY(50px) scale(0.8); }
-  70% { opacity: 1; transform: translateY(0) scale(1.05); }
+  0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+  70% { opacity: 1; transform: translateY(0) scale(1.02); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes achievement-unlock-backdrop-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-@keyframes achievement-unlock-icon-in {
-  0% { opacity: 0; transform: scale(0) rotate(-20deg); }
-  70% { opacity: 1; transform: scale(1.15) rotate(10deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0deg); }
-}
 @keyframes achievement-unlock-icon-glow {
-  from { box-shadow: 0 0 0 0 rgba($color-sage, 0.14), 0 0 0 2px rgba($color-sage, 0.2); }
-  to { box-shadow: 0 0 0 12px rgba($color-sage, 0), 0 0 30px rgba($color-sage, 0.42); }
-}
-@keyframes achievement-unlock-sparkle-in {
-  0% { opacity: 0; transform: scale(0.45) rotate(-20deg); }
-  70% { opacity: 1; transform: scale(1.16) rotate(8deg); }
-  100% { opacity: 0.82; transform: scale(1) rotate(0deg); }
+  from { box-shadow: 0 0 30px rgba(11, 59, 36, 0.1); }
+  to { box-shadow: 0 0 50px rgba(11, 59, 36, 0.25); }
 }
 @keyframes achievement-unlock-sparkle-pulse {
-  from { opacity: 0.55; transform: scale(0.9) rotate(-4deg); }
-  to { opacity: 1; transform: scale(1.12) rotate(6deg); }
+  50% { opacity: 0.5; }
 }
 @keyframes achievement-unlock-copy-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes achievement-unlock-burst-left {
-  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--particle-rotation)) scale(0.65); }
-  12% { opacity: 0.98; transform: translate3d(calc(16vw + var(--particle-drift)), var(--particle-entry-rise), 0) rotate(calc(var(--particle-rotation) + 70deg)) scale(0.96); }
-  36% { opacity: 0.98; transform: translate3d(calc(var(--particle-impact-x) + var(--particle-drift)), var(--particle-impact-y), 0) rotate(calc(var(--particle-rotation) + 165deg)) scale(1.08); }
-  64% { opacity: 0.92; transform: translate3d(calc(var(--particle-scatter-x) + var(--particle-drift)), var(--particle-scatter-y), 0) rotate(calc(var(--particle-rotation) + 245deg)) scale(1.04); }
-  100% { opacity: 0; transform: translate3d(calc(var(--particle-end-x) + var(--particle-drift)), var(--particle-fall), 0) rotate(calc(var(--particle-rotation) + 420deg)) scale(0.92); }
-}
-@keyframes achievement-unlock-burst-right {
-  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--particle-rotation)) scale(0.65); }
-  12% { opacity: 0.98; transform: translate3d(calc(-16vw + var(--particle-drift)), var(--particle-entry-rise), 0) rotate(calc(var(--particle-rotation) - 70deg)) scale(0.96); }
-  36% { opacity: 0.98; transform: translate3d(calc(var(--particle-impact-x) + var(--particle-drift)), var(--particle-impact-y), 0) rotate(calc(var(--particle-rotation) - 165deg)) scale(1.08); }
-  64% { opacity: 0.92; transform: translate3d(calc(var(--particle-scatter-x) + var(--particle-drift)), var(--particle-scatter-y), 0) rotate(calc(var(--particle-rotation) - 245deg)) scale(1.04); }
-  100% { opacity: 0; transform: translate3d(calc(var(--particle-end-x) + var(--particle-drift)), var(--particle-fall), 0) rotate(calc(var(--particle-rotation) - 420deg)) scale(0.92); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .weekly-review__hero {
   align-items: center;
