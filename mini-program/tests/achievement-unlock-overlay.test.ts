@@ -29,6 +29,8 @@ describe("achievement unlock overlay", () => {
     expect(pageLayout).toContain("activeAchievement");
     expect(app).not.toContain("AchievementUnlockOverlay");
     expect(pageStyles).toContain(".achievement-unlock-overlay__confetti");
-    expect(pageStyles).toContain("animation: achievement-unlock-particle 2800ms");
+    expect(pageStyles).toContain("animation: achievement-unlock-particle 3600ms");
+    expect(pageStyles).toContain("#d8a94b");
+    expect(pageStyles).toContain(".achievement-unlock-overlay__particle--gold");
   });
 });

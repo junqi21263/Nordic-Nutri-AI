@@ -5,7 +5,8 @@ import { getAchievementIcon } from "../../features/coach/achievement-icons";
 import type { Achievement } from "../../features/coach/domain";
 import { NordicIcon } from "../nordic-icon";
 
-const particleIndexes = Array.from({ length: 14 }, (_, index) => index);
+const particleIndexes = Array.from({ length: 20 }, (_, index) => index);
+const particleTones = ["forest", "sage", "cream", "gold"] as const;
 
 export function AchievementUnlockOverlay({
   achievement,
@@ -29,7 +30,7 @@ export function AchievementUnlockOverlay({
         {particleIndexes.map((index) => (
           <View
             key={index}
-            className={`achievement-unlock-overlay__particle achievement-unlock-overlay__particle--${index}`}
+            className={`achievement-unlock-overlay__particle achievement-unlock-overlay__particle--${index} achievement-unlock-overlay__particle--${particleTones[index % particleTones.length]}`}
           />
         ))}
       </View>
