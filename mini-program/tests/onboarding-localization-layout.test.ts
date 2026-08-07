@@ -13,7 +13,7 @@ describe("Onboarding localization and WeChat layout contract", () => {
     const messages = getLocaleMessages(defaultLocale);
     expect(defaultLocale).toBe("zh-CN");
     expect(messages.onboarding.title).toBe("你的目标是什么？");
-    expect(messages.onboarding.goals.muscle_gain.title).toBe("增肌");
+    expect(messages.onboarding.goals.muscle_gain.title).toBe("增益增肌");
     expect(messages.onboarding.continue).toBe("继续");
   });
 

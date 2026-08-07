@@ -36,10 +36,10 @@ import { markOnboardingCompleted } from "../../utils/local-experience";
 
 const today = getLocalDateString();
 const goalLabels = {
-  muscle_gain: "精益增肌",
-  fat_loss: "稳健减脂",
-  maintenance: "保持体型",
-  performance: "提升运动表现",
+  muscle_gain: "增益增肌",
+  fat_loss: "轻盈减脂",
+  maintenance: "保持状态",
+  performance: "健康饮食",
 };
 
 type PlanView = {

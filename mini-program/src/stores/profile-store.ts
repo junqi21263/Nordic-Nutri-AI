@@ -41,7 +41,7 @@ export interface ProfileStorage {
 const initialProfile = {
   nickname: "",
   avatarUrl: null,
-  goalLabel: "精益增肌",
+  goalLabel: "增益增肌",
   weight: 70,
   targetWeight: 74,
   targetCalories: 2600,

@@ -41,7 +41,7 @@ function formulaNutritionPlanFallback(input) {
     high: 1.725,
     very_high: 1.9,
   };
-  const proteinPerKg = { muscle_gain: 2, fat_loss: 2, maintenance: 1.6, performance: 1.8 };
+  const proteinPerKg = { muscle_gain: 2, fat_loss: 2, maintenance: 1.6, performance: 1.6 };
   const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === "male" ? 5 : -161);
   const tdee = bmr * (activityMultiplier[activityLevel] || 1.55);
   const rawCalories =
@@ -49,8 +49,8 @@ function formulaNutritionPlanFallback(input) {
       ? tdee + 300
       : goalType === "fat_loss"
         ? tdee - 400
-        : goalType === "performance"
-          ? tdee * 1.08
+      : goalType === "performance"
+        ? tdee
           : tdee;
   const calories = Math.round(rawCalories / 10) * 10;
   const baseProteinG = Math.round(weightKg * (proteinPerKg[goalType] || 1.6));

@@ -11,20 +11,20 @@ export const zhCN = {
     continue: "继续",
     goals: {
       muscle_gain: {
-        title: "增肌",
+        title: "增益增肌",
         description: "增加肌肉量与力量。",
       },
       fat_loss: {
-        title: "减脂",
+        title: "轻盈减脂",
         description: "降低体脂，同时尽量保留肌肉。",
       },
       maintenance: {
-        title: "保持体型",
+        title: "保持状态",
         description: "维持稳定、均衡的身体状态。",
       },
       performance: {
-        title: "提升运动表现",
-        description: "提升训练表现与恢复能力。",
+        title: "健康饮食",
+        description: "建立均衡、可持续的饮食习惯。",
       },
     },
   },

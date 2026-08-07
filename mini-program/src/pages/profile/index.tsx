@@ -119,10 +119,10 @@ export default function ProfilePage() {
     void getProductAccount()
       .then((account) => {
         const labels: Record<string, string> = {
-          muscle_gain: "精益增肌",
+          muscle_gain: "增益增肌",
           fat_loss: "轻盈减脂",
           maintain: "保持状态",
-          performance: "运动表现",
+          performance: "健康饮食",
         };
         const realNickname =
           account.nickname && account.nickname !== "微信用户" ? account.nickname : null;
@@ -135,7 +135,7 @@ export default function ProfilePage() {
         if (realNickname) changes.nickname = realNickname;
         if (account.avatarUrl) changes.avatarUrl = account.avatarUrl;
         if (account.weightKg != null) changes.weight = account.weightKg;
-        if (account.goalType) changes.goalLabel = labels[account.goalType] ?? "精益增肌";
+        if (account.goalType) changes.goalLabel = labels[account.goalType] ?? "增益增肌";
         if (Object.keys(changes).length > 0) {
           useProfileStore.getState().setProfile(changes);
         }

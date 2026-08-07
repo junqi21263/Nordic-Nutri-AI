@@ -21,12 +21,12 @@ import { navigateBackOrHome } from "../../utils/navigation";
 import { resolveAvatarUrl, isDefaultAvatarSentinel } from "../../features/profile/avatar-defaults";
 import { nicknameModerationError } from "../../features/profile/nickname-moderation";
 
-const goalOptions = ["精益增肌", "轻盈减脂", "保持状态", "提升运动表现"];
+const goalOptions = ["增益增肌", "轻盈减脂", "保持状态", "健康饮食"];
 const goalTypeByLabel: Record<string, "muscle_gain" | "fat_loss" | "maintain" | "performance"> = {
-  精益增肌: "muscle_gain",
+  增益增肌: "muscle_gain",
   轻盈减脂: "fat_loss",
   保持状态: "maintain",
-  提升运动表现: "performance",
+  健康饮食: "performance",
 };
 
 export default function ProfileEditPage() {
@@ -253,7 +253,7 @@ export default function ProfileEditPage() {
           </View>
           <View className="profile-form__field">
             <Text>当前方向</Text>
-            <View className="profile-choice-group">
+             <View className="profile-choice-group profile-choice-group--single-line">
               {goalOptions.map((option) => (
                 <View
                   className={`profile-choice ${goalLabel === option ? "profile-choice--active" : ""}`}

@@ -14,7 +14,9 @@ describe("profile edit real save", () => {
     expect(page).toContain("saveProductGoal");
     expect(page).toContain("previewProductNutritionPlan");
     expect(page).toContain("ConfirmDialog");
-    expect(page).toContain("提升运动表现");
+    expect(page).toContain("增益增肌");
+    expect(page).toContain("健康饮食");
+    expect(page).toContain("profile-choice-group--single-line");
     expect(page).toContain("目标方向已更新");
     expect(page).toContain("getProductAccount");
     expect(page).toContain("nicknameModerationError");

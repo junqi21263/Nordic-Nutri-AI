@@ -16,10 +16,10 @@ describe("Stitch onboarding visual contract", () => {
     [
       "你的目标是什么？",
       "AI 将根据你的目标，为你制定个性化营养计划。",
-      "增肌",
-      "减脂",
-      "保持体型",
-      "提升运动表现",
+      "增益增肌",
+      "轻盈减脂",
+      "保持状态",
+      "健康饮食",
     ].forEach((label) => {
       expect(zhCnSource).toContain(label);
     });

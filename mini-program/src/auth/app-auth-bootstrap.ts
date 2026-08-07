@@ -51,10 +51,10 @@ async function loadIdentity(user: { id: string }) {
     }
   }
   const labels: Record<string, string> = {
-    muscle_gain: "精益增肌",
+    muscle_gain: "增益增肌",
     fat_loss: "轻盈减脂",
     maintain: "保持状态",
-    performance: "运动表现",
+    performance: "健康饮食",
   };
   // Prefer the server/bootstrap nickname when present so home/profile stay in sync.
   const realNickname = account.nickname && account.nickname !== "微信用户" ? account.nickname : null;
@@ -64,7 +64,7 @@ async function loadIdentity(user: { id: string }) {
       ...(realNickname ? { nickname: realNickname } : { nickname: "" }),
       ...(account.avatarUrl ? { avatarUrl: account.avatarUrl } : {}),
       ...(account.weightKg != null ? { weight: account.weightKg } : {}),
-      ...(account.goalType ? { goalLabel: labels[account.goalType] ?? "精益增肌" } : {}),
+      ...(account.goalType ? { goalLabel: labels[account.goalType] ?? "增益增肌" } : {}),
       ...(account.targetWeightKg != null ? { targetWeight: account.targetWeightKg } : {}),
       ...(account.nutritionPlan?.calories != null
         ? { targetCalories: account.nutritionPlan.calories }

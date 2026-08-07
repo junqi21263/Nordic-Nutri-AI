@@ -18,11 +18,11 @@ class PublicNutritionPlanError extends Error {
 }
 
 const GOAL_LABELS = {
-  muscle_gain: "精益增肌",
+  muscle_gain: "增益增肌",
   fat_loss: "稳健减脂",
   maintenance: "保持体型",
   maintain: "保持体型",
-  performance: "提升运动表现",
+  performance: "健康饮食",
 };
 
 const ACTIVITY_LABELS = {
@@ -110,7 +110,7 @@ function createDeepseekNutritionPlanService({ apiKey, model, fetchImpl = globalT
                 '{"calories":number,"proteinG":number,"carbsG":number,"fatG":number,"insight":string}。' +
                 "规则：calories 为整数并尽量为 10 的倍数；proteinG/carbsG/fatG 为整数克；" +
                 "proteinG*4 + carbsG*4 + fatG*9 必须接近 calories（误差≤5%）；" +
-                "增肌略盈余、减脂适度缺口、维持接近 TDEE、运动表现略高碳水；" +
+                "增肌略盈余、减脂适度缺口、保持状态与健康饮食接近 TDEE；" +
                 "必须尊重饮食模式与忌口（如低碳降碳水、生酮高脂低碳、素食/纯素侧重植物蛋白）；" +
                 "insight 用一句中文（≤40字）点明饮食模式、忌口或餐次中的关键依据，不要恐吓或减肥羞辱。",
             },

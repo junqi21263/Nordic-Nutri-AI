@@ -2050,12 +2050,24 @@
   flex-wrap: wrap;
   gap: $space-8;
 }
+.profile-choice-group--single-line {
+  flex-wrap: nowrap;
+  gap: $space-4;
+  width: 100%;
+}
 .profile-choice {
+  align-items: center;
   border: 1px solid $color-divider;
   border-radius: $radius-full;
   color: $color-text-secondary;
-  font-size: $font-caption;
-  padding: $space-8 $space-12;
+  font-size: $font-overline;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: $space-8 $space-4;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .profile-choice--active {
   background: $color-forest-green;
