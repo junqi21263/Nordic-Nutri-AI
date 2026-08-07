@@ -96,3 +96,27 @@ export function getProductAchievements(date: string) {
     fallbackMessage: "营养数据读取失败，请稍后重试",
   });
 }
+
+export interface ProductAchievementEvaluation {
+  achievements: Achievement[];
+  newlyUnlocked: Achievement[];
+}
+
+export function evaluateProductAchievements(date: string) {
+  return requestProductApi<ProductAchievementEvaluation>("/achievements/evaluate", {
+    method: "POST",
+    data: { date },
+    fallbackMessage: "成就进度更新失败，请稍后重试",
+  });
+}
+
+export function acknowledgeProductAchievementCelebration(achievementId: string) {
+  return requestProductApi<{ acknowledged: boolean }>(
+    `/achievements/${encodeURIComponent(achievementId)}/celebrate`,
+    {
+      method: "POST",
+      data: {},
+      fallbackMessage: "成就庆祝确认失败，请稍后重试",
+    },
+  );
+}

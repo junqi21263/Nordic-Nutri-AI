@@ -13,6 +13,8 @@ describe("achievement unlock overlay", () => {
     expect(overlay).toContain("achievement-unlock-overlay");
     expect(overlay).toContain("achievement-unlock-overlay__card");
     expect(overlay).toContain("achievement-unlock-overlay__particle");
+    expect(overlay).toContain("acknowledgeProductAchievementCelebration");
+    expect(overlay).toContain("markAchievementCelebrated");
     expect(overlay).toContain("成就已解锁");
     expect(overlay).toContain("继续记录");
     expect(overlay).toContain("查看成长里程");

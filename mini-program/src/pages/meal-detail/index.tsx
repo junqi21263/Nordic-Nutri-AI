@@ -137,11 +137,10 @@ export default function MealDetailPage() {
       setRemoteMeal(saved);
       if (store.getMealById(saved.id)) store.updateMeal(saved.id, saved);
       else store.addMeal(saved);
-      // “收藏灵感” is calculated from the persisted favorite flag. Refresh it
-      // after the write so the global unlock overlay receives the new event.
-      void import("../../features/coach/refresh-achievements")
-        .then(({ refreshProductAchievements }) => refreshProductAchievements(meal.date))
-        .catch(() => undefined);
+      // “收藏灵感” is calculated from the persisted favorite flag. Evaluate it
+      // after the write so the server can return the pending unlock event.
+      const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
+      await evaluateProductAchievements(meal.date);
       feedback.show({
         message: nextFavorite ? "已加入收藏，可在「记录」筛选里查看" : "已取消收藏",
         tone: "success",

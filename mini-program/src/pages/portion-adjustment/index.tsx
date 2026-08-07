@@ -85,9 +85,12 @@ export default function PortionAdjustmentPage() {
       }
       const mealDate = getLocalDateString();
       meals.replaceRemoteMeals(await getProductMeals(mealDate), mealDate);
-      void import("../../features/coach/refresh-achievements")
-        .then(({ refreshProductAchievements }) => refreshProductAchievements(mealDate))
-        .catch(() => undefined);
+      try {
+        const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
+        await evaluateProductAchievements(mealDate);
+      } catch {
+        // The saved meal remains valid if achievement refresh is temporarily unavailable.
+      }
       // Navigate before clearing the draft — resetting first re-renders this page as
       // "份量草稿不存在", and a failed/timed-out redirect leaves the user stuck there.
       await Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });

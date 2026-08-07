@@ -1432,6 +1432,13 @@ function getInsightRoute(pathname) {
   })[path] ?? null;
 }
 
+function getAchievementCelebrationRoute(pathname) {
+  const path = pathname.replace(/^\/get-login-ticket/, "");
+  if (path === "/achievements/evaluate") return { operation: "evaluate" };
+  const match = path.match(/^\/achievements\/([a-z0-9_-]{1,80})\/celebrate$/i);
+  return match ? { operation: "acknowledge", achievementId: match[1] } : null;
+}
+
 function getCoachRoute(pathname) {
   const path = pathname.replace(/^\/get-login-ticket/, "");
   if (path === "/coach/messages") return "getMessages";
@@ -1610,6 +1617,7 @@ function createHttpServer({ service }) {
     const dataOperation = getDataOperation(url.pathname);
     const mealRoute = getMealRoute(url.pathname);
     const insightOperation = getInsightRoute(url.pathname);
+    const achievementCelebrationRoute = getAchievementCelebrationRoute(url.pathname);
     const coachOperation = getCoachRoute(url.pathname);
     const foodRoute = getFoodRoute(url.pathname);
     const adminFoodRoute = getAdminFoodRoute(url.pathname);
@@ -1617,7 +1625,7 @@ function createHttpServer({ service }) {
     const feedbackRoute = getFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !achievementCelebrationRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
     }
@@ -2436,6 +2444,30 @@ function createHttpServer({ service }) {
       } catch (error) {
         sendMealError(res, error);
         return;
+      }
+    }
+    if (achievementCelebrationRoute && req.method === "POST") {
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.insights?.getAchievements || !service.insights?.acknowledgeAchievementCelebration) {
+        return sendJson(res, 503, { code: "ACHIEVEMENT_SERVICE_UNAVAILABLE" });
+      }
+      try {
+        if (achievementCelebrationRoute.operation === "evaluate") {
+          const body = await readJsonBody(req, 16 * 1024);
+          const date = typeof body?.date === "string" ? body.date : "";
+          if (!date) return sendJson(res, 400, { code: "INSIGHT_DATA_INVALID", message: "缺少日期参数" });
+          const achievements = await service.insights.getAchievements(session.sub, date);
+          return sendJson(res, 200, {
+            achievements,
+            newlyUnlocked: achievements.filter((item) => item.justUnlocked === true),
+          });
+        }
+        await service.insights.acknowledgeAchievementCelebration(session.sub, achievementCelebrationRoute.achievementId);
+        return sendJson(res, 200, { acknowledged: true });
+      } catch (error) {
+        console.error("[achievement-celebration] failed:", error?.message || error);
+        return sendJson(res, 503, { code: "ACHIEVEMENT_SERVICE_UNAVAILABLE" });
       }
     }
     if (insightOperation && req.method === "GET") {

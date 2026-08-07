@@ -66,3 +66,30 @@ test("uses a conflict-safe write when completion checks overlap", async () => {
   });
   assert.equal(achievement.justUnlocked, true);
 });
+
+test("keeps a completed achievement pending until the celebration is acknowledged", async () => {
+  const rows = [{ achievement_id: "first_meal", completed_at: "2026-08-07T09:03:00.000Z", celebrated_at: null }];
+  let updatePayload = null;
+  const db = {
+    from() {
+      const query = {
+        select() { return query; },
+        eq() { return query; },
+        is() { return query; },
+        then(resolve) { return Promise.resolve(resolve({ data: rows, error: null })); },
+        async upsert(input) { return { data: input, error: null }; },
+        update(input) { updatePayload = input; return query; },
+      };
+      return query;
+    },
+  };
+  const service = createAchievementStateService({ db, clock: () => new Date("2026-08-07T09:05:00.000Z") });
+
+  const [achievement] = await service.reconcile("user-1", [
+    { id: "first_meal", unlocked: true, unlockedAt: "2026-08-07T09:03:00.000Z" },
+  ]);
+  assert.equal(achievement.celebrationPending, true);
+
+  await service.acknowledgeCelebration("user-1", "first_meal");
+  assert.deepEqual(updatePayload, { celebrated_at: "2026-08-07T09:05:00.000Z" });
+});

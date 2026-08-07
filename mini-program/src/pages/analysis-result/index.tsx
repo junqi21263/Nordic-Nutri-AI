@@ -86,9 +86,12 @@ export default function AnalysisResultPage() {
           : request,
       );
       meals.replaceRemoteMeals(await getProductMeals(localMeal.date), localMeal.date);
-      void import("../../features/coach/refresh-achievements")
-        .then(({ refreshProductAchievements }) => refreshProductAchievements(localMeal.date))
-        .catch(() => undefined);
+      try {
+        const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
+        await evaluateProductAchievements(localMeal.date);
+      } catch {
+        // The saved meal remains valid if achievement refresh is temporarily unavailable.
+      }
       feedback.show({ message: "AI 分析已保存到饮食记录", tone: "success" });
       Taro.redirectTo({ url: `/pages/meal-detail/index?id=${saved.id}` });
     } catch {

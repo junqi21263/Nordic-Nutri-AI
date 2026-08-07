@@ -21,6 +21,8 @@ export interface Achievement {
   unlockedAt?: string | null;
   /** Set only by the server response that persisted this completion. */
   justUnlocked?: boolean;
+  /** Server-owned delivery state. Remains true until the celebration is acknowledged. */
+  celebrationPending?: boolean;
 }
 export function createCoachAdvice(
   meals: Meal[],

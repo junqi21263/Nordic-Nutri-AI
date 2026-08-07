@@ -10,12 +10,12 @@ function createAchievementStateService({ db, clock = () => new Date() }) {
     async reconcile(userId, achievements) {
       const existingResult = await db
         .from("user_achievements")
-        .select("achievement_id,completed_at")
+        .select("achievement_id,completed_at,celebrated_at")
         .eq("user_id", userId);
       if (existingResult.error) throw new Error("Achievement state read failed");
 
       const completedById = new Map(
-        (existingResult.data || []).map((row) => [row.achievement_id, row.completed_at]),
+        (existingResult.data || []).map((row) => [row.achievement_id, row]),
       );
       const newlyCompleted = achievements
         .filter((achievement) => achievement.unlocked && !completedById.has(achievement.id))
@@ -35,21 +35,31 @@ function createAchievementStateService({ db, clock = () => new Date() }) {
           ignoreDuplicates: true,
         });
         if (inserted.error) throw new Error("Achievement state save failed");
-        newlyCompleted.forEach((row) => completedById.set(row.achievement_id, row.completed_at));
+        newlyCompleted.forEach((row) => completedById.set(row.achievement_id, row));
       }
 
       return achievements.map((achievement) => {
-        const completedAt = completedById.get(achievement.id);
-        return completedAt
+        const completion = completedById.get(achievement.id);
+        return completion
           ? {
             ...achievement,
             unlocked: true,
             progress: 100,
-            unlockedAt: completedAt,
+            unlockedAt: completion.completed_at,
             justUnlocked: justUnlockedIds.has(achievement.id),
+            celebrationPending: !completion.celebrated_at,
           }
-          : { ...achievement, justUnlocked: false };
+          : { ...achievement, justUnlocked: false, celebrationPending: false };
       });
+    },
+    async acknowledgeCelebration(userId, achievementId) {
+      const result = await db
+        .from("user_achievements")
+        .update({ celebrated_at: clock().toISOString() })
+        .eq("user_id", userId)
+        .eq("achievement_id", achievementId)
+        .is("celebrated_at", null);
+      if (result.error) throw new Error("Achievement celebration acknowledgement failed");
     },
   };
 }

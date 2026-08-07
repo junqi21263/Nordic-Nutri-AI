@@ -356,7 +356,19 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
     return achievementState ? achievementState.reconcile(userId, calculated) : calculated;
   }
 
-  return { getDailySummary, getDailySummaryWithInsight, getDailyInsight, getWeeklyReview, getAchievements };
+  async function acknowledgeAchievementCelebration(userId, achievementId) {
+    if (!achievementState?.acknowledgeCelebration) throw new Error("Achievement celebration state is unavailable");
+    return achievementState.acknowledgeCelebration(userId, achievementId);
+  }
+
+  return {
+    getDailySummary,
+    getDailySummaryWithInsight,
+    getDailyInsight,
+    getWeeklyReview,
+    getAchievements,
+    acknowledgeAchievementCelebration,
+  };
 }
 
 module.exports = { createInsightDataService, dailyInsightContext };

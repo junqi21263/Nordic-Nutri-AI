@@ -602,6 +602,41 @@ test("serves meal ranges, individual meals, summaries, reviews, and achievements
   ]);
 });
 
+test("evaluates and acknowledges achievement celebration events for the signed-in user", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      insights: {
+        getAchievements: async (userId, date) => {
+          calls.push(["evaluate", userId, date]);
+          return [{ id: "first_meal", justUnlocked: true, celebrationPending: true }];
+        },
+        acknowledgeAchievementCelebration: async (userId, achievementId) => {
+          calls.push(["acknowledge", userId, achievementId]);
+        },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const headers = { authorization: "Bearer valid-session", "content-type": "application/json" };
+    const evaluated = await fetch(`${baseUrl}/get-login-ticket/achievements/evaluate`, {
+      method: "POST", headers, body: JSON.stringify({ date: "2026-08-07" }),
+    });
+    assert.equal(evaluated.status, 200);
+    assert.deepEqual((await evaluated.json()).newlyUnlocked, [{ id: "first_meal", justUnlocked: true, celebrationPending: true }]);
+    assert.equal((await fetch(`${baseUrl}/get-login-ticket/achievements/first_meal/celebrate`, {
+      method: "POST", headers, body: "{}",
+    })).status, 200);
+  });
+
+  assert.deepEqual(calls, [
+    ["evaluate", "user-1", "2026-08-07"],
+    ["acknowledge", "user-1", "first_meal"],
+  ]);
+});
+
 test("writes meal analysis and meal data without accepting a caller-controlled user id", async () => {
   const calls = [];
   const server = createHttpServer({

@@ -126,9 +126,12 @@ export default function ManualMealPage() {
         ],
       });
       meals.replaceRemoteMeals(await getProductMeals(date), date);
-      void import("../../features/coach/refresh-achievements")
-        .then(({ refreshProductAchievements }) => refreshProductAchievements(date))
-        .catch(() => undefined);
+      try {
+        const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
+        await evaluateProductAchievements(date);
+      } catch {
+        // The saved meal remains valid if achievement refresh is temporarily unavailable.
+      }
       feedback.show({ message: "已保存并同步到饮食记录", tone: "success" });
       navigateBackOrHome(`/pages/meal-detail/index?id=${saved.id}`);
     } catch {
