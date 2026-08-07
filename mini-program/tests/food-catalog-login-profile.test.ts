@@ -35,6 +35,8 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("STANDARD_FOOD_CATEGORY_ROOT_CODES");
     expect(page).toContain("categoryCodes: nextCodes");
     expect(page).toContain("categoryCodes: activeCategoryCodes");
+    expect(page).toContain("const nextCodes = [categoryCode]");
+    expect(page).not.toContain("...activeCategoryCodes, categoryCode");
     expect(page).toContain("searchProductFoodCatalog");
     expect(page).toMatch(/didBootstrapRef|hasBootstrappedRef|catalogBootstrappedRef/);
     expect(page).toContain("void loadTaxonomy()");

@@ -310,14 +310,7 @@ export default function FoodCatalogPage() {
       await discover(20, 1);
       return;
     }
-    const nextCodes = activeCategoryCodes.includes(categoryCode)
-      ? activeCategoryCodes.filter((code) => code !== categoryCode)
-      : [...activeCategoryCodes, categoryCode];
-    if (!nextCodes.length && !selectedTagCodes.length) {
-      setQuery("");
-      await discover(20, 1);
-      return;
-    }
+    const nextCodes = [categoryCode];
     await loadCatalogPage({
       query: "",
       categoryCodes: nextCodes,

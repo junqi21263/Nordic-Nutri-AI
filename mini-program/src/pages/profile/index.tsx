@@ -1,5 +1,5 @@
-import { Picker, Text, Textarea, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import { Text, Textarea, View } from "@tarojs/components";
+import Taro, { useDidShow } from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
@@ -91,9 +91,9 @@ export default function ProfilePage() {
       .catch(() => undefined);
   };
 
-  useEffect(() => {
+  useDidShow(() => {
     refreshFeedbackHistory();
-  }, []);
+  });
 
   // Silently refresh the user profile from the backend on page show,
   // so nickname/avatar/settings changes from other pages are reflected immediately.
@@ -157,8 +157,7 @@ export default function ProfilePage() {
       feedback.show({ message: "反馈提交失败，请稍后重试", tone: "error" });
     }
   };
-  const changeFeedbackMode = (value: number) => {
-    const nextMode = value === 1 ? "history" : "submit";
+  const changeFeedbackMode = (nextMode: "submit" | "history") => {
     setFeedbackMode(nextMode);
     if (nextMode !== "history") return;
     const unreadIds = feedbackItems.filter((item) => item.adminReply && !item.replyReadAt).map((item) => item.id);
@@ -169,6 +168,11 @@ export default function ProfilePage() {
         setFeedbackItems((items) => items.map((item) => unreadIds.includes(item.id) ? { ...item, replyReadAt: "read" } : item));
       })
       .catch(() => undefined);
+  };
+  const hasFeedbackReply = feedbackItems.some((item) => Boolean(item.adminReply));
+  const openFeedback = () => {
+    setFeedbackMode(hasFeedbackReply ? "history" : "submit");
+    setActiveModal("feedback");
   };
   const logout = () => {
     void logoutFlow
@@ -274,12 +278,12 @@ export default function ProfilePage() {
               description="数据说明与账号注销"
             />
           </View>
-          <View onClick={() => { setFeedbackMode("submit"); setActiveModal("feedback"); }}>
+          <View onClick={openFeedback}>
             <ListItem
               icon={<NordicIcon name="heart" size={20} ariaLabel="反馈与帮助" />}
-              title={<View className="profile-feedback-title"><Text>反馈与帮助</Text>{unreadReplyCount > 0 ? <View className="profile-feedback-title__bell"><NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" /></View> : null}</View>}
+              title={<View className="profile-feedback-title"><Text>反馈与帮助</Text><Text className="profile-feedback-title__arrow">›</Text>{unreadReplyCount > 0 ? <View className="profile-feedback-title__bell"><NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" /></View> : null}</View>}
               description="告诉我们你的想法"
-              trailing="›"
+              trailing={null}
             />
           </View>
           <View onClick={() => setActiveModal("about")}>
@@ -327,9 +331,10 @@ export default function ProfilePage() {
               <NordicIcon name="x" size={20} ariaLabel="关闭" />
             </View>
           </View>
-          <Picker mode="selector" range={["提交反馈", "反馈处理"]} value={feedbackMode === "submit" ? 0 : 1} onChange={(event) => changeFeedbackMode(Number(event.detail.value))}>
-            <View className="profile-feedback-mode-picker">{feedbackMode === "submit" ? "提交反馈" : "反馈处理"}<Text>⌄</Text></View>
-          </Picker>
+          <View className="profile-feedback-tabs">
+            <View className={`profile-feedback-tab ${feedbackMode === "submit" ? "profile-feedback-tab--active" : ""}`} onClick={() => changeFeedbackMode("submit")}><Text>提交反馈</Text></View>
+            <View className={`profile-feedback-tab ${feedbackMode === "history" ? "profile-feedback-tab--active" : ""}`} onClick={() => changeFeedbackMode("history")}><Text>反馈处理</Text></View>
+          </View>
           {feedbackMode === "submit" ? <>
             <Text className="profile-modal__lead">告诉我们哪里不顺手，或你希望下一步看到什么。</Text>
             <Textarea className="profile-modal__input" value={feedbackDraft} placeholder="例如：我希望回顾中能看到每餐的蛋白变化" maxlength={120} autoHeight onInput={(event) => setFeedbackDraft(event.detail.value)} />

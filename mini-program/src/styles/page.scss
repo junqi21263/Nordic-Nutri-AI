@@ -1718,20 +1718,34 @@
   color: $color-forest-green;
   display: flex;
 }
-.profile-feedback-mode-picker {
+.profile-feedback-title__arrow {
+  color: $color-forest-green;
+  font-size: $font-body;
+  line-height: 1;
+}
+.profile-feedback-tabs {
   align-items: center;
   background: $color-soft-beige;
   border-radius: $radius-12;
-  color: $color-text-primary;
   display: flex;
+  gap: $space-4;
+  padding: $space-4;
+}
+.profile-feedback-tab {
+  align-items: center;
+  border-radius: $radius-8;
+  color: $color-text-secondary;
+  display: flex;
+  flex: 1;
+  font-size: $font-caption;
   font-weight: $font-weight-semibold;
   justify-content: center;
-  padding: $space-12 $space-16;
-  position: relative;
+  min-height: 64px;
 }
-.profile-feedback-mode-picker Text {
-  position: absolute;
-  right: $space-16;
+.profile-feedback-tab--active {
+  background: $color-warm-white;
+  box-shadow: 0 2px 8px rgba($color-dark-forest, 0.08);
+  color: $color-forest-green;
 }
 .profile-feedback-list {
   display: flex;
