@@ -15,7 +15,9 @@ describe("achievement unlock overlay", () => {
     expect(overlay).toContain("achievement-unlock-overlay");
     expect(overlay).toContain("achievement-unlock-overlay__card");
     expect(overlay).toContain("achievement-unlock-overlay__particle");
-    expect(overlay).toContain("achievement-unlock-overlay__confetti");
+    expect(overlay).toContain("achievement-unlock-overlay__burst");
+    expect(overlay).toContain("achievement-unlock-overlay__burst--left");
+    expect(overlay).toContain("achievement-unlock-overlay__burst--right");
     expect(overlay).not.toContain("成长里程");
     expect(pageLayout).toContain("acknowledgeProductAchievementCelebration");
     expect(overlay).not.toContain("useAchievementStore");
@@ -28,9 +30,11 @@ describe("achievement unlock overlay", () => {
     expect(pageLayout).toContain("useAchievementStore((state) => state.achievementUnlocked)");
     expect(pageLayout).toContain("activeAchievement");
     expect(app).not.toContain("AchievementUnlockOverlay");
-    expect(pageStyles).toContain(".achievement-unlock-overlay__confetti");
-    expect(pageStyles).toContain("animation: achievement-unlock-particle 3600ms");
+    expect(pageStyles).toContain(".achievement-unlock-overlay__burst");
+    expect(pageStyles).toContain("achievement-unlock-burst-left");
+    expect(pageStyles).toContain("achievement-unlock-burst-right");
+    expect(pageStyles).toContain("backdrop-filter: blur(3px)");
     expect(pageStyles).toContain("#d8a94b");
-    expect(pageStyles).toContain(".achievement-unlock-overlay__particle--gold");
+    expect(pageStyles).toContain(".achievement-unlock-overlay__particle--spark");
   });
 });

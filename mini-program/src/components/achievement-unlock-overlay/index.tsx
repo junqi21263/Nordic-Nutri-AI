@@ -5,8 +5,8 @@ import { getAchievementIcon } from "../../features/coach/achievement-icons";
 import type { Achievement } from "../../features/coach/domain";
 import { NordicIcon } from "../nordic-icon";
 
-const particleIndexes = Array.from({ length: 20 }, (_, index) => index);
-const particleTones = ["forest", "sage", "cream", "gold"] as const;
+const particleIndexes = Array.from({ length: 12 }, (_, index) => index);
+const particleTypes = ["fragment", "leaf", "spark", "dot"] as const;
 
 export function AchievementUnlockOverlay({
   achievement,
@@ -26,11 +26,19 @@ export function AchievementUnlockOverlay({
   return (
     <View className="achievement-unlock-overlay" ariaLabel="成就已解锁">
       <View className="achievement-unlock-overlay__backdrop" onClick={() => { void onDismiss(); }} />
-      <View className="achievement-unlock-overlay__confetti">
+      <View className="achievement-unlock-overlay__burst achievement-unlock-overlay__burst--left">
         {particleIndexes.map((index) => (
           <View
             key={index}
-            className={`achievement-unlock-overlay__particle achievement-unlock-overlay__particle--${index} achievement-unlock-overlay__particle--${particleTones[index % particleTones.length]}`}
+            className={`achievement-unlock-overlay__particle achievement-unlock-overlay__particle--${index} achievement-unlock-overlay__particle--${particleTypes[index % particleTypes.length]}`}
+          />
+        ))}
+      </View>
+      <View className="achievement-unlock-overlay__burst achievement-unlock-overlay__burst--right">
+        {particleIndexes.map((index) => (
+          <View
+            key={index}
+            className={`achievement-unlock-overlay__particle achievement-unlock-overlay__particle--${index} achievement-unlock-overlay__particle--${particleTypes[index % particleTypes.length]}`}
           />
         ))}
       </View>
