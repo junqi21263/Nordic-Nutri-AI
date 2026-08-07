@@ -3,6 +3,7 @@ import { useDidShow } from "@tarojs/taro";
 import { useEffect, type PropsWithChildren } from "react";
 import { AppSafeArea } from "../../components/app-safe-area";
 import { AppTopBar } from "../../components/app-top-bar";
+import { AchievementUnlockOverlay } from "../../components/achievement-unlock-overlay";
 import { BottomTabBar } from "../../components/bottom-tab-bar";
 import { PullDownRefreshIndicator } from "../../components/pull-down-refresh-indicator";
 import { TopNavigation } from "../../components/top-navigation";
@@ -127,6 +128,7 @@ export function PageLayout({
         </View>
       </View>
       {showTabs && tabbarVisible ? <BottomTabBar activeKey={activeKey} /> : null}
+      <AchievementUnlockOverlay />
     </AppSafeArea>
   );
 }

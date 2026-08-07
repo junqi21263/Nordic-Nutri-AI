@@ -5,9 +5,10 @@ import { describe, expect, it } from "vitest";
 const srcRoot = resolve(import.meta.dirname, "../src");
 
 describe("achievement unlock overlay", () => {
-  it("renders a global queued celebration overlay with the two follow-up actions", () => {
+  it("mounts the queued celebration overlay in the active page layout", () => {
     const overlay = readFileSync(resolve(srcRoot, "components/achievement-unlock-overlay/index.tsx"), "utf8");
     const app = readFileSync(resolve(srcRoot, "app.tsx"), "utf8");
+    const pageLayout = readFileSync(resolve(srcRoot, "layouts/page-layout/index.tsx"), "utf8");
 
     expect(overlay).toContain("achievementUnlocked");
     expect(overlay).toContain("achievement-unlock-overlay");
@@ -19,6 +20,8 @@ describe("achievement unlock overlay", () => {
     expect(overlay).toContain("继续记录");
     expect(overlay).toContain("查看成长里程");
     expect(overlay).toContain('Taro.navigateTo({ url: "/pages/achievements/index" })');
-    expect(app).toContain("AchievementUnlockOverlay");
+    expect(pageLayout).toContain("AchievementUnlockOverlay");
+    expect(pageLayout).toContain("<AchievementUnlockOverlay />");
+    expect(app).not.toContain("AchievementUnlockOverlay");
   });
 });
