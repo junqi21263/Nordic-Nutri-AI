@@ -195,7 +195,7 @@ describe("local coach and profile", () => {
     expect(styles).toContain(".coach-chat__progress-card");
   });
 
-  it("places suggestion and progress before the conversation after the NOVA hero", () => {
+  it("places progress before the secondary suggestion and conversation after the NOVA hero", () => {
     const source = coachPageSource();
 
     const hero = source.indexOf('className="coach-chat__hero"');
@@ -204,9 +204,9 @@ describe("local coach and profile", () => {
     const conversation = source.indexOf('className="coach-chat__conversation"');
 
     expect(hero).toBeGreaterThan(-1);
-    expect(suggestion).toBeGreaterThan(hero);
-    expect(progress).toBeGreaterThan(suggestion);
-    expect(conversation).toBeGreaterThan(progress);
+    expect(progress).toBeGreaterThan(hero);
+    expect(suggestion).toBeGreaterThan(progress);
+    expect(conversation).toBeGreaterThan(suggestion);
   });
 
   it("uses a coach-aligned personal-center header and synchronizes tab selection from profile metrics", () => {

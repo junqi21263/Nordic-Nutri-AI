@@ -936,7 +936,7 @@
   border: 1px solid rgba($color-forest-green, 0.08);
   border-radius: $radius-24;
   display: flex;
-  min-height: 172px;
+  min-height: 196px;
   overflow: hidden;
   padding: $space-16 $space-16 $space-16;
   position: relative;
@@ -968,17 +968,17 @@
 }
 .coach-chat__restart-action {
   align-items: center;
-  background: rgba($color-warm-white, 0.9);
-  border: 1px solid rgba($color-forest-green, 0.16);
-  border-radius: $radius-8;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   color: $color-forest-green;
   display: flex;
   flex: 0 0 auto;
   font-size: $font-overline;
   font-weight: $font-weight-semibold;
   gap: $space-4;
-  min-height: 36px;
-  padding: 0 $space-8;
+  min-height: 28px;
+  padding: 0;
   white-space: nowrap;
 }
 .coach-chat__restart-action:active {
@@ -1013,6 +1013,26 @@
   font-weight: $font-weight-semibold;
   line-height: $line-body;
   margin-top: $space-8;
+}
+.coach-chat__hero-cta {
+  align-items: center;
+  align-self: flex-start;
+  background: $color-forest-green;
+  border-radius: $radius-full;
+  color: $color-warm-white;
+  display: flex;
+  font-size: $font-caption;
+  font-weight: $font-weight-semibold;
+  gap: $space-4;
+  margin-top: $space-12;
+  min-height: 64rpx;
+  padding: 0 $space-12 0 $space-16;
+}
+.coach-chat__hero-cta:active {
+  opacity: 0.82;
+}
+.coach-chat__hero-cta .nordic-icon {
+  filter: brightness(0) invert(1);
 }
 .coach-chat__suggestion-question {
   align-items: center;
@@ -1193,12 +1213,13 @@
   color: $color-warm-white;
 }
 .coach-chat__suggestion {
-  background: $color-soft-beige;
+  background: rgba($color-soft-beige, 0.64);
+  border: 1px solid rgba($color-forest-green, 0.08);
   border-radius: $radius-16;
   display: flex;
   flex-direction: column;
   gap: $space-8;
-  padding: $space-16;
+  padding: $space-12;
 }
 .coach-chat__suggestion-label {
   align-items: center;
@@ -1245,7 +1266,7 @@
 }
 .coach-chat__suggestion-title {
   color: $color-forest-green;
-  font-size: $font-h2;
+  font-size: $font-body;
   font-weight: $font-weight-semibold;
 }
 .coach-chat__suggestion-copy {
@@ -1264,7 +1285,7 @@
   gap: $space-12;
 }
 .coach-chat__progress-card {
-  background: linear-gradient(180deg, rgba($color-sage-light, 0.6), $color-surface 52%);
+  background: $color-surface;
   border: 1px solid rgba($color-forest-green, 0.12);
   border-radius: $radius-16;
   display: flex;
@@ -1308,7 +1329,7 @@
   gap: 5px;
 }
 .coach-chat__progress-tasks {
-  background: rgba($color-warm-white, 0.7);
+  background: rgba($color-sage-light, 0.34);
   border-radius: $radius-12;
   display: flex;
   flex-direction: column;
@@ -1323,12 +1344,12 @@
   gap: $space-8;
 }
 .coach-chat__progress-task-status {
-  background: rgba($color-forest-green, 0.1);
-  border-radius: $radius-full;
   color: $color-forest-green;
   flex: 0 0 auto;
-  font-size: 10px;
-  padding: 2px $space-4;
+  font-size: $font-caption;
+  font-weight: $font-weight-semibold;
+  line-height: 1;
+  min-width: 18px;
 }
 .coach-chat__progress-row-copy {
   color: $color-text-secondary;

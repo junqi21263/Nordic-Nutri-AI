@@ -42,7 +42,7 @@ type ChatMessage = {
 };
 
 const defaultHeroPrompt = "下一餐怎么补充蛋白质？";
-const defaultQuickPrompts = ["我想补记今天的一餐", "这餐怎么记录更准确？", "今天还差哪些营养？", "下一餐怎么搭配？"];
+const defaultQuickPrompts = ["我今天吃什么？", "我的蛋白够吗？", "下一餐怎么搭配？"];
 const dailyLimitMessage = "因个人开发成本有限，当前每人每日限制聊20句";
 const defaultDailyUsage: ProductCoachDailyUsage = { limit: 20, used: 0, remaining: 20 };
 const scrollTopPositionStorageKey = "nordic.coach.scrollTopPosition";
@@ -119,6 +119,8 @@ export default function CoachPage() {
     ? coach.advice
     : createCoachAdvice(meals.meals, date, meals.dailyTargets);
   const proteinLeft = Math.max(0, summary.protein - summary.consumed.protein);
+  const hasMealRecord = summary.consumed.calories > 0;
+  const primaryActionLabel = hasMealRecord ? "记录下一餐" : "记录第一餐";
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
@@ -136,8 +138,8 @@ export default function CoachPage() {
   const scrollTopPositionRef = useRef(scrollTopPosition);
   const scrollTopDraggedRef = useRef(false);
   const [expandedSections, setExpandedSections] = useState({
-    suggestion: true,
-    progress: true,
+    suggestion: false,
+    progress: false,
     quickReplies: true,
   });
   const greeting = getCoachGreeting(serverTime);
@@ -226,9 +228,9 @@ export default function CoachPage() {
   const handleRestartConversation = async () => {
     if (sending || restarting) return;
     const modal = await Taro.showModal({
-      title: "重启对话",
+      title: "新对话",
       content: "当前对话会清空，历史记录仍会保留。确定重新开始吗？",
-      confirmText: "确定重启",
+      confirmText: "开启新对话",
       cancelText: "取消",
     });
     if (!modal.confirm) return;
@@ -241,7 +243,7 @@ export default function CoachPage() {
       await Promise.all([refreshCoachBrief(), loadDailyBrief(), loadDailyTip()]);
       feedback.show({ message: "已开启新的营养教练对话", tone: "success" });
     } catch {
-      feedback.show({ message: "重启对话失败，请稍后重试", tone: "error" });
+      feedback.show({ message: "新对话开启失败，请稍后重试", tone: "error" });
     } finally {
       setRestarting(false);
     }
@@ -400,6 +402,10 @@ export default function CoachPage() {
     void Taro.pageScrollTo({ scrollTop: 0, duration: 300 });
   };
 
+  const handlePrimaryAction = () => {
+    void Taro.switchTab({ url: "/pages/meal-records/index" });
+  };
+
   const handleScrollTopPositionChange = (event: {
     detail: ScrollTopPosition & { source: "touch" | "touch-out-of-bounds" | "out-of-bounds" | "friction" | "" };
   }) => {
@@ -442,17 +448,105 @@ export default function CoachPage() {
               <Text className="coach-chat__hero-kicker">NOVA · 今日提醒</Text>
               <View
                 className="coach-chat__restart-action"
-                ariaLabel="重启对话"
+                ariaLabel="新对话"
                 onClick={() => void handleRestartConversation()}
               >
-                <NordicIcon name="refresh-cw" size={15} ariaLabel="重启对话" />
-                <Text>重启对话</Text>
+                <NordicIcon name="refresh-cw" size={15} ariaLabel="新对话" />
+                <Text>新对话</Text>
               </View>
             </View>
             <Text className="coach-chat__hero-greeting">{dailyBrief.greeting}</Text>
             <Text className="coach-chat__hero-summary">{dailyBrief.summary}</Text>
             <Text className="coach-chat__hero-suggestion">{dailyBrief.suggestion}</Text>
+            <View className="coach-chat__hero-cta" ariaLabel={primaryActionLabel} onClick={handlePrimaryAction}>
+              <Text>{primaryActionLabel}</Text>
+              <NordicIcon name="chevron-right" size={16} ariaLabel={primaryActionLabel} />
+            </View>
           </View>
+        </View>
+
+        <View className="coach-chat__progress-card">
+          <View
+            className={`coach-chat__progress-heading coach-chat__section-toggle ${
+              expandedSections.progress
+                ? "coach-chat__section-toggle--expanded"
+                : "coach-chat__section-toggle--collapsed"
+            }`}
+            ariaLabel={expandedSections.progress ? "收起详细营养数据" : "展开详细营养数据"}
+            onClick={() =>
+              setExpandedSections((current) => ({ ...current, progress: !current.progress }))
+            }
+          >
+            <View>
+              <Text className="coach-chat__progress-kicker">今日进度</Text>
+              <Text className="coach-chat__progress-title">
+                {hasMealRecord ? "继续完成今天的营养目标" : "先记录今天的第一餐"}
+              </Text>
+            </View>
+            <View className="coach-chat__progress-score-group">
+              <Text className="coach-chat__progress-score">{summary.completion}%</Text>
+              <NordicIcon
+                name="chevron-right"
+                size={16}
+                ariaLabel={expandedSections.progress ? "收起" : "展开"}
+              />
+            </View>
+          </View>
+          <View className="coach-chat__progress-tasks">
+            <View className="coach-chat__progress-task">
+              <Text className="coach-chat__progress-task-status">
+                {hasMealRecord ? "✓" : "○"}
+              </Text>
+              <Text>{hasMealRecord ? "已记录今天的饮食" : "记录第一餐"}</Text>
+            </View>
+            <View className="coach-chat__progress-task">
+              <Text className="coach-chat__progress-task-status">
+                {summary.consumed.protein >= summary.protein ? "✓" : "○"}
+              </Text>
+              <Text>{summary.consumed.protein >= summary.protein ? "已完成蛋白目标" : "完成蛋白目标"}</Text>
+            </View>
+          </View>
+          {[
+            ["蛋白质", summary.consumed.protein, summary.protein, "g"] as const,
+            ["热量", summary.consumed.calories, summary.calories, " kcal"] as const,
+          ].map(([label, consumed, target, unit]) => {
+            const progress = clampProgress(Number(consumed), Number(target));
+            return (
+              <View className="coach-chat__progress-row" key={label}>
+                <View className="coach-chat__progress-row-copy">
+                  <Text>{label}</Text>
+                  <Text className={progress.exceeded ? "coach-chat__progress-over" : undefined}>
+                    {consumed}/{target}
+                    {unit}
+                    {progress.exceeded ? ` · ${formatTargetStatus(progress, unit, { short: true })}` : ""}
+                  </Text>
+                </View>
+                <View className={`coach-chat__progress-track ${progress.exceeded ? "coach-chat__progress-track--exceeded" : ""}`}>
+                  <AnimatedProgressBar className="coach-chat__progress-fill animated-progress-bar" percent={progress.percent} />
+                </View>
+              </View>
+            );
+          })}
+          {expandedSections.progress
+            ? [["碳水", summary.consumed.carbs, summary.carbs, "g"] as const].map(([label, consumed, target, unit]) => {
+                const progress = clampProgress(Number(consumed), Number(target));
+                return (
+                  <View className="coach-chat__progress-row" key={label}>
+                    <View className="coach-chat__progress-row-copy">
+                      <Text>{label}</Text>
+                      <Text className={progress.exceeded ? "coach-chat__progress-over" : undefined}>
+                        {consumed}/{target}
+                        {unit}
+                        {progress.exceeded ? ` · ${formatTargetStatus(progress, unit, { short: true })}` : ""}
+                      </Text>
+                    </View>
+                    <View className={`coach-chat__progress-track ${progress.exceeded ? "coach-chat__progress-track--exceeded" : ""}`}>
+                      <AnimatedProgressBar className="coach-chat__progress-fill animated-progress-bar" percent={progress.percent} />
+                    </View>
+                  </View>
+                );
+              })
+            : null}
         </View>
 
         <View className="coach-chat__suggestion">
@@ -469,7 +563,7 @@ export default function CoachPage() {
           >
             <View className="coach-chat__suggestion-label">
               <NordicIcon name="milestone" size={18} ariaLabel="今日营养建议" />
-              <Text>今日营养建议</Text>
+              <Text>NOVA 小贴士</Text>
             </View>
             <View className="coach-chat__suggestion-actions">
               <View
@@ -491,11 +585,11 @@ export default function CoachPage() {
               </View>
             </View>
           </View>
+          <Text className="coach-chat__suggestion-title">
+            {dailyTipLoading ? "正在整理今日建议…" : (dailyTip ?? defaultDailyTip).headline}
+          </Text>
           {expandedSections.suggestion ? (
             <>
-              <Text className="coach-chat__suggestion-title">
-                {dailyTipLoading ? "正在整理今日建议…" : (dailyTip ?? defaultDailyTip).headline}
-              </Text>
               <Text className="coach-chat__suggestion-copy">
                 {dailyTipLoading ? "正在结合你的今日记录准备一条小建议。" : (dailyTip ?? defaultDailyTip).content}
               </Text>
@@ -514,85 +608,6 @@ export default function CoachPage() {
         </View>
 
         <View className="coach-chat__bottom-tools">
-          <View className="coach-chat__progress-card">
-            <View
-              className={`coach-chat__progress-heading coach-chat__section-toggle ${
-                expandedSections.progress
-                  ? "coach-chat__section-toggle--expanded"
-                  : "coach-chat__section-toggle--collapsed"
-              }`}
-              ariaLabel={expandedSections.progress ? "收起今日进度" : "展开今日进度"}
-              onClick={() =>
-                setExpandedSections((current) => ({ ...current, progress: !current.progress }))
-              }
-            >
-              <View>
-                <Text className="coach-chat__progress-kicker">今日任务</Text>
-                <Text className="coach-chat__progress-title">
-                  {summary.consumed.calories > 0 ? "继续完成今天的营养目标" : "先记录今天的第一餐"}
-                </Text>
-              </View>
-              <View className="coach-chat__progress-score-group">
-                <Text className="coach-chat__progress-score">{summary.completion}</Text>
-                <Text className="coach-chat__progress-unit">/100</Text>
-                <NordicIcon
-                  name="chevron-right"
-                  size={16}
-                  ariaLabel={expandedSections.progress ? "收起" : "展开"}
-                />
-              </View>
-            </View>
-            {expandedSections.progress
-              ? <>
-                  <View className="coach-chat__progress-tasks">
-                    <View className="coach-chat__progress-task">
-                      <Text className="coach-chat__progress-task-status">
-                        {summary.consumed.calories > 0 ? "已完成" : "待完成"}
-                      </Text>
-                      <Text>{summary.consumed.calories > 0 ? "已记录今天的饮食" : "记录今天的第一餐"}</Text>
-                    </View>
-                    <View className="coach-chat__progress-task">
-                      <Text className="coach-chat__progress-task-status">
-                        {summary.consumed.protein >= summary.protein ? "已完成" : "待完成"}
-                      </Text>
-                      <Text>{summary.consumed.protein >= summary.protein ? "已完成蛋白目标" : "完成今天的蛋白目标"}</Text>
-                    </View>
-                  </View>
-                  {[
-                  ["蛋白质", summary.consumed.protein, summary.protein, "g"] as const,
-                  ["碳水", summary.consumed.carbs, summary.carbs, "g"] as const,
-                  ["热量", summary.consumed.calories, summary.calories, " kcal"] as const,
-                  ].map(([label, consumed, target, unit]) => {
-                  const progress = clampProgress(Number(consumed), Number(target));
-                  return (
-                    <View className="coach-chat__progress-row" key={label}>
-                      <View className="coach-chat__progress-row-copy">
-                        <Text>{label}</Text>
-                        <Text className={progress.exceeded ? "coach-chat__progress-over" : undefined}>
-                          {consumed}/{target}
-                          {unit}
-                          {progress.exceeded
-                            ? ` · ${formatTargetStatus(progress, unit, { short: true })}`
-                            : ""}
-                        </Text>
-                      </View>
-                      <View
-                        className={`coach-chat__progress-track ${
-                          progress.exceeded ? "coach-chat__progress-track--exceeded" : ""
-                        }`}
-                      >
-                        <AnimatedProgressBar
-                          className="coach-chat__progress-fill animated-progress-bar"
-                          percent={progress.percent}
-                        />
-                      </View>
-                    </View>
-                  );
-                  })}
-                </>
-              : null}
-          </View>
-
           <View className="coach-chat__conversation">
             {messages.map((message) => (
               <View
