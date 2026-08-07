@@ -1,5 +1,5 @@
 import { Text, Textarea, View } from "@tarojs/components";
-import Taro, { useDidShow } from "@tarojs/taro";
+import Taro, { useDidShow, usePullDownRefresh } from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
@@ -10,12 +10,14 @@ import { BottomSheet, bottomSheetExitDuration } from "../../components/bottom-sh
 import { ListItem } from "../../components/list-item";
 import { NordicIcon } from "../../components/nordic-icon";
 import { StatisticCard } from "../../components/statistic-card";
-import { getMyFeedback, markFeedbackRepliesRead, submitProductFeedback, type ProductFeedbackItem } from "../../api/feedback-api";
-import { getProductAccount } from "../../api/product-data-api";
 import {
-  getProductWeeklyReview,
-  type ProductWeeklyReview,
-} from "../../api/insight-api";
+  getMyFeedback,
+  markFeedbackRepliesRead,
+  submitProductFeedback,
+  type ProductFeedbackItem,
+} from "../../api/feedback-api";
+import { getProductAccount } from "../../api/product-data-api";
+import { getProductWeeklyReview, type ProductWeeklyReview } from "../../api/insight-api";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
 import { sortAchievementsForProfilePreview } from "../../features/coach/achievement-catalog";
 import { createAchievements, type Achievement } from "../../features/coach/domain";
@@ -53,6 +55,7 @@ export default function ProfilePage() {
   const [feedbackItems, setFeedbackItems] = useState<ProductFeedbackItem[]>([]);
   const [unreadReplyCount, setUnreadReplyCount] = useState(0);
   const [weeklyReview, setWeeklyReview] = useState<ProductWeeklyReview | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
   const logoutFlow = createLogoutFlow({
@@ -82,14 +85,29 @@ export default function ProfilePage() {
       .catch(() => undefined);
   }, [date]);
 
-  const refreshFeedbackHistory = () => {
-    void getMyFeedback()
+  const refreshFeedbackHistory = () =>
+    getMyFeedback()
       .then((result) => {
         setFeedbackItems(result.items);
         setUnreadReplyCount(result.unreadReplyCount);
       })
       .catch(() => undefined);
-  };
+
+  usePullDownRefresh(() => {
+    setRefreshing(true);
+    void Promise.all([
+      refreshFeedbackHistory(),
+      refreshProductAchievements(date),
+      getProductWeeklyReview(date, { preferFast: true }),
+    ])
+      .then(([, , review]) => {
+        setWeeklyReview(review);
+      })
+      .finally(() => {
+        setRefreshing(false);
+        Taro.stopPullDownRefresh();
+      });
+  });
 
   useDidShow(() => {
     refreshFeedbackHistory();
@@ -108,7 +126,12 @@ export default function ProfilePage() {
         };
         const realNickname =
           account.nickname && account.nickname !== "微信用户" ? account.nickname : null;
-        const changes: { nickname?: string; avatarUrl?: string | null; weight?: number; goalLabel?: string } = {};
+        const changes: {
+          nickname?: string;
+          avatarUrl?: string | null;
+          weight?: number;
+          goalLabel?: string;
+        } = {};
         if (realNickname) changes.nickname = realNickname;
         if (account.avatarUrl) changes.avatarUrl = account.avatarUrl;
         if (account.weightKg != null) changes.weight = account.weightKg;
@@ -160,12 +183,18 @@ export default function ProfilePage() {
   const changeFeedbackMode = (nextMode: "submit" | "history") => {
     setFeedbackMode(nextMode);
     if (nextMode !== "history") return;
-    const unreadIds = feedbackItems.filter((item) => item.adminReply && !item.replyReadAt).map((item) => item.id);
+    const unreadIds = feedbackItems
+      .filter((item) => item.adminReply && !item.replyReadAt)
+      .map((item) => item.id);
     if (!unreadIds.length) return;
     void markFeedbackRepliesRead(unreadIds)
       .then(() => {
         setUnreadReplyCount(0);
-        setFeedbackItems((items) => items.map((item) => unreadIds.includes(item.id) ? { ...item, replyReadAt: "read" } : item));
+        setFeedbackItems((items) =>
+          items.map((item) =>
+            unreadIds.includes(item.id) ? { ...item, replyReadAt: "read" } : item,
+          ),
+        );
       })
       .catch(() => undefined);
   };
@@ -185,12 +214,17 @@ export default function ProfilePage() {
       title="个人中心"
       activeTab="profile"
       hideNavigation
+      refreshing={refreshing}
       className="page-layout--profile"
     >
       <View className="profile-rhythm">
         <View ariaLabel="编辑个人资料" onClick={() => openPage("/pages/profile-edit/index")}>
           <AppCard tone="dark" className="profile-hero profile-rhythm__identity">
-            <Avatar label={profile.profile.nickname.slice(0, 1).toUpperCase()} src={profile.profile.avatarUrl} size="large" />
+            <Avatar
+              label={profile.profile.nickname.slice(0, 1).toUpperCase()}
+              src={profile.profile.avatarUrl}
+              size="large"
+            />
             <View>
               <Text className="profile-hero__name">{profile.profile.nickname}</Text>
               <Text className="profile-hero__goal">
@@ -203,7 +237,11 @@ export default function ProfilePage() {
 
         <View className="card-grid profile-rhythm__stats">
           <View onClick={() => openPage("/pages/goal-adjust/index")}>
-            <StatisticCard label="目标热量" value={`${profile.profile.targetCalories}`} hint="kcal · 可调整" />
+            <StatisticCard
+              label="目标热量"
+              value={`${profile.profile.targetCalories}`}
+              hint="kcal · 可调整"
+            />
           </View>
           <View onClick={openCoach}>
             <StatisticCard
@@ -235,16 +273,22 @@ export default function ProfilePage() {
           </Text>
         </View>
         <View className="profile-rhythm__achievement-row">
-          {sortAchievementsForProfilePreview(list).slice(0, 3).map((achievement) => (
-            <View
-              className={`profile-rhythm__achievement ${achievement.unlocked ? "" : "profile-rhythm__achievement--locked"}`}
-              key={achievement.id}
-              onClick={() => setSelectedAchievement(achievement)}
-            >
-              <NordicIcon name={getAchievementIcon(achievement)} size={22} ariaLabel={achievement.title} />
-              <Text>{achievement.title}</Text>
-            </View>
-          ))}
+          {sortAchievementsForProfilePreview(list)
+            .slice(0, 3)
+            .map((achievement) => (
+              <View
+                className={`profile-rhythm__achievement ${achievement.unlocked ? "" : "profile-rhythm__achievement--locked"}`}
+                key={achievement.id}
+                onClick={() => setSelectedAchievement(achievement)}
+              >
+                <NordicIcon
+                  name={getAchievementIcon(achievement)}
+                  size={22}
+                  ariaLabel={achievement.title}
+                />
+                <Text>{achievement.title}</Text>
+              </View>
+            ))}
         </View>
 
         <View
@@ -281,7 +325,16 @@ export default function ProfilePage() {
           <View onClick={openFeedback}>
             <ListItem
               icon={<NordicIcon name="heart" size={20} ariaLabel="反馈与帮助" />}
-              title={<View className="profile-feedback-title"><Text>反馈与帮助</Text>{unreadReplyCount > 0 ? <View className="profile-feedback-title__bell"><NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" /></View> : null}</View>}
+              title={
+                <View className="profile-feedback-title">
+                  <Text>反馈与帮助</Text>
+                  {unreadReplyCount > 0 ? (
+                    <View className="profile-feedback-title__bell">
+                      <NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" />
+                    </View>
+                  ) : null}
+                </View>
+              }
               description="告诉我们你的想法"
               trailing="›"
             />
@@ -332,21 +385,77 @@ export default function ProfilePage() {
             </View>
           </View>
           <View className="profile-feedback-tabs">
-            <View className={`profile-feedback-tab ${feedbackMode === "submit" ? "profile-feedback-tab--active" : ""}`} onClick={() => changeFeedbackMode("submit")}><Text>提交反馈</Text></View>
-            <View className={`profile-feedback-tab ${feedbackMode === "history" ? "profile-feedback-tab--active" : ""}`} onClick={() => changeFeedbackMode("history")}><Text>反馈处理</Text></View>
+            <View
+              className={`profile-feedback-tab ${feedbackMode === "submit" ? "profile-feedback-tab--active" : ""}`}
+              onClick={() => changeFeedbackMode("submit")}
+            >
+              <Text>提交反馈</Text>
+            </View>
+            <View
+              className={`profile-feedback-tab ${feedbackMode === "history" ? "profile-feedback-tab--active" : ""}`}
+              onClick={() => changeFeedbackMode("history")}
+            >
+              <Text>反馈处理</Text>
+            </View>
           </View>
-          {feedbackMode === "submit" ? <>
-            <Text className="profile-modal__lead">告诉我们哪里不顺手，或你希望下一步看到什么。</Text>
-            <Textarea className="profile-modal__input" value={feedbackDraft} placeholder="例如：我希望回顾中能看到每餐的蛋白变化" maxlength={120} autoHeight onInput={(event) => setFeedbackDraft(event.detail.value)} />
-            <Text className="profile-modal__hint">提交后将安全保存，用于定位问题和改进体验。</Text>
-            <View className="profile-sheet__action"><AppButton size="medium" onClick={() => void submitFeedback()}>提交反馈</AppButton></View>
-          </> : <View className="profile-feedback-list">
-            {feedbackItems.length ? feedbackItems.map((item) => <View className="profile-feedback-card" key={item.id}>
-              <View className="profile-feedback-card__head"><Text className="profile-feedback-status">{{ new: "已收到", reviewing: "处理中", resolved: "已回复", closed: "已关闭" }[item.status]}</Text><Text>{item.createdAt.slice(0, 10)}</Text></View>
-              <Text className="profile-feedback-label">你的反馈</Text><Text>{item.content}</Text>
-              {item.adminReply ? <View className="profile-feedback-reply"><Text className="profile-feedback-label">我们的回复</Text><Text>{item.adminReply}</Text></View> : null}
-            </View>) : <View className="profile-feedback-empty"><Text>暂无反馈记录</Text><Text>你提交的反馈会在这里显示处理进度和回复。</Text></View>}
-          </View>}
+          {feedbackMode === "submit" ? (
+            <>
+              <Text className="profile-modal__lead">
+                告诉我们哪里不顺手，或你希望下一步看到什么。
+              </Text>
+              <Textarea
+                className="profile-modal__input"
+                value={feedbackDraft}
+                placeholder="例如：我希望回顾中能看到每餐的蛋白变化"
+                maxlength={120}
+                autoHeight
+                onInput={(event) => setFeedbackDraft(event.detail.value)}
+              />
+              <Text className="profile-modal__hint">
+                提交后将安全保存，用于定位问题和改进体验。
+              </Text>
+              <View className="profile-sheet__action">
+                <AppButton size="medium" onClick={() => void submitFeedback()}>
+                  提交反馈
+                </AppButton>
+              </View>
+            </>
+          ) : (
+            <View className="profile-feedback-list">
+              {feedbackItems.length ? (
+                feedbackItems.map((item) => (
+                  <View className="profile-feedback-card" key={item.id}>
+                    <View className="profile-feedback-card__head">
+                      <Text className="profile-feedback-status">
+                        {
+                          {
+                            new: "已收到",
+                            reviewing: "处理中",
+                            resolved: "已回复",
+                            closed: "已关闭",
+                          }[item.status]
+                        }
+                      </Text>
+                      <Text>{item.createdAt.slice(0, 10)}</Text>
+                    </View>
+                    <Text className="profile-feedback-label">你的反馈</Text>
+                    <Text>{item.content}</Text>
+                    {item.adminReply ? (
+                      <View className="profile-feedback-reply">
+                        <Text className="profile-feedback-label">我们的回复</Text>
+                        <Text>{item.adminReply}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ))
+              ) : (
+                <View className="profile-feedback-empty">
+                  <Text>暂无反馈记录</Text>
+                  <Text>你提交的反馈会在这里显示处理进度和回复。</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </BottomSheet>
 

@@ -1,6 +1,11 @@
 import { Text, View } from "@tarojs/components";
-import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from "@tarojs/taro";
-import { useEffect, useState } from "react";
+import Taro, {
+  useDidShow,
+  usePullDownRefresh,
+  useShareAppMessage,
+  useShareTimeline,
+} from "@tarojs/taro";
+import { useEffect, useRef, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { DailyNutritionSummary } from "../../components/daily-nutrition-summary";
 import { EmptyState } from "../../components/empty-state";
@@ -43,6 +48,8 @@ export default function HomePage() {
   const [remoteSummary, setRemoteSummary] = useState<ProductDailySummary | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const pullRefreshPending = useRef(false);
   const [guideFirstMeal, setGuideFirstMeal] = useState(
     () => !hasSeenFirstRunTip("home-first-meal"),
   );
@@ -60,6 +67,11 @@ export default function HomePage() {
   const meals = store.getMealsByDate(today);
   const greeting = getCoachGreeting(remoteSummary?.serverTime ?? null);
   const remoteInsight = summary.staleRemote ? null : (remoteSummary?.insight ?? null);
+  usePullDownRefresh(() => {
+    pullRefreshPending.current = true;
+    setRefreshing(true);
+    setRefreshVersion((version) => version + 1);
+  });
   useDidShow(() => {
     // Belt-and-suspenders: never stay on Home when server/local say onboarding is open.
     if (!isOnboardingCompleted()) {
@@ -77,11 +89,12 @@ export default function HomePage() {
     setRefreshVersion((version) => version + 1);
   });
   useEffect(() => {
+    let cancelled = false;
     if (!remoteSummary && store.getMealsByDate(today).length === 0) {
       store.setLoadingState("loading");
     }
     setSyncError(null);
-    void getProductDailySummary(today)
+    const request = getProductDailySummary(today)
       .then(async (dailySummary) => {
         setRemoteSummary(dailySummary);
         store.setDailyTargets(dailySummary.targets);
@@ -97,6 +110,16 @@ export default function HomePage() {
         setSyncError("云端同步暂时不可用，已保留本地记录。");
         store.setLoadingState(store.getMealsByDate(today).length ? "normal" : "empty");
       });
+    void request.finally(() => {
+      if (!cancelled && pullRefreshPending.current) {
+        pullRefreshPending.current = false;
+        setRefreshing(false);
+        Taro.stopPullDownRefresh();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [refreshVersion, store.replaceRemoteMeals, today]);
   const openDetail = (id: string) => Taro.navigateTo({ url: `/pages/meal-detail/index?id=${id}` });
   // Both destinations are native tabBar pages. navigateTo cannot open them.
@@ -118,12 +141,19 @@ export default function HomePage() {
         subtitle="正在整理你的云端记录。"
         eyebrow="Nordic Nutri"
         activeTab="home"
+        refreshing={refreshing}
       >
         <Loading label="正在加载今日餐次" />
       </PageLayout>
     );
   return (
-    <PageLayout activeTab="home" hideNavigation title="首页" className="page-layout--home">
+    <PageLayout
+      activeTab="home"
+      hideNavigation
+      title="首页"
+      refreshing={refreshing}
+      className="page-layout--home"
+    >
       <View className="home-page">
         <View className="home-page__header">
           <Avatar
@@ -132,7 +162,9 @@ export default function HomePage() {
             size="home"
           />
           <View className="home-page__greeting-copy">
-            <Text className="home-page__greeting">{greeting}，{profile.profile.nickname}</Text>
+            <Text className="home-page__greeting">
+              {greeting}，{profile.profile.nickname}
+            </Text>
             <Text className="home-page__goal">目标：{profile.profile.goalLabel}</Text>
           </View>
         </View>
@@ -171,7 +203,9 @@ export default function HomePage() {
           <AIInsightCard
             label="NOVA · 营养洞察"
             headline={remoteInsight?.headline ?? undefined}
-            content={remoteInsight?.content ?? "云端洞察暂不可用；记录下一餐后可获得更贴合当天进度的建议。"}
+            content={
+              remoteInsight?.content ?? "云端洞察暂不可用；记录下一餐后可获得更贴合当天进度的建议。"
+            }
             loading={summary.staleRemote || (!remoteInsight && !syncError)}
             actionLabel="查看饮食记录"
           />

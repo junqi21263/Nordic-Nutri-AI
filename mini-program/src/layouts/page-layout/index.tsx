@@ -4,6 +4,7 @@ import { useEffect, type PropsWithChildren } from "react";
 import { AppSafeArea } from "../../components/app-safe-area";
 import { AppTopBar } from "../../components/app-top-bar";
 import { BottomTabBar } from "../../components/bottom-tab-bar";
+import { PullDownRefreshIndicator } from "../../components/pull-down-refresh-indicator";
 import { TopNavigation } from "../../components/top-navigation";
 import { useSystemLayout } from "../../hooks/useSystemLayout";
 import { useTabBarStore } from "../../stores/tab-bar-store";
@@ -32,6 +33,7 @@ export interface PageLayoutProps extends PropsWithChildren {
   onTopBarHome?: () => void;
   topBarAction?: string;
   onTopBarAction?: () => void;
+  refreshing?: boolean;
   className?: string;
 }
 
@@ -53,6 +55,7 @@ export function PageLayout({
   onTopBarHome,
   topBarAction,
   onTopBarAction,
+  refreshing = false,
   className,
   children,
 }: PageLayoutProps) {
@@ -119,6 +122,7 @@ export function PageLayout({
               onActionClick={onActionClick}
             />
           ) : null}
+          <PullDownRefreshIndicator refreshing={refreshing} />
           <View className="content-stack">{children}</View>
         </View>
       </View>
