@@ -11,11 +11,11 @@ describe("NOVA proactive daily reminder", () => {
     expect(api).toContain("getProductCoachDailyBrief");
     expect(api).toContain("/coach/daily-brief");
     expect(api).toContain("greeting: string");
-    expect(api).toContain("mealLabel: \"早餐建议\"");
+    expect(api).toContain("suggestion: string");
     expect(api).toContain("theme: \"starter\"");
   });
 
-  it("renders a data-driven NOVA 今日提醒 above chat without replacing the daily tip", () => {
+  it("renders a compact three-paragraph NOVA reminder above chat without replacing the daily tip", () => {
     const page = read("src/pages/coach/index.tsx");
 
     expect(page).toContain("getProductCoachDailyBrief");
@@ -23,10 +23,10 @@ describe("NOVA proactive daily reminder", () => {
     expect(page).toContain("NOVA · 今日提醒");
     expect(page).toContain("dailyBrief.greeting");
     expect(page).toContain("dailyBrief.summary");
-    expect(page).toContain("dailyBrief.mealLabel");
     expect(page).toContain("dailyBrief.suggestion");
-    expect(page).toContain("dailyBrief.reason");
-    expect(page).toContain("dailyBrief.action");
+    expect(page).not.toContain("dailyBrief.reason");
+    expect(page).not.toContain("dailyBrief.action");
+    expect(page).not.toContain("coach-chat__status-badge");
     expect(page).toContain("今日营养建议");
   });
 });

@@ -15,7 +15,8 @@ describe("icon vocabulary variety", () => {
     expect(read("components/app-top-bar/index.tsx")).toContain("Nordic Nutri AI");
 
     expect(read("components/ai-insight-card/index.tsx")).toContain('name="nova"');
-    expect(read("pages/coach/index.tsx")).toContain('name="zap"');
+    expect(read("pages/coach/index.tsx")).not.toContain('name="zap"');
+    expect(read("pages/coach/index.tsx")).toContain('name="refresh-cw"');
     expect(read("pages/coach/index.tsx")).toContain('name="milestone"');
     expect(read("pages/food-scanner/index.tsx")).toContain('name="food-pot"');
     expect(read("pages/food-catalog/index.tsx")).toContain('name="search"');

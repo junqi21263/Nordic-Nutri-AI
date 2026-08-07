@@ -57,7 +57,10 @@ describe("local coach and profile", () => {
 
     expect(source).toContain("NOVA · 今日提醒");
     expect(composer).toContain("问问营养教练");
-    expect(source).toContain('className="coach-chat__status-badge"');
+    expect(source).toContain('className="coach-chat__hero-greeting"');
+    expect(source).toContain('className="coach-chat__hero-summary"');
+    expect(source).toContain('className="coach-chat__hero-suggestion"');
+    expect(source).not.toContain('className="coach-chat__status-badge"');
     expect(source).not.toContain('className="coach-chat__suggestion-product"');
     expect(source).not.toContain("addSuggestedSnack");
     expect(source).toContain("const defaultQuickPrompts");
@@ -78,14 +81,14 @@ describe("local coach and profile", () => {
   it("keeps restart parallel to NOVA and places the dynamic question below the nutrition tip", () => {
     const source = coachPageSource();
     const toolbarStart = source.indexOf('className="coach-chat__hero-toolbar"');
-    const titleStart = source.indexOf('className="coach-chat__hero-title"');
+    const greetingStart = source.indexOf('className="coach-chat__hero-greeting"');
     const tipCopy = source.indexOf('className="coach-chat__suggestion-copy"');
     const tipQuestion = source.indexOf('className="coach-chat__suggestion-question"');
 
     expect(toolbarStart).toBeGreaterThan(-1);
     expect(source.indexOf('className="coach-chat__hero-kicker"', toolbarStart)).toBeGreaterThan(toolbarStart);
     expect(source.indexOf('className="coach-chat__restart-action"', toolbarStart)).toBeGreaterThan(toolbarStart);
-    expect(titleStart).toBeGreaterThan(toolbarStart);
+    expect(greetingStart).toBeGreaterThan(toolbarStart);
     expect(tipQuestion).toBeGreaterThan(tipCopy);
   });
 

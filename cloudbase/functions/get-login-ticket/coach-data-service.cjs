@@ -550,6 +550,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       const profile = account?.profile ?? {};
       const preferences = createContext(today, weekly, account).preferences;
       return {
+        proactiveBriefVersion: 2,
         userJourneyStage: journeyStage(account, date, weekly),
         user: {
           name: profile.nickname || account?.nickname || "",
@@ -809,13 +810,10 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     const generated = typeof proactiveDailyBrief === "function"
       ? await proactiveDailyBrief({ date: safeDate, context })
       : {
-          greeting: "你好 👋",
-          summary: "今天从记录一餐开始，让营养反馈更贴合你。",
-          mealLabel: "早餐建议",
-          suggestion: "选择一份蛋白质、蔬菜和适量主食",
-          reason: "稳定记录能帮助你接近每日营养目标。",
+        greeting: "你好 👋",
+          summary: "今天先记下一餐，慢慢建立饮食节奏。",
+          suggestion: "早餐建议：一份蛋白、主食和水果，开启健康饮食节奏。",
           theme: "starter",
-          action: "先完成今天第一餐记录",
           source: "rule_v2",
           model: null,
           usage: null,
@@ -882,7 +880,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     if (lookup.error) throw new Error("NOVA daily brief cache read failed");
     const row = lookup.data;
     if (!row || row.context_hash !== contextHash || !row.payload || typeof row.payload !== "object" || Array.isArray(row.payload)) return null;
-    const fields = ["greeting", "summary", "mealLabel", "suggestion", "reason", "theme", "action"];
+    const fields = ["greeting", "summary", "suggestion", "theme"];
     if (fields.some((field) => typeof row.payload[field] !== "string" || !row.payload[field].trim())) return null;
     return {
       ...fields.reduce((result, field) => ({ ...result, [field]: row.payload[field].trim() }), {}),
@@ -894,7 +892,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
 
   async function writeCachedDailyBrief(userId, briefDate, contextHash, brief) {
     const provider = ["deepseek", "hunyuan-exp", "rule_v2"].includes(brief?.source) ? brief.source : "rule_v2";
-    const payload = (({ greeting, summary, mealLabel, suggestion, reason, theme, action }) => ({ greeting, summary, mealLabel, suggestion, reason, theme, action }))(brief);
+    const payload = (({ greeting, summary, suggestion, theme }) => ({ greeting, summary, suggestion, theme }))(brief);
     const persisted = await db.from("nova_daily_briefs").upsert({
       user_id: userId,
       brief_date: briefDate,

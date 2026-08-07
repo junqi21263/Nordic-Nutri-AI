@@ -58,12 +58,9 @@ const defaultDailyTip: ProductCoachDailyTip = {
 };
 const defaultDailyBrief: ProductCoachDailyBrief = {
   greeting: "你好 👋",
-  summary: "今天从记录一餐开始，让 NOVA 更懂你的饮食节奏。",
-  mealLabel: "早餐建议",
-  suggestion: "选择一份蛋白质、蔬菜和适量主食",
-  reason: "稳定记录能帮助你接近每日营养目标。",
+  summary: "今天先记下一餐，慢慢建立饮食节奏。",
+  suggestion: "早餐建议：一份蛋白、主食和水果，开启健康饮食节奏。",
   theme: "starter",
-  action: "先完成今天第一餐记录",
   source: "rule_v2",
   model: null,
 };
@@ -451,13 +448,9 @@ export default function CoachPage() {
                 <Text>重启对话</Text>
               </View>
             </View>
-            <Text className="coach-chat__hero-title">{dailyBrief.greeting}{"\n"}{dailyBrief.summary}</Text>
-            <View className="coach-chat__status-badge">
-              <NordicIcon name="zap" size={15} ariaLabel="今日营养状态" />
-              <Text>{dailyBrief.mealLabel} · {dailyBrief.suggestion}</Text>
-            </View>
-            <Text className="coach-chat__hero-reason">{dailyBrief.reason}</Text>
-            <Text className="coach-chat__hero-action">{dailyBrief.action}</Text>
+            <Text className="coach-chat__hero-greeting">{dailyBrief.greeting}</Text>
+            <Text className="coach-chat__hero-summary">{dailyBrief.summary}</Text>
+            <Text className="coach-chat__hero-suggestion">{dailyBrief.suggestion}</Text>
           </View>
         </View>
 

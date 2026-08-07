@@ -936,7 +936,7 @@
   border: 1px solid rgba($color-forest-green, 0.08);
   border-radius: $radius-24;
   display: flex;
-  min-height: 214px;
+  min-height: 172px;
   overflow: hidden;
   padding: $space-16 $space-16 $space-16;
   position: relative;
@@ -966,27 +966,6 @@
   margin-bottom: $space-12;
   min-width: 0;
 }
-.coach-chat__status-badge {
-  align-items: center;
-  background: rgba($color-forest-green, 0.08);
-  border-radius: $radius-full;
-  color: $color-forest-green;
-  display: inline-flex;
-  flex: 0 1 auto;
-  font-size: $font-overline;
-  font-weight: $font-weight-semibold;
-  gap: $space-4;
-  min-width: 0;
-  overflow: hidden;
-  margin-top: $space-8;
-  padding: $space-4 $space-12;
-  align-self: flex-start;
-}
-.coach-chat__status-badge text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .coach-chat__restart-action {
   align-items: center;
   background: rgba($color-warm-white, 0.9);
@@ -1015,25 +994,25 @@
   font-size: $font-body;
   line-height: 1.2;
 }
-.coach-chat__hero-title {
+.coach-chat__hero-greeting {
   color: $color-text-primary;
-  font-size: 36px;
+  font-size: $font-h2;
   font-weight: $font-weight-semibold;
   line-height: 1.3;
   margin-top: $space-8;
-  white-space: pre-line;
 }
-.coach-chat__hero-reason {
+.coach-chat__hero-summary {
   color: $color-text-secondary;
-  font-size: $font-overline;
-  line-height: $line-caption;
+  font-size: $font-body;
+  line-height: $line-body;
   margin-top: $space-8;
 }
-.coach-chat__hero-action {
+.coach-chat__hero-suggestion {
   color: $color-forest-green;
-  font-size: $font-overline;
+  font-size: $font-body;
   font-weight: $font-weight-semibold;
-  margin-top: $space-4;
+  line-height: $line-body;
+  margin-top: $space-8;
 }
 .coach-chat__suggestion-question {
   align-items: center;

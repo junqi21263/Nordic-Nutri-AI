@@ -69,11 +69,8 @@ export interface ProductCoachDailyTip {
 export interface ProductCoachDailyBrief {
   greeting: string;
   summary: string;
-  mealLabel: "早餐建议" | "午餐建议" | "晚餐建议" | "加餐建议";
   suggestion: string;
-  reason: string;
   theme: "starter" | "protein_gap" | "energy_gap" | "meal_rhythm" | "dietary_balance" | "progress" | "consistency";
-  action: string;
   source: "deepseek" | "hunyuan-exp" | "rule_v2";
   model: string | null;
   cached?: boolean;
