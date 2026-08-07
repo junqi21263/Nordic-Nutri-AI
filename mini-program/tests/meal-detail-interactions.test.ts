@@ -49,6 +49,8 @@ describe("餐食详情交互", () => {
     const styles = read("styles/page.scss");
 
     expect(detail).toContain("setRemoteMeal(saved)");
+    expect(detail).toContain('import("../../features/coach/refresh-achievements")');
+    expect(detail).toContain("refreshProductAchievements(meal.date)");
     expect(detail).toContain('name={meal.favorite ? "heart-filled" : "heart"}');
     expect(detail).toContain("可在「记录」筛选里查看");
     expect(detail).toContain("meal-detail-page__action--favorite");
@@ -58,4 +60,3 @@ describe("餐食详情交互", () => {
     );
   });
 });
-
