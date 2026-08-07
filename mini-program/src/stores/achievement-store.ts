@@ -33,7 +33,10 @@ export const createAchievementStore = () =>
     },
     setAchievements: (achievements) => {
       set({ achievements });
-      if (!get().userId) return;
+      // This response is already authenticated by the product API. Do not
+      // wait for the asynchronous identity bootstrap before delivering a
+      // server-confirmed celebration, otherwise a just-finished action such
+      // as 收藏 can be lost during startup.
       const active = get().achievementUnlocked;
       const activeIds = new Set([
         ...(active ? [active.achievementId] : []),

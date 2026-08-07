@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { createAchievementStore } from "../src/stores/achievement-store";
 
 describe("achievement unlock toast", () => {
+  it("queues a server-confirmed pending celebration even before identity bootstrap finishes", () => {
+    const store = createAchievementStore();
+    store.getState().setAchievements([
+      { id: "favorite", title: "收藏灵感", unlocked: true, progress: 100, celebrationPending: true },
+    ]);
+    expect(store.getState().achievementUnlocked).toEqual({ achievementId: "favorite" });
+  });
+
   it("only announces celebrations that the server marks pending", () => {
     const store = createAchievementStore();
     store.getState().setUserId("user-1");
