@@ -28,9 +28,11 @@ describe("achievement unlock overlay", () => {
     expect(modal).toContain("achievement-unlock-overlay__burst");
     expect(modal).toContain("achievement-unlock-overlay__burst--left");
     expect(modal).toContain("achievement-unlock-overlay__burst--right");
-    expect(modal).toContain('"--particle-mid"');
-    expect(modal).toContain('"--particle-scatter"');
-    expect(modal).toContain('"--particle-end"');
+    expect(modal).toContain('"--particle-impact-x"');
+    expect(modal).toContain('"--particle-impact-y"');
+    expect(modal).toContain('"--particle-scatter-x"');
+    expect(modal).toContain('"--particle-scatter-y"');
+    expect(modal).toContain('"--particle-end-x"');
     expect(modal).not.toContain("成长里程");
     expect(pageLayout).toContain("acknowledgeProductAchievementCelebration");
     expect(modal).not.toContain("useAchievementStore");
@@ -53,8 +55,11 @@ describe("achievement unlock overlay", () => {
     expect(pageStyles).toContain("#d8a94b");
     expect(pageStyles).toContain(".achievement-unlock-overlay__particle--spark");
     expect(pageStyles).toContain("border-radius: 0;");
-    expect(pageStyles).toContain("44% {");
-    expect(pageStyles).toContain("var(--particle-end) + var(--particle-drift)");
+    expect(pageStyles).toContain("64% {");
+    expect(pageStyles).toContain("var(--particle-impact-x)");
+    expect(pageStyles).toContain("var(--particle-scatter-x)");
+    expect(pageStyles).toContain("var(--particle-end-x)");
+    expect(pageStyles).not.toContain("--particle-mid");
     expect(pageStyles).toContain("var(--particle-fall)");
     expect(pageStyles).toContain(" 500ms both");
     expect(pageStyles).toContain("achievement-unlock-backdrop-in 300ms ease-out");

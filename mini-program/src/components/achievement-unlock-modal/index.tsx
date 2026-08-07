@@ -39,10 +39,11 @@ interface ParticleSeed {
   duration: number;
   rotation: number;
   drift: number;
-  mid: number;
-  scatter: number;
-  end: number;
-  rise: number;
+  impactX: number;
+  impactY: number;
+  scatterX: number;
+  scatterY: number;
+  endX: number;
   entryRise: number;
   fall: number;
 }
@@ -63,20 +64,21 @@ function createParticleSeeds(seed: string, side: "left" | "right"): ParticleSeed
   return Array.from({ length: particleCount }, (_, index) => ({
     type: particleTypes[index % particleTypes.length]!,
     size: particleSizes[Math.floor(random() * particleSizes.length)]!,
-    // Stitch launches from each edge around the vertical midpoint, not from
-    // arbitrary page coordinates. The later values keep the two streams from
-    // collapsing into a single center column after they collide.
+    // Each side starts from its own screen edge. Every seed has a separate
+    // impact and exit point so the two streams cross as a broad band instead
+    // of converging on one centre line.
     top: 35 + random() * 30,
-    delay: Math.round(random() * 220),
-    duration: Math.round(2700 + random() * 700),
+    delay: Math.round(random() * 320),
+    duration: Math.round(3800 + random() * 450),
     rotation: Math.round(-35 + random() * 70),
     drift: Math.round((random() - 0.5) * 7 * 10) / 10,
-    mid: direction * Math.round((38 + random() * 20) * 10) / 10,
-    scatter: direction * Math.round((52 + random() * 38) * 10) / 10,
-    end: direction * Math.round((16 + random() * 82) * 10) / 10,
-    rise: -(Math.round((4 + random() * 14) * 10) / 10),
-    entryRise: -(Math.round((4 + random() * 14) * 4.5) / 10),
-    fall: Math.round((38 + random() * 36) * 10) / 10,
+    impactX: direction * Math.round((32 + random() * 55) * 10) / 10,
+    impactY: Math.round((-16 + random() * 20) * 10) / 10,
+    scatterX: direction * Math.round((8 + random() * 96) * 10) / 10,
+    scatterY: Math.round((-2 + random() * 23) * 10) / 10,
+    endX: direction * Math.round((4 + random() * 104) * 10) / 10,
+    entryRise: Math.round((-7 + random() * 12) * 10) / 10,
+    fall: Math.round((44 + random() * 40) * 10) / 10,
   }));
 }
 
@@ -107,10 +109,11 @@ export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUn
         animationDuration: `${particle.duration}ms`,
         "--particle-drift": `${particle.drift}vw`,
         "--particle-rotation": `${particle.rotation}deg`,
-        "--particle-mid": `${particle.mid}vw`,
-        "--particle-scatter": `${particle.scatter}vw`,
-        "--particle-end": `${particle.end}vw`,
-        "--particle-rise": `${particle.rise}vh`,
+        "--particle-impact-x": `${particle.impactX}vw`,
+        "--particle-impact-y": `${particle.impactY}vh`,
+        "--particle-scatter-x": `${particle.scatterX}vw`,
+        "--particle-scatter-y": `${particle.scatterY}vh`,
+        "--particle-end-x": `${particle.endX}vw`,
         "--particle-entry-rise": `${particle.entryRise}vh`,
         "--particle-fall": `${particle.fall}vh`,
       } as Record<string, string>}
