@@ -24,6 +24,8 @@ describe("body and goal real save pages", () => {
     expect(page).toContain("proteinG");
     expect(page).toContain("carbsG");
     expect(page).toContain("fatG");
+    expect(page).toContain("evaluateProductAchievements");
+    expect(page).toContain("await evaluateProductAchievements()");
     expect(page).not.toContain("getSupabaseClient");
     expect(page).toContain("loading={isSaving || loadingPlan}");
   });
@@ -48,6 +50,13 @@ describe("body and goal real save pages", () => {
     expect(page).toContain("saveProductNutritionPlan");
     expect(page).toContain("保存并更新目标");
     expect(page).toContain('url: "/pages/profile/index"');
+  });
+
+  it("evaluates profile completion immediately after profile edits persist", () => {
+    const page = source("profile-edit");
+
+    expect(page).toContain("evaluateProductAchievements");
+    expect(page).toContain("await evaluateProductAchievements()");
   });
 
   it("sends mealsPerDay into nutrition plan preview with diet prefs", () => {

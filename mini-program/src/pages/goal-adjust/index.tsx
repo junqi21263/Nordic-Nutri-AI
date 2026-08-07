@@ -97,6 +97,13 @@ export default function GoalAdjustPage() {
         carbsG: nextCarbs,
         fatG: nextFat,
       });
+      try {
+        const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
+        await evaluateProductAchievements();
+      } catch (error) {
+        // A saved target must remain usable even if the optional celebration refresh fails.
+        console.warn("[achievements] goal adjustment evaluation failed", error);
+      }
       profile.setProfile({ targetWeight: nextTargetWeight, targetCalories: nextCalories });
       useMealStore.getState().setDailyTargets({
         calories: nextCalories,

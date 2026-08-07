@@ -147,6 +147,13 @@ export default function ProfileEditPage() {
         targetDate: null,
       });
       await saveProductNutritionPlan(preview);
+      try {
+        const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
+        await evaluateProductAchievements();
+      } catch (error) {
+        // Never roll back a saved profile if the non-critical celebration refresh fails.
+        console.warn("[achievements] profile edit evaluation failed", error);
+      }
       const savedNickname = saved.nickname || nextNickname;
       profile.setProfile({
         nickname: savedNickname,
