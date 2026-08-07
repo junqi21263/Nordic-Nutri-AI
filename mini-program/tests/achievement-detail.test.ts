@@ -24,6 +24,10 @@ describe("achievement detail interactions", () => {
     expect(detailSheet).toContain("BottomSheet");
     expect(detailSheet).toContain("unlockedAt");
     expect(detailSheet).toContain("解锁目标");
+    expect(detailSheet).toContain("当前进度");
+    expect(detailSheet).toContain("去记录第一餐");
+    expect(detailSheet).toContain("去记录下一餐");
+    expect(detailSheet).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');
     expect(page).toContain("达成时间");
     expect(page).toContain("achievement-center__filters");
   });

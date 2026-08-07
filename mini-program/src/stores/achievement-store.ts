@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import type { Achievement } from "../features/coach/domain";
-import { useFeedbackStore } from "./feedback-store";
 
 const SEEN_STORAGE_KEY = "nordic.achievements.seenUnlocked";
 const BOOTSTRAP_STORAGE_KEY = "nordic.achievements.seenBootstrapped";
@@ -72,26 +71,24 @@ export const taroAchievementSeenStorage: AchievementSeenStorage = {
 
 export interface AchievementStore {
   achievements: Achievement[];
+  achievementUnlocked: AchievementUnlockedEvent | null;
+  pendingAchievementUnlocks: AchievementUnlockedEvent[];
   setAchievements: (achievements: Achievement[]) => void;
+  dismissAchievementUnlocked: () => void;
   reset: () => void;
 }
 
-export type AchievementUnlockAnnouncer = (titles: string[]) => void;
-
-export const presentAchievementUnlockToast: AchievementUnlockAnnouncer = (titles) => {
-  if (!titles.length) return;
-  const message = titles.length === 1
-    ? `成就解锁：${titles[0]}`
-    : `解锁 ${titles.length} 枚成就：${titles.slice(0, 2).join("、")}${titles.length > 2 ? "…" : ""}`;
-  useFeedbackStore.getState().show({ message, tone: "success" });
-};
+export interface AchievementUnlockedEvent {
+  achievementId: string;
+}
 
 export const createAchievementStore = (
   seenStorage: AchievementSeenStorage = taroAchievementSeenStorage,
-  announce: AchievementUnlockAnnouncer = presentAchievementUnlockToast,
 ) =>
-  create<AchievementStore>((set) => ({
+  create<AchievementStore>((set, get) => ({
     achievements: [],
+    achievementUnlocked: null,
+    pendingAchievementUnlocks: [],
     setAchievements: (achievements) => {
       set({ achievements });
       const unlocked = achievements.filter((item) => item.unlocked);
@@ -103,13 +100,29 @@ export const createAchievementStore = (
       const seen = new Set(seenStorage.readSeen());
       const newlyUnlocked = unlocked.filter((item) => !seen.has(item.id));
       if (!newlyUnlocked.length) return;
-      announce(newlyUnlocked.map((item) => item.title));
       seenStorage.writeSeen([
         ...seen,
         ...newlyUnlocked.map((item) => item.id),
       ]);
+      const nextEvents = newlyUnlocked.map((item) => ({ achievementId: item.id }));
+      const current = get();
+      const pending = [...current.pendingAchievementUnlocks, ...nextEvents];
+      const [nextActive, ...remaining] = current.achievementUnlocked
+        ? [current.achievementUnlocked, ...pending]
+        : pending;
+      set({
+        achievementUnlocked: nextActive ?? null,
+        pendingAchievementUnlocks: remaining,
+      });
     },
-    reset: () => set({ achievements: [] }),
+    dismissAchievementUnlocked: () => {
+      const [nextActive, ...remaining] = get().pendingAchievementUnlocks;
+      set({
+        achievementUnlocked: nextActive ?? null,
+        pendingAchievementUnlocks: remaining,
+      });
+    },
+    reset: () => set({ achievements: [], achievementUnlocked: null, pendingAchievementUnlocks: [] }),
   }));
 
 export const useAchievementStore = createAchievementStore();

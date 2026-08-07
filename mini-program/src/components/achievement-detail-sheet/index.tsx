@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import Taro from "@tarojs/taro";
 import { BottomSheet } from "../../components/bottom-sheet";
 import {
   formatAchievementUnlockedAt,
@@ -17,6 +18,12 @@ export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDe
   const metricLabel = achievement
     ? `${achievement.metric ?? Math.round(((achievement.progress || 0) / 100) * (achievement.target || 100))}/${achievement.target ?? "—"}${achievement.unit || ""}`
     : "";
+  const canRecordNextMeal = Boolean(achievement && !achievement.unlocked && achievement.available !== false);
+  const nextActionLabel = Number(achievement?.metric ?? 0) > 0 ? "去记录下一餐" : "去记录第一餐";
+  const recordNextMeal = () => {
+    onDismiss();
+    void Taro.switchTab({ url: "/pages/meal-records/index" });
+  };
 
   return (
     <BottomSheet open={Boolean(achievement)} onDismiss={onDismiss} className="achievement-detail-sheet">
@@ -49,6 +56,13 @@ export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDe
                   style={{ width: `${Math.min(100, achievement.progress || 0)}%` }}
                 />
               </View>
+            </View>
+          ) : null}
+
+          {canRecordNextMeal ? (
+            <View className="achievement-detail__next-action" onClick={recordNextMeal}>
+              <Text>{nextActionLabel}</Text>
+              <NordicIcon name="chevron-right" size={16} ariaLabel={nextActionLabel} />
             </View>
           ) : null}
 
