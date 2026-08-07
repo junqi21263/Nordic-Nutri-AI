@@ -30,6 +30,7 @@ export default function AchievementsPage() {
   const date = getLocalDateString();
   const [filter, setFilter] = useState<AchievementFilter>("all");
   const [selected, setSelected] = useState<Achievement | null>(null);
+  const showAchievementCelebration = useAchievementStore((state) => state.showAchievementCelebration);
 
   const list = useMemo(() => {
     const source = achievements.achievements.length
@@ -53,6 +54,13 @@ export default function AchievementsPage() {
 
   const openDetail = (achievement: Achievement) => {
     setSelected(enrichAchievement(achievement));
+  };
+  const openAchievement = (achievement: Achievement) => {
+    if (achievement.unlocked) {
+      showAchievementCelebration(enrichAchievement(achievement));
+      return;
+    }
+    openDetail(achievement);
   };
 
   return (
@@ -111,7 +119,7 @@ export default function AchievementsPage() {
               <View
                 key={achievement.id}
                 className={`achievement-center__item ${locked ? "achievement-center__item--locked" : ""} ${comingSoon ? "achievement-center__item--soon" : ""}`}
-                onClick={() => openDetail(achievement)}
+                onClick={() => openAchievement(achievement)}
               >
                 <View className="achievement-center__item-icon">
                   <NordicIcon

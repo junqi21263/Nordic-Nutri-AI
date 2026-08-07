@@ -58,6 +58,7 @@ export default function ProfilePage() {
   const [refreshing, setRefreshing] = useState(false);
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
+  const showAchievementCelebration = useAchievementStore((state) => state.showAchievementCelebration);
   const logoutFlow = createLogoutFlow({
     signOut,
     openLogin: () => Taro.reLaunch({ url: "/pages/auth-entry/index" }),
@@ -208,6 +209,13 @@ export default function ProfilePage() {
       .run()
       .catch(() => feedback.show({ message: "退出登录失败，请稍后重试", tone: "error" }));
   };
+  const openAchievement = (achievement: Achievement) => {
+    if (achievement.unlocked) {
+      showAchievementCelebration(achievement);
+      return;
+    }
+    setSelectedAchievement(achievement);
+  };
 
   return (
     <PageLayout
@@ -279,7 +287,7 @@ export default function ProfilePage() {
               <View
                 className={`profile-rhythm__achievement ${achievement.unlocked ? "" : "profile-rhythm__achievement--locked"}`}
                 key={achievement.id}
-                onClick={() => setSelectedAchievement(achievement)}
+                onClick={() => openAchievement(achievement)}
               >
                 <NordicIcon
                   name={getAchievementIcon(achievement)}

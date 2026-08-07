@@ -51,4 +51,16 @@ describe("achievement unlock toast", () => {
     store.getState().setUserId("user-b");
     expect(store.getState().achievementUnlocked).toBeNull();
   });
+
+  it("opens the same celebration again when an unlocked achievement is tapped", () => {
+    const store = createAchievementStore();
+    const achievement = { id: "first-meal", title: "第一餐记录", unlocked: true, progress: 100 };
+
+    store.getState().showAchievementCelebration(achievement);
+
+    expect(store.getState().manualAchievementCelebration).toEqual(achievement);
+    expect(store.getState().achievementUnlocked).toBeNull();
+    store.getState().dismissManualAchievementCelebration();
+    expect(store.getState().manualAchievementCelebration).toBeNull();
+  });
 });

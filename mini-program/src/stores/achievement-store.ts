@@ -9,11 +9,15 @@ export interface AchievementStore {
   userId: string | null;
   achievements: Achievement[];
   achievementUnlocked: AchievementUnlockedEvent | null;
+  /** Local replay state for an already unlocked achievement. Never acknowledged to the server. */
+  manualAchievementCelebration: Achievement | null;
   pendingAchievementUnlocks: AchievementUnlockedEvent[];
   setAchievements: (achievements: Achievement[]) => void;
   setUserId: (userId: string | null) => void;
   markAchievementCelebrated: (achievementId: string) => void;
   dismissAchievementUnlocked: () => void;
+  showAchievementCelebration: (achievement: Achievement) => void;
+  dismissManualAchievementCelebration: () => void;
   reset: () => void;
 }
 
@@ -26,10 +30,17 @@ export const createAchievementStore = () =>
     userId: null,
     achievements: [],
     achievementUnlocked: null,
+    manualAchievementCelebration: null,
     pendingAchievementUnlocks: [],
     setUserId: (userId) => {
       if (get().userId === userId) return;
-      set({ userId, achievements: [], achievementUnlocked: null, pendingAchievementUnlocks: [] });
+      set({
+        userId,
+        achievements: [],
+        achievementUnlocked: null,
+        manualAchievementCelebration: null,
+        pendingAchievementUnlocks: [],
+      });
     },
     setAchievements: (achievements) => {
       set({ achievements });
@@ -62,7 +73,15 @@ export const createAchievementStore = () =>
       const [nextActive, ...remaining] = get().pendingAchievementUnlocks;
       set({ achievementUnlocked: nextActive ?? null, pendingAchievementUnlocks: remaining });
     },
-    reset: () => set({ userId: null, achievements: [], achievementUnlocked: null, pendingAchievementUnlocks: [] }),
+    showAchievementCelebration: (achievement) => set({ manualAchievementCelebration: achievement }),
+    dismissManualAchievementCelebration: () => set({ manualAchievementCelebration: null }),
+    reset: () => set({
+      userId: null,
+      achievements: [],
+      achievementUnlocked: null,
+      manualAchievementCelebration: null,
+      pendingAchievementUnlocks: [],
+    }),
   }));
 
 export const useAchievementStore = createAchievementStore();

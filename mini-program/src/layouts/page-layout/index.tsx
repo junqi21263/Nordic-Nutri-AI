@@ -67,16 +67,22 @@ export function PageLayout({
   const activeKey = useTabBarStore((state) => state.activeKey);
   const tabbarVisible = useTabBarStore((state) => state.visible);
   const achievementUnlocked = useAchievementStore((state) => state.achievementUnlocked);
+  const manualAchievementCelebration = useAchievementStore((state) => state.manualAchievementCelebration);
   const achievements = useAchievementStore((state) => state.achievements);
   const dismissAchievementUnlocked = useAchievementStore((state) => state.dismissAchievementUnlocked);
+  const dismissManualAchievementCelebration = useAchievementStore((state) => state.dismissManualAchievementCelebration);
   const markAchievementCelebrated = useAchievementStore((state) => state.markAchievementCelebrated);
   const [pageVisible, setPageVisible] = useState(false);
   const layout = useSystemLayout();
-  const activeAchievement = achievementUnlocked
+  const activeAchievement = manualAchievementCelebration ?? (achievementUnlocked
     ? achievements.find((item) => item.id === achievementUnlocked.achievementId) ?? null
-    : null;
+    : null);
   const dismissAchievementCelebration = async () => {
     if (!activeAchievement) return false;
+    if (manualAchievementCelebration) {
+      dismissManualAchievementCelebration();
+      return true;
+    }
     try {
       await acknowledgeProductAchievementCelebration(activeAchievement.id);
       markAchievementCelebrated(activeAchievement.id);

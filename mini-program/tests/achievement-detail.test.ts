@@ -55,9 +55,13 @@ describe("achievement detail interactions", () => {
     expect(result.map((achievement) => achievement.id)).toEqual(["latest", "older", "locked"]);
   });
 
-  it("opens the same achievement detail sheet from the profile preview for locked and unlocked achievements", () => {
+  it("replays the celebration from any unlocked achievement card while locked cards keep their detail sheet", () => {
     const page = readFileSync(resolve(srcRoot, "pages/profile/index.tsx"), "utf8");
-    expect(page).toContain("AchievementDetailSheet");
-    expect(page).toContain("onClick={() => setSelectedAchievement(achievement)}");
+    const achievementsPage = readFileSync(resolve(srcRoot, "pages/achievements/index.tsx"), "utf8");
+    const store = readFileSync(resolve(srcRoot, "stores/achievement-store.ts"), "utf8");
+    expect(page).toContain("openAchievement(achievement)");
+    expect(achievementsPage).toContain("openAchievement(achievement)");
+    expect(store).toContain("showAchievementCelebration");
+    expect(store).toContain("manualAchievementCelebration");
   });
 });
