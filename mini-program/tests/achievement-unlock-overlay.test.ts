@@ -48,11 +48,11 @@ describe("achievement unlock overlay", () => {
     expect(pageStyles).toContain("translateY(50px) scale(0.8)");
     expect(pageStyles).toContain("achievement-unlock-icon-glow 2s ease-in-out");
     expect(pageStyles).not.toContain("#d8a94b");
-    expect(confetti).toContain("const particleCountPerSide = 60");
+    expect(confetti).toContain("const particleCountPerSide = 80");
     expect(confetti).toContain('const colors = ["#0B3B24", "#bdeecc", "#e3e3de", "#F9F8F3"]');
     expect(confetti).toContain("const gravity = 0.5");
     expect(confetti).toContain("const drag = 0.95");
-    expect(confetti).toContain("const motionRate = 0.66");
+    expect(confetti).toContain("const motionRate = 0.5");
     expect(confetti).toContain("const confettiDelayMs = 300");
     expect(confetti).toContain("requestAnimationFrame");
     expect(confetti).toContain('const startX = side === "left" ? -20 : width + 20');

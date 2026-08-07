@@ -2,12 +2,12 @@ import { Canvas } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useMemo } from "react";
 
-const particleCountPerSide = 60;
+const particleCountPerSide = 80;
 const colors = ["#0B3B24", "#bdeecc", "#e3e3de", "#F9F8F3"];
 const confettiDelayMs = 300;
 const gravity = 0.5;
 const drag = 0.95;
-const motionRate = 0.66;
+const motionRate = 0.5;
 
 type ParticleSide = "left" | "right";
 
