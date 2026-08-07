@@ -18,6 +18,7 @@ import { NordicIcon } from "../../components/nordic-icon";
 import { type MealType } from "../../features/meals/domain";
 import { resolveHomeDailySummary } from "../../features/meals/home-daily-summary";
 import { getCoachGreeting } from "../../features/coach/server-time";
+import { evaluateProductAchievements } from "../../features/coach/refresh-achievements";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import {
   hasSeenFirstRunTip,
@@ -90,6 +91,13 @@ export default function HomePage() {
   });
   useEffect(() => {
     let cancelled = false;
+    // Home is the final safety net for every onboarding/profile path. The
+    // server owns the pending state, so this is safe to run on each show.
+    if (isOnboardingCompleted()) {
+      void evaluateProductAchievements(today).catch((error) => {
+        console.warn("[achievements] home evaluation failed", error);
+      });
+    }
     if (!remoteSummary && store.getMealsByDate(today).length === 0) {
       store.setLoadingState("loading");
     }

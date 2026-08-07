@@ -26,6 +26,11 @@ describe("home remote meal synchronization fallback", () => {
     expect(homePage).toContain("resolveHomeDailySummary");
   });
 
+  it("evaluates pending achievements whenever the completed onboarding returns to Home", () => {
+    expect(homePage).toContain("evaluateProductAchievements");
+    expect(homePage).toContain("void evaluateProductAchievements(today)");
+  });
+
   it("prefers local intake when the cached remote summary is still empty", () => {
     const remote = {
       calories: 2450,
