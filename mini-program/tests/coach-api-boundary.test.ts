@@ -43,8 +43,9 @@ describe("persisted coach boundary", () => {
     expect(page).toContain("useDidShow");
     expect(page).toContain("getProductCoachDailyTip");
     expect(page).toContain("restartProductCoachConversation");
-    expect(page).toContain("今日营养建议");
-    expect(page).toContain("重启对话");
+    expect(page).toContain("NOVA 小贴士");
+    expect(page).toContain("新对话");
+    expect(page).not.toContain("重启对话");
     expect(page).toContain("heroPrompt");
     expect(page).toContain("getCoachGreeting");
     expect(page).toContain("analyzeProductImage");

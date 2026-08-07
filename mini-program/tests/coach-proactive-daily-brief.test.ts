@@ -15,7 +15,7 @@ describe("NOVA proactive daily reminder", () => {
     expect(api).toContain("theme: \"starter\"");
   });
 
-  it("renders a compact three-paragraph NOVA reminder above chat without replacing the daily tip", () => {
+  it("renders the daily reminder as the single action-first Coach entry", () => {
     const page = read("src/pages/coach/index.tsx");
 
     expect(page).toContain("getProductCoachDailyBrief");
@@ -24,12 +24,21 @@ describe("NOVA proactive daily reminder", () => {
     expect(page).toContain("dailyBrief.greeting");
     expect(page).toContain("dailyBrief.summary");
     expect(page).toContain("dailyBrief.suggestion");
+    expect(page).toContain("记录第一餐");
+    expect(page).toContain("记录下一餐");
+    expect(page).toContain("今日进度");
+    expect(page).toContain("蛋白质");
+    expect(page).toContain("热量");
     expect(page).not.toContain("dailyBrief.reason");
     expect(page).not.toContain("dailyBrief.action");
     expect(page).not.toContain("coach-chat__status-badge");
-    expect(page).toContain("今日营养建议");
+    expect(page).toContain("NOVA 小贴士");
     expect(page).toContain("换一个建议");
     expect(page).toContain("推荐原因：");
-    expect(page).toContain("今日任务");
+    expect(page).toContain("新对话");
+    expect(page).toContain("我今天吃什么？");
+    expect(page).toContain("我的蛋白够吗？");
+    expect(page).toContain("下一餐怎么搭配？");
+    expect(page).not.toContain("重启对话");
   });
 });
