@@ -152,7 +152,6 @@ export function PageLayout({
       {showTabs && tabbarVisible ? <BottomTabBar activeKey={activeKey} /> : null}
       <AchievementUnlockOverlay
         achievement={activeAchievement}
-        achievements={achievements}
         onDismiss={dismissAchievementCelebration}
       />
     </AppSafeArea>

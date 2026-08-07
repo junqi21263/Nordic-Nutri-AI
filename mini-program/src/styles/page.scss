@@ -2437,6 +2437,16 @@
   width: 100%;
   z-index: 1;
 }
+.achievement-unlock-overlay__confetti {
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 0;
+}
 .achievement-unlock-overlay__icon {
   align-items: center;
   animation: achievement-unlock-glow 1.8s ease-in-out infinite alternate;
@@ -2449,10 +2459,11 @@
   width: 88px;
 }
 .achievement-unlock-overlay__eyebrow {
-  color: $color-sage;
-  font-size: $font-overline;
+  color: $color-forest-green;
+  font-size: $font-body;
   font-weight: $font-weight-semibold;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
 }
 .achievement-unlock-overlay__title {
   color: $color-forest-green;
@@ -2466,28 +2477,6 @@
   line-height: $line-body;
   margin-top: $space-8;
   max-width: 460px;
-}
-.achievement-unlock-overlay__progress {
-  align-self: stretch;
-  margin-top: $space-20;
-}
-.achievement-unlock-overlay__progress-copy {
-  color: $color-text-secondary;
-  display: flex;
-  font-size: $font-caption;
-  justify-content: space-between;
-  margin-bottom: $space-8;
-}
-.achievement-unlock-overlay__progress-track {
-  background: rgba($color-forest-green, 0.1);
-  border-radius: $radius-full;
-  height: 8px;
-  overflow: hidden;
-}
-.achievement-unlock-overlay__progress-fill {
-  background: $color-sage;
-  border-radius: inherit;
-  height: 100%;
 }
 .achievement-unlock-overlay__primary-action {
   align-items: center;
@@ -2509,21 +2498,29 @@
   margin-top: $space-16;
 }
 .achievement-unlock-overlay__particle {
-  animation: achievement-unlock-particle 720ms ease-out both;
-  background: $color-sage;
+  animation: achievement-unlock-particle 2800ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  background: $color-sage-light;
   border-radius: 60% 0 60% 0;
-  height: 10px;
+  height: 12px;
   opacity: 0;
   position: absolute;
-  top: 94px;
-  width: 7px;
+  top: -32px;
+  width: 8px;
 }
-.achievement-unlock-overlay__particle--0 { left: 18%; transform: rotate(16deg); }
-.achievement-unlock-overlay__particle--1 { left: 28%; top: 58px; transform: rotate(-36deg); }
-.achievement-unlock-overlay__particle--2 { left: 39%; top: 42px; }
-.achievement-unlock-overlay__particle--3 { right: 39%; top: 42px; transform: rotate(30deg); }
-.achievement-unlock-overlay__particle--4 { right: 28%; top: 58px; transform: rotate(-22deg); }
-.achievement-unlock-overlay__particle--5 { right: 18%; transform: rotate(46deg); }
+.achievement-unlock-overlay__particle--0 { animation-delay: 0ms; left: 5%; }
+.achievement-unlock-overlay__particle--1 { animation-delay: 120ms; left: 13%; }
+.achievement-unlock-overlay__particle--2 { animation-delay: 280ms; left: 21%; }
+.achievement-unlock-overlay__particle--3 { animation-delay: 60ms; left: 30%; }
+.achievement-unlock-overlay__particle--4 { animation-delay: 360ms; left: 39%; }
+.achievement-unlock-overlay__particle--5 { animation-delay: 160ms; left: 48%; }
+.achievement-unlock-overlay__particle--6 { animation-delay: 440ms; left: 56%; }
+.achievement-unlock-overlay__particle--7 { animation-delay: 220ms; left: 64%; }
+.achievement-unlock-overlay__particle--8 { animation-delay: 500ms; left: 71%; }
+.achievement-unlock-overlay__particle--9 { animation-delay: 100ms; left: 78%; }
+.achievement-unlock-overlay__particle--10 { animation-delay: 320ms; left: 85%; }
+.achievement-unlock-overlay__particle--11 { animation-delay: 540ms; left: 92%; }
+.achievement-unlock-overlay__particle--12 { animation-delay: 190ms; left: 34%; }
+.achievement-unlock-overlay__particle--13 { animation-delay: 410ms; left: 67%; }
 @keyframes achievement-unlock-card-in {
   from { opacity: 0; transform: translateY(24px) scale(0.94); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -2533,9 +2530,10 @@
   to { box-shadow: 0 0 0 12px rgba($color-sage, 0); }
 }
 @keyframes achievement-unlock-particle {
-  0% { opacity: 0; transform: translateY(10px) rotate(0deg); }
-  35% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-34px) rotate(120deg); }
+  0% { opacity: 0; transform: translateY(-24px) rotate(0deg) scale(0.7); }
+  12% { opacity: 0.95; }
+  78% { opacity: 0.84; }
+  100% { opacity: 0; transform: translateY(108vh) rotate(420deg) scale(1.08); }
 }
 .weekly-review__hero {
   align-items: center;
