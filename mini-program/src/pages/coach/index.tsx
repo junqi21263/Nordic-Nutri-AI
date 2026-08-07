@@ -492,7 +492,9 @@ export default function CoachPage() {
               />
             </View>
           </View>
-          <View className="coach-chat__progress-tasks">
+          {expandedSections.progress ? (
+            <View className="coach-chat__progress-details">
+              <View className="coach-chat__progress-tasks">
             <View className="coach-chat__progress-task">
               <Text className="coach-chat__progress-task-status">
                 {hasMealRecord ? "✓" : "○"}
@@ -527,8 +529,7 @@ export default function CoachPage() {
               </View>
             );
           })}
-          {expandedSections.progress
-            ? [["碳水", summary.consumed.carbs, summary.carbs, "g"] as const].map(([label, consumed, target, unit]) => {
+          {[["碳水", summary.consumed.carbs, summary.carbs, "g"] as const].map(([label, consumed, target, unit]) => {
                 const progress = clampProgress(Number(consumed), Number(target));
                 return (
                   <View className="coach-chat__progress-row" key={label}>
@@ -545,8 +546,9 @@ export default function CoachPage() {
                     </View>
                   </View>
                 );
-              })
-            : null}
+              })}
+            </View>
+          ) : null}
         </View>
 
         <View className="coach-chat__suggestion">

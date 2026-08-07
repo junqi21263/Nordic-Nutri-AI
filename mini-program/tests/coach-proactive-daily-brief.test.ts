@@ -41,4 +41,18 @@ describe("NOVA proactive daily reminder", () => {
     expect(page).toContain("下一餐怎么搭配？");
     expect(page).not.toContain("重启对话");
   });
+
+  it("keeps the daily action on one line and hides all progress details when collapsed", () => {
+    const page = read("src/pages/coach/index.tsx");
+    const styles = read("src/styles/page.scss");
+    const heroSuggestion = styles.slice(
+      styles.indexOf(".coach-chat__hero-suggestion"),
+      styles.indexOf(".coach-chat__hero-cta"),
+    );
+
+    expect(heroSuggestion).toContain("white-space: nowrap");
+    expect(heroSuggestion).toContain("text-overflow: ellipsis");
+    expect(page).toContain('className="coach-chat__progress-details"');
+    expect(page).toContain("{expandedSections.progress ? (");
+  });
 });

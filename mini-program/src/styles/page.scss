@@ -1013,6 +1013,9 @@
   font-weight: $font-weight-semibold;
   line-height: $line-body;
   margin-top: $space-8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .coach-chat__hero-cta {
   align-items: center;
@@ -1327,6 +1330,11 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+.coach-chat__progress-details {
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
 }
 .coach-chat__progress-tasks {
   background: rgba($color-sage-light, 0.34);
