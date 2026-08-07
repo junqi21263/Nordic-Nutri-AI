@@ -27,7 +27,13 @@ function createAchievementStateService({ db, clock = () => new Date() }) {
       const justUnlockedIds = new Set(newlyCompleted.map((row) => row.achievement_id));
 
       if (newlyCompleted.length) {
-        const inserted = await db.from("user_achievements").insert(newlyCompleted);
+        // A profile save and the app bootstrap can evaluate achievements at the
+        // same time. The unique user/achievement key makes this write idempotent
+        // instead of losing the response (and its unlock event) to a conflict.
+        const inserted = await db.from("user_achievements").upsert(newlyCompleted, {
+          onConflict: "user_id,achievement_id",
+          ignoreDuplicates: true,
+        });
         if (inserted.error) throw new Error("Achievement state save failed");
         newlyCompleted.forEach((row) => completedById.set(row.achievement_id, row.completed_at));
       }

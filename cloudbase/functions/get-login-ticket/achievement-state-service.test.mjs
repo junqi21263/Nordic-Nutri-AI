@@ -12,7 +12,7 @@ test("keeps a completed achievement after its live condition later becomes false
         select() { return query; },
         eq() { return query; },
         then(resolve) { return Promise.resolve(resolve({ data: rows, error: null })); },
-        async insert(input) {
+        async upsert(input) {
           rows = [...rows, ...input];
           return { data: input, error: null };
         },
@@ -35,4 +35,34 @@ test("keeps a completed achievement after its live condition later becomes false
   assert.equal(retained[0].justUnlocked, false);
   assert.equal(retained[0].unlockedAt, "2026-08-07T08:00:00.000Z");
   assert.equal(rows.length, 1);
+});
+
+test("uses a conflict-safe write when completion checks overlap", async () => {
+  let receivedOptions;
+  const db = {
+    from(table) {
+      assert.equal(table, "user_achievements");
+      const query = {
+        select() { return query; },
+        eq() { return query; },
+        then(resolve) { return Promise.resolve(resolve({ data: [], error: null })); },
+        async upsert(rows, options) {
+          receivedOptions = options;
+          return { data: rows, error: null };
+        },
+      };
+      return query;
+    },
+  };
+  const service = createAchievementStateService({ db, clock: () => new Date("2026-08-07T08:00:00.000Z") });
+
+  const [achievement] = await service.reconcile("user-1", [
+    { id: "profile_complete", unlocked: true, unlockedAt: "2026-08-07T08:00:00.000Z" },
+  ]);
+
+  assert.deepEqual(receivedOptions, {
+    onConflict: "user_id,achievement_id",
+    ignoreDuplicates: true,
+  });
+  assert.equal(achievement.justUnlocked, true);
 });
