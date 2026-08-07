@@ -11,8 +11,8 @@ import {
 test("validateDailyTip accepts the three public tip types", () => {
   for (const type of ["nutrition_tip", "food_function", "food_knowledge"]) {
     assert.deepEqual(
-      validateDailyTip({ type, headline: "补充深色蔬菜", content: "今天的一餐可以加入一份深色蔬菜。" }),
-      { type, headline: "补充深色蔬菜", content: "今天的一餐可以加入一份深色蔬菜。", food: null },
+      validateDailyTip({ type, headline: "补充深色蔬菜", content: "今天的一餐可以加入一份深色蔬菜。", reason: "帮助补足当天的膳食纤维。" }),
+      { type, headline: "补充深色蔬菜", content: "今天的一餐可以加入一份深色蔬菜。", reason: "帮助补足当天的膳食纤维。", food: null },
     );
   }
 });
@@ -24,6 +24,10 @@ test("validateDailyTip rejects unsafe or oversized model output", () => {
   );
   assert.throws(
     () => validateDailyTip({ type: "nutrition_tip", headline: "a".repeat(33), content: "有效内容" }),
+    /DAILY_TIP_RETRYABLE/,
+  );
+  assert.throws(
+    () => validateDailyTip({ type: "nutrition_tip", headline: "补充蛋白", content: "下一餐加入一份优质蛋白。" }),
     /DAILY_TIP_RETRYABLE/,
   );
 });
@@ -43,6 +47,7 @@ test("daily-tip prompt requires a contextual decision and a practical action", (
   assert.match(DAILY_TIP_SYSTEM_PROMPT, /当天记录中最需要优先补足的一个方向/);
   assert.match(DAILY_TIP_SYSTEM_PROMPT, /具体食物或搭配方式/);
   assert.match(DAILY_TIP_SYSTEM_PROMPT, /避免泛泛而谈/);
+  assert.match(DAILY_TIP_SYSTEM_PROMPT, /reason/);
 });
 
 test("coach-question prompt requires a concrete context and rejects generic wording", () => {
@@ -67,6 +72,7 @@ test("service falls back when DeepSeek is unavailable", async () => {
   assert.equal(result.type, "nutrition_tip");
   assert.ok(result.headline);
   assert.ok(result.content);
+  assert.ok(result.reason);
 });
 
 test("service sends only bounded context and returns deepseek result", async () => {
@@ -79,6 +85,7 @@ test("service sends only bounded context and returns deepseek result", async () 
         type: "food_function",
         headline: "燕麦的饱腹感",
         content: "燕麦含有膳食纤维，可作为均衡早餐的一部分。",
+        reason: "帮助提升早餐的饱腹感。",
       };
     },
     random: () => 0.5,
@@ -118,7 +125,7 @@ test("service preserves dev worker metadata for generated tips and quick prompts
     model: "hunyuan-2.0-instruct-20251111",
     requestCompletion: async ({ purpose }) => purpose === "coach_quick_prompt"
       ? { prompt: "晚餐怎么补充蛋白质？" }
-      : { type: "nutrition_tip", headline: "下一餐补蛋白", content: "午餐可搭配鸡蛋或豆腐。", food: null },
+      : { type: "nutrition_tip", headline: "下一餐补蛋白", content: "午餐可搭配鸡蛋或豆腐。", reason: "帮助完成今天的蛋白目标。", food: null },
     random: () => 0,
   });
 

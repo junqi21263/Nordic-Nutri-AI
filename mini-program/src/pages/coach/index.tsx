@@ -52,6 +52,7 @@ const defaultDailyTip: ProductCoachDailyTip = {
   type: "nutrition_tip",
   headline: "下一餐加一份深色蔬菜",
   content: "西兰花、菠菜等能帮助补充膳食纤维；搭配蛋白质和适量主食更均衡。",
+  reason: "帮助补足当天的膳食纤维。",
   food: null,
   source: "rule_v2",
   model: null,
@@ -59,7 +60,7 @@ const defaultDailyTip: ProductCoachDailyTip = {
 const defaultDailyBrief: ProductCoachDailyBrief = {
   greeting: "你好 👋",
   summary: "今天先记下一餐，慢慢建立饮食节奏。",
-  suggestion: "早餐建议：一份蛋白、主食和水果，开启健康饮食节奏。",
+  suggestion: "今日行动：记录早餐，完成今天的第一条饮食数据。",
   theme: "starter",
   source: "rule_v2",
   model: null,
@@ -473,14 +474,14 @@ export default function CoachPage() {
             <View className="coach-chat__suggestion-actions">
               <View
                 className={`coach-chat__suggestion-refresh ${dailyTipLoading ? "coach-chat__suggestion-refresh--loading" : ""}`}
-                ariaLabel="换一条今日营养建议"
+                ariaLabel="换一个今日营养建议"
                 onClick={(event) => {
                   event.stopPropagation();
                   void loadDailyTip(true);
                 }}
               >
-                <NordicIcon name="refresh-cw" size={15} ariaLabel="换一条" />
-                <Text>换一条</Text>
+                <NordicIcon name="refresh-cw" size={15} ariaLabel="换一个建议" />
+                <Text>换一个建议</Text>
               </View>
               <View
                 className="coach-chat__suggestion-collapse"
@@ -497,6 +498,9 @@ export default function CoachPage() {
               </Text>
               <Text className="coach-chat__suggestion-copy">
                 {dailyTipLoading ? "正在结合你的今日记录准备一条小建议。" : (dailyTip ?? defaultDailyTip).content}
+              </Text>
+              <Text className="coach-chat__suggestion-reason">
+                {dailyTipLoading ? "" : `推荐原因：${(dailyTip ?? defaultDailyTip).reason}`}
               </Text>
               <View
                 className="coach-chat__suggestion-question"
@@ -523,8 +527,10 @@ export default function CoachPage() {
               }
             >
               <View>
-                <Text className="coach-chat__progress-kicker">今日进度</Text>
-                <Text className="coach-chat__progress-title">营养节奏</Text>
+                <Text className="coach-chat__progress-kicker">今日任务</Text>
+                <Text className="coach-chat__progress-title">
+                  {summary.consumed.calories > 0 ? "继续完成今天的营养目标" : "先记录今天的第一餐"}
+                </Text>
               </View>
               <View className="coach-chat__progress-score-group">
                 <Text className="coach-chat__progress-score">{summary.completion}</Text>
@@ -537,11 +543,26 @@ export default function CoachPage() {
               </View>
             </View>
             {expandedSections.progress
-              ? [
+              ? <>
+                  <View className="coach-chat__progress-tasks">
+                    <View className="coach-chat__progress-task">
+                      <Text className="coach-chat__progress-task-status">
+                        {summary.consumed.calories > 0 ? "已完成" : "待完成"}
+                      </Text>
+                      <Text>{summary.consumed.calories > 0 ? "已记录今天的饮食" : "记录今天的第一餐"}</Text>
+                    </View>
+                    <View className="coach-chat__progress-task">
+                      <Text className="coach-chat__progress-task-status">
+                        {summary.consumed.protein >= summary.protein ? "已完成" : "待完成"}
+                      </Text>
+                      <Text>{summary.consumed.protein >= summary.protein ? "已完成蛋白目标" : "完成今天的蛋白目标"}</Text>
+                    </View>
+                  </View>
+                  {[
                   ["蛋白质", summary.consumed.protein, summary.protein, "g"] as const,
                   ["碳水", summary.consumed.carbs, summary.carbs, "g"] as const,
                   ["热量", summary.consumed.calories, summary.calories, " kcal"] as const,
-                ].map(([label, consumed, target, unit]) => {
+                  ].map(([label, consumed, target, unit]) => {
                   const progress = clampProgress(Number(consumed), Number(target));
                   return (
                     <View className="coach-chat__progress-row" key={label}>
@@ -567,7 +588,8 @@ export default function CoachPage() {
                       </View>
                     </View>
                   );
-                })
+                  })}
+                </>
               : null}
           </View>
 

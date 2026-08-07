@@ -28,5 +28,8 @@ describe("NOVA proactive daily reminder", () => {
     expect(page).not.toContain("dailyBrief.action");
     expect(page).not.toContain("coach-chat__status-badge");
     expect(page).toContain("今日营养建议");
+    expect(page).toContain("换一个建议");
+    expect(page).toContain("推荐原因：");
+    expect(page).toContain("今日任务");
   });
 });

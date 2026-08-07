@@ -478,6 +478,7 @@ test("returns a daily tip from the server context provider", async () => {
       type: "food_knowledge",
       headline: "看营养成分表",
       content: `${date} 的蛋白质缺口是 ${context.daily.remaining.protein}g。`,
+      reason: "帮助判断食品是否适合今天。",
       food: null,
       source: "rule_v2",
       model: null,
@@ -504,6 +505,7 @@ test("reuses a cached daily tip for the same nutrition context", async () => {
         type: "nutrition_tip",
         headline: "下一餐加鸡蛋",
         content: "用鸡蛋搭配蔬菜和主食，补足今天的蛋白质缺口。",
+        reason: "帮助完成今天的蛋白目标。",
         food: null,
         source: "hunyuan-exp",
         model: "hunyuan",
@@ -576,7 +578,7 @@ test("builds a cached proactive brief from yesterday, habit, stage and preferenc
   const second = await service.getDailyBrief("user-1", "2026-07-20");
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].userJourneyStage, "first_week");
+  assert.equal(calls[0].userJourneyStage, "habit_building");
   assert.equal(calls[0].today.period, "morning");
   assert.equal(calls[0].yesterday.proteinRate, 69);
   assert.deepEqual(calls[0].recentTrend, { proteinCompletionChange: 15, recordedDaysChange: 2 });
@@ -609,6 +611,7 @@ test("shares one context build across concurrent brief and tip requests", async 
       type: "nutrition_tip",
       headline: "下一餐加鸡蛋",
       content: "用鸡蛋搭配蔬菜和主食。",
+      reason: "帮助完成今天的蛋白目标。",
       food: null,
       source: "rule_v2",
       model: null,

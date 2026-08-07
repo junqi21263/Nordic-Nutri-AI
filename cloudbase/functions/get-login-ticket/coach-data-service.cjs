@@ -154,11 +154,9 @@ function journeyStage(account, date, weekly) {
   const createdAt = account?.createdAt || account?.created_at || account?.profile?.createdAt || account?.profile?.created_at;
   const ageInDays = typeof createdAt === "string" ? dayDifference(createdAt.slice(0, 10), date) : 0;
   const recordedDays = safeNumber(weekly?.recordedDays);
-  if (!recordedDays && ageInDays === 0) return "first_day";
-  if (ageInDays <= 7 || recordedDays <= 6) return "first_week";
-  if (recordedDays < 14) return "habit_building";
-  if (safeNumber(weekly?.proteinCompletion) >= 80) return "goal_progress";
-  return "stable_tracking";
+  if (!recordedDays && ageInDays <= 3) return "new_user";
+  if (ageInDays <= 14 || recordedDays < 14) return "habit_building";
+  return "regular_user";
 }
 
 function dayPeriod(date, clock) {
@@ -550,7 +548,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       const profile = account?.profile ?? {};
       const preferences = createContext(today, weekly, account).preferences;
       return {
-        proactiveBriefVersion: 2,
+        proactiveBriefVersion: 3,
         userJourneyStage: journeyStage(account, date, weekly),
         user: {
           name: profile.nickname || account?.nickname || "",
@@ -766,7 +764,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
   async function getDailyTip(userId, date, options = {}) {
     const safeDate = normalizeDate(date);
     const context = await buildContext(userId, safeDate);
-    const contextHash = tipContextHash(context);
+    const contextHash = tipContextHash({ ...context, dailyTipVersion: 2 });
     const refresh = Boolean(options.refresh);
 
     if (!refresh) {
@@ -784,6 +782,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
           type: "nutrition_tip",
           headline: "下一餐保持均衡",
           content: "选择一份优质蛋白、半盘蔬菜和适量主食，让今天的饮食更完整。",
+          reason: "帮助稳定完成今天的营养目标。",
           food: null,
           source: "rule_v2",
           model: null,
@@ -812,7 +811,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       : {
         greeting: "你好 👋",
           summary: "今天先记下一餐，慢慢建立饮食节奏。",
-          suggestion: "早餐建议：一份蛋白、主食和水果，开启健康饮食节奏。",
+          suggestion: "今日行动：记录早餐，完成今天的第一条饮食数据。",
           theme: "starter",
           source: "rule_v2",
           model: null,
@@ -840,11 +839,13 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     const type = typeof row.payload.type === "string" ? row.payload.type : "";
     const headline = typeof row.payload.headline === "string" ? row.payload.headline.trim() : "";
     const content = typeof row.payload.content === "string" ? row.payload.content.trim() : "";
-    if (!type || !headline || !content) return null;
+    const reason = typeof row.payload.reason === "string" ? row.payload.reason.trim() : "";
+    if (!type || !headline || !content || !reason) return null;
     return {
       type,
       headline,
       content,
+      reason,
       food: row.payload.food ?? null,
       source: row.provider ?? "rule_v2",
       model: row.model ?? null,
@@ -862,6 +863,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
         type: tip.type,
         headline: tip.headline,
         content: tip.content,
+        reason: tip.reason,
         food: tip.food ?? null,
       },
       provider,

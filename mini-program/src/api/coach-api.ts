@@ -60,6 +60,7 @@ export interface ProductCoachDailyTip {
   type: "nutrition_tip" | "food_function" | "food_knowledge";
   headline: string;
   content: string;
+  reason: string;
   food: { name: string; proteinG: number } | null;
   source: "deepseek" | "hunyuan-exp" | "rule_v2";
   model: string | null;
