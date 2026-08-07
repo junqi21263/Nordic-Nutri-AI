@@ -19,6 +19,8 @@ export interface Achievement {
   unit?: string;
   requirement?: string;
   unlockedAt?: string | null;
+  /** Set only by the server response that persisted this completion. */
+  justUnlocked?: boolean;
 }
 export function createCoachAdvice(
   meals: Meal[],

@@ -30,7 +30,9 @@ test("keeps a completed achievement after its live condition later becomes false
   ]);
 
   assert.equal(unlocked[0].unlocked, true);
+  assert.equal(unlocked[0].justUnlocked, true);
   assert.equal(retained[0].unlocked, true);
+  assert.equal(retained[0].justUnlocked, false);
   assert.equal(retained[0].unlockedAt, "2026-08-07T08:00:00.000Z");
   assert.equal(rows.length, 1);
 });

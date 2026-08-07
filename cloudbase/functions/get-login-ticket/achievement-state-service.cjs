@@ -24,6 +24,7 @@ function createAchievementStateService({ db, clock = () => new Date() }) {
           achievement_id: achievement.id,
           completed_at: timestamp(achievement.unlockedAt, clock),
         }));
+      const justUnlockedIds = new Set(newlyCompleted.map((row) => row.achievement_id));
 
       if (newlyCompleted.length) {
         const inserted = await db.from("user_achievements").insert(newlyCompleted);
@@ -34,8 +35,14 @@ function createAchievementStateService({ db, clock = () => new Date() }) {
       return achievements.map((achievement) => {
         const completedAt = completedById.get(achievement.id);
         return completedAt
-          ? { ...achievement, unlocked: true, progress: 100, unlockedAt: completedAt }
-          : achievement;
+          ? {
+            ...achievement,
+            unlocked: true,
+            progress: 100,
+            unlockedAt: completedAt,
+            justUnlocked: justUnlockedIds.has(achievement.id),
+          }
+          : { ...achievement, justUnlocked: false };
       });
     },
   };

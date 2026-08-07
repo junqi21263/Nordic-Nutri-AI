@@ -34,6 +34,55 @@ describe("achievement unlock toast", () => {
     expect(seen).toContain("achievement-1");
   });
 
+  it("announces a server-confirmed unlock even when the initial baseline arrives late", () => {
+    let seen: string[] = [];
+    let bootstrapped = false;
+    const storage: AchievementSeenStorage = {
+      readSeen: () => seen,
+      writeSeen: (_userId, ids) => { seen = [...ids]; },
+      isBootstrapped: () => bootstrapped,
+      markBootstrapped: () => { bootstrapped = true; },
+    };
+    const store = createAchievementStore(storage);
+    store.getState().setUserId("user-1");
+
+    store.getState().setAchievements([
+      { id: "achievement-13", title: "认识自己", unlocked: true, progress: 100, justUnlocked: true },
+    ]);
+
+    expect(store.getState().achievementUnlocked).toEqual({ achievementId: "achievement-13" });
+    expect(seen).toEqual(["achievement-13"]);
+  });
+
+  it("replays a recently completed achievement once when an earlier app build missed its overlay", () => {
+    let seen: string[] = ["achievement-13"];
+    let bootstrapped = true;
+    const recovered: string[] = [];
+    const storage: AchievementSeenStorage = {
+      readSeen: () => seen,
+      writeSeen: (_userId, ids) => { seen = [...ids]; },
+      isBootstrapped: () => bootstrapped,
+      markBootstrapped: () => { bootstrapped = true; },
+      readRecovered: () => recovered,
+      writeRecovered: (_userId, ids) => { recovered.splice(0, recovered.length, ...ids); },
+    };
+    const store = createAchievementStore(storage, () => new Date("2026-08-07T16:55:00+08:00"));
+    store.getState().setUserId("user-1");
+
+    store.getState().setAchievements([
+      {
+        id: "achievement-13",
+        title: "认识自己",
+        unlocked: true,
+        progress: 100,
+        unlockedAt: "2026-08-07T16:51:00+08:00",
+      },
+    ]);
+
+    expect(store.getState().achievementUnlocked).toEqual({ achievementId: "achievement-13" });
+    expect(recovered).toEqual(["achievement-13"]);
+  });
+
   it("queues multiple newly unlocked achievements one at a time", () => {
     let seen: string[] = [];
     let bootstrapped = false;
