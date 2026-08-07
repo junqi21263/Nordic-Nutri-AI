@@ -28,6 +28,18 @@ export function getAchievementRequirement(title: string) {
   return ACHIEVEMENT_REQUIREMENTS[title] || "继续保持记录，即可逐步解锁。";
 }
 
+const ACHIEVEMENT_RECORD_ACTIONS: Record<string, string> = {
+  第一餐记录: "去记录第一餐",
+  早餐节奏: "去记录早餐",
+  午餐专注: "去记录午餐",
+  晚餐平衡: "去记录晚餐",
+  加餐有度: "去记录加餐",
+};
+
+export function getAchievementNextAction(title: string, metric = 0) {
+  return ACHIEVEMENT_RECORD_ACTIONS[title] || (metric > 0 ? "去记录下一餐" : "去记录第一餐");
+}
+
 export function formatAchievementUnlockedAt(value?: string | null) {
   if (!value) return "已根据云端记录解锁";
   const raw = String(value);

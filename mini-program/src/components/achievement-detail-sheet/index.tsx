@@ -3,6 +3,7 @@ import Taro from "@tarojs/taro";
 import { BottomSheet } from "../../components/bottom-sheet";
 import {
   formatAchievementUnlockedAt,
+  getAchievementNextAction,
   getAchievementRequirement,
 } from "../../features/coach/achievement-catalog";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
@@ -19,7 +20,7 @@ export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDe
     ? `${achievement.metric ?? Math.round(((achievement.progress || 0) / 100) * (achievement.target || 100))}/${achievement.target ?? "—"}${achievement.unit || ""}`
     : "";
   const canRecordNextMeal = Boolean(achievement && !achievement.unlocked && achievement.available !== false);
-  const nextActionLabel = Number(achievement?.metric ?? 0) > 0 ? "去记录下一餐" : "去记录第一餐";
+  const nextActionLabel = getAchievementNextAction(achievement?.title ?? "", Number(achievement?.metric ?? 0));
   const recordNextMeal = () => {
     onDismiss();
     void Taro.switchTab({ url: "/pages/meal-records/index" });
