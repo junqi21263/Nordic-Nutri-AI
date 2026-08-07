@@ -2633,16 +2633,16 @@
 }
 @keyframes achievement-unlock-burst-left {
   0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--particle-rotation)) scale(0.65); }
-  14% { opacity: 0.98; transform: translate3d(calc(16vw + var(--particle-drift)), var(--particle-entry-rise), 0) rotate(calc(var(--particle-rotation) + 70deg)) scale(0.96); }
-  42% { opacity: 0.98; transform: translate3d(calc(var(--particle-mid) + var(--particle-drift)), var(--particle-rise), 0) rotate(calc(var(--particle-rotation) + 165deg)) scale(1.08); }
-  58% { opacity: 0.92; transform: translate3d(calc(var(--particle-mid) + var(--particle-drift)), 2vh, 0) rotate(calc(var(--particle-rotation) + 215deg)) scale(1.04); }
+  10% { opacity: 0.98; transform: translate3d(calc(18vw + var(--particle-drift)), var(--particle-entry-rise), 0) rotate(calc(var(--particle-rotation) + 70deg)) scale(0.96); }
+  30% { opacity: 0.98; transform: translate3d(calc(var(--particle-mid) + var(--particle-drift)), var(--particle-rise), 0) rotate(calc(var(--particle-rotation) + 165deg)) scale(1.08); }
+  44% { opacity: 0.92; transform: translate3d(calc(var(--particle-scatter) + var(--particle-drift)), 2vh, 0) rotate(calc(var(--particle-rotation) + 245deg)) scale(1.04); }
   100% { opacity: 0; transform: translate3d(calc(var(--particle-end) + var(--particle-drift)), var(--particle-fall), 0) rotate(calc(var(--particle-rotation) + 420deg)) scale(0.92); }
 }
 @keyframes achievement-unlock-burst-right {
   0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--particle-rotation)) scale(0.65); }
-  14% { opacity: 0.98; transform: translate3d(calc(-16vw + var(--particle-drift)), var(--particle-entry-rise), 0) rotate(calc(var(--particle-rotation) - 70deg)) scale(0.96); }
-  42% { opacity: 0.98; transform: translate3d(calc(var(--particle-mid) + var(--particle-drift)), var(--particle-rise), 0) rotate(calc(var(--particle-rotation) - 165deg)) scale(1.08); }
-  58% { opacity: 0.92; transform: translate3d(calc(var(--particle-mid) + var(--particle-drift)), 2vh, 0) rotate(calc(var(--particle-rotation) - 215deg)) scale(1.04); }
+  10% { opacity: 0.98; transform: translate3d(calc(-18vw + var(--particle-drift)), var(--particle-entry-rise), 0) rotate(calc(var(--particle-rotation) - 70deg)) scale(0.96); }
+  30% { opacity: 0.98; transform: translate3d(calc(var(--particle-mid) + var(--particle-drift)), var(--particle-rise), 0) rotate(calc(var(--particle-rotation) - 165deg)) scale(1.08); }
+  44% { opacity: 0.92; transform: translate3d(calc(var(--particle-scatter) + var(--particle-drift)), 2vh, 0) rotate(calc(var(--particle-rotation) - 245deg)) scale(1.04); }
   100% { opacity: 0; transform: translate3d(calc(var(--particle-end) + var(--particle-drift)), var(--particle-fall), 0) rotate(calc(var(--particle-rotation) - 420deg)) scale(0.92); }
 }
 .weekly-review__hero {

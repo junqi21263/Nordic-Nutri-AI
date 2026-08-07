@@ -29,6 +29,7 @@ describe("achievement unlock overlay", () => {
     expect(modal).toContain("achievement-unlock-overlay__burst--left");
     expect(modal).toContain("achievement-unlock-overlay__burst--right");
     expect(modal).toContain('"--particle-mid"');
+    expect(modal).toContain('"--particle-scatter"');
     expect(modal).toContain('"--particle-end"');
     expect(modal).not.toContain("成长里程");
     expect(pageLayout).toContain("acknowledgeProductAchievementCelebration");
@@ -52,7 +53,7 @@ describe("achievement unlock overlay", () => {
     expect(pageStyles).toContain("#d8a94b");
     expect(pageStyles).toContain(".achievement-unlock-overlay__particle--spark");
     expect(pageStyles).toContain("border-radius: 0;");
-    expect(pageStyles).toContain("42% {");
+    expect(pageStyles).toContain("44% {");
     expect(pageStyles).toContain("var(--particle-end) + var(--particle-drift)");
     expect(pageStyles).toContain("var(--particle-fall)");
     expect(pageStyles).toContain(" 500ms both");

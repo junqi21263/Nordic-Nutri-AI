@@ -40,6 +40,7 @@ interface ParticleSeed {
   rotation: number;
   drift: number;
   mid: number;
+  scatter: number;
   end: number;
   rise: number;
   entryRise: number;
@@ -66,12 +67,13 @@ function createParticleSeeds(seed: string, side: "left" | "right"): ParticleSeed
     // arbitrary page coordinates. The later values keep the two streams from
     // collapsing into a single center column after they collide.
     top: 35 + random() * 30,
-    delay: Math.round(random() * 480),
+    delay: Math.round(random() * 220),
     duration: Math.round(2700 + random() * 700),
     rotation: Math.round(-35 + random() * 70),
     drift: Math.round((random() - 0.5) * 7 * 10) / 10,
-    mid: direction * Math.round((40 + random() * 22) * 10) / 10,
-    end: direction * Math.round((22 + random() * 70) * 10) / 10,
+    mid: direction * Math.round((38 + random() * 20) * 10) / 10,
+    scatter: direction * Math.round((52 + random() * 38) * 10) / 10,
+    end: direction * Math.round((16 + random() * 82) * 10) / 10,
     rise: -(Math.round((4 + random() * 14) * 10) / 10),
     entryRise: -(Math.round((4 + random() * 14) * 4.5) / 10),
     fall: Math.round((38 + random() * 36) * 10) / 10,
@@ -106,6 +108,7 @@ export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUn
         "--particle-drift": `${particle.drift}vw`,
         "--particle-rotation": `${particle.rotation}deg`,
         "--particle-mid": `${particle.mid}vw`,
+        "--particle-scatter": `${particle.scatter}vw`,
         "--particle-end": `${particle.end}vw`,
         "--particle-rise": `${particle.rise}vh`,
         "--particle-entry-rise": `${particle.entryRise}vh`,
