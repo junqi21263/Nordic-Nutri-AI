@@ -2407,13 +2407,14 @@
   display: flex;
   justify-content: center;
   left: 0;
-  padding: $space-20;
+  padding: $space-12;
   position: fixed;
   right: 0;
   top: 0;
   z-index: 260;
 }
 .achievement-unlock-overlay__backdrop {
+  animation: achievement-unlock-backdrop-in 300ms ease-out both;
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
   background: rgba(20, 42, 29, 0.38);
@@ -2432,13 +2433,29 @@
   box-shadow: 0 22px 48px rgba($color-forest-green, 0.22);
   display: flex;
   flex-direction: column;
-  max-width: 560px;
+  max-width: 680px;
   overflow: hidden;
-  padding: $space-24 $space-20 $space-20;
+  padding: $space-28 $space-24 $space-24;
   position: relative;
   text-align: center;
   width: 100%;
   z-index: 2;
+}
+.achievement-unlock-overlay__close {
+  align-items: center;
+  color: $color-text-secondary;
+  display: flex;
+  height: 64px;
+  justify-content: center;
+  position: absolute;
+  right: $space-8;
+  top: $space-8;
+  width: 64px;
+  z-index: 4;
+}
+.achievement-unlock-overlay__close:active {
+  opacity: 0.68;
+  transform: scale(0.94);
 }
 .achievement-unlock-overlay__burst {
   bottom: 0;
@@ -2458,20 +2475,21 @@
 }
 .achievement-unlock-overlay__icon {
   align-items: center;
-  animation: achievement-unlock-icon-glow 2s ease-in-out 800ms infinite alternate;
+  animation: achievement-unlock-icon-in 520ms cubic-bezier(0.175, 0.885, 0.32, 1.275) 800ms both,
+    achievement-unlock-icon-glow 2s ease-in-out 1.25s infinite alternate;
   background: $color-sage-light;
   border: 2px solid rgba($color-sage, 0.3);
   border-radius: $radius-full;
   display: flex;
-  height: 88px;
+  height: 104px;
   justify-content: center;
   margin-bottom: $space-12;
   position: relative;
-  width: 88px;
+  width: 104px;
 }
 .achievement-unlock-overlay__icon > .nordic-icon {
-  height: 44px !important;
-  width: 44px !important;
+  height: 52px !important;
+  width: 52px !important;
 }
 .achievement-unlock-overlay__sparkle {
   animation: achievement-unlock-sparkle-in 520ms ease-out 950ms both, achievement-unlock-sparkle-pulse 2.2s ease-in-out 1.5s infinite alternate;
@@ -2577,42 +2595,19 @@
 .achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--leaf { height: 23px; width: 13px; }
 .achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--spark { height: 8px; width: 8px; }
 .achievement-unlock-overlay__particle--large.achievement-unlock-overlay__particle--dot { height: 16px; width: 16px; }
-.achievement-unlock-overlay__particle--0 { animation-delay: 0ms; top: 12%; }
-.achievement-unlock-overlay__particle--1 { animation-delay: 90ms; top: 18%; }
-.achievement-unlock-overlay__particle--2 { animation-delay: 180ms; top: 24%; }
-.achievement-unlock-overlay__particle--3 { animation-delay: 270ms; top: 31%; }
-.achievement-unlock-overlay__particle--4 { animation-delay: 360ms; top: 38%; }
-.achievement-unlock-overlay__particle--5 { animation-delay: 450ms; top: 45%; }
-.achievement-unlock-overlay__particle--6 { animation-delay: 540ms; top: 52%; }
-.achievement-unlock-overlay__particle--7 { animation-delay: 630ms; top: 59%; }
-.achievement-unlock-overlay__particle--8 { animation-delay: 720ms; top: 66%; }
-.achievement-unlock-overlay__particle--9 { animation-delay: 810ms; top: 73%; }
-.achievement-unlock-overlay__particle--10 { animation-delay: 120ms; top: 80%; }
-.achievement-unlock-overlay__particle--11 { animation-delay: 240ms; top: 87%; }
-.achievement-unlock-overlay__particle--12 { animation-delay: 330ms; top: 15%; }
-.achievement-unlock-overlay__particle--13 { animation-delay: 420ms; top: 21%; }
-.achievement-unlock-overlay__particle--14 { animation-delay: 510ms; top: 28%; }
-.achievement-unlock-overlay__particle--15 { animation-delay: 600ms; top: 35%; }
-.achievement-unlock-overlay__particle--16 { animation-delay: 690ms; top: 42%; }
-.achievement-unlock-overlay__particle--17 { animation-delay: 780ms; top: 49%; }
-.achievement-unlock-overlay__particle--18 { animation-delay: 630ms; top: 56%; }
-.achievement-unlock-overlay__particle--19 { animation-delay: 180ms; top: 63%; }
-.achievement-unlock-overlay__particle--20 { animation-delay: 360ms; top: 70%; }
-.achievement-unlock-overlay__particle--21 { animation-delay: 540ms; top: 77%; }
-.achievement-unlock-overlay__particle--22 { animation-delay: 720ms; top: 84%; }
-.achievement-unlock-overlay__particle--23 { animation-delay: 300ms; top: 90%; }
-.achievement-unlock-overlay__particle--24 { animation-delay: 480ms; top: 10%; }
-.achievement-unlock-overlay__particle--25 { animation-delay: 660ms; top: 27%; }
-.achievement-unlock-overlay__particle--26 { animation-delay: 840ms; top: 44%; }
-.achievement-unlock-overlay__particle--27 { animation-delay: 210ms; top: 61%; }
-.achievement-unlock-overlay__particle--28 { animation-delay: 390ms; top: 78%; }
-.achievement-unlock-overlay__particle--29 { animation-delay: 570ms; top: 93%; }
-.achievement-unlock-overlay__particle--30 { animation-delay: 750ms; top: 34%; }
-.achievement-unlock-overlay__particle--31 { animation-delay: 720ms; top: 68%; }
 @keyframes achievement-unlock-card-in {
-  0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+  0% { opacity: 0; transform: translateY(50px) scale(0.8); }
   70% { opacity: 1; transform: translateY(0) scale(1.05); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes achievement-unlock-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes achievement-unlock-icon-in {
+  0% { opacity: 0; transform: scale(0) rotate(-20deg); }
+  70% { opacity: 1; transform: scale(1.15) rotate(10deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 @keyframes achievement-unlock-icon-glow {
   from { box-shadow: 0 0 0 0 rgba($color-sage, 0.14), 0 0 0 2px rgba($color-sage, 0.2); }
@@ -2632,18 +2627,18 @@
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes achievement-unlock-burst-left {
-  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.65); }
-  18% { opacity: 0.96; transform: translate3d(22vw, -4vh, 0) rotate(75deg) scale(0.96); }
-  52% { opacity: 0.98; transform: translate3d(50vw, 0, 0) rotate(165deg) scale(1.08); }
-  68% { opacity: 0.82; transform: translate3d(50vw, 7vh, 0) rotate(210deg) scale(1.04); }
-  100% { opacity: 0; transform: translate3d(48vw, 38vh, 0) rotate(320deg) scale(0.92); }
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--particle-rotation)) scale(0.65); }
+  18% { opacity: 0.96; transform: translate3d(calc(22vw + var(--particle-drift)), -4vh, 0) rotate(calc(var(--particle-rotation) + 70deg)) scale(0.96); }
+  52% { opacity: 0.98; transform: translate3d(calc(50vw + var(--particle-drift)), 0, 0) rotate(calc(var(--particle-rotation) + 165deg)) scale(1.08); }
+  68% { opacity: 0.82; transform: translate3d(calc(50vw + var(--particle-drift)), 7vh, 0) rotate(calc(var(--particle-rotation) + 215deg)) scale(1.04); }
+  100% { opacity: 0; transform: translate3d(calc(48vw + var(--particle-drift)), 38vh, 0) rotate(calc(var(--particle-rotation) + 320deg)) scale(0.92); }
 }
 @keyframes achievement-unlock-burst-right {
-  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.65); }
-  18% { opacity: 0.96; transform: translate3d(-22vw, 4vh, 0) rotate(-75deg) scale(0.96); }
-  52% { opacity: 0.98; transform: translate3d(-50vw, 0, 0) rotate(-165deg) scale(1.08); }
-  68% { opacity: 0.82; transform: translate3d(-50vw, 7vh, 0) rotate(-210deg) scale(1.04); }
-  100% { opacity: 0; transform: translate3d(-48vw, 38vh, 0) rotate(-320deg) scale(0.92); }
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--particle-rotation)) scale(0.65); }
+  18% { opacity: 0.96; transform: translate3d(calc(-22vw + var(--particle-drift)), 4vh, 0) rotate(calc(var(--particle-rotation) - 70deg)) scale(0.96); }
+  52% { opacity: 0.98; transform: translate3d(calc(-50vw + var(--particle-drift)), 0, 0) rotate(calc(var(--particle-rotation) - 165deg)) scale(1.08); }
+  68% { opacity: 0.82; transform: translate3d(calc(-50vw + var(--particle-drift)), 7vh, 0) rotate(calc(var(--particle-rotation) - 215deg)) scale(1.04); }
+  100% { opacity: 0; transform: translate3d(calc(-48vw + var(--particle-drift)), 38vh, 0) rotate(calc(var(--particle-rotation) - 320deg)) scale(0.92); }
 }
 .weekly-review__hero {
   align-items: center;
