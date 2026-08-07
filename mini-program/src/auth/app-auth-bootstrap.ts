@@ -2,6 +2,7 @@ import Taro from "@tarojs/taro";
 import { loginWithWechat } from "../api/auth-api";
 import { getProductAccount } from "../api/product-data-api";
 import { getLocalDateString } from "../features/onboarding/domain";
+import { refreshProductAchievements } from "../features/coach/refresh-achievements";
 import { hasSeenWelcome } from "../features/welcome/welcome-seen";
 import { useMealStore } from "../stores/meal-store";
 import { useProfileStore } from "../stores/profile-store";
@@ -74,6 +75,13 @@ async function loadIdentity(user: { id: string }) {
     },
     account.settings ?? {},
   );
+  // Capture the existing achievement state before users can save a meal.
+  // A later save refresh can then emit an achievementUnlocked event reliably.
+  try {
+    await refreshProductAchievements();
+  } catch {
+    // Achievement refresh must not prevent a valid user session from launching.
+  }
 }
 
 const authBootstrap = createAuthBootstrap({
