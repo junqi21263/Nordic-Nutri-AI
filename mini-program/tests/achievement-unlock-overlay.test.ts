@@ -15,6 +15,8 @@ describe("achievement unlock overlay", () => {
     expect(overlay).toContain("achievement-unlock-overlay");
     expect(overlay).toContain("achievement-unlock-overlay__card");
     expect(overlay).toContain("achievement-unlock-overlay__particle");
+    expect(overlay).toContain("achievement-unlock-overlay__sparkle");
+    expect(overlay).toContain('size={44}');
     expect(overlay).toContain("achievement-unlock-overlay__burst");
     expect(overlay).toContain("achievement-unlock-overlay__burst--left");
     expect(overlay).toContain("achievement-unlock-overlay__burst--right");
@@ -36,5 +38,7 @@ describe("achievement unlock overlay", () => {
     expect(pageStyles).toContain("backdrop-filter: blur(3px)");
     expect(pageStyles).toContain("#d8a94b");
     expect(pageStyles).toContain(".achievement-unlock-overlay__particle--spark");
+    expect(pageStyles).toContain(" 500ms both");
+    expect(pageStyles).toContain("animation: achievement-unlock-icon-glow");
   });
 });

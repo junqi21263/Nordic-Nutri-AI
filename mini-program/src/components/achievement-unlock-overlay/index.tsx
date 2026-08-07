@@ -5,7 +5,7 @@ import { getAchievementIcon } from "../../features/coach/achievement-icons";
 import type { Achievement } from "../../features/coach/domain";
 import { NordicIcon } from "../nordic-icon";
 
-const particleIndexes = Array.from({ length: 12 }, (_, index) => index);
+const particleIndexes = Array.from({ length: 32 }, (_, index) => index);
 const particleTypes = ["fragment", "leaf", "spark", "dot"] as const;
 
 export function AchievementUnlockOverlay({
@@ -44,7 +44,13 @@ export function AchievementUnlockOverlay({
       </View>
       <View className="achievement-unlock-overlay__card">
         <View className="achievement-unlock-overlay__icon">
-          <NordicIcon name={getAchievementIcon(achievement)} size={34} ariaLabel={achievement.title} />
+          <NordicIcon name={getAchievementIcon(achievement)} size={44} ariaLabel={achievement.title} />
+          <View className="achievement-unlock-overlay__sparkle achievement-unlock-overlay__sparkle--top-right">
+            <NordicIcon name="sparkles" size={20} ariaLabel="解锁闪光" />
+          </View>
+          <View className="achievement-unlock-overlay__sparkle achievement-unlock-overlay__sparkle--bottom-left">
+            <NordicIcon name="sparkles" size={18} ariaLabel="解锁闪光" />
+          </View>
         </View>
         <Text className="achievement-unlock-overlay__eyebrow">成就已解锁</Text>
         <Text className="achievement-unlock-overlay__title">{achievement.title}</Text>

@@ -429,10 +429,10 @@
   color: $color-forest-green;
   display: flex;
   font-size: $font-h2;
-  height: 88px;
+  height: 104px;
   justify-content: center;
   line-height: 1;
-  width: 88px;
+  width: 104px;
 }
 .onboarding-brand-copy {
   display: flex;
@@ -2426,7 +2426,7 @@
 }
 .achievement-unlock-overlay__card {
   align-items: center;
-  animation: achievement-unlock-card-in 520ms cubic-bezier(0.2, 0.85, 0.25, 1.16) both;
+  animation: achievement-unlock-card-in 600ms cubic-bezier(0.175, 0.885, 0.32, 1.275) 500ms both;
   background: $color-surface;
   border-radius: $radius-24;
   box-shadow: 0 22px 48px rgba($color-forest-green, 0.22);
@@ -2458,16 +2458,38 @@
 }
 .achievement-unlock-overlay__icon {
   align-items: center;
-  animation: achievement-unlock-glow 1.8s ease-in-out infinite alternate;
+  animation: achievement-unlock-icon-glow 2s ease-in-out 800ms infinite alternate;
   background: $color-sage-light;
+  border: 2px solid rgba($color-sage, 0.3);
   border-radius: $radius-full;
   display: flex;
   height: 88px;
   justify-content: center;
   margin-bottom: $space-12;
+  position: relative;
   width: 88px;
 }
+.achievement-unlock-overlay__icon > .nordic-icon {
+  height: 44px !important;
+  width: 44px !important;
+}
+.achievement-unlock-overlay__sparkle {
+  animation: achievement-unlock-sparkle-in 520ms ease-out 950ms both, achievement-unlock-sparkle-pulse 2.2s ease-in-out 1.5s infinite alternate;
+  position: absolute;
+}
+.achievement-unlock-overlay__sparkle .nordic-icon {
+  opacity: 0.72;
+}
+.achievement-unlock-overlay__sparkle--top-right {
+  right: -16px;
+  top: -12px;
+}
+.achievement-unlock-overlay__sparkle--bottom-left {
+  bottom: -10px;
+  left: -16px;
+}
 .achievement-unlock-overlay__eyebrow {
+  animation: achievement-unlock-copy-in 420ms ease-out 1.15s both;
   color: $color-forest-green;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
@@ -2475,12 +2497,14 @@
   line-height: 1.2;
 }
 .achievement-unlock-overlay__title {
+  animation: achievement-unlock-copy-in 420ms ease-out 1.2s both;
   color: $color-forest-green;
   font-size: $font-h2;
   font-weight: $font-weight-semibold;
   margin-top: $space-8;
 }
 .achievement-unlock-overlay__copy {
+  animation: achievement-unlock-copy-in 420ms ease-out 1.25s both;
   color: $color-text-secondary;
   font-size: $font-body;
   line-height: $line-body;
@@ -2496,11 +2520,13 @@
   font-size: $font-body;
   font-weight: $font-weight-semibold;
   justify-content: center;
+  animation: achievement-unlock-copy-in 420ms ease-out 1.35s both;
   margin-top: $space-20;
   min-height: 84rpx;
   width: 100%;
 }
 .achievement-unlock-overlay__secondary-action {
+  animation: achievement-unlock-copy-in 420ms ease-out 1.45s both;
   color: $color-forest-green;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
@@ -2546,26 +2572,59 @@
   height: 11px;
   width: 11px;
 }
-.achievement-unlock-overlay__particle--0 { animation-delay: 0ms; top: 17%; }
-.achievement-unlock-overlay__particle--1 { animation-delay: 110ms; top: 26%; }
-.achievement-unlock-overlay__particle--2 { animation-delay: 260ms; top: 37%; }
-.achievement-unlock-overlay__particle--3 { animation-delay: 70ms; top: 48%; }
-.achievement-unlock-overlay__particle--4 { animation-delay: 340ms; top: 59%; }
-.achievement-unlock-overlay__particle--5 { animation-delay: 150ms; top: 71%; }
-.achievement-unlock-overlay__particle--6 { animation-delay: 420ms; top: 23%; }
-.achievement-unlock-overlay__particle--7 { animation-delay: 210ms; top: 33%; }
-.achievement-unlock-overlay__particle--8 { animation-delay: 470ms; top: 45%; }
-.achievement-unlock-overlay__particle--9 { animation-delay: 90ms; top: 55%; }
-.achievement-unlock-overlay__particle--10 { animation-delay: 310ms; top: 66%; }
-.achievement-unlock-overlay__particle--11 { animation-delay: 500ms; top: 78%; }
+.achievement-unlock-overlay__particle--0 { animation-delay: 0ms; top: 12%; }
+.achievement-unlock-overlay__particle--1 { animation-delay: 90ms; top: 18%; }
+.achievement-unlock-overlay__particle--2 { animation-delay: 180ms; top: 24%; }
+.achievement-unlock-overlay__particle--3 { animation-delay: 270ms; top: 31%; }
+.achievement-unlock-overlay__particle--4 { animation-delay: 360ms; top: 38%; }
+.achievement-unlock-overlay__particle--5 { animation-delay: 450ms; top: 45%; }
+.achievement-unlock-overlay__particle--6 { animation-delay: 540ms; top: 52%; }
+.achievement-unlock-overlay__particle--7 { animation-delay: 630ms; top: 59%; }
+.achievement-unlock-overlay__particle--8 { animation-delay: 720ms; top: 66%; }
+.achievement-unlock-overlay__particle--9 { animation-delay: 810ms; top: 73%; }
+.achievement-unlock-overlay__particle--10 { animation-delay: 120ms; top: 80%; }
+.achievement-unlock-overlay__particle--11 { animation-delay: 240ms; top: 87%; }
+.achievement-unlock-overlay__particle--12 { animation-delay: 330ms; top: 15%; }
+.achievement-unlock-overlay__particle--13 { animation-delay: 420ms; top: 21%; }
+.achievement-unlock-overlay__particle--14 { animation-delay: 510ms; top: 28%; }
+.achievement-unlock-overlay__particle--15 { animation-delay: 600ms; top: 35%; }
+.achievement-unlock-overlay__particle--16 { animation-delay: 690ms; top: 42%; }
+.achievement-unlock-overlay__particle--17 { animation-delay: 780ms; top: 49%; }
+.achievement-unlock-overlay__particle--18 { animation-delay: 630ms; top: 56%; }
+.achievement-unlock-overlay__particle--19 { animation-delay: 180ms; top: 63%; }
+.achievement-unlock-overlay__particle--20 { animation-delay: 360ms; top: 70%; }
+.achievement-unlock-overlay__particle--21 { animation-delay: 540ms; top: 77%; }
+.achievement-unlock-overlay__particle--22 { animation-delay: 720ms; top: 84%; }
+.achievement-unlock-overlay__particle--23 { animation-delay: 300ms; top: 90%; }
+.achievement-unlock-overlay__particle--24 { animation-delay: 480ms; top: 10%; }
+.achievement-unlock-overlay__particle--25 { animation-delay: 660ms; top: 27%; }
+.achievement-unlock-overlay__particle--26 { animation-delay: 840ms; top: 44%; }
+.achievement-unlock-overlay__particle--27 { animation-delay: 210ms; top: 61%; }
+.achievement-unlock-overlay__particle--28 { animation-delay: 390ms; top: 78%; }
+.achievement-unlock-overlay__particle--29 { animation-delay: 570ms; top: 93%; }
+.achievement-unlock-overlay__particle--30 { animation-delay: 750ms; top: 34%; }
+.achievement-unlock-overlay__particle--31 { animation-delay: 720ms; top: 68%; }
 @keyframes achievement-unlock-card-in {
-  0% { opacity: 0; transform: translateY(88px) scale(0.9); }
-  72% { opacity: 1; transform: translateY(-8px) scale(1.05); }
+  0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+  70% { opacity: 1; transform: translateY(0) scale(1.05); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes achievement-unlock-glow {
-  from { box-shadow: 0 0 0 0 rgba($color-sage, 0.18); }
-  to { box-shadow: 0 0 0 12px rgba($color-sage, 0); }
+@keyframes achievement-unlock-icon-glow {
+  from { box-shadow: 0 0 0 0 rgba($color-sage, 0.14), 0 0 0 2px rgba($color-sage, 0.2); }
+  to { box-shadow: 0 0 0 12px rgba($color-sage, 0), 0 0 30px rgba($color-sage, 0.42); }
+}
+@keyframes achievement-unlock-sparkle-in {
+  0% { opacity: 0; transform: scale(0.45) rotate(-20deg); }
+  70% { opacity: 1; transform: scale(1.16) rotate(8deg); }
+  100% { opacity: 0.82; transform: scale(1) rotate(0deg); }
+}
+@keyframes achievement-unlock-sparkle-pulse {
+  from { opacity: 0.55; transform: scale(0.9) rotate(-4deg); }
+  to { opacity: 1; transform: scale(1.12) rotate(6deg); }
+}
+@keyframes achievement-unlock-copy-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @keyframes achievement-unlock-burst-left {
   0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.65); }
