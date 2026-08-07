@@ -65,8 +65,9 @@ function validateDailyTip(value) {
   const type = typeof value?.type === "string" ? value.type.trim() : "";
   const headline = typeof value?.headline === "string" ? value.headline.trim() : "";
   const content = typeof value?.content === "string" ? value.content.trim() : "";
-  return metadata && ["nutrition_tip", "food_function", "food_knowledge"].includes(type) && headline && headline.length <= 32 && content && content.length <= 120 && !forbiddenPresentationWording.test(`${headline}\n${content}`)
-    ? { type, headline, content, food: value.food ?? null, ...metadata }
+  const reason = typeof value?.reason === "string" ? value.reason.trim() : "";
+  return metadata && ["nutrition_tip", "food_function", "food_knowledge"].includes(type) && headline && headline.length <= 32 && content && content.length <= 120 && reason && reason.length <= 30 && !forbiddenPresentationWording.test(`${headline}\n${content}\n${reason}`)
+    ? { type, headline, content, reason, food: value.food ?? null, ...metadata }
     : null;
 }
 

@@ -77,7 +77,7 @@ test("signs the three fixed coach-content requests against dev routes", async ()
       const route = new URL(request.url).pathname;
       const responseByRoute = {
         "/hunyuan-image-worker/daily-insight": { focus: "protein", headline: "晚餐优先补蛋白", content: "还差约20g蛋白质，晚餐可加一份鱼或豆腐。" },
-        "/hunyuan-image-worker/daily-tip": { type: "nutrition_tip", headline: "下一餐补蛋白", content: "午餐可搭配鸡蛋或豆腐。", food: null },
+        "/hunyuan-image-worker/daily-tip": { type: "nutrition_tip", headline: "下一餐补蛋白", content: "午餐可搭配鸡蛋或豆腐。", reason: "帮助完成今天的蛋白目标。", food: null },
         "/hunyuan-image-worker/coach-quick-prompt": { prompt: "晚餐怎么补充蛋白质？" },
       };
       return { statusCode: 200, body: JSON.stringify({ ...responseByRoute[route], source: "hunyuan-exp", model: "hunyuan-2.0-instruct-20251111" }) };
@@ -92,6 +92,7 @@ test("signs the three fixed coach-content requests against dev routes", async ()
 
   assert.equal(insight.source, "hunyuan-exp");
   assert.equal(tip.type, "nutrition_tip");
+  assert.equal(tip.reason, "帮助完成今天的蛋白目标。");
   assert.equal(prompt.prompt, "晚餐怎么补充蛋白质？");
   assert.deepEqual(requests.map((request) => new URL(request.url).pathname).sort(), [
     "/hunyuan-image-worker/coach-quick-prompt",

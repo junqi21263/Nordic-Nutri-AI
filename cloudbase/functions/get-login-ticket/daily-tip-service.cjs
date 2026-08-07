@@ -141,19 +141,24 @@ function unwrapCompletion(raw) {
 function createDailyTipService({ apiKey, model, requestCompletion, contextProvider, random = Math.random, source = "deepseek" } = {}) {
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
   const complete = requestCompletion ?? (apiKey ? createDeepseekDailyTipCompletion({ apiKey, model: selectedModel }) : null);
-  const getDailyTip = async ({ date, context } = {}) => {
-    if (typeof date !== "string" || !datePattern.test(date)) throw dailyTipError("DAILY_TIP_INPUT_INVALID");
-    const nutritionContext = context ?? (typeof contextProvider === "function" ? await contextProvider(date) : {});
-    const types = ["nutrition_tip", "food_function", "food_knowledge"];
-    const type = types[Math.min(types.length - 1, Math.floor(random() * types.length))];
+  const generateDailyTip = async ({ date, context, type }) => {
     if (!complete) return { ...pickFallback(type, random), source: "rule_v2", model: null, usage: null };
     try {
-      const raw = unwrapCompletion(await complete({ date, type, context: nutritionContext }));
+      const raw = unwrapCompletion(await complete({ date, type, context }));
       const tip = validateDailyTip(raw.payload);
       return { ...tip, source, model: selectedModel, usage: raw.usage };
     } catch {
       return { ...pickFallback(type, random), source: "rule_v2", model: null, usage: null };
     }
+  };
+  const getDailyTip = async ({ date, context, preferFast = false } = {}) => {
+    if (typeof date !== "string" || !datePattern.test(date)) throw dailyTipError("DAILY_TIP_INPUT_INVALID");
+    const nutritionContext = context ?? (typeof contextProvider === "function" ? await contextProvider(date) : {});
+    const types = ["nutrition_tip", "food_function", "food_knowledge"];
+    const type = types[Math.min(types.length - 1, Math.floor(random() * types.length))];
+    if (!preferFast) return generateDailyTip({ date, context: nutritionContext, type });
+    const immediate = { ...pickFallback(type, random), source: "rule_v2", model: null, usage: null };
+    return { ...immediate, upgrade: generateDailyTip({ date, context: nutritionContext, type }) };
   };
 
   getDailyTip.getQuickPrompt = async ({ date, context } = {}) => {

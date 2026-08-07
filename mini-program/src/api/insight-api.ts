@@ -2,6 +2,8 @@ import type { Achievement } from "../features/coach/domain";
 import type { DailyTargets } from "../features/meals/domain";
 import { requestProductApi } from "./product-api-client";
 
+const summaryInflight = new Map<string, Promise<ProductDailySummary>>();
+
 export interface ProductDailyInsight {
   focus: "protein" | "calories" | "carbs" | "fat" | "fiber" | "logging" | "regularity";
   headline: string;
@@ -63,11 +65,20 @@ export interface ProductWeeklyReview {
   };
 }
 
-export function getProductDailySummary(date: string) {
-  return requestProductApi<ProductDailySummary>(`/meal-summary?date=${encodeURIComponent(date)}`, {
+export function getProductDailySummary(date: string, options: { light?: boolean } = {}) {
+  const params = new URLSearchParams({ date });
+  if (options.light) params.set("light", "1");
+  const key = `${date}:${options.light ? "light" : "full"}`;
+  const existing = summaryInflight.get(key);
+  if (existing) return existing;
+  const request = requestProductApi<ProductDailySummary>(`/meal-summary?${params.toString()}`, {
     method: "GET",
     fallbackMessage: "营养数据读取失败，请稍后重试",
+  }).finally(() => {
+    if (summaryInflight.get(key) === request) summaryInflight.delete(key);
   });
+  summaryInflight.set(key, request);
+  return request;
 }
 
 export function getProductWeeklyReview(date: string, options: { preferFast?: boolean } = {}) {

@@ -151,8 +151,7 @@ function createDeepseekCompletion({ apiKey, model, fetchImpl = globalThis.fetch 
 
 function createProactiveDailyBriefService({ apiKey, model = "deepseek-v4-flash", requestCompletion, fetchImpl } = {}) {
   const complete = requestCompletion ?? createDeepseekCompletion({ apiKey, model, fetchImpl });
-  return async ({ date, context } = {}) => {
-    if (!datePattern.test(date || "")) throw error("PROACTIVE_DAILY_BRIEF_INPUT_INVALID");
+  const generateBrief = async ({ date, context }) => {
     if (!complete) return { ...fallbackForContext(context), source: "rule_v2", model: null, usage: null };
     try {
       const raw = await complete({ date, context });
@@ -164,6 +163,17 @@ function createProactiveDailyBriefService({ apiKey, model = "deepseek-v4-flash",
     } catch {
       return { ...fallbackForContext(context), source: "rule_v2", model: null, usage: null };
     }
+  };
+  return async ({ date, context, preferFast = false } = {}) => {
+    if (!datePattern.test(date || "")) throw error("PROACTIVE_DAILY_BRIEF_INPUT_INVALID");
+    if (!preferFast) return generateBrief({ date, context });
+    return {
+      ...fallbackForContext(context),
+      source: "rule_v2",
+      model: null,
+      usage: null,
+      upgrade: generateBrief({ date, context }),
+    };
   };
 }
 

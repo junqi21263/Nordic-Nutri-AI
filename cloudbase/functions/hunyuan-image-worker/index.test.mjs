@@ -116,7 +116,7 @@ test("accepts signed fixed nutrition-content requests through the dev worker", a
       },
       generateDailyTip: async (input) => {
         calls.push(["daily-tip", input]);
-        return { type: "nutrition_tip", headline: "下一餐补一份蛋白质", content: "午餐可搭配鸡蛋或豆腐。", food: null, source: "hunyuan-exp", model: "hunyuan-2.0-instruct-20251111" };
+        return { type: "nutrition_tip", headline: "下一餐补一份蛋白质", content: "午餐可搭配鸡蛋或豆腐。", reason: "帮助完成今天的蛋白目标。", food: null, source: "hunyuan-exp", model: "hunyuan-2.0-instruct-20251111" };
       },
       generateCoachQuickPrompt: async (input) => {
         calls.push(["coach-quick-prompt", input]);

@@ -14,9 +14,11 @@ describe("persisted insight API boundary", () => {
     expect(insightApi).toContain("getProductWeeklyReview");
     expect(insightApi).toContain("getProductAchievements");
     expect(insightApi).toContain("serverTime: string");
-    expect(insightApi).toContain("/meal-summary?date=");
+    expect(insightApi).toContain("/meal-summary?");
     expect(insightApi).toContain("/weekly-review?");
     expect(insightApi).toContain('preferFast');
+    expect(insightApi).toContain('light?: boolean');
+    expect(insightApi).toContain('summaryInflight');
     expect(insightApi).toContain("/achievements?date=");
     expect(mealApi).toContain("getProductMealsRange");
     expect(mealApi).toContain("light");
@@ -42,5 +44,11 @@ describe("persisted insight API boundary", () => {
     expect(achievementsPage).toContain("refreshProductAchievements");
     expect(weeklyPage).not.toContain("基于当前设备中的记录生成");
     expect(achievementsPage).not.toContain("所有成就均根据当前设备中的记录计算");
+  });
+
+  it("uses the light summary variant for coach target synchronization", () => {
+    const coachPage = read("src/pages/coach/index.tsx");
+
+    expect(coachPage).toContain("getProductDailySummary(date, { light: true })");
   });
 });

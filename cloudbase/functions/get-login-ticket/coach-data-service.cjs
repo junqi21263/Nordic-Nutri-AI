@@ -777,7 +777,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     }
 
     const generated = typeof dailyTip === "function"
-      ? await dailyTip({ date: safeDate, context })
+      ? await dailyTip({ date: safeDate, context, preferFast: true })
       : {
           type: "nutrition_tip",
           headline: "下一餐保持均衡",
@@ -788,12 +788,16 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
           model: null,
         };
 
+    const { upgrade, ...immediate } = generated;
     try {
-      await writeCachedDailyTip(userId, safeDate, contextHash, generated);
+      await writeCachedDailyTip(userId, safeDate, contextHash, immediate);
     } catch {
       // Tip remains usable even when the optional cache write fails.
     }
-    return { ...generated, cached: false };
+    if (upgrade && typeof upgrade.then === "function") {
+      void upgrade.then((tip) => writeCachedDailyTip(userId, safeDate, contextHash, tip)).catch(() => undefined);
+    }
+    return { ...immediate, cached: false };
   }
 
   async function getDailyBrief(userId, date) {
@@ -807,7 +811,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       // Cache schema lag must never block the reminder.
     }
     const generated = typeof proactiveDailyBrief === "function"
-      ? await proactiveDailyBrief({ date: safeDate, context })
+      ? await proactiveDailyBrief({ date: safeDate, context, preferFast: true })
       : {
         greeting: "你好 👋",
           summary: "今天先记下一餐，慢慢建立饮食节奏。",
@@ -817,12 +821,16 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
           model: null,
           usage: null,
         };
+    const { upgrade, ...immediate } = generated;
     try {
-      await writeCachedDailyBrief(userId, safeDate, contextHash, generated);
+      await writeCachedDailyBrief(userId, safeDate, contextHash, immediate);
     } catch {
       // The generated reminder stays usable if the optional cache write fails.
     }
-    return { ...generated, cached: false };
+    if (upgrade && typeof upgrade.then === "function") {
+      void upgrade.then((brief) => writeCachedDailyBrief(userId, safeDate, contextHash, brief)).catch(() => undefined);
+    }
+    return { ...immediate, cached: false };
   }
 
   async function readCachedDailyTip(userId, tipDate, contextHash) {

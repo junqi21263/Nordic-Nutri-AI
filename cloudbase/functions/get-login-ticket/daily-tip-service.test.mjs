@@ -75,6 +75,29 @@ test("service falls back when DeepSeek is unavailable", async () => {
   assert.ok(result.reason);
 });
 
+test("preferFast returns a rule tip immediately and exposes the AI upgrade", async () => {
+  let resolveCompletion;
+  const service = createDailyTipService({
+    requestCompletion: () => new Promise((resolve) => { resolveCompletion = resolve; }),
+    random: () => 0,
+  });
+
+  const immediate = await service({ date: "2026-08-07", context: {}, preferFast: true });
+
+  assert.equal(immediate.source, "rule_v2");
+  assert.equal(immediate.model, null);
+  assert.equal(typeof immediate.upgrade?.then, "function");
+
+  resolveCompletion({
+    type: "nutrition_tip",
+    headline: "下一餐加一份深色蔬菜",
+    content: "西兰花或菠菜搭配蛋白质和主食，让这一餐更均衡。",
+    reason: "帮助补足当天的膳食纤维。",
+    food: null,
+  });
+  assert.equal((await immediate.upgrade).source, "deepseek");
+});
+
 test("service sends only bounded context and returns deepseek result", async () => {
   let request;
   const service = createDailyTipService({

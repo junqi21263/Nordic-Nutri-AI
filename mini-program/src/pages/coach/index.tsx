@@ -253,7 +253,7 @@ export default function CoachPage() {
     void loadDailyBrief();
     void loadDailyTip();
     // Keep nutrition rhythm targets in sync with home / cloud plan.
-    void getProductDailySummary(date)
+    void getProductDailySummary(date, { light: true })
       .then((dailySummary) => {
         meals.setDailyTargets(dailySummary.targets);
       })

@@ -225,7 +225,7 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
   }
 
   async function getDailySummaryWithInsight(userId, date, options = {}) {
-    const summary = await getDailySummary(userId, date, { resolveImages: true });
+    const summary = await getDailySummary(userId, date, { resolveImages: options.resolveImages !== false });
     return { ...summary, insight: await getDailyInsightForSummary(userId, date, summary, options) };
   }
 

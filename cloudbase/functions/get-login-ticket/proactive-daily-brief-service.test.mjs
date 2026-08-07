@@ -97,3 +97,24 @@ test("does not keep yesterday's theme even when the model repeats it", async () 
 
   assert.notEqual(result.theme, "consistency");
 });
+
+test("preferFast returns the action card before the model completes", async () => {
+  let resolveCompletion;
+  const service = createProactiveDailyBriefService({
+    requestCompletion: () => new Promise((resolve) => { resolveCompletion = resolve; }),
+  });
+
+  const immediate = await service({ date: "2026-08-07", context: proteinGapContext, preferFast: true });
+
+  assert.equal(immediate.source, "rule_v2");
+  assert.match(immediate.suggestion, /^今日行动：/);
+  assert.equal(typeof immediate.upgrade?.then, "function");
+
+  resolveCompletion({
+    greeting: "早上好，Lewis 👋",
+    summary: "昨天蛋白完成 69%，今天继续补足。",
+    suggestion: "今日行动：记录早餐，优先完成今天的蛋白目标。",
+    theme: "protein_gap",
+  });
+  assert.equal((await immediate.upgrade).source, "deepseek");
+});

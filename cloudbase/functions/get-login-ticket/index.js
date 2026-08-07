@@ -2433,7 +2433,11 @@ function createHttpServer({ service }) {
         const preferFast = url.searchParams.get("preferFast") === "1";
         if (insightOperation === "getDailySummaryWithInsight") {
           // Home / meal-records: never block the summary on LLM; upgrade cache in background.
-          return sendJson(res, 200, await service.insights.getDailySummaryWithInsight(session.sub, date, { preferFast: true }));
+          const light = url.searchParams.get("light") === "1";
+          return sendJson(res, 200, await service.insights.getDailySummaryWithInsight(session.sub, date, {
+            preferFast: true,
+            resolveImages: !light,
+          }));
         }
         if (insightOperation === "getWeeklyReview") {
           return sendJson(res, 200, await service.insights.getWeeklyReview(session.sub, date, { preferFast }));
