@@ -12,6 +12,10 @@ describe("profile edit real save", () => {
     expect(page).toContain("saveProductProfile");
     expect(page).toContain("saveProductBodyProfile");
     expect(page).toContain("saveProductGoal");
+    expect(page).toContain("previewProductNutritionPlan");
+    expect(page).toContain("ConfirmDialog");
+    expect(page).toContain("提升运动表现");
+    expect(page).toContain("目标方向已更新");
     expect(page).toContain("getProductAccount");
     expect(page).toContain("nicknameModerationError");
     expect(page).toContain("feedback.show({ message: nicknameError");

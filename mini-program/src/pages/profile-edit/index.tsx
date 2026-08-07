@@ -3,6 +3,7 @@ import Taro from "@tarojs/taro";
 import { useState } from "react";
 import {
   getProductAccount,
+  previewProductNutritionPlan,
   saveProductBodyProfile,
   saveProductGoal,
   saveProductNutritionPlan,
@@ -11,6 +12,7 @@ import {
 import { randomizeDefaultAvatar, uploadProfileAvatar } from "../../api/profile-avatar-api";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
+import { ConfirmDialog } from "../../components/confirm-dialog";
 import { NordicIcon } from "../../components/nordic-icon";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
@@ -19,11 +21,12 @@ import { navigateBackOrHome } from "../../utils/navigation";
 import { resolveAvatarUrl, isDefaultAvatarSentinel } from "../../features/profile/avatar-defaults";
 import { nicknameModerationError } from "../../features/profile/nickname-moderation";
 
-const goalOptions = ["精益增肌", "轻盈减脂", "保持状态"];
-const goalTypeByLabel: Record<string, "muscle_gain" | "fat_loss" | "maintain"> = {
+const goalOptions = ["精益增肌", "轻盈减脂", "保持状态", "提升运动表现"];
+const goalTypeByLabel: Record<string, "muscle_gain" | "fat_loss" | "maintain" | "performance"> = {
   精益增肌: "muscle_gain",
   轻盈减脂: "fat_loss",
   保持状态: "maintain",
+  提升运动表现: "performance",
 };
 
 export default function ProfileEditPage() {
@@ -32,9 +35,20 @@ export default function ProfileEditPage() {
   const [nickname, setNickname] = useState(profile.profile.nickname);
   const [weight, setWeight] = useState(String(profile.profile.weight));
   const [goalLabel, setGoalLabel] = useState(profile.profile.goalLabel);
+  const [pendingGoalLabel, setPendingGoalLabel] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isRandomizingAvatar, setIsRandomizingAvatar] = useState(false);
+
+  const requestGoalChange = (nextGoalLabel: string) => {
+    if (nextGoalLabel === goalLabel || isSaving) return;
+    setPendingGoalLabel(nextGoalLabel);
+  };
+
+  const confirmGoalChange = () => {
+    if (pendingGoalLabel) setGoalLabel(pendingGoalLabel);
+    setPendingGoalLabel(null);
+  };
 
   const onChooseAvatar = async (event: { detail?: { avatarUrl?: string } }) => {
     if (isUploadingAvatar || isSaving || isRandomizingAvatar) return;
@@ -102,6 +116,20 @@ export default function ProfileEditPage() {
       ) {
         throw new Error("请先补全身体资料");
       }
+      const nextGoalType = goalTypeByLabel[goalLabel] ?? "muscle_gain";
+      const settings = account.settings;
+      const preview = await previewProductNutritionPlan({
+        age: account.age,
+        sex: account.sex,
+        heightCm: account.heightCm,
+        weightKg: nextWeight,
+        activityLevel: account.activityLevel,
+        trainingDays: account.trainingDays,
+        goalType: nextGoalType,
+        dietaryPattern: settings?.dietaryPattern ?? "none",
+        foodAvoidances: settings?.foodAvoidances ?? [],
+        mealsPerDay: settings?.mealsPerDay ?? 3,
+      });
       const saved = await saveProductProfile({ nickname: nextNickname });
       await saveProductBodyProfile({
         age: account.age,
@@ -113,22 +141,26 @@ export default function ProfileEditPage() {
         trainingDays: account.trainingDays,
       });
       await saveProductGoal({
-        goalType: goalTypeByLabel[goalLabel] ?? "muscle_gain",
+        goalType: nextGoalType,
         targetWeightKg: account.targetWeightKg,
-        targetCaloriesKcal: account.targetCaloriesKcal,
+        targetCaloriesKcal: preview.calories,
         targetDate: null,
       });
-      if (account.nutritionPlan) {
-        await saveProductNutritionPlan({
-          calories: account.nutritionPlan.calories,
-          proteinG: account.nutritionPlan.proteinG,
-          carbsG: account.nutritionPlan.carbsG,
-          fatG: account.nutritionPlan.fatG,
-        });
-      }
+      await saveProductNutritionPlan(preview);
       const savedNickname = saved.nickname || nextNickname;
-      profile.setProfile({ nickname: savedNickname, weight: nextWeight, goalLabel });
-      feedback.show({ message: "个人资料已保存", tone: "success" });
+      profile.setProfile({
+        nickname: savedNickname,
+        weight: nextWeight,
+        goalLabel,
+        targetCalories: preview.calories,
+      });
+      feedback.show({
+        message:
+          goalLabel !== profile.profile.goalLabel
+            ? "目标方向已更新，营养目标已重新生成"
+            : "资料已保存，营养目标已更新",
+        tone: "success",
+      });
       navigateBackOrHome("/pages/profile/index");
     } catch (error) {
       feedback.show({
@@ -226,7 +258,7 @@ export default function ProfileEditPage() {
                 <View
                   className={`profile-choice ${goalLabel === option ? "profile-choice--active" : ""}`}
                   key={option}
-                  onClick={() => setGoalLabel(option)}
+                  onClick={() => requestGoalChange(option)}
                 >
                   <Text>{option}</Text>
                 </View>
@@ -250,6 +282,14 @@ export default function ProfileEditPage() {
           保存资料
         </AppButton>
       </View>
+      <ConfirmDialog
+        open={Boolean(pendingGoalLabel)}
+        title="确认更新目标方向？"
+        description={`将切换为“${pendingGoalLabel ?? ""}”，并重新生成每日热量和营养目标。已记录的饮食数据不会改变。`}
+        confirmLabel="确认更新"
+        onConfirm={confirmGoalChange}
+        onCancel={() => setPendingGoalLabel(null)}
+      />
     </PageLayout>
   );
 }
