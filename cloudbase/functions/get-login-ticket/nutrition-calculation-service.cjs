@@ -11,12 +11,12 @@ const achievementDefinitions = [
   { title: "蛋白达人", target: 3, metric: (data) => data.proteinDays, available: true, requirement: "有 3 天蛋白质完成度达到 90% 及以上。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.proteinDayDates, 3) },
   { title: "连续七天", target: 7, metric: (data) => data.longestStreak, available: true, requirement: "连续 7 天都有饮食记录。", unit: "天", unlockAt: (data) => unlockAtStreakEnd(data.recordedDates, data.endDate, 7) },
   { title: "连续十四天", target: 14, metric: (data) => data.longestStreak, available: true, requirement: "连续 14 天都有饮食记录。", unit: "天", unlockAt: (data) => unlockAtStreakEnd(data.recordedDates, data.endDate, 14) },
-  { title: "累计三十餐", target: 30, metric: (data) => data.meals.length, available: true, requirement: "累计记录 30 餐。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 30) },
-  { title: "累计五十餐", target: 50, metric: (data) => data.meals.length, available: true, requirement: "累计记录 50 餐。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 50) },
-  { title: "累计一百餐", target: 100, metric: (data) => data.meals.length, available: true, requirement: "累计记录 100 餐。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 100) },
+  { title: "累计三十餐", target: 30, metric: (data) => data.lifetimeMealCount, available: true, requirement: "累计记录 30 餐。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 30) },
+  { title: "累计五十餐", target: 50, metric: (data) => data.lifetimeMealCount, available: true, requirement: "累计记录 50 餐。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 50) },
+  { title: "累计一百餐", target: 100, metric: (data) => data.lifetimeMealCount, available: true, requirement: "累计记录 100 餐。", unit: "餐", unlockAt: (data) => unlockAtNthMeal(data.meals, 100) },
   { title: "水分自律", target: 1, metric: () => 0, available: false, requirement: "即将上线：完成每日饮水目标。", unit: "次", unlockAt: () => null },
   { title: "睡眠优先", target: 1, metric: () => 0, available: false, requirement: "即将上线：连续记录优质睡眠。", unit: "次", unlockAt: () => null },
-  { title: "训练伙伴", target: 1, metric: () => 0, available: false, requirement: "即将上线：完成一次训练打卡。", unit: "次", unlockAt: () => null },
+  { title: "认识自己", target: 1, metric: (data) => data.profileComplete ? 1 : 0, available: true, requirement: "完成身体资料、目标与饮食偏好。", unit: "项", unlockAt: (data) => data.profileCompletedAt || null },
   { title: "恢复达人", target: 1, metric: () => 0, available: false, requirement: "即将上线：完成恢复日节奏。", unit: "次", unlockAt: () => null },
   { title: "蔬菜优先", target: 3, metric: (data) => data.vegetableDays, available: true, requirement: "有 3 天的餐食包含蔬菜。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.vegetableDates, 3) },
   { title: "碳水平衡", target: 3, metric: (data) => data.carbBalanceDays, available: true, requirement: "有 3 天碳水完成度在 60%–120%，且蛋白质不少于 60%。", unit: "天", unlockAt: (data) => unlockAtNthDate(data.carbBalanceDates, 3) },
@@ -235,7 +235,7 @@ function longestStreak(dates, endDate) {
   return best;
 }
 
-function calculateAchievements(meals = [], plan = {}, endDate) {
+function calculateAchievements(meals = [], plan = {}, endDate, options = {}) {
   const safeEndDate = assertDate(endDate);
   const targets = normalizeTargets(plan);
   const stats = dayStats(Array.isArray(meals) ? meals : [], targets, safeEndDate);
@@ -261,6 +261,7 @@ function calculateAchievements(meals = [], plan = {}, endDate) {
   const favoriteMealRows = stats.safeMeals.filter((meal) => Boolean(meal.isFavorite));
   const data = {
     meals: stats.safeMeals,
+    lifetimeMealCount: Math.max(stats.safeMeals.length, Number(options.lifetimeMealCount) || 0),
     mealDaysByType,
     proteinDays: proteinDayDates.length,
     proteinDayDates,
@@ -277,6 +278,8 @@ function calculateAchievements(meals = [], plan = {}, endDate) {
     qualifiedDates,
     recordedDates,
     endDate: safeEndDate,
+    profileComplete: options.profileComplete === true,
+    profileCompletedAt: typeof options.profileCompletedAt === "string" ? options.profileCompletedAt : null,
   };
   return achievementDefinitions.map((definition, index) => {
     const metric = Math.max(0, Number(definition.metric(data)) || 0);

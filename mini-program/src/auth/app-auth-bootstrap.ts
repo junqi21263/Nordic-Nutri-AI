@@ -5,6 +5,7 @@ import { getLocalDateString } from "../features/onboarding/domain";
 import { refreshProductAchievements } from "../features/coach/refresh-achievements";
 import { hasSeenWelcome } from "../features/welcome/welcome-seen";
 import { useMealStore } from "../stores/meal-store";
+import { useAchievementStore } from "../stores/achievement-store";
 import { useProfileStore } from "../stores/profile-store";
 import {
   clearOnboardingCompleted,
@@ -28,6 +29,7 @@ function openWelcomeIfNeeded() {
 }
 
 async function loadIdentity(user: { id: string }) {
+  useAchievementStore.getState().setUserId(user.id);
   let account;
   try {
     account = await getProductAccount();

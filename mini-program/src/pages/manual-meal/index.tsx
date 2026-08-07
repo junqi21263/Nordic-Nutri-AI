@@ -126,11 +126,9 @@ export default function ManualMealPage() {
         ],
       });
       meals.replaceRemoteMeals(await getProductMeals(date), date);
-      setTimeout(() => {
-        void import("../../features/coach/refresh-achievements")
-          .then(({ refreshProductAchievements }) => refreshProductAchievements(date))
-          .catch(() => undefined);
-      }, 2800);
+      void import("../../features/coach/refresh-achievements")
+        .then(({ refreshProductAchievements }) => refreshProductAchievements(date))
+        .catch(() => undefined);
       feedback.show({ message: "已保存并同步到饮食记录", tone: "success" });
       navigateBackOrHome(`/pages/meal-detail/index?id=${saved.id}`);
     } catch {

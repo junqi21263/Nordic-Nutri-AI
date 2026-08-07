@@ -111,6 +111,24 @@ test("builds a seven-day review and server-derived achievements", async () => {
   assert.equal(achievements[3].unlocked, false);
 });
 
+test("unlocks profile completion from the persisted onboarding marker", async () => {
+  const service = createInsightDataService({
+    listMealsRange: async () => [],
+    countMeals: async () => 0,
+    getNutritionPlan: async () => null,
+    getProfileCompletion: async () => ({
+      completed: true,
+      completedAt: "2026-07-20T08:00:00.000Z",
+    }),
+  });
+
+  const achievements = await service.getAchievements("user-1", "2026-07-20");
+  const profileCompletion = achievements.find((achievement) => achievement.title === "认识自己");
+
+  assert.equal(profileCompletion?.unlocked, true);
+  assert.equal(profileCompletion?.unlockedAt, "2026-07-20T08:00:00.000Z");
+});
+
 test("persists one record-aware insight per day and reuses it while the nutrition snapshot is unchanged", async () => {
   let generationCount = 0;
   const service = createCachedInsightService({

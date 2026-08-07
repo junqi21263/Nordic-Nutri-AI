@@ -98,3 +98,16 @@ test("achievement payloads expose requirement text and unlock timestamps", () =>
   assert.equal(locked.unlockedAt, null);
   assert.match(locked.requirement, /早餐/);
 });
+
+test("uses the lifetime meal count for cumulative milestones", () => {
+  const result = calculateAchievements([], {}, "2026-07-20", { lifetimeMealCount: 100 });
+  assert.equal(result.find((item) => item.title === "累计五十餐").unlocked, true);
+  assert.equal(result.find((item) => item.title === "累计一百餐").unlocked, true);
+});
+
+test("unlocks profile completion only after onboarding is complete", () => {
+  const locked = calculateAchievements([], {}, "2026-07-20", { profileComplete: false });
+  const complete = calculateAchievements([], {}, "2026-07-20", { profileComplete: true });
+  assert.equal(locked.find((item) => item.title === "认识自己").unlocked, false);
+  assert.equal(complete.find((item) => item.title === "认识自己").unlocked, true);
+});

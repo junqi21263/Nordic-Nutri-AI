@@ -8,6 +8,7 @@ const { createDeepseekMealService, PublicMealAnalysisError } = require("./deepse
 const { createDeepseekEvaluationService } = require("./deepseek-evaluation-service.cjs");
 const { createDeepseekNutritionPlanService } = require("./deepseek-nutrition-plan-service.cjs");
 const { createMealDataService, PublicMealDataError } = require("./meal-data-service.cjs");
+const { createAchievementStateService } = require("./achievement-state-service.cjs");
 const {
   createDeepseekMealInsightService,
 } = require("./meal-food-link-service.cjs");
@@ -836,6 +837,20 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   const insights = createInsightDataService({
     db,
     listMealsRange: meals.listMealsRange,
+    countMeals: meals.countMeals,
+    achievementState: createAchievementStateService({ db }),
+    getProfileCompletion: async (userId) => {
+      const profile = await db
+        .from("profiles")
+        .select("onboarding_completed_at")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profile.error) throw new Error("Achievement profile lookup failed");
+      return {
+        completed: Boolean(profile.data?.onboarding_completed_at),
+        completedAt: profile.data?.onboarding_completed_at ?? null,
+      };
+    },
     getNutritionPlan: data.getNutritionPlan,
     generateDailyInsight: async (input) => {
       const result = await withDeepseekBudget(input?.userId, () => dailyInsight(input));

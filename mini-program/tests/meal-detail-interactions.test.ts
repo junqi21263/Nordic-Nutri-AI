@@ -30,6 +30,7 @@ describe("餐食详情交互", () => {
 
   it("让手动保存、列表编辑和删除都通过服务端餐食接口确认", () => {
     const manual = read("pages/manual-meal/index.tsx");
+    const analysis = read("pages/analysis-result/index.tsx");
     const records = read("pages/meal-records/index.tsx");
     const detail = read("pages/meal-detail/index.tsx");
     const portion = read("pages/portion-adjustment/index.tsx");
@@ -42,6 +43,10 @@ describe("餐食详情交互", () => {
     expect(records).toContain("dailySummary.meals");
     expect(detail).toContain("deleteProductMeal(meal.id)");
     expect(portion).toContain("updateProductMeal(editingId");
+    [manual, analysis, portion].forEach((source) => {
+      expect(source).toContain("refreshProductAchievements");
+      expect(source).not.toContain("setTimeout(() => {");
+    });
   });
 
   it("更新收藏后同步详情态，并给出可发现的反馈", () => {

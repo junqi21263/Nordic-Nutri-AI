@@ -10,12 +10,13 @@ describe("achievement unlock toast", () => {
     let bootstrapped = false;
     const storage: AchievementSeenStorage = {
       readSeen: () => seen,
-      writeSeen: (ids) => { seen = [...ids]; },
+      writeSeen: (_userId, ids) => { seen = [...ids]; },
       isBootstrapped: () => bootstrapped,
       markBootstrapped: () => { bootstrapped = true; },
     };
 
     const store = createAchievementStore(storage);
+    store.getState().setUserId("user-1");
 
     store.getState().setAchievements([
       { id: "achievement-0", title: "第一餐记录", unlocked: true, progress: 100 },
@@ -38,11 +39,12 @@ describe("achievement unlock toast", () => {
     let bootstrapped = false;
     const storage: AchievementSeenStorage = {
       readSeen: () => seen,
-      writeSeen: (ids) => { seen = [...ids]; },
+      writeSeen: (_userId, ids) => { seen = [...ids]; },
       isBootstrapped: () => bootstrapped,
       markBootstrapped: () => { bootstrapped = true; },
     };
     const store = createAchievementStore(storage);
+    store.getState().setUserId("user-1");
 
     store.getState().setAchievements([{ id: "existing", title: "第一餐记录", unlocked: true, progress: 100 }]);
     store.getState().setAchievements([
@@ -56,5 +58,28 @@ describe("achievement unlock toast", () => {
     expect(store.getState().achievementUnlocked).toEqual({ achievementId: "new-2" });
     store.getState().dismissAchievementUnlocked();
     expect(store.getState().achievementUnlocked).toBeNull();
+  });
+
+  it("tracks seen unlocks independently for each signed-in user", () => {
+    const seenByUser = new Map<string, string[]>();
+    const bootstrappedUsers = new Set<string>();
+    const storage: AchievementSeenStorage = {
+      readSeen: (userId) => seenByUser.get(userId) ?? [],
+      writeSeen: (userId, ids) => { seenByUser.set(userId, [...ids]); },
+      isBootstrapped: (userId) => bootstrappedUsers.has(userId),
+      markBootstrapped: (userId) => { bootstrappedUsers.add(userId); },
+    };
+    const store = createAchievementStore(storage);
+
+    store.getState().setUserId("user-a");
+    store.getState().setAchievements([]);
+    store.getState().setAchievements([{ id: "achievement-0", title: "第一餐记录", unlocked: true, progress: 100 }]);
+    expect(store.getState().achievementUnlocked).toEqual({ achievementId: "achievement-0" });
+    store.getState().dismissAchievementUnlocked();
+
+    store.getState().setUserId("user-b");
+    store.getState().setAchievements([]);
+    store.getState().setAchievements([{ id: "achievement-0", title: "第一餐记录", unlocked: true, progress: 100 }]);
+    expect(store.getState().achievementUnlocked).toEqual({ achievementId: "achievement-0" });
   });
 });

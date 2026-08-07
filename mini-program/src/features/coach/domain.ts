@@ -81,7 +81,7 @@ export function createAchievements(meals: Meal[], date: string): Achievement[] {
     "累计一百餐",
     "水分自律",
     "睡眠优先",
-    "训练伙伴",
+    "认识自己",
     "恢复达人",
     "蔬菜优先",
     "碳水平衡",

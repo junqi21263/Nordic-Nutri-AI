@@ -5,14 +5,18 @@ const SEEN_STORAGE_KEY = "nordic.achievements.seenUnlocked";
 const BOOTSTRAP_STORAGE_KEY = "nordic.achievements.seenBootstrapped";
 
 export interface AchievementSeenStorage {
-  readSeen: () => string[];
-  writeSeen: (ids: string[]) => void;
-  isBootstrapped: () => boolean;
-  markBootstrapped: () => void;
+  readSeen: (userId: string) => string[];
+  writeSeen: (userId: string, ids: string[]) => void;
+  isBootstrapped: (userId: string) => boolean;
+  markBootstrapped: (userId: string) => void;
 }
 
-const memorySeen = new Set<string>();
-let memoryBootstrapped = false;
+const memorySeenByUser = new Map<string, Set<string>>();
+const memoryBootstrappedUsers = new Set<string>();
+
+function scopedStorageKey(base: string, userId: string) {
+  return `${base}.${encodeURIComponent(userId)}`;
+}
 
 function readStorageRaw(key: string): unknown {
   try {
@@ -40,40 +44,41 @@ function writeStorageRaw(key: string, value: unknown) {
 }
 
 export const taroAchievementSeenStorage: AchievementSeenStorage = {
-  readSeen: () => {
-    const raw = readStorageRaw(SEEN_STORAGE_KEY);
+  readSeen: (userId) => {
+    const raw = readStorageRaw(scopedStorageKey(SEEN_STORAGE_KEY, userId));
     if (Array.isArray(raw)) return raw.map(String);
     if (typeof raw === "string" && raw) {
       try {
         const parsed = JSON.parse(raw) as unknown;
         return Array.isArray(parsed) ? parsed.map(String) : [];
       } catch {
-        return [...memorySeen];
+        return [...(memorySeenByUser.get(userId) ?? [])];
       }
     }
-    return [...memorySeen];
+    return [...(memorySeenByUser.get(userId) ?? [])];
   },
-  writeSeen: (ids) => {
-    memorySeen.clear();
-    ids.forEach((id) => memorySeen.add(id));
-    writeStorageRaw(SEEN_STORAGE_KEY, JSON.stringify(ids));
+  writeSeen: (userId, ids) => {
+    memorySeenByUser.set(userId, new Set(ids));
+    writeStorageRaw(scopedStorageKey(SEEN_STORAGE_KEY, userId), JSON.stringify(ids));
   },
-  isBootstrapped: () => {
-    if (memoryBootstrapped) return true;
-    const raw = readStorageRaw(BOOTSTRAP_STORAGE_KEY);
+  isBootstrapped: (userId) => {
+    if (memoryBootstrappedUsers.has(userId)) return true;
+    const raw = readStorageRaw(scopedStorageKey(BOOTSTRAP_STORAGE_KEY, userId));
     return raw === true || raw === "1" || raw === 1;
   },
-  markBootstrapped: () => {
-    memoryBootstrapped = true;
-    writeStorageRaw(BOOTSTRAP_STORAGE_KEY, "1");
+  markBootstrapped: (userId) => {
+    memoryBootstrappedUsers.add(userId);
+    writeStorageRaw(scopedStorageKey(BOOTSTRAP_STORAGE_KEY, userId), "1");
   },
 };
 
 export interface AchievementStore {
+  userId: string | null;
   achievements: Achievement[];
   achievementUnlocked: AchievementUnlockedEvent | null;
   pendingAchievementUnlocks: AchievementUnlockedEvent[];
   setAchievements: (achievements: Achievement[]) => void;
+  setUserId: (userId: string | null) => void;
   dismissAchievementUnlocked: () => void;
   reset: () => void;
 }
@@ -86,21 +91,28 @@ export const createAchievementStore = (
   seenStorage: AchievementSeenStorage = taroAchievementSeenStorage,
 ) =>
   create<AchievementStore>((set, get) => ({
+    userId: null,
     achievements: [],
     achievementUnlocked: null,
     pendingAchievementUnlocks: [],
+    setUserId: (userId) => {
+      if (get().userId === userId) return;
+      set({ userId, achievements: [], achievementUnlocked: null, pendingAchievementUnlocks: [] });
+    },
     setAchievements: (achievements) => {
       set({ achievements });
+      const userId = get().userId;
+      if (!userId) return;
       const unlocked = achievements.filter((item) => item.unlocked);
-      if (!seenStorage.isBootstrapped()) {
-        seenStorage.writeSeen(unlocked.map((item) => item.id));
-        seenStorage.markBootstrapped();
+      if (!seenStorage.isBootstrapped(userId)) {
+        seenStorage.writeSeen(userId, unlocked.map((item) => item.id));
+        seenStorage.markBootstrapped(userId);
         return;
       }
-      const seen = new Set(seenStorage.readSeen());
+      const seen = new Set(seenStorage.readSeen(userId));
       const newlyUnlocked = unlocked.filter((item) => !seen.has(item.id));
       if (!newlyUnlocked.length) return;
-      seenStorage.writeSeen([
+      seenStorage.writeSeen(userId, [
         ...seen,
         ...newlyUnlocked.map((item) => item.id),
       ]);
@@ -122,7 +134,7 @@ export const createAchievementStore = (
         pendingAchievementUnlocks: remaining,
       });
     },
-    reset: () => set({ achievements: [], achievementUnlocked: null, pendingAchievementUnlocks: [] }),
+    reset: () => set({ userId: null, achievements: [], achievementUnlocked: null, pendingAchievementUnlocks: [] }),
   }));
 
 export const useAchievementStore = createAchievementStore();

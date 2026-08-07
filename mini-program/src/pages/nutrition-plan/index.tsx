@@ -257,6 +257,12 @@ export default function NutritionPlanPage() {
         goalLabel: goalLabels[profile.goalType],
       });
       markOnboardingCompleted();
+      try {
+        const { refreshProductAchievements } = await import("../../features/coach/refresh-achievements");
+        await refreshProductAchievements();
+      } catch (error) {
+        console.warn("[achievements] onboarding refresh failed", error);
+      }
       await Taro.switchTab({ url: "/pages/home/index" });
     } catch (error) {
       feedback.show({

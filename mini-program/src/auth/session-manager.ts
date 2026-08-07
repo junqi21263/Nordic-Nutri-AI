@@ -1,4 +1,5 @@
 import { type AppAuthSession, type AppAuthUser, useAuthStore } from "./auth-store";
+import { useAchievementStore } from "../stores/achievement-store";
 
 let refreshInFlight: Promise<AppAuthSession | null> | null = null;
 
@@ -64,6 +65,7 @@ export async function refreshSession(): Promise<AppAuthSession | null> {
 export async function clearInvalidSession() {
   persistSession(null);
   useAuthStore.getState().clear();
+  useAchievementStore.getState().reset();
 }
 
 export async function signOut() {

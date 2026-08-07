@@ -15,6 +15,7 @@ describe("app authentication wiring", () => {
     expect(bootstrap).toContain("loginWithWechat");
     expect(bootstrap).toContain("refreshProductAchievements");
     expect(bootstrap).toContain("await refreshProductAchievements()");
+    expect(bootstrap).toContain("setUserId(user.id)");
     expect(bootstrap).not.toContain("getSupabaseClient");
     expect(bootstrap).toContain("authBootstrap.start({");
     expect(bootstrap).toContain("allowSilentLogin: options?.allowSilentLogin ?? false");

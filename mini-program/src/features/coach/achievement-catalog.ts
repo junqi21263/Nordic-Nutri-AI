@@ -15,7 +15,7 @@ export const ACHIEVEMENT_REQUIREMENTS: Record<string, string> = {
   累计一百餐: "累计记录 100 餐。",
   水分自律: "即将上线：完成每日饮水目标。",
   睡眠优先: "即将上线：连续记录优质睡眠。",
-  训练伙伴: "即将上线：完成一次训练打卡。",
+  认识自己: "完成身体资料、目标与饮食偏好。",
   恢复达人: "即将上线：完成恢复日节奏。",
   蔬菜优先: "有 3 天的餐食包含蔬菜。",
   碳水平衡: "有 3 天碳水完成度在 60%–120%，且蛋白质不少于 60%。",
@@ -29,6 +29,7 @@ export function getAchievementRequirement(title: string) {
 }
 
 const ACHIEVEMENT_RECORD_ACTIONS: Record<string, string> = {
+  认识自己: "去完善资料",
   第一餐记录: "去记录第一餐",
   早餐节奏: "去记录早餐",
   午餐专注: "去记录午餐",
@@ -38,6 +39,10 @@ const ACHIEVEMENT_RECORD_ACTIONS: Record<string, string> = {
 
 export function getAchievementNextAction(title: string, metric = 0) {
   return ACHIEVEMENT_RECORD_ACTIONS[title] || (metric > 0 ? "去记录下一餐" : "去记录第一餐");
+}
+
+export function getAchievementNextActionTarget(title: string) {
+  return title === "认识自己" ? "/pages/profile-edit/index" : "/pages/meal-records/index";
 }
 
 export function formatAchievementUnlockedAt(value?: string | null) {

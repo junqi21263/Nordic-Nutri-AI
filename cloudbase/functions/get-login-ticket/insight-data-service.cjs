@@ -89,7 +89,7 @@ function serverMetadata(clock) {
   return { serverTime, serverDate: dateKey(serverTime) };
 }
 
-function createInsightDataService({ db, listMealsRange, getNutritionPlan, generateDailyInsight, generateWeeklyReview, clock = () => new Date() }) {
+function createInsightDataService({ db, listMealsRange, countMeals, getNutritionPlan, getProfileCompletion, achievementState, generateDailyInsight, generateWeeklyReview, clock = () => new Date() }) {
   if (typeof listMealsRange !== "function" || typeof getNutritionPlan !== "function") {
     throw new Error("Insight dependencies are unavailable");
   }
@@ -320,6 +320,8 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
     assertDate(date);
     let meals = [];
     let plan = null;
+    let lifetimeMealCount = meals.length;
+    let profileCompletion = null;
     try {
       meals = await listMealsRange(userId, shiftDate(date, -29), date, { resolveImages: false });
     } catch (error) {
@@ -332,7 +334,26 @@ function createInsightDataService({ db, listMealsRange, getNutritionPlan, genera
       console.warn("[achievements] nutrition plan read failed:", error?.message || error);
       plan = null;
     }
-    return calculateAchievements(meals, plan, date);
+    if (typeof countMeals === "function") {
+      try {
+        lifetimeMealCount = await countMeals(userId);
+      } catch (error) {
+        console.warn("[achievements] lifetime meal count read failed:", error?.message || error);
+      }
+    }
+    if (typeof getProfileCompletion === "function") {
+      try {
+        profileCompletion = await getProfileCompletion(userId);
+      } catch (error) {
+        console.warn("[achievements] profile completion read failed:", error?.message || error);
+      }
+    }
+    const calculated = calculateAchievements(meals, plan, date, {
+      lifetimeMealCount,
+      profileComplete: profileCompletion?.completed === true,
+      profileCompletedAt: profileCompletion?.completedAt ?? null,
+    });
+    return achievementState ? achievementState.reconcile(userId, calculated) : calculated;
   }
 
   return { getDailySummary, getDailySummaryWithInsight, getDailyInsight, getWeeklyReview, getAchievements };

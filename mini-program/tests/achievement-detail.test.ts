@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatAchievementUnlockedAt,
   getAchievementNextAction,
+  getAchievementNextActionTarget,
   getAchievementRequirement,
   sortAchievementsForProfilePreview,
 } from "../src/features/coach/achievement-catalog";
@@ -20,6 +21,8 @@ describe("achievement detail interactions", () => {
     expect(getAchievementNextAction("早餐节奏", 0)).toBe("去记录早餐");
     expect(getAchievementNextAction("午餐专注", 0)).toBe("去记录午餐");
     expect(getAchievementNextAction("晚餐平衡", 0)).toBe("去记录晚餐");
+    expect(getAchievementNextAction("认识自己", 0)).toBe("去完善资料");
+    expect(getAchievementNextActionTarget("认识自己")).toBe("/pages/profile-edit/index");
   });
 
   it("uses the shared bottom-sheet detail instead of a separate route", () => {
@@ -35,7 +38,9 @@ describe("achievement detail interactions", () => {
     expect(catalog).toContain("去记录第一餐");
     expect(catalog).toContain("去记录早餐");
     expect(catalog).toContain("去记录下一餐");
-    expect(detailSheet).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');
+    expect(detailSheet).toContain("getAchievementNextActionTarget");
+    expect(detailSheet).toContain("Taro.switchTab({ url: target })");
+    expect(detailSheet).toContain("Taro.navigateTo({ url: target })");
     expect(page).toContain("达成时间");
     expect(page).toContain("achievement-center__filters");
   });

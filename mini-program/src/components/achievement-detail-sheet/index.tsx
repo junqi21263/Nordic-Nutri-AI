@@ -4,6 +4,7 @@ import { BottomSheet } from "../../components/bottom-sheet";
 import {
   formatAchievementUnlockedAt,
   getAchievementNextAction,
+  getAchievementNextActionTarget,
   getAchievementRequirement,
 } from "../../features/coach/achievement-catalog";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
@@ -21,9 +22,14 @@ export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDe
     : "";
   const canRecordNextMeal = Boolean(achievement && !achievement.unlocked && achievement.available !== false);
   const nextActionLabel = getAchievementNextAction(achievement?.title ?? "", Number(achievement?.metric ?? 0));
-  const recordNextMeal = () => {
+  const performNextAction = () => {
     onDismiss();
-    void Taro.switchTab({ url: "/pages/meal-records/index" });
+    const target = getAchievementNextActionTarget(achievement?.title ?? "");
+    if (target === "/pages/meal-records/index") {
+      void Taro.switchTab({ url: target });
+      return;
+    }
+    void Taro.navigateTo({ url: target });
   };
 
   return (
@@ -61,7 +67,7 @@ export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDe
           ) : null}
 
           {canRecordNextMeal ? (
-            <View className="achievement-detail__next-action" onClick={recordNextMeal}>
+            <View className="achievement-detail__next-action" onClick={performNextAction}>
               <Text>{nextActionLabel}</Text>
               <NordicIcon name="chevron-right" size={16} ariaLabel={nextActionLabel} />
             </View>

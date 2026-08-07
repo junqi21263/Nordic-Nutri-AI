@@ -320,6 +320,13 @@ function createMealDataService({
       return mapWithConcurrency(meals, 4, (meal) => withResolvedImage(meal));
     },
 
+    async countMeals(userId) {
+      const result = await db.from("meal_records").select("id", { count: "exact", head: true })
+        .eq("user_id", userId).is("deleted_at", null);
+      if (result.error) throw new Error("Meal count failed");
+      return Number(result.count) || 0;
+    },
+
     async createMeal(userId, input) {
       const meal = normalizeMealInput(input);
       const existing = await db.from("meal_records").select("id").eq("user_id", userId).eq("client_request_id", meal.clientRequestId).maybeSingle();
