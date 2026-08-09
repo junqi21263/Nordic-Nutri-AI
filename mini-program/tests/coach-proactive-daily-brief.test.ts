@@ -22,10 +22,13 @@ describe("NOVA proactive daily reminder", () => {
     expect(page).toContain("loadDailyBrief");
     expect(page).toContain("NOVA · 今日提醒");
     expect(page).toContain("dailyBrief.greeting");
-    expect(page).toContain("dailyBrief.summary");
-    expect(page).toContain("dailyBrief.suggestion");
-    expect(page).toContain("记录第一餐");
-    expect(page).toContain("记录下一餐");
+    expect(page).toContain("createCoachMealContext");
+    expect(page).toContain("heroContext.summary");
+    expect(page).toContain("heroContext.suggestion");
+    expect(page).not.toContain("dailyBrief.summary");
+    expect(page).not.toContain("dailyBrief.suggestion");
+    expect(page).toContain("heroContext.ctaLabel");
+    expect(page).toContain("heroContext.ctaAction");
     expect(page).toContain("今日进度");
     expect(page).toContain("蛋白质");
     expect(page).toContain("热量");

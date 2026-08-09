@@ -21,6 +21,7 @@ import { CoachAvatar } from "../../components/coach-avatar";
 import { NordicIcon } from "../../components/nordic-icon";
 import { CoachComposer } from "./components/CoachComposer";
 import { createCoachAdvice } from "../../features/coach/domain";
+import { createCoachMealContext } from "../../features/coach/meal-context";
 import { getCoachGreeting } from "../../features/coach/server-time";
 import { clampProgress, formatTargetStatus } from "../../features/meals/domain";
 import { assertImageWithinPickLimit } from "../../features/media/image-upload-limits";
@@ -119,8 +120,6 @@ export default function CoachPage() {
     ? coach.advice
     : createCoachAdvice(meals.meals, date, meals.dailyTargets);
   const proteinLeft = Math.max(0, summary.protein - summary.consumed.protein);
-  const hasMealRecord = summary.consumed.calories > 0;
-  const primaryActionLabel = hasMealRecord ? "记录下一餐" : "记录第一餐";
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
@@ -143,6 +142,11 @@ export default function CoachPage() {
     quickReplies: true,
   });
   const greeting = getCoachGreeting(serverTime);
+  const heroContext = createCoachMealContext({
+    meals: meals.getMealsByDate(date),
+    summary,
+    hour: new Date().getHours(),
+  });
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: "proactive-message",
@@ -403,6 +407,11 @@ export default function CoachPage() {
   };
 
   const handlePrimaryAction = () => {
+    if (heroContext.ctaAction === "progress") {
+      setExpandedSections((current) => ({ ...current, progress: true }));
+      void Taro.pageScrollTo({ selector: "#coach-progress", duration: 300 });
+      return;
+    }
     void Taro.switchTab({ url: "/pages/meal-records/index" });
   };
 
@@ -456,16 +465,16 @@ export default function CoachPage() {
               </View>
             </View>
             <Text className="coach-chat__hero-greeting">{dailyBrief.greeting}</Text>
-            <Text className="coach-chat__hero-summary">{dailyBrief.summary}</Text>
-            <Text className="coach-chat__hero-suggestion">{dailyBrief.suggestion}</Text>
-            <View className="coach-chat__hero-cta" ariaLabel={primaryActionLabel} onClick={handlePrimaryAction}>
-              <Text>{primaryActionLabel}</Text>
-              <NordicIcon name="chevron-right" size={16} ariaLabel={primaryActionLabel} />
+            <Text className="coach-chat__hero-summary">{heroContext.summary}</Text>
+            <Text className="coach-chat__hero-suggestion">{heroContext.suggestion}</Text>
+            <View className="coach-chat__hero-cta" ariaLabel={heroContext.ctaLabel} onClick={handlePrimaryAction}>
+              <Text>{heroContext.ctaLabel}</Text>
+              <NordicIcon name="chevron-right" size={16} ariaLabel={heroContext.ctaLabel} />
             </View>
           </View>
         </View>
 
-        <View className="coach-chat__progress-card">
+        <View id="coach-progress" className="coach-chat__progress-card">
           <View
             className={`coach-chat__progress-heading coach-chat__section-toggle ${
               expandedSections.progress
@@ -480,7 +489,7 @@ export default function CoachPage() {
             <View>
               <Text className="coach-chat__progress-kicker">今日进度</Text>
               <Text className="coach-chat__progress-title">
-                {hasMealRecord ? "继续完成今天的营养目标" : "先记录今天的第一餐"}
+                {heroContext.ctaAction === "progress" ? "查看今天的营养完成度" : heroContext.summary}
               </Text>
             </View>
             <View className="coach-chat__progress-score-group">
@@ -497,9 +506,9 @@ export default function CoachPage() {
               <View className="coach-chat__progress-tasks">
             <View className="coach-chat__progress-task">
               <Text className="coach-chat__progress-task-status">
-                {hasMealRecord ? "✓" : "○"}
+                {heroContext.ctaAction === "progress" ? "✓" : "○"}
               </Text>
-              <Text>{hasMealRecord ? "已记录今天的饮食" : "记录第一餐"}</Text>
+              <Text>{heroContext.ctaAction === "progress" ? "三餐已记录" : heroContext.ctaLabel}</Text>
             </View>
             <View className="coach-chat__progress-task">
               <Text className="coach-chat__progress-task-status">
