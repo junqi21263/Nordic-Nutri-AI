@@ -18,6 +18,7 @@ import { getProductDailySummary } from "../../api/insight-api";
 import { analyzeProductImage } from "../../api/vision-api";
 import { AnimatedProgressBar } from "../../components/animated-progress-bar";
 import { CoachAvatar } from "../../components/coach-avatar";
+import { ConfirmDialog } from "../../components/confirm-dialog";
 import { NordicIcon } from "../../components/nordic-icon";
 import { CoachComposer } from "./components/CoachComposer";
 import { createCoachAdvice } from "../../features/coach/domain";
@@ -123,6 +124,7 @@ export default function CoachPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false);
   const [quickPrompts, setQuickPrompts] = useState(defaultQuickPrompts);
   const [heroPrompt, setHeroPrompt] = useState(defaultHeroPrompt);
   const [serverTime, setServerTime] = useState<string | null>(null);
@@ -231,13 +233,7 @@ export default function CoachPage() {
 
   const handleRestartConversation = async () => {
     if (sending || restarting) return;
-    const modal = await Taro.showModal({
-      title: "新对话",
-      content: "当前对话会清空，历史记录仍会保留。确定重新开始吗？",
-      confirmText: "开启新对话",
-      cancelText: "取消",
-    });
-    if (!modal.confirm) return;
+    setRestartDialogOpen(false);
     setRestarting(true);
     try {
       await restartProductCoachConversation();
@@ -458,7 +454,7 @@ export default function CoachPage() {
               <View
                 className="coach-chat__restart-action"
                 ariaLabel="新对话"
-                onClick={() => void handleRestartConversation()}
+                onClick={() => setRestartDialogOpen(true)}
               >
                 <NordicIcon name="refresh-cw" size={15} ariaLabel="新对话" />
                 <Text>新对话</Text>
@@ -724,6 +720,14 @@ export default function CoachPage() {
         onSend={() => void sendMessage()}
         onPickImage={() => void chooseCoachImage()}
         onClearImage={() => setSelectedImagePath(null)}
+      />
+      <ConfirmDialog
+        open={restartDialogOpen}
+        title="新对话"
+        description="当前对话会清空，历史记录仍会保留。确定重新开始吗？"
+        confirmLabel="开启新对话"
+        onConfirm={() => void handleRestartConversation()}
+        onCancel={() => setRestartDialogOpen(false)}
       />
     </PageLayout>
   );

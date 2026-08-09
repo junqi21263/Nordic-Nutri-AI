@@ -107,4 +107,30 @@ describe("coach restart action placement", () => {
     const novaKicker = pageStyles.match(/\.coach-chat__hero-kicker\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
     expect(novaKicker).toContain("font-size: $font-h3;");
   });
+
+  it("opens the project confirmation dialog before restarting the conversation", () => {
+    const page = read("src/pages/coach/index.tsx");
+    const pageStyles = read("src/styles/page.scss");
+
+    expect(page).toContain('import { ConfirmDialog } from "../../components/confirm-dialog";');
+    expect(page).toContain("restartDialogOpen");
+    expect(page).toContain('<ConfirmDialog');
+    expect(page).toContain("onConfirm={() => void handleRestartConversation()}");
+    expect(page).not.toContain("Taro.showModal");
+    const restartAction = pageStyles.match(/\.coach-chat__restart-action\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(restartAction).toContain("margin-left: auto;");
+    expect(restartAction).toContain("margin-right: $space-12;");
+  });
+
+  it("keeps project modals above the fixed coach composer", () => {
+    const componentStyles = read("src/styles/components.scss");
+    const composerStyles = read("src/pages/coach/components/CoachComposer/index.scss");
+    const modalBackdrop = componentStyles.match(/\.modal-backdrop,[\s\S]*?\n\}/)?.[0] ?? "";
+    const composer = composerStyles.match(/\.coach-composer\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+
+    const modalZIndex = Number(modalBackdrop.match(/z-index:\s*(\d+);/)?.[1]);
+    const composerZIndex = Number(composer.match(/z-index:\s*(\d+);/)?.[1]);
+
+    expect(modalZIndex).toBeGreaterThan(composerZIndex);
+  });
 });

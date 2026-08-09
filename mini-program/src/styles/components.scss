@@ -1153,7 +1153,7 @@
   position: fixed;
   right: 0;
   top: 0;
-  z-index: 50;
+  z-index: 200;
   animation: overlay-enter $duration-overlay $ease-standard both;
 }
 .modal {
