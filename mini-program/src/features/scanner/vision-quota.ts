@@ -1,9 +1,5 @@
-/**
- * Temporary animation-QA mode: the server keeps recording vision usage but no
- * longer enforces the former 10-per-day cap. Keep the scanner controls usable
- * even for accounts whose historical counter has already reached ten.
- */
-export const visionDailyQuotaEnforced = false;
+/** Daily image-recognition quota is enforced by the API and reflected in scanner controls. */
+export const visionDailyQuotaEnforced = true;
 
 export function isVisionQuotaExhausted(remaining: number | null) {
   return visionDailyQuotaEnforced && remaining === 0;
