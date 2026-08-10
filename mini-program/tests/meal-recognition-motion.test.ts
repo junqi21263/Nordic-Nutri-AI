@@ -17,7 +17,8 @@ describe("meal recognition result reveal motion", () => {
     expect(mealRecognitionMotionConfig.metricsCountAtMs).toBe(600);
     expect(mealRecognitionMotionConfig.contentRevealAtMs).toBe(1400);
     expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBe(2200);
-    expect(mealRecognitionMotionConfig.completeAtMs).toBe(2600);
+    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(420);
+    expect(mealRecognitionMotionConfig.completeAtMs).toBe(2700);
     expect(mealRecognitionMotionConfig.contentStaggerMs).toBe(80);
     expect(mealRecognitionMotionConfig.macroStaggerMs).toBe(60);
     expect(mealRecognitionMotionConfig.easing).toBe("cubic-bezier(.22, 1, .36, 1)");
@@ -71,6 +72,8 @@ describe("meal recognition result reveal motion", () => {
     expect(styles).toContain(".analysis-result-page__bottom-bar");
     expect(styles).toContain("position: fixed");
     expect(styles).toContain(".analysis-result-page__bottom-bar .analysis-result-page__actions");
+    expect(styles).toContain("transform: translateY(100%)");
+    expect(styles).toContain("opacity 420ms cubic-bezier(.22, 1, .36, 1)");
     expect(layout).toContain("--analysis-result-bottom-bar-height");
   });
 

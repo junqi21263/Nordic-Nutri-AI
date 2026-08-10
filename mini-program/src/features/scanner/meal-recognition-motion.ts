@@ -10,8 +10,8 @@ export const mealRecognitionMotionConfig = {
   contentStaggerMs: 80,
   macroStaggerMs: 60,
   bottomActionRevealAtMs: 2200,
-  bottomActionDurationMs: 340,
-  completeAtMs: 2600,
+  bottomActionDurationMs: 420,
+  completeAtMs: 2700,
   easing: "cubic-bezier(.22, 1, .36, 1)",
 } as const;
 
