@@ -62,4 +62,17 @@ describe("local AI meal flow", () => {
     expect(analysis.getState().analysis).toBeNull();
     expect(portion.getState().meal).toBeNull();
   });
+
+  it("consumes a recognition result reveal marker only once", () => {
+    const scanner = createScannerStore(createScannerFixtures());
+
+    expect(scanner.getState().resultRevealPending).toBe(false);
+    scanner.getState().markResultRevealPending();
+    expect(scanner.getState().consumeResultRevealPending()).toBe(true);
+    expect(scanner.getState().consumeResultRevealPending()).toBe(false);
+
+    scanner.getState().markResultRevealPending();
+    scanner.getState().reset();
+    expect(scanner.getState().resultRevealPending).toBe(false);
+  });
 });

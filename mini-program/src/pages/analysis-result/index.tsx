@@ -1,5 +1,6 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
@@ -7,7 +8,6 @@ import { CircularProgress } from "../../components/circular-progress";
 import { ErrorState } from "../../components/error-state";
 import { MacroProgress } from "../../components/macro-progress";
 import { NordicIcon } from "../../components/nordic-icon";
-import { NutritionTag } from "../../components/nutrition-tag";
 import bowlImage from "../../assets/meal-bowl.svg";
 import oatsImage from "../../assets/meal-oats.svg";
 import salmonImage from "../../assets/meal-salmon.svg";
@@ -15,6 +15,7 @@ import { PageLayout } from "../../layouts/page-layout";
 import type { MealType } from "../../features/meals/domain";
 import { mealTypeOptions } from "../../features/meals/meal-type";
 import { getAdjustedAnalysis } from "../../features/scanner/domain";
+import { getMealRecognitionMotionSchedule, mealRecognitionMotionConfig } from "../../features/scanner/meal-recognition-motion";
 import { analyzeProductMeal, createProductMeal, getProductMeals } from "../../api/meal-data-api";
 import { toProductMealInput } from "../../features/meals/product-meal-input";
 import { useAnalysisStore } from "../../stores/analysis-store";
@@ -24,6 +25,8 @@ import { getLocalDateString } from "../../features/onboarding/domain";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useScannerStore } from "../../stores/scanner-store";
 import { navigateBackOrHome } from "../../utils/navigation";
+import { useCountUp } from "../../hooks/useCountUp";
+import { useMealRecognitionMotion, type MealRecognitionMotionPhase } from "../../hooks/useMealRecognitionMotion";
 
 const nowTime = () => {
   const date = new Date();
@@ -32,12 +35,91 @@ const nowTime = () => {
 
 const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
 
+const phaseOrder: MealRecognitionMotionPhase[] = [
+  "idle",
+  "imageReady",
+  "status",
+  "foodReveal",
+  "nutritionReveal",
+  "nutritionCounting",
+  "actionReveal",
+  "complete",
+];
+
+function hasReachedPhase(current: MealRecognitionMotionPhase, target: MealRecognitionMotionPhase) {
+  return phaseOrder.indexOf(current) >= phaseOrder.indexOf(target);
+}
+
+function RecognitionCountedText({
+  className,
+  target,
+  suffix,
+  enabled,
+  holdAtZero,
+  delayMs = 0,
+}: {
+  className: string;
+  target: number;
+  suffix: string;
+  enabled: boolean;
+  holdAtZero: boolean;
+  delayMs?: number;
+}) {
+  const value = useCountUp(target, {
+    enabled,
+    delayMs,
+    durationMs: mealRecognitionMotionConfig.countDurationMs,
+    initialValue: holdAtZero ? 0 : target,
+  });
+  return <Text className={className}>{`${value}${suffix}`}</Text>;
+}
+
+function RecognitionMacroProgress({
+  label,
+  value,
+  target,
+  tone,
+  enabled,
+  holdAtZero,
+  delayMs,
+}: {
+  label: string;
+  value: number;
+  target: number;
+  tone?: "protein" | "carbs" | "fat";
+  enabled: boolean;
+  holdAtZero: boolean;
+  delayMs: number;
+}) {
+  const displayValue = useCountUp(value, {
+    enabled,
+    delayMs,
+    durationMs: mealRecognitionMotionConfig.countDurationMs,
+    initialValue: holdAtZero ? 0 : value,
+  });
+  return (
+    <MacroProgress
+      label={label}
+      value={value}
+      displayValue={displayValue}
+      target={target}
+      tone={tone}
+      reveal={holdAtZero ? enabled : true}
+      revealDelayMs={delayMs}
+      revealDurationMs={mealRecognitionMotionConfig.countDurationMs}
+    />
+  );
+}
+
 export default function AnalysisResultPage() {
   const analysisStore = useAnalysisStore();
   const portion = usePortionDraftStore();
   const meals = useMealStore();
   const feedback = useFeedbackStore();
   const scanner = useScannerStore();
+  const [revealOnMount] = useState(() => scanner.consumeResultRevealPending());
+  const [replayKey, setReplayKey] = useState(0);
+  const motion = useMealRecognitionMotion(revealOnMount || replayKey > 0, replayKey);
   const meal = analysisStore.analysis;
   const setMealType = (mealType: MealType) => {
     if (!analysisStore.analysis) return;
@@ -60,6 +142,12 @@ export default function AnalysisResultPage() {
       </PageLayout>
     );
   const adjusted = getAdjustedAnalysis(meal, 1);
+  const motionSchedule = getMealRecognitionMotionSchedule(adjusted.items.length);
+  const isRecognitionMotion = revealOnMount || replayKey > 0;
+  const isNutritionCounting = isRecognitionMotion && hasReachedPhase(motion.phase, "nutritionCounting");
+  const isFoodVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "foodReveal");
+  const isActionVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "actionReveal");
+  const isDev = process.env.NODE_ENV !== "production";
   const save = async () => {
     const localMeal = {
       date: getLocalDateString(),
@@ -110,7 +198,11 @@ export default function AnalysisResultPage() {
       onTopBarBack={() => Taro.navigateBack()}
       className="page-layout--analysis-result"
     >
-      <View className="analysis-result-page">
+      <View
+        className="analysis-result-page"
+        data-recognition-reveal={motion.isRevealing ? "true" : undefined}
+        data-motion-phase={motion.isRevealing ? motion.phase : undefined}
+      >
         <View className="analysis-result-page__header">
           <View className="analysis-result-page__heading">
             <Text className="analysis-result-page__title">{evaluation}</Text>
@@ -122,6 +214,15 @@ export default function AnalysisResultPage() {
             <NordicIcon name="check" size={22} ariaLabel="分析完成" />
             <Text>AI 完成</Text>
           </View>
+          {isDev && (
+            <View
+              className="analysis-result-page__debug-replay"
+              ariaLabel="重播识别结果动画"
+              onClick={() => setReplayKey((value) => value + 1)}
+            >
+              <Text>重播动画</Text>
+            </View>
+          )}
         </View>
 
         <AppCard tone="beige" className="analysis-result-page__summary">
@@ -194,22 +295,60 @@ export default function AnalysisResultPage() {
             total={100}
             label="餐点评分"
             tone="sage"
+            reveal={isRecognitionMotion ? isNutritionCounting : true}
+            revealDurationMs={mealRecognitionMotionConfig.countDurationMs}
+            animateValue={isRecognitionMotion}
           />
           <View className="analysis-result-page__score-copy">
             <Text className="analysis-result-page__score-grade">{adjusted.score} · 餐点评分</Text>
-            <Text className="analysis-result-page__score-kcal">{adjusted.calories} kcal</Text>
+            <RecognitionCountedText
+              className="analysis-result-page__score-kcal"
+              target={adjusted.calories}
+              suffix=" kcal"
+              enabled={isNutritionCounting}
+              holdAtZero={isRecognitionMotion}
+            />
             <View className="analysis-result-page__macro-tags">
-              <NutritionTag>{adjusted.protein}g 蛋白质</NutritionTag>
-              <NutritionTag tone="carbs">{adjusted.carbs}g 碳水</NutritionTag>
-              <NutritionTag tone="fat">{adjusted.fat}g 脂肪</NutritionTag>
+              <RecognitionCountedText
+                className="nutrition-tag nutrition-tag--protein"
+                target={adjusted.protein}
+                suffix="g 蛋白质"
+                enabled={isNutritionCounting}
+                holdAtZero={isRecognitionMotion}
+              />
+              <RecognitionCountedText
+                className="nutrition-tag nutrition-tag--carbs"
+                target={adjusted.carbs}
+                suffix="g 碳水"
+                enabled={isNutritionCounting}
+                holdAtZero={isRecognitionMotion}
+                delayMs={mealRecognitionMotionConfig.macroStaggerMs}
+              />
+              <RecognitionCountedText
+                className="nutrition-tag nutrition-tag--fat"
+                target={adjusted.fat}
+                suffix="g 脂肪"
+                enabled={isNutritionCounting}
+                holdAtZero={isRecognitionMotion}
+                delayMs={mealRecognitionMotionConfig.macroStaggerMs * 2}
+              />
             </View>
           </View>
         </AppCard>
 
         <AppCard className="analysis-result-page__ingredients">
           <Text className="analysis-result-page__section-title">识别食材</Text>
-          {adjusted.items.map((item) => (
-            <View className="analysis-ingredient" key={item.id}>
+          {adjusted.items.map((item, index) => (
+            <View
+              className={isFoodVisible ? "analysis-ingredient analysis-ingredient--revealed" : "analysis-ingredient"}
+              key={item.id}
+              style={{
+                transitionDelay: `${
+                  (motionSchedule.foodDelaysMs[index] ?? mealRecognitionMotionConfig.foodAtMs) -
+                  mealRecognitionMotionConfig.foodAtMs
+                }ms`,
+              }}
+            >
               <Text>{item.name}</Text>
               <Text>
                 {item.amount} · {item.calories} kcal
@@ -217,9 +356,32 @@ export default function AnalysisResultPage() {
             </View>
           ))}
           <View className="analysis-result-page__macro-list">
-            <MacroProgress label="蛋白质" value={adjusted.protein} target={60} />
-            <MacroProgress label="碳水" value={adjusted.carbs} target={90} tone="carbs" />
-            <MacroProgress label="脂肪" value={adjusted.fat} target={25} tone="fat" />
+            <RecognitionMacroProgress
+              label="蛋白质"
+              value={adjusted.protein}
+              target={60}
+              enabled={isNutritionCounting}
+              holdAtZero={isRecognitionMotion}
+              delayMs={(motionSchedule.macroCountDelaysMs[0] ?? mealRecognitionMotionConfig.countAtMs) - mealRecognitionMotionConfig.countAtMs}
+            />
+            <RecognitionMacroProgress
+              label="碳水"
+              value={adjusted.carbs}
+              target={90}
+              tone="carbs"
+              enabled={isNutritionCounting}
+              holdAtZero={isRecognitionMotion}
+              delayMs={(motionSchedule.macroCountDelaysMs[1] ?? mealRecognitionMotionConfig.countAtMs) - mealRecognitionMotionConfig.countAtMs}
+            />
+            <RecognitionMacroProgress
+              label="脂肪"
+              value={adjusted.fat}
+              target={25}
+              tone="fat"
+              enabled={isNutritionCounting}
+              holdAtZero={isRecognitionMotion}
+              delayMs={(motionSchedule.macroCountDelaysMs[2] ?? mealRecognitionMotionConfig.countAtMs) - mealRecognitionMotionConfig.countAtMs}
+            />
           </View>
         </AppCard>
 
@@ -232,7 +394,10 @@ export default function AnalysisResultPage() {
           营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
         </Text>
 
-        <View className="analysis-result-page__actions">
+        <View
+          className="analysis-result-page__actions"
+          data-motion-action={isActionVisible ? "revealed" : undefined}
+        >
           <AppButton
             variant="outline"
             size="large"

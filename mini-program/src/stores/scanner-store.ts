@@ -11,10 +11,14 @@ export interface ScannerStore {
   flashEnabled: boolean;
   galleryMode: boolean;
   previewPath: string | null;
+  resultRevealPending: boolean;
   setCandidates: (candidates: ScannerMealFixture[]) => void;
   captureRandom: () => ScannerMealFixture;
   setCapturedMeal: (meal: ScannerMealFixture) => void;
   setPreviewPath: (previewPath: string | null) => void;
+  markResultRevealPending: () => void;
+  consumeResultRevealPending: () => boolean;
+  clearResultRevealPending: () => void;
   setGalleryMode: (galleryMode: boolean) => void;
   toggleFlash: () => void;
   toggleGallery: () => void;
@@ -27,6 +31,7 @@ export function createScannerStore(fixtures = createScannerFixtures()) {
     flashEnabled: false,
     galleryMode: false,
     previewPath: null,
+    resultRevealPending: false,
     setCandidates: (candidates) => set({ candidates }),
     captureRandom: () => {
       const candidates = get().candidates.length
@@ -38,6 +43,13 @@ export function createScannerStore(fixtures = createScannerFixtures()) {
     },
     setCapturedMeal: (capturedMeal) => set({ capturedMeal }),
     setPreviewPath: (previewPath) => set({ previewPath }),
+    markResultRevealPending: () => set({ resultRevealPending: true }),
+    consumeResultRevealPending: () => {
+      const resultRevealPending = get().resultRevealPending;
+      set({ resultRevealPending: false });
+      return resultRevealPending;
+    },
+    clearResultRevealPending: () => set({ resultRevealPending: false }),
     setGalleryMode: (galleryMode) => set({ galleryMode }),
     toggleFlash: () => set((state) => ({ flashEnabled: !state.flashEnabled })),
     toggleGallery: () => set((state) => ({ galleryMode: !state.galleryMode })),
@@ -48,6 +60,7 @@ export function createScannerStore(fixtures = createScannerFixtures()) {
         flashEnabled: false,
         galleryMode: false,
         previewPath: null,
+        resultRevealPending: false,
       }),
   }));
 }

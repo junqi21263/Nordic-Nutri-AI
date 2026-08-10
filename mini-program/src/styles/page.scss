@@ -6317,6 +6317,85 @@
   padding: 0 $space-8;
   width: 100%;
 }
+
+// Motion-only layer for one true scanner recognition result. It intentionally
+// leaves all layout metrics intact so the frozen result UI never reflows.
+.analysis-result-page[data-recognition-reveal="true"] {
+  .analysis-result-page__summary-image,
+  .analysis-result-page__ai-status,
+  .analysis-ingredient,
+  .analysis-result-page__score,
+  .analysis-result-page__macro-list,
+  .analysis-result-page__actions {
+    will-change: opacity, transform;
+  }
+  .analysis-result-page__summary-image {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+    transition: opacity 300ms cubic-bezier(.22, 1, .36, 1), transform 300ms cubic-bezier(.22, 1, .36, 1);
+  }
+  .analysis-result-page__ai-status {
+    opacity: 0;
+    transform: translateY(5px);
+    transition: opacity 260ms cubic-bezier(.22, 1, .36, 1), transform 260ms cubic-bezier(.22, 1, .36, 1);
+  }
+  .analysis-ingredient {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 250ms cubic-bezier(.22, 1, .36, 1), transform 250ms cubic-bezier(.22, 1, .36, 1);
+  }
+  .analysis-result-page__score,
+  .analysis-result-page__macro-list {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 340ms cubic-bezier(.22, 1, .36, 1), transform 340ms cubic-bezier(.22, 1, .36, 1);
+  }
+  .analysis-result-page__actions {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 280ms cubic-bezier(.22, 1, .36, 1), transform 280ms cubic-bezier(.22, 1, .36, 1);
+  }
+}
+.analysis-result-page[data-motion-phase="imageReady"] .analysis-result-page__summary-image,
+.analysis-result-page[data-motion-phase="status"] .analysis-result-page__summary-image,
+.analysis-result-page[data-motion-phase="foodReveal"] .analysis-result-page__summary-image,
+.analysis-result-page[data-motion-phase="nutritionReveal"] .analysis-result-page__summary-image,
+.analysis-result-page[data-motion-phase="nutritionCounting"] .analysis-result-page__summary-image,
+.analysis-result-page[data-motion-phase="actionReveal"] .analysis-result-page__summary-image,
+.analysis-result-page[data-motion-phase="status"] .analysis-result-page__ai-status,
+.analysis-result-page[data-motion-phase="foodReveal"] .analysis-result-page__ai-status,
+.analysis-result-page[data-motion-phase="nutritionReveal"] .analysis-result-page__ai-status,
+.analysis-result-page[data-motion-phase="nutritionCounting"] .analysis-result-page__ai-status,
+.analysis-result-page[data-motion-phase="actionReveal"] .analysis-result-page__ai-status,
+.analysis-result-page[data-motion-phase="foodReveal"] .analysis-ingredient--revealed,
+.analysis-result-page[data-motion-phase="nutritionReveal"] .analysis-ingredient--revealed,
+.analysis-result-page[data-motion-phase="nutritionCounting"] .analysis-ingredient--revealed,
+.analysis-result-page[data-motion-phase="actionReveal"] .analysis-ingredient--revealed,
+.analysis-result-page[data-motion-phase="nutritionReveal"] .analysis-result-page__score,
+.analysis-result-page[data-motion-phase="nutritionReveal"] .analysis-result-page__macro-list,
+.analysis-result-page[data-motion-phase="nutritionCounting"] .analysis-result-page__score,
+.analysis-result-page[data-motion-phase="nutritionCounting"] .analysis-result-page__macro-list,
+.analysis-result-page[data-motion-phase="actionReveal"] .analysis-result-page__score,
+.analysis-result-page[data-motion-phase="actionReveal"] .analysis-result-page__macro-list,
+.analysis-result-page[data-motion-phase="actionReveal"] .analysis-result-page__actions[data-motion-action="revealed"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.analysis-result-page__debug-replay {
+  color: $color-text-secondary;
+  font-size: $font-overline;
+  margin-left: auto;
+}
+[data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] .analysis-result-page__summary-image,
+[data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] .analysis-result-page__ai-status,
+[data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] .analysis-ingredient,
+[data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] .analysis-result-page__score,
+[data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] .analysis-result-page__macro-list,
+[data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] .analysis-result-page__actions {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
 .portion-stepper {
   align-items: center;
   display: flex;

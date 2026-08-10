@@ -25,7 +25,7 @@ function cancelFrame(id: number) {
  * transition `conic-gradient` stops smoothly in the WeChat runtime.
  * Only commits React updates when the rounded percent changes to avoid jank.
  */
-export function useAnimatedProgress(targetPercent: number, durationMs = 520) {
+export function useAnimatedProgress(targetPercent: number, durationMs = 520, enabled = true) {
   const target = Math.round(clampPercent(targetPercent));
   const [display, setDisplay] = useState(0);
   const valueRef = useRef(0);
@@ -34,6 +34,12 @@ export function useAnimatedProgress(targetPercent: number, durationMs = 520) {
 
   useEffect(() => {
     if (frameRef.current) cancelFrame(frameRef.current);
+    if (!enabled) {
+      valueRef.current = 0;
+      postedRef.current = 0;
+      setDisplay(0);
+      return;
+    }
     const from = valueRef.current;
     const to = target;
     if (Math.abs(from - to) < 0.5) {
@@ -67,7 +73,7 @@ export function useAnimatedProgress(targetPercent: number, durationMs = 520) {
     return () => {
       if (frameRef.current) cancelFrame(frameRef.current);
     };
-  }, [target, durationMs]);
+  }, [target, durationMs, enabled]);
 
   return display;
 }
@@ -76,14 +82,18 @@ export function useAnimatedProgress(targetPercent: number, durationMs = 520) {
  * Defers applying the target percent so CSS transform transitions can run
  * from 0 (or the previous value) after the first paint.
  */
-export function useDeferredProgress(targetPercent: number, delayMs = 16) {
+export function useDeferredProgress(targetPercent: number, delayMs = 16, enabled = true) {
   const target = Math.round(clampPercent(targetPercent));
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
+    if (!enabled) {
+      setDisplay(0);
+      return;
+    }
     const id = setTimeout(() => setDisplay(target), delayMs);
     return () => clearTimeout(id);
-  }, [target, delayMs]);
+  }, [target, delayMs, enabled]);
 
   return display;
 }

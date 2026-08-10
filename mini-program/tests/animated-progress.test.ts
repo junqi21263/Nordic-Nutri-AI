@@ -22,6 +22,13 @@ describe("progress bar animations", () => {
     expect(read("components/animated-progress-bar/index.tsx")).toContain("scaleX");
   });
 
+  it("allows result reveal motion to hold progress at zero without changing default callers", () => {
+    expect(read("components/animated-progress-bar/index.tsx")).toContain("reveal = true");
+    expect(read("components/macro-progress/index.tsx")).toContain("reveal?: boolean");
+    expect(read("components/circular-progress/index.tsx")).toContain("reveal?: boolean");
+    expect(read("hooks/useAnimatedProgress.ts")).toContain("enabled = true");
+  });
+
   it("animates page-level progress tracks with GPU transform and respects reduced motion", () => {
     expect(read("pages/meal-records/index.tsx")).toContain("AnimatedProgressBar");
     expect(read("pages/coach/index.tsx")).toContain("AnimatedProgressBar");

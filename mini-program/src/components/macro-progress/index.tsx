@@ -7,6 +7,10 @@ export interface MacroProgressProps {
   target: number;
   unit?: string;
   tone?: "forest" | "protein" | "carbs" | "fat" | "sage" | "warning";
+  displayValue?: number;
+  reveal?: boolean;
+  revealDelayMs?: number;
+  revealDurationMs?: number;
 }
 
 export function MacroProgress({
@@ -15,6 +19,10 @@ export function MacroProgress({
   target,
   unit = "g",
   tone = "protein",
+  displayValue = value,
+  reveal = true,
+  revealDelayMs,
+  revealDurationMs,
 }: MacroProgressProps) {
   const progress = Math.min(100, Math.max(0, Math.round((value / Math.max(target, 1)) * 100)));
   const exceeded = target > 0 && value > target;
@@ -27,12 +35,18 @@ export function MacroProgress({
       <View className="macro-progress__row">
         <Text>{label}</Text>
         <Text className="macro-progress__value">
-          {value}/{target}
+          {displayValue}/{target}
           {unit}
         </Text>
       </View>
       <View className="macro-progress__track">
-        <AnimatedProgressBar className="macro-progress__bar animated-progress-bar" percent={progress} />
+        <AnimatedProgressBar
+          className="macro-progress__bar animated-progress-bar"
+          percent={progress}
+          reveal={reveal}
+          delayMs={revealDelayMs}
+          durationMs={revealDurationMs}
+        />
       </View>
     </View>
   );

@@ -92,8 +92,10 @@ export default function FoodScannerPage() {
       const meal = await analyzeProductImage(previewPath);
       scanner.setCapturedMeal(meal);
       analysis.setAnalysis(meal);
+      scanner.markResultRevealPending();
       await Taro.navigateTo({ url: "/pages/analysis-result/index" });
     } catch (error) {
+      scanner.clearResultRevealPending();
       const errorName = error instanceof Error ? error.name : "";
       const isNotConfigured = errorName === "VISION_SERVICE_NOT_CONFIGURED";
       const isContentBlocked = errorName === "VISION_CONTENT_BLOCKED";
