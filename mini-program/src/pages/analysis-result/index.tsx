@@ -220,7 +220,7 @@ export default function AnalysisResultPage() {
     >
       <View
         className="analysis-result-page"
-        data-recognition-reveal={motion.isRevealing ? "true" : undefined}
+        data-recognition-reveal={isRecognitionMotion ? "true" : undefined}
         data-motion-phase={motion.isRevealing ? motion.phase : undefined}
         data-base-revealed={motion.isRevealing && isBaseVisible ? "true" : undefined}
         data-nutrition-revealed={motion.isRevealing && isNutritionVisible ? "true" : undefined}

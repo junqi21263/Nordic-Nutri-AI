@@ -54,6 +54,7 @@ describe("meal recognition result reveal motion", () => {
     expect(page).toContain("shouldPlayMealRecognitionReveal");
     expect(page).toContain("useMealRecognitionMotion");
     expect(page).toContain("data-recognition-reveal");
+    expect(page).toContain('data-recognition-reveal={isRecognitionMotion ? "true" : undefined}');
     expect(styles).toContain("data-recognition-reveal");
     expect(styles).toContain("analysis-result-page__summary-image");
     expect(styles).toContain("analysis-result-page__ai-status");
