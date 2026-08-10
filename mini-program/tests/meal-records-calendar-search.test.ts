@@ -65,5 +65,19 @@ describe("meal records calendar search and filters", () => {
     expect(styles).toContain("min-height: 0");
     expect(styles).toContain(".records-filter-sheet__manual-meta");
   });
-});
 
+  it("does not let stale date responses overwrite the currently selected day", () => {
+    const page = readFileSync(resolve(sourceRoot, "pages/meal-records/index.tsx"), "utf8");
+    const dailySync = page.slice(
+      page.indexOf("useEffect(() => {\n    const selectedDate = store.selectedDate;"),
+      page.indexOf("  useEffect(() => {\n    const searching"),
+    );
+
+    expect(dailySync).toContain("const selectedDate = store.selectedDate;");
+    expect(dailySync).toContain("getProductDailySummary(selectedDate)");
+    expect(dailySync.match(/if \(cancelled\) return;/g)).toHaveLength(3);
+    expect(dailySync).toContain("getProductMeals(selectedDate)");
+    expect(dailySync).toContain("store.replaceRemoteMeals(remoteMeals, selectedDate);");
+    expect(dailySync).not.toContain("store.replaceRemoteMeals(remoteMeals, store.selectedDate);");
+  });
+});

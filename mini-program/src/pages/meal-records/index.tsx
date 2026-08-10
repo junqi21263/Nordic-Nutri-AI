@@ -239,21 +239,25 @@ export default function MealRecordsPage() {
   useEffect(() => () => setTabBarVisible(true), [setTabBarVisible]);
 
   useEffect(() => {
+    const selectedDate = store.selectedDate;
     let cancelled = false;
-    const request = getProductDailySummary(store.selectedDate)
+    const request = getProductDailySummary(selectedDate)
       .then(async (dailySummary) => {
+        if (cancelled) return;
         setRemoteSummary(dailySummary);
         store.setDailyTargets(dailySummary.targets);
         if (Array.isArray(dailySummary.meals)) {
-          store.replaceRemoteMeals(dailySummary.meals.map(mapProductMeal), store.selectedDate);
+          store.replaceRemoteMeals(dailySummary.meals.map(mapProductMeal), selectedDate);
           return;
         }
-        const remoteMeals = await getProductMeals(store.selectedDate);
-        store.replaceRemoteMeals(remoteMeals, store.selectedDate);
+        const remoteMeals = await getProductMeals(selectedDate);
+        if (cancelled) return;
+        store.replaceRemoteMeals(remoteMeals, selectedDate);
       })
       .catch(() => {
+        if (cancelled) return;
         setRemoteSummary(null);
-        store.replaceRemoteMeals([], store.selectedDate);
+        store.replaceRemoteMeals([], selectedDate);
         store.setErrorState("饮食记录同步失败，请稍后重试");
       });
     void request.finally(() => {

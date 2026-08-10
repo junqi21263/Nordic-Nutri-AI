@@ -5,6 +5,7 @@ import { AIInsightCard } from "../../components/ai-insight-card";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { CircularProgress } from "../../components/circular-progress";
+import { ConfirmDialog } from "../../components/confirm-dialog";
 import { ErrorState } from "../../components/error-state";
 import { MacroProgress } from "../../components/macro-progress";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -126,6 +127,8 @@ export default function AnalysisResultPage() {
     shouldPlayMealRecognitionReveal(router.params.reveal, scanner.consumeResultRevealPending()),
   );
   const [replayKey, setReplayKey] = useState(0);
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+  const [ingredientsExpanded, setIngredientsExpanded] = useState(true);
   const isDev = process.env.NODE_ENV !== "production";
   const motion = useMealRecognitionMotion(revealOnMount || replayKey > 0, replayKey);
   const bottomAction = useBottomActionReveal(revealOnMount || replayKey > 0, replayKey, motion.phase);
@@ -216,7 +219,7 @@ export default function AnalysisResultPage() {
       showTabs={false}
       hideNavigation
       showBack
-      onTopBarBack={() => Taro.navigateBack()}
+      onTopBarBack={() => setExitConfirmOpen(true)}
       className="page-layout--analysis-result"
     >
       <View
@@ -353,23 +356,49 @@ export default function AnalysisResultPage() {
         </AppCard>
 
         <AppCard className="analysis-result-page__ingredients" motionLayer="content">
-          <Text className="analysis-result-page__section-title">识别食材</Text>
-          {adjusted.items.map((item, index) => (
-            <View
-              className={isContentVisible ? "analysis-ingredient analysis-ingredient--revealed" : "analysis-ingredient"}
-              key={item.id}
-              style={{
-                transitionDelay: `${
-                  motionSchedule.ingredientDelaysMs[index] ?? 0
-                }ms`,
-              }}
-            >
-              <Text>{item.name}</Text>
-              <Text>
-                {item.amount} · {item.calories} kcal
-              </Text>
+          <View
+            className="analysis-result-page__ingredients-heading"
+            ariaLabel={ingredientsExpanded ? "收起识别食材" : "展开识别食材"}
+            onClick={() => setIngredientsExpanded((current) => !current)}
+          >
+            <Text className="analysis-result-page__section-title">识别食材</Text>
+            <View className="analysis-result-page__ingredients-toggle">
+              <Text>{ingredientsExpanded ? "收起" : "展开"}</Text>
+              <View
+                className={
+                  ingredientsExpanded
+                    ? "analysis-result-page__ingredients-toggle-icon analysis-result-page__ingredients-toggle-icon--expanded"
+                    : "analysis-result-page__ingredients-toggle-icon"
+                }
+              >
+                <NordicIcon
+                  name="chevron-right"
+                  size={14}
+                  ariaLabel={ingredientsExpanded ? "收起" : "展开"}
+                />
+              </View>
             </View>
-          ))}
+          </View>
+          {ingredientsExpanded
+            ? adjusted.items.map((item, index) => (
+                <View
+                  className={
+                    isContentVisible
+                      ? "analysis-ingredient analysis-ingredient--revealed"
+                      : "analysis-ingredient"
+                  }
+                  key={item.id}
+                  style={{
+                    transitionDelay: `${motionSchedule.ingredientDelaysMs[index] ?? 0}ms`,
+                  }}
+                >
+                  <Text>{item.name}</Text>
+                  <Text>
+                    {item.amount} · {item.calories} kcal
+                  </Text>
+                </View>
+              ))
+            : null}
           <View className="analysis-result-page__macro-list">
             <RecognitionMacroProgress
               label="蛋白质"
@@ -439,6 +468,18 @@ export default function AnalysisResultPage() {
           </View>
         </View>
       </View>
+      <ConfirmDialog
+        open={exitConfirmOpen}
+        title="放弃本次分析？"
+        description="返回后，本次未保存的分析结果将不再保留。"
+        confirmLabel="放弃并返回"
+        cancelLabel="继续分析"
+        onCancel={() => setExitConfirmOpen(false)}
+        onConfirm={() => {
+          setExitConfirmOpen(false);
+          Taro.navigateBack();
+        }}
+      />
     </PageLayout>
   );
 }

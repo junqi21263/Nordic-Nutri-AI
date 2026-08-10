@@ -115,4 +115,31 @@ describe("meal recognition result reveal motion", () => {
     expect(page).toContain("setReplayKey");
     expect(page).not.toContain("analyzeProductImage");
   });
+
+  it("confirms before leaving an unsaved analysis result", () => {
+    const page = read("pages/analysis-result/index.tsx");
+
+    expect(page).toContain("const [exitConfirmOpen, setExitConfirmOpen] = useState(false);");
+    expect(page).toContain("onTopBarBack={() => setExitConfirmOpen(true)}");
+    expect(page).toContain("<ConfirmDialog");
+    expect(page).toContain('title="放弃本次分析？"');
+    expect(page).toContain('description="返回后，本次未保存的分析结果将不再保留。"');
+    expect(page).toContain('confirmLabel="放弃并返回"');
+    expect(page).toContain('cancelLabel="继续分析"');
+  });
+
+  it("collapses only ingredient rows while keeping nutrition progress visible", () => {
+    const page = read("pages/analysis-result/index.tsx");
+    const styles = read("styles/page.scss");
+
+    expect(page).toContain("const [ingredientsExpanded, setIngredientsExpanded] = useState(true);");
+    expect(page).toMatch(/ingredientsExpanded\s*\?\s*adjusted\.items\.map/);
+    expect(page).toContain('ariaLabel={ingredientsExpanded ? "收起识别食材" : "展开识别食材"}');
+    expect(page).toContain('ingredientsExpanded ? "收起" : "展开"');
+    expect(page.indexOf("adjusted.items.map")).toBeLessThan(
+      page.indexOf('className="analysis-result-page__macro-list"'),
+    );
+    expect(styles).toContain(".analysis-result-page__ingredients-heading");
+    expect(styles).toContain(".analysis-result-page__ingredients-toggle");
+  });
 });

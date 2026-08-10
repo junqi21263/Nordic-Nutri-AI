@@ -6297,11 +6297,35 @@
   flex-direction: column;
   gap: $space-8;
 }
+.analysis-result-page__ingredients-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: $space-4;
+}
 .analysis-result-page__section-title {
   color: $color-text-primary;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
   margin-bottom: $space-4;
+}
+.analysis-result-page__ingredients-heading .analysis-result-page__section-title {
+  margin-bottom: 0;
+}
+.analysis-result-page__ingredients-toggle {
+  align-items: center;
+  color: $color-text-secondary;
+  display: flex;
+  font-size: $font-overline;
+  gap: $space-4;
+}
+.analysis-result-page__ingredients-toggle-icon {
+  align-items: center;
+  display: flex;
+  transform: rotate(-90deg);
+}
+.analysis-result-page__ingredients-toggle-icon--expanded {
+  transform: rotate(90deg);
 }
 .analysis-result-page__macro-list {
   display: flex;
