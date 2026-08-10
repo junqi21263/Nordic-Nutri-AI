@@ -398,27 +398,25 @@ export default function AnalysisResultPage() {
           actionLabel="查看饮食记录"
           onActionClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
         />
-        <Text className="nutrition-disclaimer" data-motion-layer="bottom">
-          营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
-        </Text>
-
-        <View
-          className="analysis-result-page__actions"
-          data-motion-layer="bottom"
-        >
-          <AppButton
-            variant="outline"
-            size="large"
-            onClick={() => {
-              portion.start(meal);
-              Taro.navigateTo({ url: "/pages/portion-adjustment/index" });
-            }}
-          >
-            调整份量
-          </AppButton>
-          <AppButton size="large" onClick={() => void save()}>
-            保存本餐
-          </AppButton>
+        <View className="analysis-result-page__bottom-bar" data-motion-layer="bottom">
+          <Text className="nutrition-disclaimer">
+            营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
+          </Text>
+          <View className="analysis-result-page__actions">
+            <AppButton
+              variant="outline"
+              size="large"
+              onClick={() => {
+                portion.start(meal);
+                Taro.navigateTo({ url: "/pages/portion-adjustment/index" });
+              }}
+            >
+              调整份量
+            </AppButton>
+            <AppButton size="large" onClick={() => void save()}>
+              保存本餐
+            </AppButton>
+          </View>
         </View>
       </View>
     </PageLayout>

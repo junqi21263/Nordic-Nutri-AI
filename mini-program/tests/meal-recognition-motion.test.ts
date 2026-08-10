@@ -59,6 +59,21 @@ describe("meal recognition result reveal motion", () => {
     expect(styles).toContain('[data-reduced-motion="true"]');
   });
 
+  it("keeps scan-result actions fixed without changing their existing handlers", () => {
+    const page = read("pages/analysis-result/index.tsx");
+    const styles = read("styles/page.scss");
+    const layout = read("styles/layout.scss");
+
+    expect(page).toContain('className="analysis-result-page__bottom-bar"');
+    expect(page).toContain('className="nutrition-disclaimer"');
+    expect(page).toContain('className="analysis-result-page__actions"');
+    expect(page).toContain('data-motion-layer="bottom"');
+    expect(styles).toContain(".analysis-result-page__bottom-bar");
+    expect(styles).toContain("position: fixed");
+    expect(styles).toContain(".analysis-result-page__bottom-bar .analysis-result-page__actions");
+    expect(layout).toContain("--analysis-result-bottom-bar-height");
+  });
+
   it("keeps replay development-only and free of recognition requests", () => {
     const page = read("pages/analysis-result/index.tsx");
     expect(page).toContain('process.env.NODE_ENV !== "production"');

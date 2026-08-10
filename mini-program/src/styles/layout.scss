@@ -39,8 +39,11 @@
 .page-layout--meal-records .page-layout__content {
   padding-bottom: calc($tabbar-height + $safe-area-bottom + $section-gap);
 }
+.page-layout--analysis-result {
+  --analysis-result-bottom-bar-height: 148px;
+}
 .page-layout--analysis-result .page-layout__content {
-  padding-bottom: calc($safe-area-bottom + $space-32);
+  padding-bottom: calc($safe-area-bottom + var(--analysis-result-bottom-bar-height) + $space-16);
 }
 .page-layout--portion-adjustment .page-layout__content {
   padding-bottom: calc($safe-area-bottom + $space-32);

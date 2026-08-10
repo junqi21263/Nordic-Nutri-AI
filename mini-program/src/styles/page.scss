@@ -6305,11 +6305,27 @@
   gap: $space-12;
   margin-top: $space-8;
 }
+.analysis-result-page__bottom-bar {
+  background: rgba($color-warm-white, 0.98);
+  border-top: 1px solid rgba($color-forest-green, 0.12);
+  bottom: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: $space-12;
+  left: 0;
+  padding: $space-12 $page-horizontal calc($space-12 + $safe-area-bottom);
+  position: fixed;
+  right: 0;
+  z-index: 20;
+}
 .analysis-result-page__actions {
   display: grid;
   gap: $space-12;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding-bottom: calc($safe-area-bottom + $space-16);
+}
+.analysis-result-page__bottom-bar .analysis-result-page__actions {
+  padding-bottom: 0;
 }
 .analysis-result-page__actions .app-button {
   font-size: $font-caption;
