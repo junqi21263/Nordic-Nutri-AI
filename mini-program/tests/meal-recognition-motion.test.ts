@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  getMealRecognitionMotionPhaseSchedule,
   getMealRecognitionMotionSchedule,
   mealRecognitionMotionConfig,
 } from "../src/features/scanner/meal-recognition-motion";
@@ -11,23 +12,35 @@ const read = (relativePath: string) => readFileSync(resolve(srcRoot, relativePat
 
 describe("meal recognition result reveal motion", () => {
   it("keeps the approved timing in one schedule", () => {
-    expect(mealRecognitionMotionConfig.completeAtMs).toBe(3200);
-    expect(mealRecognitionMotionConfig.foodStaggerMs).toBe(90);
+    expect(mealRecognitionMotionConfig.baseRevealAtMs).toBe(0);
+    expect(mealRecognitionMotionConfig.nutritionRevealAtMs).toBe(250);
+    expect(mealRecognitionMotionConfig.metricsCountAtMs).toBe(600);
+    expect(mealRecognitionMotionConfig.contentRevealAtMs).toBe(1400);
+    expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBe(2200);
+    expect(mealRecognitionMotionConfig.completeAtMs).toBe(2600);
+    expect(mealRecognitionMotionConfig.contentStaggerMs).toBe(80);
     expect(mealRecognitionMotionConfig.macroStaggerMs).toBe(60);
     expect(mealRecognitionMotionConfig.easing).toBe("cubic-bezier(.22, 1, .36, 1)");
   });
 
   it("derives stagger delays from the real food count", () => {
     const schedule = getMealRecognitionMotionSchedule(3);
-    expect(schedule.foodDelaysMs).toEqual([700, 790, 880]);
-    expect(schedule.macroCountDelaysMs).toEqual([1900, 1960, 2020]);
+    expect(schedule.ingredientDelaysMs).toEqual([0, 80, 160]);
+    expect(schedule.macroDelaysMs).toEqual([0, 60, 120]);
   });
 
   it("keeps controller and counter animation lightweight and cancellable", () => {
     const controller = read("hooks/useMealRecognitionMotion.ts");
     const counter = read("hooks/useCountUp.ts");
-    expect(controller).toContain('"imageReady"');
-    expect(controller).toContain('"actionReveal"');
+    expect(controller).toContain("getMealRecognitionMotionPhaseSchedule");
+    expect(getMealRecognitionMotionPhaseSchedule().map((entry) => entry.phase)).toEqual([
+      "baseReveal",
+      "nutritionReveal",
+      "metricsCount",
+      "contentReveal",
+      "bottomActionReveal",
+      "complete",
+    ]);
     expect(controller).toContain("clearTimeout");
     expect(counter).toContain("requestAnimationFrame");
     expect(counter).toContain("cancelAnimationFrame");

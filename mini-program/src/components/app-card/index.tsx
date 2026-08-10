@@ -8,6 +8,7 @@ export interface AppCardProps extends PropsWithChildren {
   className?: string;
   active?: boolean;
   flat?: boolean;
+  motionLayer?: "base" | "nutrition" | "content";
 }
 
 export function AppCard({
@@ -17,11 +18,13 @@ export function AppCard({
   className = "",
   active = false,
   flat = false,
+  motionLayer,
   children,
 }: AppCardProps) {
   return (
     <View
       className={`app-card app-card--${tone} ${active ? "app-card--active" : ""} ${flat ? "app-card--flat" : ""} ${className}`}
+      data-motion-layer={motionLayer}
     >
       {title ? <Text className="section-title__title">{title}</Text> : null}
       {subtitle ? <Text className="top-navigation__subtitle">{subtitle}</Text> : null}

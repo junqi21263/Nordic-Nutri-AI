@@ -1,6 +1,6 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
@@ -37,12 +37,11 @@ const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
 
 const phaseOrder: MealRecognitionMotionPhase[] = [
   "idle",
-  "imageReady",
-  "status",
-  "foodReveal",
+  "baseReveal",
   "nutritionReveal",
-  "nutritionCounting",
-  "actionReveal",
+  "metricsCount",
+  "contentReveal",
+  "bottomActionReveal",
   "complete",
 ];
 
@@ -119,7 +118,18 @@ export default function AnalysisResultPage() {
   const scanner = useScannerStore();
   const [revealOnMount] = useState(() => scanner.consumeResultRevealPending());
   const [replayKey, setReplayKey] = useState(0);
+  const isDev = process.env.NODE_ENV !== "production";
   const motion = useMealRecognitionMotion(revealOnMount || replayKey > 0, replayKey);
+  useEffect(() => {
+    if (!isDev) return;
+    const debugTarget = globalThis as typeof globalThis & {
+      __NORDIC_REPLAY_MEAL_REVEAL__?: () => void;
+    };
+    debugTarget.__NORDIC_REPLAY_MEAL_REVEAL__ = () => setReplayKey((value) => value + 1);
+    return () => {
+      delete debugTarget.__NORDIC_REPLAY_MEAL_REVEAL__;
+    };
+  }, [isDev]);
   const meal = analysisStore.analysis;
   const setMealType = (mealType: MealType) => {
     if (!analysisStore.analysis) return;
@@ -144,10 +154,13 @@ export default function AnalysisResultPage() {
   const adjusted = getAdjustedAnalysis(meal, 1);
   const motionSchedule = getMealRecognitionMotionSchedule(adjusted.items.length);
   const isRecognitionMotion = revealOnMount || replayKey > 0;
-  const isNutritionCounting = isRecognitionMotion && hasReachedPhase(motion.phase, "nutritionCounting");
-  const isFoodVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "foodReveal");
-  const isActionVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "actionReveal");
-  const isDev = process.env.NODE_ENV !== "production";
+  const isBaseVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "baseReveal");
+  const isNutritionVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "nutritionReveal");
+  const isMetricsCounting = !isRecognitionMotion || hasReachedPhase(motion.phase, "metricsCount");
+  const isContentVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "contentReveal");
+  const isBottomActionVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "bottomActionReveal");
+  const shouldAnimateMetrics = isRecognitionMotion && isMetricsCounting;
+  const shouldAnimateContentMetrics = isRecognitionMotion && isContentVisible;
   const save = async () => {
     const localMeal = {
       date: getLocalDateString(),
@@ -202,8 +215,12 @@ export default function AnalysisResultPage() {
         className="analysis-result-page"
         data-recognition-reveal={motion.isRevealing ? "true" : undefined}
         data-motion-phase={motion.isRevealing ? motion.phase : undefined}
+        data-base-revealed={motion.isRevealing && isBaseVisible ? "true" : undefined}
+        data-nutrition-revealed={motion.isRevealing && isNutritionVisible ? "true" : undefined}
+        data-content-revealed={motion.isRevealing && isContentVisible ? "true" : undefined}
+        data-bottom-revealed={motion.isRevealing && isBottomActionVisible ? "true" : undefined}
       >
-        <View className="analysis-result-page__header">
+        <View className="analysis-result-page__header" data-motion-layer="base">
           <View className="analysis-result-page__heading">
             <Text className="analysis-result-page__title">{evaluation}</Text>
             <Text className="analysis-result-page__subtitle">
@@ -214,18 +231,9 @@ export default function AnalysisResultPage() {
             <NordicIcon name="check" size={22} ariaLabel="分析完成" />
             <Text>AI 完成</Text>
           </View>
-          {isDev && (
-            <View
-              className="analysis-result-page__debug-replay"
-              ariaLabel="重播识别结果动画"
-              onClick={() => setReplayKey((value) => value + 1)}
-            >
-              <Text>重播动画</Text>
-            </View>
-          )}
         </View>
 
-        <AppCard tone="beige" className="analysis-result-page__summary">
+        <AppCard tone="beige" className="analysis-result-page__summary" motionLayer="base">
           <View
             className="analysis-result-page__summary-visual"
             ariaLabel="查看原始餐食照片"
@@ -289,13 +297,13 @@ export default function AnalysisResultPage() {
           </View>
         </AppCard>
 
-        <AppCard className="analysis-result-page__score">
+        <AppCard className="analysis-result-page__score" motionLayer="nutrition">
           <CircularProgress
             value={adjusted.score === "A" ? 92 : adjusted.score === "B" ? 76 : 58}
             total={100}
             label="餐点评分"
             tone="sage"
-            reveal={isRecognitionMotion ? isNutritionCounting : true}
+            reveal={isRecognitionMotion ? isMetricsCounting : true}
             revealDurationMs={mealRecognitionMotionConfig.countDurationMs}
             animateValue={isRecognitionMotion}
           />
@@ -305,7 +313,7 @@ export default function AnalysisResultPage() {
               className="analysis-result-page__score-kcal"
               target={adjusted.calories}
               suffix=" kcal"
-              enabled={isNutritionCounting}
+              enabled={shouldAnimateMetrics}
               holdAtZero={isRecognitionMotion}
             />
             <View className="analysis-result-page__macro-tags">
@@ -313,14 +321,14 @@ export default function AnalysisResultPage() {
                 className="nutrition-tag nutrition-tag--protein"
                 target={adjusted.protein}
                 suffix="g 蛋白质"
-                enabled={isNutritionCounting}
+                enabled={shouldAnimateMetrics}
                 holdAtZero={isRecognitionMotion}
               />
               <RecognitionCountedText
                 className="nutrition-tag nutrition-tag--carbs"
                 target={adjusted.carbs}
                 suffix="g 碳水"
-                enabled={isNutritionCounting}
+                enabled={shouldAnimateMetrics}
                 holdAtZero={isRecognitionMotion}
                 delayMs={mealRecognitionMotionConfig.macroStaggerMs}
               />
@@ -328,7 +336,7 @@ export default function AnalysisResultPage() {
                 className="nutrition-tag nutrition-tag--fat"
                 target={adjusted.fat}
                 suffix="g 脂肪"
-                enabled={isNutritionCounting}
+                enabled={shouldAnimateMetrics}
                 holdAtZero={isRecognitionMotion}
                 delayMs={mealRecognitionMotionConfig.macroStaggerMs * 2}
               />
@@ -336,16 +344,15 @@ export default function AnalysisResultPage() {
           </View>
         </AppCard>
 
-        <AppCard className="analysis-result-page__ingredients">
+        <AppCard className="analysis-result-page__ingredients" motionLayer="content">
           <Text className="analysis-result-page__section-title">识别食材</Text>
           {adjusted.items.map((item, index) => (
             <View
-              className={isFoodVisible ? "analysis-ingredient analysis-ingredient--revealed" : "analysis-ingredient"}
+              className={isContentVisible ? "analysis-ingredient analysis-ingredient--revealed" : "analysis-ingredient"}
               key={item.id}
               style={{
                 transitionDelay: `${
-                  (motionSchedule.foodDelaysMs[index] ?? mealRecognitionMotionConfig.foodAtMs) -
-                  mealRecognitionMotionConfig.foodAtMs
+                  motionSchedule.ingredientDelaysMs[index] ?? 0
                 }ms`,
               }}
             >
@@ -360,43 +367,44 @@ export default function AnalysisResultPage() {
               label="蛋白质"
               value={adjusted.protein}
               target={60}
-              enabled={isNutritionCounting}
+              enabled={shouldAnimateContentMetrics}
               holdAtZero={isRecognitionMotion}
-              delayMs={(motionSchedule.macroCountDelaysMs[0] ?? mealRecognitionMotionConfig.countAtMs) - mealRecognitionMotionConfig.countAtMs}
+              delayMs={motionSchedule.macroDelaysMs[0] ?? 0}
             />
             <RecognitionMacroProgress
               label="碳水"
               value={adjusted.carbs}
               target={90}
               tone="carbs"
-              enabled={isNutritionCounting}
+              enabled={shouldAnimateContentMetrics}
               holdAtZero={isRecognitionMotion}
-              delayMs={(motionSchedule.macroCountDelaysMs[1] ?? mealRecognitionMotionConfig.countAtMs) - mealRecognitionMotionConfig.countAtMs}
+              delayMs={motionSchedule.macroDelaysMs[1] ?? 0}
             />
             <RecognitionMacroProgress
               label="脂肪"
               value={adjusted.fat}
               target={25}
               tone="fat"
-              enabled={isNutritionCounting}
+              enabled={shouldAnimateContentMetrics}
               holdAtZero={isRecognitionMotion}
-              delayMs={(motionSchedule.macroCountDelaysMs[2] ?? mealRecognitionMotionConfig.countAtMs) - mealRecognitionMotionConfig.countAtMs}
+              delayMs={motionSchedule.macroDelaysMs[2] ?? 0}
             />
           </View>
         </AppCard>
 
         <AIInsightCard
+          motionLayer="content"
           content={meal.insight}
           actionLabel="查看饮食记录"
           onActionClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
         />
-        <Text className="nutrition-disclaimer">
+        <Text className="nutrition-disclaimer" data-motion-layer="bottom">
           营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
         </Text>
 
         <View
           className="analysis-result-page__actions"
-          data-motion-action={isActionVisible ? "revealed" : undefined}
+          data-motion-layer="bottom"
         >
           <AppButton
             variant="outline"

@@ -2,6 +2,8 @@ import { Text, View } from "@tarojs/components";
 import { NordicIcon } from "../nordic-icon";
 
 export interface AIInsightCardProps {
+  className?: string;
+  motionLayer?: "content";
   label?: string;
   headline?: string;
   content: string;
@@ -11,6 +13,8 @@ export interface AIInsightCardProps {
 }
 
 export function AIInsightCard({
+  className = "",
+  motionLayer,
   label = "NOVA AI 洞察",
   headline,
   content,
@@ -19,7 +23,7 @@ export function AIInsightCard({
   onActionClick,
 }: AIInsightCardProps) {
   return (
-    <View className="ai-insight">
+    <View className={`ai-insight ${className}`} data-motion-layer={motionLayer}>
       <View className="ai-insight__top">
         <View className="ai-insight__orb">
           <NordicIcon name="nova" size={18} ariaLabel="NOVA 营养洞察" />
