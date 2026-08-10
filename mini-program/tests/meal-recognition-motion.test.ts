@@ -132,7 +132,7 @@ describe("meal recognition result reveal motion", () => {
     const page = read("pages/analysis-result/index.tsx");
     const styles = read("styles/page.scss");
 
-    expect(page).toContain("const [ingredientsExpanded, setIngredientsExpanded] = useState(true);");
+    expect(page).toContain("const [ingredientsExpanded, setIngredientsExpanded] = useState(false);");
     expect(page).toMatch(/ingredientsExpanded\s*\?\s*adjusted\.items\.map/);
     expect(page).toContain('ariaLabel={ingredientsExpanded ? "收起识别食材" : "展开识别食材"}');
     expect(page).toContain('ingredientsExpanded ? "收起" : "展开"');
@@ -141,5 +141,13 @@ describe("meal recognition result reveal motion", () => {
     );
     expect(styles).toContain(".analysis-result-page__ingredients-heading");
     expect(styles).toContain(".analysis-result-page__ingredients-toggle");
+  });
+
+  it("keeps the NOVA insight mark legible on its light surface", () => {
+    const styles = read("styles/components.scss");
+
+    expect(styles).toContain(".ai-insight__orb");
+    expect(styles).toContain("background: rgba($color-sage, 0.5);");
+    expect(styles).toContain("color: $color-forest-green;");
   });
 });

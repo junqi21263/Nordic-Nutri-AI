@@ -666,9 +666,10 @@
 }
 .ai-insight__orb {
   align-items: center;
-  background: $color-forest-green;
+  background: rgba($color-sage, 0.5);
+  border: 1px solid rgba($color-forest-green, 0.12);
   border-radius: $radius-full;
-  color: $color-warm-white;
+  color: $color-forest-green;
   display: flex;
   height: 44px;
   justify-content: center;

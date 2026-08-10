@@ -128,7 +128,7 @@ export default function AnalysisResultPage() {
   );
   const [replayKey, setReplayKey] = useState(0);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
-  const [ingredientsExpanded, setIngredientsExpanded] = useState(true);
+  const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
   const isDev = process.env.NODE_ENV !== "production";
   const motion = useMealRecognitionMotion(revealOnMount || replayKey > 0, replayKey);
   const bottomAction = useBottomActionReveal(revealOnMount || replayKey > 0, replayKey, motion.phase);
