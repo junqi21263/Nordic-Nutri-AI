@@ -16,9 +16,9 @@ describe("meal recognition result reveal motion", () => {
     expect(mealRecognitionMotionConfig.nutritionRevealAtMs).toBe(250);
     expect(mealRecognitionMotionConfig.metricsCountAtMs).toBe(600);
     expect(mealRecognitionMotionConfig.contentRevealAtMs).toBe(1400);
-    expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBe(2200);
-    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(420);
-    expect(mealRecognitionMotionConfig.completeAtMs).toBe(2700);
+    expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBe(2400);
+    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(700);
+    expect(mealRecognitionMotionConfig.completeAtMs).toBe(3100);
     expect(mealRecognitionMotionConfig.contentStaggerMs).toBe(80);
     expect(mealRecognitionMotionConfig.macroStaggerMs).toBe(60);
     expect(mealRecognitionMotionConfig.easing).toBe("cubic-bezier(.22, 1, .36, 1)");
@@ -50,7 +50,8 @@ describe("meal recognition result reveal motion", () => {
   it("wires motion only to the true scanner-to-result transition", () => {
     const page = read("pages/analysis-result/index.tsx");
     const styles = read("styles/page.scss");
-    expect(page).toContain("consumeResultRevealPending");
+    expect(page).toContain("router.params.reveal");
+    expect(page).toContain("shouldPlayMealRecognitionReveal");
     expect(page).toContain("useMealRecognitionMotion");
     expect(page).toContain("data-recognition-reveal");
     expect(styles).toContain("data-recognition-reveal");
@@ -73,7 +74,7 @@ describe("meal recognition result reveal motion", () => {
     expect(styles).toContain("position: fixed");
     expect(styles).toContain(".analysis-result-page__bottom-bar .analysis-result-page__actions");
     expect(styles).toContain("transform: translateY(100%)");
-    expect(styles).toContain("opacity 420ms cubic-bezier(.22, 1, .36, 1)");
+    expect(styles).toContain("opacity 700ms cubic-bezier(.22, 1, .36, 1)");
     expect(layout).toContain("--analysis-result-bottom-bar-height");
   });
 

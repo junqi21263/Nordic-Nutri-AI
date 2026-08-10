@@ -1142,6 +1142,17 @@
 .toast--error {
   background: $color-error;
 }
+.toast--prominent {
+  border-radius: $radius-16;
+  font-size: $font-body;
+  font-weight: $font-weight-medium;
+  left: $space-32;
+  line-height: 1.5;
+  padding: $space-20 $space-24;
+  right: $space-32;
+  text-align: center;
+  top: 42%;
+}
 .modal-backdrop,
 .bottom-sheet-backdrop {
   align-items: flex-end;

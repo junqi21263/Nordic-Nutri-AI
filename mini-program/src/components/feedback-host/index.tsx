@@ -20,6 +20,6 @@ export function FeedbackHost() {
     return () => clearTimeout(timer);
   }, [toast, clear]);
 
-  if (hasNativeToastBridge() || !toast) return null;
-  return <Toast message={toast.message} tone={toast.tone} />;
+  if (!toast || (hasNativeToastBridge() && toast.presentation !== "prominent")) return null;
+  return <Toast message={toast.message} tone={toast.tone} presentation={toast.presentation} />;
 }

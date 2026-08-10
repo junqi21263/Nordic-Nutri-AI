@@ -9,9 +9,9 @@ export const mealRecognitionMotionConfig = {
   contentRevealDurationMs: 250,
   contentStaggerMs: 80,
   macroStaggerMs: 60,
-  bottomActionRevealAtMs: 2200,
-  bottomActionDurationMs: 420,
-  completeAtMs: 2700,
+  bottomActionRevealAtMs: 2400,
+  bottomActionDurationMs: 700,
+  completeAtMs: 3100,
   easing: "cubic-bezier(.22, 1, .36, 1)",
 } as const;
 
@@ -23,6 +23,15 @@ export type MealRecognitionMotionPhase =
   | "contentReveal"
   | "bottomActionReveal"
   | "complete";
+
+/**
+ * The route flag survives the scanner-to-result native page transition.
+ * The in-memory pending value remains as a compatibility fallback for an
+ * already-open result page and local replay paths.
+ */
+export function shouldPlayMealRecognitionReveal(revealParam?: string, pending = false) {
+  return revealParam === "1" || pending;
+}
 
 export function getMealRecognitionMotionPhaseSchedule(): Array<{
   atMs: number;

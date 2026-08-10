@@ -1,5 +1,5 @@
 import { Image, Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { AppButton } from "../../components/app-button";
@@ -15,7 +15,11 @@ import { PageLayout } from "../../layouts/page-layout";
 import type { MealType } from "../../features/meals/domain";
 import { mealTypeOptions } from "../../features/meals/meal-type";
 import { getAdjustedAnalysis } from "../../features/scanner/domain";
-import { getMealRecognitionMotionSchedule, mealRecognitionMotionConfig } from "../../features/scanner/meal-recognition-motion";
+import {
+  getMealRecognitionMotionSchedule,
+  mealRecognitionMotionConfig,
+  shouldPlayMealRecognitionReveal,
+} from "../../features/scanner/meal-recognition-motion";
 import { analyzeProductMeal, createProductMeal, getProductMeals } from "../../api/meal-data-api";
 import { toProductMealInput } from "../../features/meals/product-meal-input";
 import { useAnalysisStore } from "../../stores/analysis-store";
@@ -111,12 +115,15 @@ function RecognitionMacroProgress({
 }
 
 export default function AnalysisResultPage() {
+  const router = useRouter();
   const analysisStore = useAnalysisStore();
   const portion = usePortionDraftStore();
   const meals = useMealStore();
   const feedback = useFeedbackStore();
   const scanner = useScannerStore();
-  const [revealOnMount] = useState(() => scanner.consumeResultRevealPending());
+  const [revealOnMount] = useState(() =>
+    shouldPlayMealRecognitionReveal(router.params.reveal, scanner.consumeResultRevealPending()),
+  );
   const [replayKey, setReplayKey] = useState(0);
   const isDev = process.env.NODE_ENV !== "production";
   const motion = useMealRecognitionMotion(revealOnMount || replayKey > 0, replayKey);

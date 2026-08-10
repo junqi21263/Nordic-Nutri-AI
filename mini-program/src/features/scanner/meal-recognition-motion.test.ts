@@ -3,6 +3,7 @@ import {
   getMealRecognitionMotionPhaseSchedule,
   getMealRecognitionMotionSchedule,
   mealRecognitionMotionConfig,
+  shouldPlayMealRecognitionReveal,
 } from "./meal-recognition-motion";
 
 describe("meal recognition motion", () => {
@@ -42,5 +43,24 @@ describe("meal recognition motion", () => {
       "bottomActionReveal",
       "complete",
     ]);
+  });
+
+  it("uses the explicit result route flag when deciding whether to reveal", () => {
+    expect(shouldPlayMealRecognitionReveal("1", false)).toBe(true);
+    expect(shouldPlayMealRecognitionReveal(undefined, true)).toBe(true);
+    expect(shouldPlayMealRecognitionReveal(undefined, false)).toBe(false);
+  });
+
+  it("starts the fixed action bar only after the content metrics have finished", () => {
+    const finalContentMetricAtMs =
+      mealRecognitionMotionConfig.contentRevealAtMs +
+      mealRecognitionMotionConfig.macroStaggerMs * 2 +
+      mealRecognitionMotionConfig.countDurationMs;
+
+    expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBeGreaterThan(finalContentMetricAtMs);
+    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(700);
+    expect(mealRecognitionMotionConfig.completeAtMs).toBe(
+      mealRecognitionMotionConfig.bottomActionRevealAtMs + mealRecognitionMotionConfig.bottomActionDurationMs,
+    );
   });
 });

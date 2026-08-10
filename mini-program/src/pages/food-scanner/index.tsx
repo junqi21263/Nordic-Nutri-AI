@@ -51,12 +51,14 @@ export default function FoodScannerPage() {
   const feedback = useFeedbackStore();
   const [isScanning, setIsScanning] = useState(false);
   const [fallbackOpen, setFallbackOpen] = useState(false);
+  const [fallbackKind, setFallbackKind] = useState<"generic" | "daily_limit">("generic");
   const [fallbackMessage, setFallbackMessage] = useState("可检查相机、相册和网络权限；如果视觉服务尚未配置，可以先手动记录。");
   const [showScannerTip, setShowScannerTip] = useState(shouldShowScannerTip);
   const [visionRemaining, setVisionRemaining] = useState<number | null>(null);
   const isScanningRef = useRef(false);
   const suppressPreviewResetRef = useRef(false);
   const preview = scanner.capturedMeal ?? scanner.candidates[0] ?? null;
+  const visionQuotaExhausted = visionRemaining === 0;
 
   const clearPreviewDisplay = () => {
     scanner.setPreviewPath(null);
@@ -83,6 +85,24 @@ export default function FoodScannerPage() {
       .catch(() => undefined);
   }, []);
 
+  const refreshVisionUsage = async () => {
+    try {
+      const usage = await getProductAccountUsage();
+      setVisionRemaining(usage.vision.remaining);
+      return usage.vision.remaining;
+    } catch {
+      return null;
+    }
+  };
+
+  const showVisionQuotaToast = () => {
+    feedback.show({
+      message: "今日图片识别次数已用完，请明天再试或手动记录",
+      tone: "default",
+      presentation: "prominent",
+    });
+  };
+
   const analyzeCurrentPreview = async (previewPath: string) => {
     if (isScanningRef.current) return;
     isScanningRef.current = true;
@@ -93,7 +113,7 @@ export default function FoodScannerPage() {
       scanner.setCapturedMeal(meal);
       analysis.setAnalysis(meal);
       scanner.markResultRevealPending();
-      await Taro.navigateTo({ url: "/pages/analysis-result/index" });
+      await Taro.navigateTo({ url: "/pages/analysis-result/index?reveal=1" });
     } catch (error) {
       scanner.clearResultRevealPending();
       const errorName = error instanceof Error ? error.name : "";
@@ -101,7 +121,11 @@ export default function FoodScannerPage() {
       const isContentBlocked = errorName === "VISION_CONTENT_BLOCKED";
       const isNonFood = errorName === "VISION_NON_FOOD";
       console.error("[vision] analyzeProductImage failed:", error);
-      const userMessage = isNotConfigured
+      const visionRemainingAfterLimit = errorName === "RATE_LIMITED" ? await refreshVisionUsage() : null;
+      const isDailyLimitReached = visionRemainingAfterLimit === 0;
+      const userMessage = isDailyLimitReached
+        ? "今日图片识别次数已用完，请明天再试或手动记录。"
+        : isNotConfigured
         ? "图片识别服务尚未配置，可先手动记录。"
         : isContentBlocked
           ? "图片未通过安全审核，请更换后重试"
@@ -110,6 +134,7 @@ export default function FoodScannerPage() {
             : error instanceof Error
               ? error.message
               : "图片识别失败，请重新选择图片或手动记录。";
+      setFallbackKind(isDailyLimitReached ? "daily_limit" : "generic");
       setFallbackMessage(userMessage);
       feedback.show({
         message: isNotConfigured
@@ -126,6 +151,10 @@ export default function FoodScannerPage() {
 
   const chooseImage = async (source: "camera" | "album") => {
     if (isScanningRef.current) return;
+    if (visionQuotaExhausted) {
+      showVisionQuotaToast();
+      return;
+    }
     suppressPreviewResetRef.current = true;
     try {
       const result = await Taro.chooseMedia({
@@ -140,6 +169,7 @@ export default function FoodScannerPage() {
       assertImageWithinPickLimit(picked?.size);
       scanner.setPreviewPath(previewPath);
       scanner.setGalleryMode(source === "album");
+      setFallbackKind("generic");
       setFallbackOpen(false);
       // Any successful capture path completes step 2 — not only the tip CTA.
       dismissScannerTip();
@@ -160,6 +190,10 @@ export default function FoodScannerPage() {
   };
 
   const retryChooseImage = () => {
+    if (visionQuotaExhausted) {
+      showVisionQuotaToast();
+      return;
+    }
     setFallbackOpen(false);
     void chooseImage("album");
   };
@@ -192,7 +226,9 @@ export default function FoodScannerPage() {
         </View>
 
         {visionRemaining != null && visionRemaining <= 2 ? (
-          <Text className="usage-quota-tip">今日识别剩余 {visionRemaining} 次</Text>
+          <Text className="usage-quota-tip">
+            {visionQuotaExhausted ? "今日图片识别次数已用完，明日恢复" : `今日识别剩余 ${visionRemaining} 次`}
+          </Text>
         ) : null}
 
         {showScannerTip && !isScanning ? (
@@ -260,7 +296,7 @@ export default function FoodScannerPage() {
             <Text>手动记录</Text>
           </View>
           <View
-            className="scanner-capture"
+            className={`scanner-capture ${visionQuotaExhausted ? "scanner-capture--disabled" : ""}`}
             ariaLabel="拍摄并开始分析"
             onClick={() => chooseImage("camera")}
           >
@@ -269,7 +305,7 @@ export default function FoodScannerPage() {
             </View>
           </View>
           <View
-            className={`scanner-control ${scanner.galleryMode ? "scanner-control--active" : ""}`}
+            className={`scanner-control ${scanner.galleryMode ? "scanner-control--active" : ""} ${visionQuotaExhausted ? "scanner-control--disabled" : ""}`}
             ariaLabel="从图库选择图片"
             onClick={() => chooseImage("album")}
           >
@@ -278,8 +314,13 @@ export default function FoodScannerPage() {
           </View>
         </View>
         <View className="scanner-primary-action">
-          <AppButton size="large" disabled={isScanning} onClick={() => chooseImage("camera")}>
-            {isScanning ? "正在 AI 分析" : "拍摄并 AI 分析"}
+          <AppButton
+            size="large"
+            disabled={isScanning}
+            visualDisabled={visionQuotaExhausted}
+            onClick={() => void chooseImage("camera")}
+          >
+            {isScanning ? "正在 AI 分析" : visionQuotaExhausted ? "今日识别已用完" : "拍摄并 AI 分析"}
           </AppButton>
         </View>
         <Text className="scanner-upload-hint">{formatVisionUploadHint()}</Text>
@@ -291,17 +332,19 @@ export default function FoodScannerPage() {
       >
         <View className="scanner-fallback-sheet__content">
           <View className="scanner-fallback-sheet__header">
-            <Text>暂时无法打开图片</Text>
+            <Text>{fallbackKind === "daily_limit" ? "今日图片识别次数已用完" : "暂时无法打开图片"}</Text>
             <View ariaLabel="关闭" onClick={() => setFallbackOpen(false)}>
               <NordicIcon name="x" size={20} ariaLabel="关闭" />
             </View>
           </View>
           <Text className="scanner-fallback-sheet__copy">{fallbackMessage}</Text>
-          <AppButton size="medium" onClick={retryChooseImage}>
-            重新选择图片
-          </AppButton>
-          <AppButton variant="outline" size="medium" onClick={openManualMeal}>
-            手动记录
+          {fallbackKind === "daily_limit" ? null : (
+            <AppButton size="medium" onClick={retryChooseImage}>
+              重新选择图片
+            </AppButton>
+          )}
+          <AppButton variant={fallbackKind === "daily_limit" ? "primary" : "outline"} size="medium" onClick={openManualMeal}>
+            {fallbackKind === "daily_limit" ? "手动记录这一餐" : "手动记录"}
           </AppButton>
         </View>
       </BottomSheet>

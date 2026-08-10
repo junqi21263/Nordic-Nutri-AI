@@ -17,7 +17,7 @@ describe("MVP polish foundation", () => {
     });
     store.getState().show({ message: "已保存到本地记录", tone: "success" });
     expect(store.getState().toast).toMatchObject({ message: "已保存到本地记录", tone: "success" });
-    expect(presented).toEqual([{ message: "已保存到本地记录", tone: "success" }]);
+    expect(presented).toEqual([{ message: "已保存到本地记录", tone: "success", presentation: "native" }]);
     store.getState().clear();
     expect(store.getState().toast).toBeNull();
   });

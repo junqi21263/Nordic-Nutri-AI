@@ -6,6 +6,8 @@ export interface AppButtonProps extends PropsWithChildren {
   size?: "small" | "medium" | "large";
   loading?: boolean;
   disabled?: boolean;
+  /** Applies the disabled visual treatment while preserving a parent-managed click affordance. */
+  visualDisabled?: boolean;
   active?: boolean;
   ariaLabel?: string;
   onClick?: () => void;
@@ -17,13 +19,14 @@ export function AppButton({
   size = "medium",
   loading = false,
   disabled = false,
+  visualDisabled = false,
   active = false,
   ariaLabel,
   onClick,
 }: AppButtonProps) {
   return (
     <Button
-      className={`app-button app-button--${variant} app-button--${size} ${disabled ? "app-button--disabled" : ""} ${loading ? "app-button--loading" : ""} ${active ? "app-button--active" : ""}`}
+      className={`app-button app-button--${variant} app-button--${size} ${disabled || visualDisabled ? "app-button--disabled" : ""} ${loading ? "app-button--loading" : ""} ${active ? "app-button--active" : ""}`}
       disabled={disabled || loading}
       loading={loading}
       ariaLabel={ariaLabel}
