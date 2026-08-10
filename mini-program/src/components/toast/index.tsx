@@ -12,7 +12,7 @@ export function Toast({
 }) {
   return visible ? (
     <View className={`toast toast--${tone} toast--${presentation}`}>
-      <Text>●</Text>
+      {presentation === "prominent" ? null : <Text>●</Text>}
       <Text>{message}</Text>
     </View>
   ) : null;

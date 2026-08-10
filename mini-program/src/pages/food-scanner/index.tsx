@@ -7,6 +7,7 @@ import { AppButton } from "../../components/app-button";
 import { BottomSheet } from "../../components/bottom-sheet";
 import { FirstRunTip } from "../../components/first-run-tip";
 import { NordicIcon } from "../../components/nordic-icon";
+import { Toast } from "../../components/toast";
 import bowlImage from "../../assets/meal-bowl.svg";
 import oatsImage from "../../assets/meal-oats.svg";
 import salmonImage from "../../assets/meal-salmon.svg";
@@ -55,8 +56,10 @@ export default function FoodScannerPage() {
   const [fallbackMessage, setFallbackMessage] = useState("可检查相机、相册和网络权限；如果视觉服务尚未配置，可以先手动记录。");
   const [showScannerTip, setShowScannerTip] = useState(shouldShowScannerTip);
   const [visionRemaining, setVisionRemaining] = useState<number | null>(null);
+  const [quotaToastVisible, setQuotaToastVisible] = useState(false);
   const isScanningRef = useRef(false);
   const suppressPreviewResetRef = useRef(false);
+  const quotaToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preview = scanner.capturedMeal ?? scanner.candidates[0] ?? null;
   const visionQuotaExhausted = visionRemaining === 0;
 
@@ -85,6 +88,10 @@ export default function FoodScannerPage() {
       .catch(() => undefined);
   }, []);
 
+  useEffect(() => () => {
+    if (quotaToastTimerRef.current) clearTimeout(quotaToastTimerRef.current);
+  }, []);
+
   const refreshVisionUsage = async () => {
     try {
       const usage = await getProductAccountUsage();
@@ -96,11 +103,9 @@ export default function FoodScannerPage() {
   };
 
   const showVisionQuotaToast = () => {
-    feedback.show({
-      message: "今日图片识别次数已用完，请明天再试或手动记录",
-      tone: "default",
-      presentation: "prominent",
-    });
+    if (quotaToastTimerRef.current) clearTimeout(quotaToastTimerRef.current);
+    setQuotaToastVisible(true);
+    quotaToastTimerRef.current = setTimeout(() => setQuotaToastVisible(false), 2600);
   };
 
   const analyzeCurrentPreview = async (previewPath: string) => {
@@ -325,6 +330,12 @@ export default function FoodScannerPage() {
         </View>
         <Text className="scanner-upload-hint">{formatVisionUploadHint()}</Text>
       </View>
+      <Toast
+        message="今日图片识别次数已用完，请明天再试或手动记录"
+        tone="default"
+        presentation="prominent"
+        visible={quotaToastVisible}
+      />
       <BottomSheet
         open={fallbackOpen}
         className="scanner-fallback-sheet"

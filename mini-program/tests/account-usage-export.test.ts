@@ -33,7 +33,10 @@ describe("account usage HTTPS boundary", () => {
     expect(page).toContain("今日图片识别次数已用完");
     expect(page).toContain("请明天再试或手动记录");
     expect(page).toContain("visualDisabled={visionQuotaExhausted}");
-    expect(page).toContain('presentation: "prominent"');
+    expect(page).toContain('presentation="prominent"');
+    expect(page).toContain("quotaToastVisible");
+    expect(page).toContain("<Toast");
+    expect(page).toContain("message=\"今日图片识别次数已用完，请明天再试或手动记录\"");
     expect(page).toContain("RATE_LIMITED");
     expect(button).toContain("visualDisabled");
   });
