@@ -30,6 +30,7 @@ import { useFeedbackStore } from "../../stores/feedback-store";
 import { useScannerStore } from "../../stores/scanner-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { useCountUp } from "../../hooks/useCountUp";
+import { useBottomActionReveal } from "../../hooks/useBottomActionReveal";
 import { useMealRecognitionMotion, type MealRecognitionMotionPhase } from "../../hooks/useMealRecognitionMotion";
 
 const nowTime = () => {
@@ -127,6 +128,7 @@ export default function AnalysisResultPage() {
   const [replayKey, setReplayKey] = useState(0);
   const isDev = process.env.NODE_ENV !== "production";
   const motion = useMealRecognitionMotion(revealOnMount || replayKey > 0, replayKey);
+  const bottomAction = useBottomActionReveal(revealOnMount || replayKey > 0, replayKey);
   useEffect(() => {
     if (!isDev) return;
     const debugTarget = globalThis as typeof globalThis & {
@@ -165,7 +167,6 @@ export default function AnalysisResultPage() {
   const isNutritionVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "nutritionReveal");
   const isMetricsCounting = !isRecognitionMotion || hasReachedPhase(motion.phase, "metricsCount");
   const isContentVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "contentReveal");
-  const isBottomActionVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "bottomActionReveal");
   const shouldAnimateMetrics = isRecognitionMotion && isMetricsCounting;
   const shouldAnimateContentMetrics = isRecognitionMotion && isContentVisible;
   const save = async () => {
@@ -225,7 +226,7 @@ export default function AnalysisResultPage() {
         data-base-revealed={motion.isRevealing && isBaseVisible ? "true" : undefined}
         data-nutrition-revealed={motion.isRevealing && isNutritionVisible ? "true" : undefined}
         data-content-revealed={motion.isRevealing && isContentVisible ? "true" : undefined}
-        data-bottom-revealed={motion.isRevealing && isBottomActionVisible ? "true" : undefined}
+        data-bottom-revealed={bottomAction.phase === "entered" ? "true" : undefined}
       >
         <View className="analysis-result-page__header" data-motion-layer="base">
           <View className="analysis-result-page__heading">

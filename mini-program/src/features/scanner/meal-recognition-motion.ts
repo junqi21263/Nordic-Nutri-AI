@@ -9,9 +9,11 @@ export const mealRecognitionMotionConfig = {
   contentRevealDurationMs: 250,
   contentStaggerMs: 80,
   macroStaggerMs: 60,
-  bottomActionRevealAtMs: 2400,
-  bottomActionDurationMs: 700,
-  completeAtMs: 3100,
+  // The fixed action bar is intentionally the last visual beat: all existing
+  // content has settled before the bar gets its own native-rendered entrance.
+  bottomActionRevealAtMs: 3500,
+  bottomActionDurationMs: 320,
+  completeAtMs: 3820,
   easing: "cubic-bezier(.22, 1, .36, 1)",
 } as const;
 

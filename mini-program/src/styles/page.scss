@@ -6366,8 +6366,9 @@
   }
   [data-motion-layer="bottom"] {
     opacity: 0;
-    transform: translateY(100%);
-    transition: opacity 700ms cubic-bezier(.22, 1, .36, 1), transform 700ms cubic-bezier(.22, 1, .36, 1);
+    pointer-events: none;
+    transform: translate3d(0, 140%, 0);
+    transition: opacity 220ms ease-out, transform 320ms cubic-bezier(.22, 1, .36, 1);
   }
 }
 .analysis-result-page[data-base-revealed="true"] [data-motion-layer="base"],
@@ -6376,7 +6377,8 @@
 .analysis-result-page[data-content-revealed="true"] .analysis-ingredient--revealed,
 .analysis-result-page[data-bottom-revealed="true"] [data-motion-layer="bottom"] {
   opacity: 1;
-  transform: translateY(0);
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
 }
 [data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] [data-motion-layer="base"],
 [data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] .analysis-ingredient,

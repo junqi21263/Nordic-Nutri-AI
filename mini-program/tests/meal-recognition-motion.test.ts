@@ -16,9 +16,9 @@ describe("meal recognition result reveal motion", () => {
     expect(mealRecognitionMotionConfig.nutritionRevealAtMs).toBe(250);
     expect(mealRecognitionMotionConfig.metricsCountAtMs).toBe(600);
     expect(mealRecognitionMotionConfig.contentRevealAtMs).toBe(1400);
-    expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBe(2400);
-    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(700);
-    expect(mealRecognitionMotionConfig.completeAtMs).toBe(3100);
+    expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBe(3500);
+    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(320);
+    expect(mealRecognitionMotionConfig.completeAtMs).toBe(3820);
     expect(mealRecognitionMotionConfig.contentStaggerMs).toBe(80);
     expect(mealRecognitionMotionConfig.macroStaggerMs).toBe(60);
     expect(mealRecognitionMotionConfig.easing).toBe("cubic-bezier(.22, 1, .36, 1)");
@@ -66,16 +66,25 @@ describe("meal recognition result reveal motion", () => {
     const page = read("pages/analysis-result/index.tsx");
     const styles = read("styles/page.scss");
     const layout = read("styles/layout.scss");
+    const bottomReveal = read("hooks/useBottomActionReveal.ts");
 
     expect(page).toContain('className="analysis-result-page__bottom-bar"');
     expect(page).toContain('className="nutrition-disclaimer"');
     expect(page).toContain('className="analysis-result-page__actions"');
     expect(page).toContain('data-motion-layer="bottom"');
+    expect(page).toContain("useBottomActionReveal");
+    expect(page).toContain('data-bottom-revealed={bottomAction.phase === "entered" ? "true" : undefined}');
+    expect(bottomReveal).toContain("Taro.nextTick");
+    expect(bottomReveal).toContain("setTimeout");
+    expect(bottomReveal).toContain("bottomActionRevealAtMs");
+    expect(bottomReveal).toContain("clearTimeout");
     expect(styles).toContain(".analysis-result-page__bottom-bar");
     expect(styles).toContain("position: fixed");
     expect(styles).toContain(".analysis-result-page__bottom-bar .analysis-result-page__actions");
-    expect(styles).toContain("transform: translateY(100%)");
-    expect(styles).toContain("opacity 700ms cubic-bezier(.22, 1, .36, 1)");
+    expect(styles).toContain("transform: translate3d(0, 140%, 0)");
+    expect(styles).toContain("pointer-events: none");
+    expect(styles).toContain("pointer-events: auto");
+    expect(styles).toContain("transform 320ms cubic-bezier(.22, 1, .36, 1)");
     expect(layout).toContain("--analysis-result-bottom-bar-height");
   });
 

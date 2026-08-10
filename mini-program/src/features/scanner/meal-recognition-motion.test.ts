@@ -58,7 +58,7 @@ describe("meal recognition motion", () => {
       mealRecognitionMotionConfig.countDurationMs;
 
     expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBeGreaterThan(finalContentMetricAtMs);
-    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(700);
+    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(320);
     expect(mealRecognitionMotionConfig.completeAtMs).toBe(
       mealRecognitionMotionConfig.bottomActionRevealAtMs + mealRecognitionMotionConfig.bottomActionDurationMs,
     );
