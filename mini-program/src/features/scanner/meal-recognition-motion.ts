@@ -12,7 +12,10 @@ export const mealRecognitionMotionConfig = {
   // The fixed action bar is intentionally the last visual beat: all existing
   // content has settled before the bar gets its own native-rendered entrance.
   bottomActionRevealAtMs: 3500,
-  bottomActionDurationMs: 320,
+  // This independent native timing is intentionally shorter than the page
+  // phase schedule, so the fixed compositor layer enters during metric motion.
+  bottomActionNativeRevealAtMs: 860,
+  bottomActionDurationMs: 230,
   completeAtMs: 3820,
   easing: "cubic-bezier(.22, 1, .36, 1)",
 } as const;

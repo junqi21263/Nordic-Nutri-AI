@@ -6365,17 +6365,16 @@
     transition: opacity 250ms cubic-bezier(.22, 1, .36, 1), transform 250ms cubic-bezier(.22, 1, .36, 1);
   }
   [data-motion-layer="bottom"] {
-    opacity: 0;
-    pointer-events: none;
-    transform: translate3d(0, 140%, 0);
-    transition: opacity 220ms ease-out, transform 320ms cubic-bezier(.22, 1, .36, 1);
+    // The fixed bar owns its native Taro animation. Keeping this layer free of
+    // CSS transforms prevents WeChat from composing a stale fixed-layer frame.
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 .analysis-result-page[data-base-revealed="true"] [data-motion-layer="base"],
 .analysis-result-page[data-nutrition-revealed="true"] [data-motion-layer="nutrition"],
 .analysis-result-page[data-content-revealed="true"] [data-motion-layer="content"],
-.analysis-result-page[data-content-revealed="true"] .analysis-ingredient--revealed,
-.analysis-result-page[data-bottom-revealed="true"] [data-motion-layer="bottom"] {
+.analysis-result-page[data-content-revealed="true"] .analysis-ingredient--revealed {
   opacity: 1;
   pointer-events: auto;
   transform: translate3d(0, 0, 0);
@@ -6383,8 +6382,7 @@
 [data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] [data-motion-layer="base"],
 [data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] .analysis-ingredient,
 [data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] [data-motion-layer="nutrition"],
-[data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] [data-motion-layer="content"],
-[data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] [data-motion-layer="bottom"] {
+[data-reduced-motion="true"] .analysis-result-page[data-recognition-reveal="true"] [data-motion-layer="content"] {
   opacity: 1;
   transform: none;
   transition: none;

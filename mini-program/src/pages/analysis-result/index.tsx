@@ -128,7 +128,7 @@ export default function AnalysisResultPage() {
   const [replayKey, setReplayKey] = useState(0);
   const isDev = process.env.NODE_ENV !== "production";
   const motion = useMealRecognitionMotion(revealOnMount || replayKey > 0, replayKey);
-  const bottomAction = useBottomActionReveal(revealOnMount || replayKey > 0, replayKey);
+  const bottomAction = useBottomActionReveal(revealOnMount || replayKey > 0, replayKey, motion.phase);
   useEffect(() => {
     if (!isDev) return;
     const debugTarget = globalThis as typeof globalThis & {
@@ -406,7 +406,12 @@ export default function AnalysisResultPage() {
           actionLabel="查看饮食记录"
           onActionClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
         />
-        <View className="analysis-result-page__bottom-bar" data-motion-layer="bottom">
+        <View
+          id="meal-bottom-action"
+          className="analysis-result-page__bottom-bar"
+          data-motion-layer="bottom"
+          animation={bottomAction.animation}
+        >
           <Text className="nutrition-disclaimer">
             营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
           </Text>

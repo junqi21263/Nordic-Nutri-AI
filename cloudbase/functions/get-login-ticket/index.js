@@ -87,6 +87,15 @@ const MAX_BODY_BYTES = 4096;
 // ~4MB decoded image ≈ ~5.4MB base64 + JSON envelope.
 const MAX_VISION_BODY_BYTES = 6 * 1024 * 1024;
 const VISION_DAILY_LIMIT = 10;
+// Temporary animation-QA mode. The usual daily cap can be restored without a
+// code change by setting VISION_DAILY_LIMIT_ENABLED=true in the function env.
+// A high guard remains so usage is still tracked and a faulty client cannot
+// create an unbounded counter in a single day.
+const VISION_DAILY_LIMIT_ENABLED = process.env.VISION_DAILY_LIMIT_ENABLED === "true";
+const VISION_UNLIMITED_TESTING_LIMIT = 1_000_000;
+const VISION_EFFECTIVE_DAILY_LIMIT = VISION_DAILY_LIMIT_ENABLED
+  ? VISION_DAILY_LIMIT
+  : VISION_UNLIMITED_TESTING_LIMIT;
 const VISION_BURST_LIMIT = 3;
 const VISION_DAILY_WINDOW_SECONDS = 86400;
 const VISION_BURST_WINDOW_SECONDS = 600;
@@ -335,7 +344,7 @@ function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = nu
       featureLabel: "食物识别",
       provider: vision?.provider || (env.QWEN_API_KEY || env.DASHSCOPE_API_KEY ? "qwen" : "vita"),
       model: vision?.model || env.QWEN_VL_FLASH_MODEL || env.VITA_MODEL || "qwen3-vl-flash",
-      dailyLimit: VISION_DAILY_LIMIT,
+      dailyLimit: VISION_EFFECTIVE_DAILY_LIMIT,
       burstLimit: VISION_BURST_LIMIT,
       burstWindowSeconds: VISION_BURST_WINDOW_SECONDS,
     },
@@ -1906,7 +1915,7 @@ function createHttpServer({ service }) {
             models: catalog,
             modelBoard,
             limits: {
-              visionDaily: VISION_DAILY_LIMIT,
+              visionDaily: VISION_EFFECTIVE_DAILY_LIMIT,
               visionBurst: VISION_BURST_LIMIT,
               visionBurstWindowSeconds: VISION_BURST_WINDOW_SECONDS,
               coachDaily: COACH_DAILY_MESSAGE_LIMIT,
@@ -2735,10 +2744,12 @@ function createHttpServer({ service }) {
       const startedAt = Date.now();
       try {
         if (service.operationGuard?.consumeQuota) {
-          await service.operationGuard.consumeQuota(session.sub, "vision_analysis_daily", {
-            limit: VISION_DAILY_LIMIT,
-            windowSeconds: VISION_DAILY_WINDOW_SECONDS,
-          });
+          if (VISION_DAILY_LIMIT_ENABLED) {
+            await service.operationGuard.consumeQuota(session.sub, "vision_analysis_daily", {
+              limit: VISION_DAILY_LIMIT,
+              windowSeconds: VISION_DAILY_WINDOW_SECONDS,
+            });
+          }
           await service.operationGuard.consumeQuota(session.sub, "vision_analysis_burst", {
             limit: VISION_BURST_LIMIT,
             windowSeconds: VISION_BURST_WINDOW_SECONDS,
@@ -2838,12 +2849,12 @@ function createHttpServer({ service }) {
             windowSeconds: VISION_DAILY_WINDOW_SECONDS,
           });
         }
-        const vision = service.operationGuard?.getQuotaUsage
+        const vision = VISION_DAILY_LIMIT_ENABLED && service.operationGuard?.getQuotaUsage
           ? await service.operationGuard.getQuotaUsage(session.sub, "vision_analysis_daily", {
             limit: VISION_DAILY_LIMIT,
             windowSeconds: VISION_DAILY_WINDOW_SECONDS,
           })
-          : { used: 0, limit: VISION_DAILY_LIMIT, remaining: VISION_DAILY_LIMIT };
+          : { used: 0, limit: VISION_EFFECTIVE_DAILY_LIMIT, remaining: VISION_EFFECTIVE_DAILY_LIMIT };
         const deepseek = typeof service.deepseekBudget?.getUsage === "function"
           ? await service.deepseekBudget.getUsage(session.sub)
           : null;

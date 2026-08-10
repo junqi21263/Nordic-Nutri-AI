@@ -51,16 +51,10 @@ describe("meal recognition motion", () => {
     expect(shouldPlayMealRecognitionReveal(undefined, false)).toBe(false);
   });
 
-  it("starts the fixed action bar only after the content metrics have finished", () => {
-    const finalContentMetricAtMs =
-      mealRecognitionMotionConfig.contentRevealAtMs +
-      mealRecognitionMotionConfig.macroStaggerMs * 2 +
-      mealRecognitionMotionConfig.countDurationMs;
-
-    expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBeGreaterThan(finalContentMetricAtMs);
-    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(320);
-    expect(mealRecognitionMotionConfig.completeAtMs).toBe(
-      mealRecognitionMotionConfig.bottomActionRevealAtMs + mealRecognitionMotionConfig.bottomActionDurationMs,
-    );
+  it("starts the fixed action bar with its own native timing during the final metric beat", () => {
+    expect(mealRecognitionMotionConfig.bottomActionNativeRevealAtMs).toBeGreaterThanOrEqual(800);
+    expect(mealRecognitionMotionConfig.bottomActionNativeRevealAtMs).toBeLessThanOrEqual(900);
+    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBeGreaterThanOrEqual(220);
+    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBeLessThanOrEqual(240);
   });
 });

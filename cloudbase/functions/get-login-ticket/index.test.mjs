@@ -837,6 +837,34 @@ test("accepts authenticated visual analysis without trusting a client user id", 
   assert.equal(calls[0].userId, "user-1");
 });
 
+test("skips the daily vision quota store during temporary animation QA", async () => {
+  const quotaOperations = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      vision: { analyzeImage: async () => ({ mealName: "午餐" }) },
+      operationGuard: {
+        consumeQuota: async (_userId, operation) => {
+          quotaOperations.push(operation);
+          if (operation === "vision_analysis_daily") throw new Error("daily quota store must not be called");
+          return { used: 1, limit: 3, remaining: 2 };
+        },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/vision-analysis`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({ imageBase64: "AA==" }),
+    });
+    assert.equal(response.status, 200);
+  });
+
+  assert.deepEqual(quotaOperations, ["vision_analysis_burst"]);
+});
+
 test("serves food categories and tags to authenticated users", async () => {
   const server = createHttpServer({
     service: {

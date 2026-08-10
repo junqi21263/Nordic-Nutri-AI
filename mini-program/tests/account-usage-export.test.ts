@@ -41,6 +41,18 @@ describe("account usage HTTPS boundary", () => {
     expect(button).toContain("visualDisabled");
   });
 
+  it("temporarily keeps scanner image recognition available after the former daily cap", () => {
+    const scanner = readFileSync(resolve(sourceRoot, "features/scanner/vision-quota.ts"), "utf8");
+    const page = readFileSync(resolve(sourceRoot, "pages/food-scanner/index.tsx"), "utf8");
+    const api = readFileSync(resolve(sourceRoot, "../../cloudbase/functions/get-login-ticket/index.js"), "utf8");
+
+    expect(scanner).toContain("visionDailyQuotaEnforced = false");
+    expect(scanner).toContain("visionDailyQuotaEnforced && remaining === 0");
+    expect(page).toContain("isVisionQuotaExhausted");
+    expect(api).toContain("VISION_DAILY_LIMIT_ENABLED");
+    expect(api).toContain("VISION_UNLIMITED_TESTING_LIMIT");
+  });
+
   it("shows low coach quota near the composer", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/coach/index.tsx"), "utf8");
 

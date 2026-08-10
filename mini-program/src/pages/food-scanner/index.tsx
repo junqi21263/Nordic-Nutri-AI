@@ -12,6 +12,7 @@ import bowlImage from "../../assets/meal-bowl.svg";
 import oatsImage from "../../assets/meal-oats.svg";
 import salmonImage from "../../assets/meal-salmon.svg";
 import { assertImageWithinPickLimit, formatVisionUploadHint } from "../../features/media/image-upload-limits";
+import { isVisionQuotaExhausted, visionDailyQuotaEnforced } from "../../features/scanner/vision-quota";
 import {
   hasSeenFirstRunTip,
   markFirstRunTipSeen,
@@ -61,7 +62,7 @@ export default function FoodScannerPage() {
   const suppressPreviewResetRef = useRef(false);
   const quotaToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preview = scanner.capturedMeal ?? scanner.candidates[0] ?? null;
-  const visionQuotaExhausted = visionRemaining === 0;
+  const visionQuotaExhausted = isVisionQuotaExhausted(visionRemaining);
 
   const clearPreviewDisplay = () => {
     scanner.setPreviewPath(null);
@@ -127,7 +128,7 @@ export default function FoodScannerPage() {
       const isNonFood = errorName === "VISION_NON_FOOD";
       console.error("[vision] analyzeProductImage failed:", error);
       const visionRemainingAfterLimit = errorName === "RATE_LIMITED" ? await refreshVisionUsage() : null;
-      const isDailyLimitReached = visionRemainingAfterLimit === 0;
+      const isDailyLimitReached = isVisionQuotaExhausted(visionRemainingAfterLimit);
       const userMessage = isDailyLimitReached
         ? "今日图片识别次数已用完，请明天再试或手动记录。"
         : isNotConfigured
@@ -230,7 +231,7 @@ export default function FoodScannerPage() {
           </View>
         </View>
 
-        {visionRemaining != null && visionRemaining <= 2 ? (
+        {visionDailyQuotaEnforced && visionRemaining != null && visionRemaining <= 2 ? (
           <Text className="usage-quota-tip">
             {visionQuotaExhausted ? "今日图片识别次数已用完，明日恢复" : `今日识别剩余 ${visionRemaining} 次`}
           </Text>

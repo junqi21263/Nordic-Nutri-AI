@@ -16,8 +16,8 @@ describe("meal recognition result reveal motion", () => {
     expect(mealRecognitionMotionConfig.nutritionRevealAtMs).toBe(250);
     expect(mealRecognitionMotionConfig.metricsCountAtMs).toBe(600);
     expect(mealRecognitionMotionConfig.contentRevealAtMs).toBe(1400);
-    expect(mealRecognitionMotionConfig.bottomActionRevealAtMs).toBe(3500);
-    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(320);
+    expect(mealRecognitionMotionConfig.bottomActionNativeRevealAtMs).toBe(860);
+    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(230);
     expect(mealRecognitionMotionConfig.completeAtMs).toBe(3820);
     expect(mealRecognitionMotionConfig.contentStaggerMs).toBe(80);
     expect(mealRecognitionMotionConfig.macroStaggerMs).toBe(60);
@@ -68,23 +68,31 @@ describe("meal recognition result reveal motion", () => {
     const layout = read("styles/layout.scss");
     const bottomReveal = read("hooks/useBottomActionReveal.ts");
 
+    expect(page).toContain('id="meal-bottom-action"');
     expect(page).toContain('className="analysis-result-page__bottom-bar"');
     expect(page).toContain('className="nutrition-disclaimer"');
     expect(page).toContain('className="analysis-result-page__actions"');
     expect(page).toContain('data-motion-layer="bottom"');
     expect(page).toContain("useBottomActionReveal");
+    expect(page).toContain('animation={bottomAction.animation}');
     expect(page).toContain('data-bottom-revealed={bottomAction.phase === "entered" ? "true" : undefined}');
+    expect(bottomReveal).toContain("Taro.createAnimation");
+    expect(bottomReveal).toContain("createSelectorQuery");
+    expect(bottomReveal).toContain("meal-bottom-action");
+    expect(bottomReveal).toContain("boundingClientRect");
     expect(bottomReveal).toContain("Taro.nextTick");
     expect(bottomReveal).toContain("setTimeout");
-    expect(bottomReveal).toContain("bottomActionRevealAtMs");
+    expect(bottomReveal).toContain("bottomActionNativeRevealAtMs");
     expect(bottomReveal).toContain("clearTimeout");
+    expect(bottomReveal).toContain("[BottomReveal]");
+    expect(bottomReveal).toContain('"initial hidden applied"');
+    expect(bottomReveal).toContain('"initial paint complete"');
+    expect(bottomReveal).toContain('"enter start"');
+    expect(bottomReveal).toContain('"enter end"');
     expect(styles).toContain(".analysis-result-page__bottom-bar");
     expect(styles).toContain("position: fixed");
     expect(styles).toContain(".analysis-result-page__bottom-bar .analysis-result-page__actions");
-    expect(styles).toContain("transform: translate3d(0, 140%, 0)");
-    expect(styles).toContain("pointer-events: none");
-    expect(styles).toContain("pointer-events: auto");
-    expect(styles).toContain("transform 320ms cubic-bezier(.22, 1, .36, 1)");
+    expect(styles).not.toContain("transform: translate3d(0, 140%, 0)");
     expect(layout).toContain("--analysis-result-bottom-bar-height");
   });
 
