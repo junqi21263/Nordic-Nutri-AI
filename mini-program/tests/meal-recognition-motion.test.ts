@@ -17,7 +17,13 @@ describe("meal recognition result reveal motion", () => {
     expect(mealRecognitionMotionConfig.metricsCountAtMs).toBe(600);
     expect(mealRecognitionMotionConfig.contentRevealAtMs).toBe(1400);
     expect(mealRecognitionMotionConfig.bottomActionNativeRevealAtMs).toBe(860);
-    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBe(230);
+    expect(mealRecognitionMotionConfig.bottomActionShellDurationMs).toBe(390);
+    expect(mealRecognitionMotionConfig.bottomActionShellPauseMs).toBe(120);
+    expect(mealRecognitionMotionConfig.bottomActionDisclaimerDurationMs).toBe(300);
+    expect(mealRecognitionMotionConfig.bottomActionAdjustStartMs).toBe(790);
+    expect(mealRecognitionMotionConfig.bottomActionAdjustDurationMs).toBe(320);
+    expect(mealRecognitionMotionConfig.bottomActionSaveStartMs).toBe(1010);
+    expect(mealRecognitionMotionConfig.bottomActionSaveDurationMs).toBe(360);
     expect(mealRecognitionMotionConfig.completeAtMs).toBe(3820);
     expect(mealRecognitionMotionConfig.contentStaggerMs).toBe(80);
     expect(mealRecognitionMotionConfig.macroStaggerMs).toBe(60);
@@ -75,7 +81,10 @@ describe("meal recognition result reveal motion", () => {
     expect(page).toContain('data-motion-layer="bottom"');
     expect(page).toContain("useBottomActionReveal");
     expect(page).toContain('animation={bottomAction.animation}');
-    expect(page).toContain('data-bottom-revealed={bottomAction.phase === "entered" ? "true" : undefined}');
+    expect(page).toContain('animation={bottomAction.disclaimerAnimation}');
+    expect(page).toContain('animation={bottomAction.adjustButtonAnimation}');
+    expect(page).toContain('animation={bottomAction.saveButtonAnimation}');
+    expect(page).toContain('data-bottom-revealed={bottomAction.phase === "complete" ? "true" : undefined}');
     expect(bottomReveal).toContain("Taro.createAnimation");
     expect(bottomReveal).toContain("createSelectorQuery");
     expect(bottomReveal).toContain("meal-bottom-action");
@@ -89,6 +98,10 @@ describe("meal recognition result reveal motion", () => {
     expect(bottomReveal).toContain('"initial paint complete"');
     expect(bottomReveal).toContain('"enter start"');
     expect(bottomReveal).toContain('"enter end"');
+    expect(bottomReveal).toContain("playBottomActionSequence");
+    expect(bottomReveal).toContain("bottomActionShellPauseMs");
+    expect(bottomReveal).toContain("bottomActionAdjustStartMs");
+    expect(bottomReveal).toContain("bottomActionSaveStartMs");
     expect(styles).toContain(".analysis-result-page__bottom-bar");
     expect(styles).toContain("position: fixed");
     expect(styles).toContain(".analysis-result-page__bottom-bar .analysis-result-page__actions");

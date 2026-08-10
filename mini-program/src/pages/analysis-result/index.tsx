@@ -226,7 +226,7 @@ export default function AnalysisResultPage() {
         data-base-revealed={motion.isRevealing && isBaseVisible ? "true" : undefined}
         data-nutrition-revealed={motion.isRevealing && isNutritionVisible ? "true" : undefined}
         data-content-revealed={motion.isRevealing && isContentVisible ? "true" : undefined}
-        data-bottom-revealed={bottomAction.phase === "entered" ? "true" : undefined}
+        data-bottom-revealed={bottomAction.phase === "complete" ? "true" : undefined}
       >
         <View className="analysis-result-page__header" data-motion-layer="base">
           <View className="analysis-result-page__heading">
@@ -412,23 +412,30 @@ export default function AnalysisResultPage() {
           data-motion-layer="bottom"
           animation={bottomAction.animation}
         >
-          <Text className="nutrition-disclaimer">
-            营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
-          </Text>
+          <View animation={bottomAction.disclaimerAnimation}>
+            <Text className="nutrition-disclaimer">
+              营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
+            </Text>
+          </View>
           <View className="analysis-result-page__actions">
-            <AppButton
-              variant="outline"
-              size="large"
-              onClick={() => {
-                portion.start(meal);
-                Taro.navigateTo({ url: "/pages/portion-adjustment/index" });
-              }}
-            >
-              调整份量
-            </AppButton>
-            <AppButton size="large" onClick={() => void save()}>
-              保存本餐
-            </AppButton>
+            <View className="analysis-result-page__action-motion" animation={bottomAction.adjustButtonAnimation}>
+              <AppButton
+                variant="outline"
+                size="large"
+                disabled={!bottomAction.isAdjustInteractive}
+                onClick={() => {
+                  portion.start(meal);
+                  Taro.navigateTo({ url: "/pages/portion-adjustment/index" });
+                }}
+              >
+                调整份量
+              </AppButton>
+            </View>
+            <View className="analysis-result-page__action-motion" animation={bottomAction.saveButtonAnimation}>
+              <AppButton size="large" disabled={!bottomAction.isSaveInteractive} onClick={() => void save()}>
+                保存本餐
+              </AppButton>
+            </View>
           </View>
         </View>
       </View>

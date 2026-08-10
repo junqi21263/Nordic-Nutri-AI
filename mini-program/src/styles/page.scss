@@ -6331,6 +6331,9 @@
 .analysis-result-page__bottom-bar .analysis-result-page__actions {
   padding-bottom: 0;
 }
+.analysis-result-page__action-motion {
+  min-width: 0;
+}
 .analysis-result-page__actions .app-button {
   font-size: $font-caption;
   min-width: 0;

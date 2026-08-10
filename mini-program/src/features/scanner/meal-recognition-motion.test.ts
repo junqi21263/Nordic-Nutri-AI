@@ -54,7 +54,14 @@ describe("meal recognition motion", () => {
   it("starts the fixed action bar with its own native timing during the final metric beat", () => {
     expect(mealRecognitionMotionConfig.bottomActionNativeRevealAtMs).toBeGreaterThanOrEqual(800);
     expect(mealRecognitionMotionConfig.bottomActionNativeRevealAtMs).toBeLessThanOrEqual(900);
-    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBeGreaterThanOrEqual(220);
-    expect(mealRecognitionMotionConfig.bottomActionDurationMs).toBeLessThanOrEqual(240);
+    expect(mealRecognitionMotionConfig.bottomActionShellDurationMs).toBe(390);
+    expect(mealRecognitionMotionConfig.bottomActionShellPauseMs).toBeGreaterThanOrEqual(100);
+    expect(mealRecognitionMotionConfig.bottomActionShellPauseMs).toBeLessThanOrEqual(140);
+    expect(mealRecognitionMotionConfig.bottomActionAdjustStartMs).toBeGreaterThan(
+      mealRecognitionMotionConfig.bottomActionShellDurationMs,
+    );
+    expect(mealRecognitionMotionConfig.bottomActionSaveStartMs).toBeGreaterThan(
+      mealRecognitionMotionConfig.bottomActionAdjustStartMs,
+    );
   });
 });

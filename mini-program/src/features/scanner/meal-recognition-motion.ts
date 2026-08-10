@@ -15,7 +15,14 @@ export const mealRecognitionMotionConfig = {
   // This independent native timing is intentionally shorter than the page
   // phase schedule, so the fixed compositor layer enters during metric motion.
   bottomActionNativeRevealAtMs: 860,
-  bottomActionDurationMs: 230,
+  bottomActionShellDurationMs: 390,
+  bottomActionShellPauseMs: 120,
+  bottomActionDisclaimerDurationMs: 300,
+  bottomActionAdjustStartMs: 790,
+  bottomActionAdjustDurationMs: 320,
+  bottomActionSaveStartMs: 1010,
+  bottomActionSaveDurationMs: 360,
+  bottomActionSequenceDurationMs: 1370,
   completeAtMs: 3820,
   easing: "cubic-bezier(.22, 1, .36, 1)",
 } as const;
