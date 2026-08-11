@@ -48,6 +48,13 @@ test("validates runtime configuration without constructing database-dependent se
   });
 });
 
+test("reports only missing runtime configuration names", () => {
+  assert.throws(
+    () => readRuntimeConfig({ WX_APPID: "wx-app", WX_SECRET: "wx-secret" }),
+    /TCB_ENV, IDENTITY_HASH_PEPPER, CLOUDBASE_APIKEY, APP_SESSION_SECRET/,
+  );
+});
+
 test("assembles every runtime service after the RDB client is available", () => {
   const db = createRuntimeDb();
   const service = createRuntimeService({
@@ -65,6 +72,23 @@ test("assembles every runtime service after the RDB client is available", () => 
   for (const capability of ["data", "meals", "insights", "coach", "feedback"]) assert.ok(service[capability]);
   assert.equal(service.vision, null);
   assert.equal(service.foodImageDispatchSecret, "");
+});
+
+test("keeps the login runtime available when optional Node SDK initialization fails", () => {
+  const db = createRuntimeDb();
+  assert.doesNotThrow(() => createRuntimeService({
+    WX_APPID: "wx-app",
+    WX_SECRET: "wx-secret",
+    TCB_ENV: "env-id",
+    IDENTITY_HASH_PEPPER: "identity-pepper",
+    CLOUDBASE_APIKEY: "cloudbase-key",
+    APP_SESSION_SECRET: "session-secret",
+    HY_IMAGE_WORKER_ENDPOINT: "https://worker.example.com/generate",
+    AI_WORKER_SHARED_SECRET: "worker-secret",
+  }, {
+    cloudbaseSdk: { init: () => ({ rdb: () => db }) },
+    cloudbaseNodeSdk: { init: () => { throw new Error("node runtime unavailable"); } },
+  }));
 });
 
 test("uses the existing worker secret only as a first-rollout fallback for dispatch", () => {
@@ -837,7 +861,7 @@ test("accepts authenticated visual analysis without trusting a client user id", 
   assert.equal(calls[0].userId, "user-1");
 });
 
-test("skips the daily vision quota store during temporary animation QA", async () => {
+test("consumes the daily and burst vision quota before analysis", async () => {
   const quotaOperations = [];
   const server = createHttpServer({
     service: {
@@ -846,7 +870,6 @@ test("skips the daily vision quota store during temporary animation QA", async (
       operationGuard: {
         consumeQuota: async (_userId, operation) => {
           quotaOperations.push(operation);
-          if (operation === "vision_analysis_daily") throw new Error("daily quota store must not be called");
           return { used: 1, limit: 3, remaining: 2 };
         },
       },
@@ -862,7 +885,7 @@ test("skips the daily vision quota store during temporary animation QA", async (
     assert.equal(response.status, 200);
   });
 
-  assert.deepEqual(quotaOperations, ["vision_analysis_burst"]);
+  assert.deepEqual(quotaOperations, ["vision_analysis_daily", "vision_analysis_burst"]);
 });
 
 test("serves food categories and tags to authenticated users", async () => {

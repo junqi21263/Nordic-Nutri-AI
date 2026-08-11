@@ -4,13 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   getProductCoachMessages,
   getProductCoachBrief,
-  getProductCoachDailyBrief,
   getProductCoachDailyTip,
   restartProductCoachConversation,
   sendProductCoachMessage,
   streamProductCoachMessage,
   type ProductCoachDailyTip,
-  type ProductCoachDailyBrief,
   type ProductCoachDailyUsage,
   type ProductCoachMessage,
 } from "../../api/coach-api";
@@ -33,6 +31,7 @@ import { createClientRequestId } from "../../repositories/client-request-id";
 import { useCoachStore } from "../../stores/coach-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
+import { useProfileStore } from "../../stores/profile-store";
 
 type ChatMessage = {
   id: string;
@@ -59,15 +58,6 @@ const defaultDailyTip: ProductCoachDailyTip = {
   source: "rule_v2",
   model: null,
 };
-const defaultDailyBrief: ProductCoachDailyBrief = {
-  greeting: "你好 👋",
-  summary: "今天先记下一餐，慢慢建立饮食节奏。",
-  suggestion: "今日行动：记录早餐，完成今天的第一条饮食数据。",
-  theme: "starter",
-  source: "rule_v2",
-  model: null,
-};
-
 type ScrollTopPosition = { x: number; y: number };
 
 function getDefaultScrollTopPosition(): ScrollTopPosition {
@@ -113,6 +103,7 @@ function getSnappedScrollTopPosition(position: ScrollTopPosition): ScrollTopPosi
 export default function CoachPage() {
   useAppShare();
   const meals = useMealStore();
+  const profile = useProfileStore();
   const coach = useCoachStore();
   const feedback = useFeedbackStore();
   const date = getLocalDateString();
@@ -130,7 +121,6 @@ export default function CoachPage() {
   const [serverTime, setServerTime] = useState<string | null>(null);
   const [dailyTip, setDailyTip] = useState<ProductCoachDailyTip | null>(null);
   const [dailyTipLoading, setDailyTipLoading] = useState(false);
-  const [dailyBrief, setDailyBrief] = useState<ProductCoachDailyBrief>(defaultDailyBrief);
   const [selectedImagePath, setSelectedImagePath] = useState<string | null>(null);
   const [dailyUsage, setDailyUsage] = useState<ProductCoachDailyUsage>(defaultDailyUsage);
   const [completedReplyVersion, setCompletedReplyVersion] = useState(0);
@@ -215,14 +205,6 @@ export default function CoachPage() {
     }
   };
 
-  const loadDailyBrief = async () => {
-    try {
-      setDailyBrief(await getProductCoachDailyBrief(date));
-    } catch {
-      // Keep a contextual local starter fallback when the product API is unavailable.
-    }
-  };
-
   const createProactiveMessage = (): ChatMessage => ({
     id: "proactive-message-" + Date.now(),
     role: "coach",
@@ -240,7 +222,7 @@ export default function CoachPage() {
       setMessages([createProactiveMessage()]);
       setDraft("");
       setSelectedImagePath(null);
-      await Promise.all([refreshCoachBrief(), loadDailyBrief(), loadDailyTip()]);
+      await Promise.all([refreshCoachBrief(), loadDailyTip()]);
       feedback.show({ message: "已开启新的营养教练对话", tone: "success" });
     } catch {
       feedback.show({ message: "新对话开启失败，请稍后重试", tone: "error" });
@@ -250,9 +232,8 @@ export default function CoachPage() {
   };
 
   useDidShow(() => {
-    // Tab pages stay mounted; re-fetch reminder/brief/tip so profile edits show up.
+    // Tab pages stay mounted; re-fetch time-sensitive Coach data when the tab returns.
     void refreshCoachBrief();
-    void loadDailyBrief();
     void loadDailyTip();
     // Keep nutrition rhythm targets in sync with home / cloud plan.
     void getProductDailySummary(date, { light: true })
@@ -460,7 +441,7 @@ export default function CoachPage() {
                 <Text>新对话</Text>
               </View>
             </View>
-            <Text className="coach-chat__hero-greeting">{dailyBrief.greeting}</Text>
+            <Text className="coach-chat__hero-greeting">{greeting}，{profile.profile.nickname || "你"} 👋</Text>
             <Text className="coach-chat__hero-summary">{heroContext.summary}</Text>
             <Text className="coach-chat__hero-suggestion">{heroContext.suggestion}</Text>
             <View className="coach-chat__hero-cta" ariaLabel={heroContext.ctaLabel} onClick={handlePrimaryAction}>

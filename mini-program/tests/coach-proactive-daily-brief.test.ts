@@ -18,10 +18,12 @@ describe("NOVA proactive daily reminder", () => {
   it("renders the daily reminder as the single action-first Coach entry", () => {
     const page = read("src/pages/coach/index.tsx");
 
-    expect(page).toContain("getProductCoachDailyBrief");
-    expect(page).toContain("loadDailyBrief");
     expect(page).toContain("NOVA · 今日提醒");
-    expect(page).toContain("dailyBrief.greeting");
+    expect(page).toContain("getCoachGreeting(serverTime)");
+    expect(page).toContain("{greeting}，{profile.profile.nickname || \"你\"} 👋");
+    expect(page).not.toContain("{dailyBrief.greeting}");
+    expect(page).not.toContain("getProductCoachDailyBrief");
+    expect(page).not.toContain("loadDailyBrief");
     expect(page).toContain("createCoachMealContext");
     expect(page).toContain("heroContext.summary");
     expect(page).toContain("heroContext.suggestion");

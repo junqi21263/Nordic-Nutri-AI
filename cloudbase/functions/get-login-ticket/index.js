@@ -87,6 +87,10 @@ const MAX_BODY_BYTES = 4096;
 // ~4MB decoded image ≈ ~5.4MB base64 + JSON envelope.
 const MAX_VISION_BODY_BYTES = 6 * 1024 * 1024;
 const VISION_DAILY_LIMIT = 10;
+// Keep the model catalog and account-usage fallback aligned with the active
+// quota. This alias also protects the public login bootstrap from a missing
+// catalog constant when the temporary unlimited-QA switch is removed.
+const VISION_EFFECTIVE_DAILY_LIMIT = VISION_DAILY_LIMIT;
 const VISION_BURST_LIMIT = 3;
 const VISION_DAILY_WINDOW_SECONDS = 86400;
 const VISION_BURST_WINDOW_SECONDS = 600;
@@ -266,8 +270,11 @@ function verifyFoodImageDispatchSignature(secret, req, { path, body, now = Date.
 
 function readRuntimeConfig(env) {
   const required = ["WX_APPID", "WX_SECRET", "TCB_ENV", "IDENTITY_HASH_PEPPER", "CLOUDBASE_APIKEY", "APP_SESSION_SECRET"];
-  if (required.some((name) => typeof env[name] !== "string" || !env[name])) {
-    throw new Error("Login service configuration is incomplete");
+  const missing = required.filter((name) => typeof env[name] !== "string" || !env[name]);
+  if (missing.length) {
+    // Only expose configuration *names*. Values are credentials and must never
+    // be written to function logs.
+    throw new Error(`Login service configuration is incomplete: ${missing.join(", ")}`);
   }
 
   return {
@@ -543,10 +550,18 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   // HTTP cloud functions do not always inject TENCENTCLOUD_* temp keys the way event
   // functions do. Pass the same server API key used by the relational DB client so
   // storage uploadFile / getTempFileURL authenticate reliably.
-  const admin = cloudbaseNode.init({
-    env: config.cloudbaseEnvId,
-    accessKey: config.cloudbaseApiKey,
-  });
+  // The product login path only needs the RDB client above. Storage/AI/admin
+  // helpers must not make an otherwise valid WeChat login return 503 when the
+  // Node SDK cannot initialize in a particular SCF runtime.
+  let admin = null;
+  try {
+    admin = cloudbaseNode.init({
+      env: config.cloudbaseEnvId,
+      accessKey: config.cloudbaseApiKey,
+    });
+  } catch (error) {
+    console.error("[storage] API-key runtime init failed; continuing without fallback:", error?.message || error);
+  }
   const workerEndpoint = typeof env.HY_IMAGE_WORKER_ENDPOINT === "string" ? env.HY_IMAGE_WORKER_ENDPOINT.trim() : "";
   // Hunyuan image must use SCF runtime credentials (TENCENTCLOUD_SECRETID/KEY),
   // not CLOUDBASE_APIKEY. node-sdk init() prefers CLOUDBASE_APIKEY from process.env
@@ -898,6 +913,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
         const content = await downloadImageBuffer(imageUrl);
         if (!content.length || content.length > 2 * 1024 * 1024) throw new Error("Food image mirror failed");
         const cloudPath = `food-catalog/${String(foodKey).replace(/[^a-z0-9:_-]/gi, "-")}.jpg`;
+        if (!admin || typeof admin.uploadFile !== "function") {
+          throw new Error("Food image mirror storage is unavailable");
+        }
         const uploaded = await admin.uploadFile({ cloudPath, fileContent: content });
         if (!uploaded?.fileID) throw new Error("Food image upload failed");
         const temporary = await getTemporaryUrl(uploaded.fileID);
@@ -2984,8 +3002,11 @@ if (require.main === module) {
   let service = null;
   try {
     service = createRuntimeService();
-  } catch {
-    // Keep the public surface fail-closed until all required secrets are configured.
+  } catch (error) {
+    // Keep the public surface fail-closed while retaining a sanitized startup
+    // signal in CloudBase logs. This makes a configuration/dependency outage
+    // diagnosable without ever printing credential values.
+    console.error("[startup] get-login-ticket service initialization failed:", error?.message || error);
   }
   createHttpServer({ service }).listen(9000);
 }
