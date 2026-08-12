@@ -1,4 +1,5 @@
 import { createClientRequestId } from "../repositories/client-request-id";
+import type { OnboardingDraft } from "../features/onboarding/domain";
 import { requestProductApi } from "./product-api-client";
 
 export interface ProductSettings {
@@ -35,6 +36,7 @@ export interface ProductAccount {
   settings: ProductSettings | null;
   nutritionPlan: ProductNutritionPlan | null;
   onboardingCompleted?: boolean;
+  onboardingDraft?: OnboardingDraft | null;
 }
 
 export interface ProductAccountUsageQuota {
@@ -149,6 +151,15 @@ export function completeProductOnboarding(input: {
     method: "POST",
     data: input,
     fallbackMessage: "资料初始化失败，请稍后重试",
+  });
+}
+
+export function saveProductOnboardingDraft(draft: OnboardingDraft) {
+  return requestProductApi<OnboardingDraft>("/onboarding-draft", {
+    method: "POST",
+    data: { ...draft },
+    fallbackMessage: "草稿同步失败，请稍后重试",
+    timeout: 8_000,
   });
 }
 

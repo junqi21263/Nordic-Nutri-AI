@@ -12,6 +12,8 @@ export interface AchievementStore {
   /** Local replay state for an already unlocked achievement. Never acknowledged to the server. */
   manualAchievementCelebration: Achievement | null;
   pendingAchievementUnlocks: AchievementUnlockedEvent[];
+  /** Prevents a late, stale pending response from replaying an acknowledged celebration. */
+  deliveredAchievementIds: string[];
   setAchievements: (achievements: Achievement[]) => void;
   setUserId: (userId: string | null) => void;
   markAchievementCelebrated: (achievementId: string) => void;
@@ -32,6 +34,7 @@ export const createAchievementStore = () =>
     achievementUnlocked: null,
     manualAchievementCelebration: null,
     pendingAchievementUnlocks: [],
+    deliveredAchievementIds: [],
     setUserId: (userId) => {
       if (get().userId === userId) return;
       set({
@@ -40,6 +43,7 @@ export const createAchievementStore = () =>
         achievementUnlocked: null,
         manualAchievementCelebration: null,
         pendingAchievementUnlocks: [],
+        deliveredAchievementIds: [],
       });
     },
     setAchievements: (achievements) => {
@@ -52,6 +56,7 @@ export const createAchievementStore = () =>
       const activeIds = new Set([
         ...(active ? [active.achievementId] : []),
         ...get().pendingAchievementUnlocks.map((event) => event.achievementId),
+        ...get().deliveredAchievementIds,
       ]);
       const pendingEvents = achievements
         .filter((item) => item.unlocked && item.celebrationPending && !activeIds.has(item.id))
@@ -67,6 +72,10 @@ export const createAchievementStore = () =>
         achievements: get().achievements.map((item) => (
           item.id === achievementId ? { ...item, celebrationPending: false } : item
         )),
+        deliveredAchievementIds: Array.from(new Set([
+          ...get().deliveredAchievementIds,
+          achievementId,
+        ])),
       });
     },
     dismissAchievementUnlocked: () => {
@@ -81,6 +90,7 @@ export const createAchievementStore = () =>
       achievementUnlocked: null,
       manualAchievementCelebration: null,
       pendingAchievementUnlocks: [],
+      deliveredAchievementIds: [],
     }),
   }));
 

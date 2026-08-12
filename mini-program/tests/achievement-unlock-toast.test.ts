@@ -42,6 +42,20 @@ describe("achievement unlock toast", () => {
     expect(store.getState().achievementUnlocked).toBeNull();
   });
 
+  it("does not replay an acknowledged achievement when a stale pending response arrives", () => {
+    const store = createAchievementStore();
+    store.getState().setUserId("user-1");
+    const pending = { id: "new", title: "认识自己", unlocked: true, progress: 100, celebrationPending: true };
+
+    store.getState().setAchievements([pending]);
+    store.getState().markAchievementCelebrated("new");
+    store.getState().dismissAchievementUnlocked();
+    store.getState().setAchievements([pending]);
+
+    expect(store.getState().achievementUnlocked).toBeNull();
+    expect(store.getState().pendingAchievementUnlocks).toEqual([]);
+  });
+
   it("keeps pending delivery isolated per signed-in user", () => {
     const store = createAchievementStore();
     store.getState().setUserId("user-a");

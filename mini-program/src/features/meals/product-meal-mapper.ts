@@ -19,6 +19,7 @@ export interface ProductMeal {
   name: string;
   recordedAt: string;
   isFavorite: boolean;
+  portionMultiplier?: number | null;
   imageUrl?: string | null;
   insight?: string | null;
   items: ProductMealItem[];
@@ -45,6 +46,7 @@ function mapProductItem(item: ProductMealItem): MealItem {
     protein: round(item.proteinPer100g * scale),
     carbs: round(item.carbsPer100g * scale),
     fat: round(item.fatPer100g * scale),
+    aiQuantityG: item.aiQuantityG ?? null,
     foodId: item.foodId ?? null,
     imageUrl: item.imageUrl ?? null,
   };
@@ -59,6 +61,7 @@ export function mapProductMeal(meal: ProductMeal): Meal {
     title: meal.name,
     mealType: meal.mealType,
     favorite: meal.isFavorite,
+    portionMultiplier: meal.portionMultiplier ?? null,
     imageKey: null,
     imageUrl: meal.imageUrl ?? null,
     insight: typeof meal.insight === "string" && meal.insight.trim()

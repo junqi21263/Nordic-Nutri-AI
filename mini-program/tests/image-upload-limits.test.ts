@@ -1,26 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
-  assertImageWithinPickLimit,
-  formatImageTooLargeMessage,
   formatVisionUploadHint,
-  MAX_PICK_IMAGE_BYTES,
-  MAX_PICK_IMAGE_MB,
+  MAX_UPLOAD_IMAGE_BYTES,
   VISION_SUPPORTED_FORMATS_LABEL,
 } from "../src/features/media/image-upload-limits";
 
 describe("image upload limits", () => {
-  it("allows images within the pick limit and rejects oversized ones", () => {
-    expect(() => assertImageWithinPickLimit(undefined)).not.toThrow();
-    expect(() => assertImageWithinPickLimit(MAX_PICK_IMAGE_BYTES)).not.toThrow();
-    expect(() => assertImageWithinPickLimit(MAX_PICK_IMAGE_BYTES + 1)).toThrow(
-      formatImageTooLargeMessage(MAX_PICK_IMAGE_MB),
-    );
-  });
-
-  it("describes supported formats and pick size for the scanner page", () => {
+  it("tells users that camera photos are optimized after selection", () => {
     const hint = formatVisionUploadHint();
     expect(hint).toContain(VISION_SUPPORTED_FORMATS_LABEL);
-    expect(hint).toContain(`${MAX_PICK_IMAGE_MB}MB`);
-    expect(hint).not.toContain("自动压缩");
+    expect(hint).toContain("自动优化");
+    expect(hint).not.toContain("8MB");
+  });
+
+  it("keeps the client payload below the WeChat image-security fallback ceiling", () => {
+    expect(MAX_UPLOAD_IMAGE_BYTES).toBeLessThan(900 * 1024);
   });
 });

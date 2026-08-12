@@ -21,6 +21,7 @@ export function toProductMealInput(
     name: meal.title,
     recordedAt: recordedAtFromLocal(meal.date, meal.time),
     isFavorite: meal.favorite,
+    portionMultiplier: meal.portionMultiplier ?? 1,
     // Prefer durable cloud file IDs via imagePath; keep imageUrl for short https/wxfile refs.
     ...(imageRef && /^cloud:\/\//i.test(imageRef)
       ? { imagePath: imageRef }
@@ -31,6 +32,10 @@ export function toProductMealInput(
       return {
         name: item.name,
         quantityG,
+        // Every persisted item needs an immutable recognition baseline. When an
+        // older item has no baseline yet, initialise it from the quantity being
+        // saved instead of leaving the next portion edit without a reference.
+        aiQuantityG: item.aiQuantityG ?? quantityG,
         caloriesPer100g: item.calories / scale,
         proteinPer100g: item.protein / scale,
         carbsPer100g: item.carbs / scale,

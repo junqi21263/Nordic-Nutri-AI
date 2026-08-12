@@ -2,15 +2,15 @@ import Taro from "@tarojs/taro";
 import { useAuthStore } from "../auth/auth-store";
 import {
   formatImageTooLargeMessage,
-  MAX_PICK_IMAGE_BYTES,
   MAX_UPLOAD_IMAGE_BYTES,
+  MAX_UPLOAD_HARD_BYTES,
   assertImageWithinUploadHardLimit,
 } from "../features/media/image-upload-limits";
 import { inferMealTypeFromTime } from "../features/meals/meal-type";
 import type { ScannerMealFixture } from "../features/scanner/domain";
 import { createClientRequestId } from "../repositories/client-request-id";
 import { productApiEndpoint } from "./product-api-config";
-const maxImageBytes = MAX_PICK_IMAGE_BYTES;
+const maxImageBytes = MAX_UPLOAD_HARD_BYTES;
 /** Network upload target — keep base64 payload small enough for mobile + cloud timeout. */
 const targetUploadBytes = MAX_UPLOAD_IMAGE_BYTES;
 
@@ -143,13 +143,14 @@ async function prepareImagePath(sourcePath: string) {
   let path = sourcePath;
   try {
     const originalSize = await fileSizeOf(sourcePath);
-    // Aim ≤2MB soft target. Quality-only often stalls on phone JPEGs; also shrink the long edge.
-    const firstQuality = originalSize > 8 * 1024 * 1024 ? 40 : originalSize > 3 * 1024 * 1024 ? 48 : 58;
+    // Keep the browser-side payload below WeChat image-security's 900KB fallback
+    // limit. Quality-only often stalls on phone JPEGs, so shrink the long edge too.
+    const firstQuality = originalSize > 8 * 1024 * 1024 ? 48 : originalSize > 3 * 1024 * 1024 ? 58 : 68;
     const passes: Array<{ quality: number; width: number }> = [
-      { quality: firstQuality, width: 1920 },
-      { quality: 40, width: 1600 },
-      { quality: 32, width: 1280 },
-      { quality: 28, width: 1024 },
+      { quality: firstQuality, width: 1280 },
+      { quality: 54, width: 960 },
+      { quality: 46, width: 750 },
+      { quality: 36, width: 640 },
     ];
     for (const pass of passes) {
       path = await compressOnce(path, pass.quality, pass.width);
@@ -175,7 +176,9 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
     console.error("[vision] getFileInfo failed:", err);
     throw createVisionError("无法读取图片文件，请重新选择", err);
   }
-  if (!("size" in info) || info.size > maxImageBytes) throw new Error(formatImageTooLargeMessage());
+  if (!("size" in info) || info.size > maxImageBytes) {
+    throw new Error(formatImageTooLargeMessage(MAX_UPLOAD_HARD_BYTES / (1024 * 1024)));
+  }
   assertImageWithinUploadHardLimit("size" in info ? info.size : null);
   let imageBase64;
   try {

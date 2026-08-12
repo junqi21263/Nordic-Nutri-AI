@@ -1,5 +1,6 @@
 const { assertNicknameAllowed } = require("./nickname-moderation.cjs");
 const { pickDefaultAvatarSentinel } = require("./profile-avatar-service.cjs");
+const { createOnboardingDraftDataService } = require("./onboarding-draft-data-service.cjs");
 
 function fail(message) {
   const error = new Error(message);
@@ -111,7 +112,7 @@ function mapPlan(row) {
   };
 }
 
-function createProductDataService({ db, record = () => {}, resolveAvatarUrl = async () => null }) {
+function createProductDataService({ db, record = () => {}, resolveAvatarUrl = async () => null, onboardingDrafts = createOnboardingDraftDataService({ db }) }) {
   return {
     async saveProfile(userId, input) {
       const nickname = typeof input?.nickname === "string" ? input.nickname.trim().slice(0, 40) : "";
@@ -234,7 +235,17 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
         : await profileTable.insert({ id: userId, nickname, onboarding_completed_at: new Date().toISOString() }).select().single();
       if (profile.error || !profile.data) throw new Error("Onboarding completion save failed");
 
+      try {
+        await onboardingDrafts.clear(userId);
+      } catch (error) {
+        console.warn("[onboarding-draft] clear failed after completion:", error?.message || error);
+      }
+
       return { userId, nickname: profile.data.nickname, goalId: goal.id, bodyProfileId: bodyProfile.id, nutritionPlanId: plan.data.id };
+    },
+
+    async saveOnboardingDraft(userId, input) {
+      return onboardingDrafts.save(userId, input);
     },
 
     async saveSettings(userId, input) {
@@ -321,6 +332,14 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
           }
         }
       }
+      let onboardingDraft = null;
+      if (!profile.data?.onboarding_completed_at) {
+        try {
+          onboardingDraft = await onboardingDrafts.get(userId);
+        } catch (error) {
+          console.warn("[onboarding-draft] read failed:", error?.message || error);
+        }
+      }
       return {
         nickname: profile.data?.nickname ?? null,
         avatarUrl,
@@ -336,6 +355,7 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
         settings: mapSettings(settings.data),
         nutritionPlan: mapPlan(plan.data),
         onboardingCompleted: Boolean(profile.data?.onboarding_completed_at),
+        onboardingDraft,
       };
     },
   };

@@ -35,10 +35,10 @@ export default defineAppConfig({
   },
   window: {
     navigationStyle: "custom",
-    navigationBarBackgroundColor: "#faf9f6",
+    navigationBarBackgroundColor: "#fbfaf7",
     navigationBarTextStyle: "black",
     navigationBarTitleText: "Nordic Nutri AI",
-    backgroundColor: "#faf9f6",
+    backgroundColor: "#fbfaf7",
   },
   tabBar: {
     custom: true,

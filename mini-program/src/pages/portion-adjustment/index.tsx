@@ -1,12 +1,13 @@
 import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { ErrorState } from "../../components/error-state";
 import { MacroProgress } from "../../components/macro-progress";
 import { PageLayout } from "../../layouts/page-layout";
 import { mealTypeOptions } from "../../features/meals/meal-type";
+import { toMealSavedCelebration } from "../../features/meals/meal-saved-celebration-data";
 import type { MealType } from "../../features/meals/domain";
 import { createMealFromAnalysis } from "../../features/scanner/domain";
 import { createProductMeal, getProductMeals, updateProductMeal } from "../../api/meal-data-api";
@@ -15,6 +16,7 @@ import { getLocalDateString } from "../../features/onboarding/domain";
 import { useMealStore } from "../../stores/meal-store";
 import { usePortionDraftStore } from "../../stores/portion-draft-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
+import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 const nowTime = () => {
@@ -29,6 +31,10 @@ export default function PortionAdjustmentPage() {
   const meals = useMealStore();
   const feedback = useFeedbackStore();
   const [isSaving, setIsSaving] = useState(false);
+  const clearDraftAfterSuccess = useRef(false);
+  useEffect(() => () => {
+    if (clearDraftAfterSuccess.current) usePortionDraftStore.getState().reset();
+  }, []);
   const adjusted = portion.getAdjusted();
   if (!portion.meal || !adjusted)
     return (
@@ -60,19 +66,28 @@ export default function PortionAdjustmentPage() {
     const draftMeal = portion.meal;
     const multiplier = portion.multiplier;
     if (!draftMeal || !adjusted) return;
+    const mealDate = getLocalDateString();
+    const previousCalories = meals.getDailySummary(mealDate).consumed.calories;
     setIsSaving(true);
     try {
-      let id = editingId;
+      let savedMeal = null;
       if (editingId) {
         const current = meals.getMealById(editingId);
         if (!current) throw new Error("Meal not found");
+        const originalQuantityByItemId = new Map(
+          draftMeal.items.map((item) => [item.id, item.aiQuantityG]),
+        );
+        const updatedItems = adjusted.items.map((item) => ({
+          ...item,
+          aiQuantityG: originalQuantityByItemId.get(item.id) ?? item.aiQuantityG,
+        }));
         const saved = await updateProductMeal(editingId, {
           mealType: draftMeal.mealType,
-          items: toProductMealInput({ ...current, mealType: draftMeal.mealType, items: adjusted.items }).items,
+          portionMultiplier: multiplier,
+          items: toProductMealInput({ ...current, mealType: draftMeal.mealType, items: updatedItems }).items,
         });
         if (!saved) throw new Error("Meal not found");
-        id = saved.id;
-        feedback.show({ message: "份量已更新并同步", tone: "success" });
+        savedMeal = saved;
       } else {
         const localMeal = createMealFromAnalysis(
           draftMeal,
@@ -80,21 +95,28 @@ export default function PortionAdjustmentPage() {
           getLocalDateString(),
           nowTime(),
         );
-        id = (await createProductMeal(toProductMealInput(localMeal))).id;
-        feedback.show({ message: "已保存并同步到饮食记录", tone: "success" });
+        savedMeal = await createProductMeal(toProductMealInput(localMeal));
       }
-      const mealDate = getLocalDateString();
-      meals.replaceRemoteMeals(await getProductMeals(mealDate), mealDate);
+      const syncedMeals = await getProductMeals(mealDate);
+      meals.replaceRemoteMeals(syncedMeals, mealDate);
       try {
         const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
         await evaluateProductAchievements(mealDate);
       } catch {
         // The saved meal remains valid if achievement refresh is temporarily unavailable.
       }
-      // Navigate before clearing the draft — resetting first re-renders this page as
-      // "份量草稿不存在", and a failed/timed-out redirect leaves the user stuck there.
-      await Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` });
-      portion.reset();
+      if (savedMeal) {
+        useMealSavedCelebrationStore.getState().show(
+          toMealSavedCelebration({
+            savedMeal,
+            previousCalories,
+            syncedMeals,
+            targetCalories: meals.dailyTargets.calories,
+            kind: editingId ? "updated" : "created",
+          }),
+        );
+        clearDraftAfterSuccess.current = true;
+      }
     } catch {
       feedback.show({ message: "保存调整失败，请稍后重试", tone: "error" });
     } finally {

@@ -10,6 +10,7 @@ describe("meal data API mapping", () => {
         name: "鸡胸肉沙拉",
         recordedAt: "2026-07-20T04:00:00.000Z",
         isFavorite: true,
+        portionMultiplier: 0.75,
         insight: "蛋白质充足，下一餐可补蔬菜。",
         items: [
           {
@@ -30,6 +31,7 @@ describe("meal data API mapping", () => {
       title: "鸡胸肉沙拉",
       mealType: "lunch",
       favorite: true,
+      portionMultiplier: 0.75,
       insight: "蛋白质充足，下一餐可补蔬菜。",
       items: [{
         id: "item-1",

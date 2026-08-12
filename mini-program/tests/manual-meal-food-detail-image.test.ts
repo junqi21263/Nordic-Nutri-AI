@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { estimateNutritionFromAnalysis } from "../src/features/meals/manual-meal-estimate";
 
 const manualMealPage = readFileSync(resolve(import.meta.dirname, "../src/pages/manual-meal/index.tsx"), "utf8");
+const recordTimeEditorPath = resolve(import.meta.dirname, "../src/components/record-time-editor/index.tsx");
 const foodDetailPage = readFileSync(resolve(import.meta.dirname, "../src/pages/food-detail/index.tsx"), "utf8");
 const foodThumbnail = readFileSync(resolve(import.meta.dirname, "../src/components/food-thumbnail/index.tsx"), "utf8");
 const pageStyles = readFileSync(resolve(import.meta.dirname, "../src/styles/page.scss"), "utf8");
@@ -13,6 +15,40 @@ describe("manual meal and food detail image layout", () => {
     expect(manualMealPage).not.toContain("manual-meal__catalog-link");
     expect(manualMealPage).toContain("manual-meal__selected-food");
     expect(manualMealPage).toContain("consumeSelectedFood");
+  });
+
+  it("uses editable record date and time plus automatic name-based nutrition estimates", () => {
+    expect(manualMealPage).toContain('import { Input, Text, View }');
+    expect(manualMealPage).not.toContain("Picker");
+    expect(manualMealPage).toContain("RecordTimeEditor");
+    expect(manualMealPage).toContain('const [recordDate, setRecordDate]');
+    expect(manualMealPage).toContain('const [recordTime, setRecordTime]');
+    expect(manualMealPage).toContain('analyzeProductMeal([{ name: normalizedTitle, quantityG: 100 }])');
+    expect(manualMealPage).toContain('recordedAt: recordedAtFromLocal(recordDate, recordTime)');
+    expect(manualMealPage).toContain("餐食名称");
+    expect(manualMealPage).toContain("记录时间");
+    expect(manualMealPage).toContain("重新估算");
+  });
+
+  it("uses a custom record-time editor with an explicit editable hint and time controls", () => {
+    expect(recordTimeEditorPath).toBeTruthy();
+    const recordTimeEditor = readFileSync(recordTimeEditorPath, "utf8");
+
+    expect(recordTimeEditor).toContain("可修改");
+    expect(recordTimeEditor).toContain("设置记录时间");
+    expect(recordTimeEditor).toContain("调整日期");
+    expect(recordTimeEditor).toContain("直接设置时间");
+    expect(recordTimeEditor).toContain('type="number"');
+    expect(recordTimeEditor).toContain("onBlur");
+  });
+
+  it("converts all automatic analysis items into the editable nutrition totals", () => {
+    expect(
+      estimateNutritionFromAnalysis([
+        { name: "鸡胸肉", quantityG: 150, caloriesPer100g: 133, proteinPer100g: 24, carbsPer100g: 0, fatPer100g: 3 },
+        { name: "蔬菜", quantityG: 100, caloriesPer100g: 25, proteinPer100g: 2, carbsPer100g: 4, fatPer100g: 0 },
+      ]),
+    ).toEqual({ calories: "225", protein: "38", carbs: "4", fat: "4.5" });
   });
 
   it("renders the food detail image after identity and before portion selection", () => {

@@ -1,0 +1,175 @@
+@use "../../styles/tokens" as *;
+
+.plan-transition-overlay {
+  background: rgba($stitch-page-bg, 0.5);
+  bottom: 0;
+  left: 0;
+  pointer-events: auto;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 280;
+}
+
+.plan-transition-overlay__center {
+  align-items: center;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  left: 0;
+  padding: 0 $page-gutter;
+  position: absolute;
+  right: 0;
+  top: 0;
+  transition: opacity 500ms ease-out, transform 500ms ease-out;
+}
+
+.plan-transition-overlay__bars {
+  align-items: flex-end;
+  display: flex;
+  gap: 10rpx;
+  height: 48rpx;
+  margin-bottom: 16rpx;
+}
+
+.plan-transition-overlay__bar {
+  animation: plan-transition-bar 800ms ease-in-out infinite alternate;
+  background: $stitch-brand-green;
+  border-radius: 999rpx;
+  height: 30rpx;
+  transform-origin: bottom;
+  width: 8rpx;
+}
+
+.plan-transition-overlay__bar--2 {
+  animation-delay: 120ms;
+  background: #78917d;
+  height: 46rpx;
+}
+
+.plan-transition-overlay__bar--3 {
+  animation-delay: 240ms;
+  background: $stitch-text-secondary;
+  height: 34rpx;
+}
+
+.plan-transition-overlay--completing .plan-transition-overlay__bars {
+  animation: plan-transition-complete 160ms ease-out both;
+}
+
+.plan-transition-overlay--completing .plan-transition-overlay__label {
+  animation: plan-transition-label-out 140ms ease-out both;
+}
+
+.plan-transition-overlay__label {
+  color: $stitch-text-secondary;
+  font-size: 20rpx;
+  font-weight: $font-weight-semibold;
+  line-height: 1.4;
+  letter-spacing: 1.2rpx;
+}
+
+.plan-transition-overlay__completion-mark {
+  align-items: center;
+  background: $stitch-surface-green;
+  border-radius: 999rpx;
+  color: $stitch-brand-green;
+  display: flex;
+  font-size: 38rpx;
+  font-weight: $font-weight-semibold;
+  height: 64rpx;
+  justify-content: center;
+  margin-top: -64rpx;
+  opacity: 0;
+  transform: scale(.7);
+  width: 64rpx;
+  animation: plan-transition-check-in 140ms ease-out 120ms both;
+}
+
+// Stitch first-time generation: blur the source screen itself (rather than
+// relying on backdrop-filter, which differs between WeChat renderers).
+.diet-preferences-page--initial-processing .diet-preferences-page__source {
+  filter: blur(4px);
+  opacity: 0.5;
+  transition: filter 500ms ease-out, opacity 500ms ease-out;
+}
+
+.diet-preferences-page--initial-processing .diet-preferences-page__action-source {
+  filter: blur(4px);
+  opacity: 0.5;
+  transition: filter 500ms ease-out, opacity 500ms ease-out;
+}
+
+// Stitch first-time generation: a 200px segmented calculation ring at centre.
+.plan-transition-overlay--initial {
+  background: rgba($stitch-page-bg, 0.18);
+}
+
+.plan-transition-overlay--regenerate .plan-transition-overlay__bars {
+  gap: 14rpx;
+  height: 64rpx;
+}
+
+.plan-transition-overlay--regenerate .plan-transition-overlay__bar {
+  height: 42rpx;
+  width: 10rpx;
+}
+
+.plan-transition-overlay--regenerate .plan-transition-overlay__bar--2 {
+  height: 62rpx;
+}
+
+.plan-transition-overlay--regenerate .plan-transition-overlay__bar--3 {
+  height: 48rpx;
+}
+
+.plan-transition-overlay--regenerate .plan-transition-overlay__label {
+  font-size: 26rpx;
+  letter-spacing: 1.6rpx;
+}
+
+.plan-transition-overlay__initial-completion-mark {
+  align-items: center;
+  background: #012d1d;
+  border-radius: 999rpx;
+  color: #ffffff;
+  display: flex;
+  box-shadow: 0 8px 20px rgba(1, 45, 29, 0.28);
+  font-size: 52px;
+  font-weight: $font-weight-semibold;
+  height: 96px;
+  justify-content: center;
+  line-height: 1;
+  width: 96px;
+  animation: plan-transition-initial-check-in 500ms ease-out both;
+}
+
+.plan-transition-overlay--regenerate .plan-transition-overlay__initial-completion-mark {
+  animation: plan-transition-check-in 180ms ease-out 80ms both;
+  margin-top: -80rpx;
+}
+
+@keyframes plan-transition-bar {
+  from { transform: scaleY(0.78); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes plan-transition-complete {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(.58); }
+}
+
+@keyframes plan-transition-label-out {
+  to { opacity: 0; }
+}
+
+@keyframes plan-transition-check-in {
+  from { opacity: 0; transform: scale(.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes plan-transition-initial-check-in {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}

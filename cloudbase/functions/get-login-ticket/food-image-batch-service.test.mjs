@@ -9,6 +9,8 @@ const {
   normalizeCategoryBatchPayload,
   normalizeFoodIds,
   isClaimableBatchItemStatus,
+  isSkippableBatchError,
+  shouldCountDispatchOutcome,
   resolveBatchCompletionStatus,
   createFoodImageBatchService,
 } = batchModule;
@@ -48,6 +50,16 @@ test("retryable batch items remain claimable until the attempt budget is exhaust
   assert.equal(isClaimableBatchItemStatus("needs_retry"), true);
   assert.equal(isClaimableBatchItemStatus("needs_review"), false);
   assert.equal(isClaimableBatchItemStatus("failed"), false);
+});
+
+test("an already-approved primary image is skipped instead of retried as a generation failure", () => {
+  assert.equal(isSkippableBatchError("FOOD_IMAGE_ALREADY_READY"), true);
+  assert.equal(isSkippableBatchError("HY_IMAGE_UNAVAILABLE"), false);
+});
+
+test("empty legacy batches do not consume the dispatch quota needed by new pending work", () => {
+  assert.equal(shouldCountDispatchOutcome({ processed: 0 }), false);
+  assert.equal(shouldCountDispatchOutcome({ processed: 1 }), true);
 });
 
 test("a batch remains active while generated candidates are waiting for review", () => {

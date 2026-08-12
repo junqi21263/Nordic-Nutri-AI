@@ -88,7 +88,11 @@ test("completes onboarding through authenticated server-side tables only", async
       insert: (payload) => ({ select: () => ({ single: async () => ({ data: { id: `${table}-1`, ...payload }, error: null }) }) }),
     }),
   };
-  const service = createProductDataService({ db, record: (call) => calls.push(call) });
+  const service = createProductDataService({
+    db,
+    record: (call) => calls.push(call),
+    onboardingDrafts: { clear: async () => undefined },
+  });
 
   const result = await service.saveOnboarding("user-1", {
     nickname: "Lewis",
@@ -115,6 +119,7 @@ test("reads only the authenticated user's current account records", async () => 
     user_goals: { goal_type: "muscle_gain", target_weight_kg: 72, target_calories_kcal: 2400 },
     user_settings: { dietary_pattern: "none", food_avoidances: ["peanut"], meals_per_day: 4, theme: "system", locale: "zh-CN", notification_enabled: true, unit_system: "metric" },
     nutrition_plans: { id: "plan-1", daily_calories_kcal: 2400, protein_g: 160, carbs_g: 260, fat_g: 70, status: "active" },
+    onboarding_drafts: { payload: { nickname: "Lewis", goalType: "muscle_gain", age: "28", gender: "male", heightCm: "175", weightKg: "76", activityLevel: "moderate", trainingDays: "4", targetWeightKg: "72", targetDate: "", dietaryPattern: "none", foodAvoidances: [], mealsPerDay: "4" } },
   };
   const db = { from: (table) => ({ select: () => ({ eq: (column, value) => ({ eq: () => ({ maybeSingle: async () => ({ data: rows[table], error: null }) }), maybeSingle: async () => { filters.push([table, column, value]); return { data: rows[table], error: null }; } }) }) }) };
   const result = await createProductDataService({ db }).getAccount("user-1");
@@ -132,7 +137,8 @@ test("reads only the authenticated user's current account records", async () => 
     id: "plan-1", calories: 2400, proteinG: 160, carbsG: 260, fatG: 70, status: "active",
   });
   assert.equal(result.onboardingCompleted, false);
-  assert.deepEqual(filters, [["profiles", "id", "user-1"], ["user_settings", "id", "user-1"]]);
+  assert.equal(result.onboardingDraft?.goalType, "muscle_gain");
+  assert.deepEqual(filters, [["profiles", "id", "user-1"], ["user_settings", "id", "user-1"], ["onboarding_drafts", "user_id", "user-1"]]);
 });
 
 test("marks onboardingCompleted when the profile has completed onboarding", async () => {

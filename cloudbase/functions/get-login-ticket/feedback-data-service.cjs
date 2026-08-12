@@ -61,6 +61,7 @@ function createFeedbackDataService({ db }) {
         .from("user_feedback")
         .select("id,category,content,status,admin_reply,created_at,replied_at,reply_read_at")
         .eq("user_id", userId)
+        .not("admin_reply", "is", null)
         .order("created_at", { ascending: false })
         .limit(cap);
       if (result.error) throw new Error("Feedback list failed");

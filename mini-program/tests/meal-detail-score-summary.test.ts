@@ -6,15 +6,18 @@ const sourceRoot = resolve(process.cwd(), "src");
 const read = (path: string) => readFileSync(resolve(sourceRoot, path), "utf8");
 
 describe("餐食详情评分与营养小结", () => {
-  it("用照片主导的纵向 hero，并把评分依据放进独立弹窗", () => {
+  it("使用可响应图片状态的 hero，并把评分依据放进独立弹窗", () => {
     const detail = read("pages/meal-detail/index.tsx");
+    const hero = read("components/meal-detail-hero/index.tsx");
     const styles = read("styles/page.scss");
 
-    expect(detail).toContain('className="meal-detail-page__hero"');
-    expect(detail).toContain('className="meal-detail-page__score-badge"');
-    expect(detail).toContain('className="meal-detail-page__score-footer"');
-    expect(detail).toContain("本餐评分");
-    expect(detail).toContain("依据");
+    expect(detail).toContain("<MealDetailHero");
+    expect(hero).toContain("meal-detail-page__hero--photo");
+    expect(hero).toContain("meal-detail-page__hero--data");
+    expect(hero).toContain('className="meal-detail-page__score-badge"');
+    expect(hero).toContain('className="meal-detail-page__score-footer"');
+    expect(hero).toContain("本餐评分");
+    expect(hero).toContain("依据");
     expect(detail).toContain('useState<"score" | "insight" | null>(null)');
     expect(detail).toContain("<Modal open={detailModal !== null}>");
     expect(detail).toContain('setDetailModal("score")');
@@ -51,13 +54,17 @@ describe("餐食详情评分与营养小结", () => {
     expect(detail).not.toContain('ariaLabel="关闭弹窗"');
   });
 
-  it("使用全宽照片舞台并支持预览原图", () => {
-    const detail = read("pages/meal-detail/index.tsx");
+  it("仅在真实图片可用时使用全宽照片舞台，并在加载失败时降级数据卡", () => {
+    const hero = read("components/meal-detail-hero/index.tsx");
     const styles = read("styles/page.scss");
 
-    expect(detail).toContain('mode="aspectFill"');
-    expect(detail).toContain("Taro.previewImage({ current: heroImage, urls: [heroImage] })");
-    expect(detail).toContain("查看原始餐食照片");
+    expect(hero).toContain('mode="aspectFill"');
+    expect(hero).toContain("Taro.previewImage({ current: imageUrl, urls: [imageUrl] })");
+    expect(hero).toContain("查看原始餐食照片");
+    expect(hero).toContain("onError={() => setImageFailed(true)}");
+    expect(hero).toContain("hasValidMealImage(imageUrl)");
+    expect(hero).toContain("meal-detail-page__data-hero-arc");
+    expect(hero).toContain("MealRatingSummary");
     expect(styles).toContain("aspect-ratio: 16 / 10");
     expect(styles).toContain("object-fit: cover");
   });

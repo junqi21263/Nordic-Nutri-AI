@@ -1,5 +1,4 @@
 import Taro from "@tarojs/taro";
-import { useEffect, useState } from "react";
 import {
   getOnboardingNavigationMetrics,
   type OnboardingNavigationMetrics,
@@ -85,20 +84,14 @@ function computeMetrics(): SystemLayout {
 
 let cachedLayout: SystemLayout | null = null;
 
+function getCachedLayout(): SystemLayout {
+  if (!cachedLayout) cachedLayout = computeMetrics();
+  return cachedLayout;
+}
+
 /** Unified system layout hook. Computes once and caches. */
 export function useSystemLayout(): SystemLayout {
-  const [layout, setLayout] = useState<SystemLayout>(
-    () => cachedLayout ?? computeMetrics(),
-  );
-
-  useEffect(() => {
-    if (cachedLayout) return;
-    const next = computeMetrics();
-    cachedLayout = next;
-    setLayout(next);
-  }, []);
-
-  return layout;
+  return getCachedLayout();
 }
 
 export { computeMetrics };

@@ -27,12 +27,24 @@ describe("份量调整交互", () => {
     expect(store).toContain("setMealType:");
   });
 
-  it("保存后先跳转餐食详情再清空草稿，避免卡在草稿不存在页", () => {
+  it("为新建和重新编辑的餐食均触发保存弹窗而不显示成功 Toast", () => {
     const source = read("pages/portion-adjustment/index.tsx");
-    const redirectIndex = source.indexOf("Taro.redirectTo({ url: `/pages/meal-detail/index?id=${id}` })");
-    const resetIndex = source.indexOf("portion.reset()");
-    expect(redirectIndex).toBeGreaterThan(-1);
-    expect(resetIndex).toBeGreaterThan(-1);
-    expect(redirectIndex).toBeLessThan(resetIndex);
+    expect(source).toContain("const previousCalories = meals.getDailySummary(mealDate).consumed.calories");
+    expect(source).toContain("const syncedMeals = await getProductMeals(mealDate)");
+    expect(source).toContain("useMealSavedCelebrationStore.getState().show");
+    expect(source).toContain("if (editingId)");
+    expect(source).toContain('kind: editingId ? "updated" : "created"');
+    expect(source).not.toContain('feedback.show({ message: "份量已更新并同步", tone: "success" })');
+    const newMealBranch = source.slice(source.indexOf("} else {"), source.indexOf("const syncedMeals"));
+    expect(newMealBranch).not.toContain('feedback.show({ message: "已保存并同步到饮食记录", tone: "success" })');
+  });
+
+  it("保存后保留草稿到调整页离开，避免庆祝弹窗下方先渲染失效页", () => {
+    const source = read("pages/portion-adjustment/index.tsx");
+
+    expect(source).toContain("const clearDraftAfterSuccess = useRef(false)");
+    expect(source).toContain("if (clearDraftAfterSuccess.current) usePortionDraftStore.getState().reset()");
+    expect(source).toContain("clearDraftAfterSuccess.current = true");
+    expect(source).not.toContain("portion.reset();");
   });
 });

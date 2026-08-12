@@ -35,13 +35,14 @@ test("rejects empty or oversized feedback before persistence", async () => {
   await assert.rejects(() => service.submitFeedback("user-1", { content: "x".repeat(2001) }), /无效/);
 });
 
-test("lists only the current user's feedback with reply read state", async () => {
+test("lists only replied feedback for the current user with reply read state", async () => {
   const calls = [];
   const db = {
     from(table) {
       const api = {
         select() { return api; },
         eq(column, value) { calls.push(["eq", table, column, value]); return api; },
+        not(column, operator, value) { calls.push(["not", table, column, operator, value]); return api; },
         order() { return api; },
         limit() { return Promise.resolve({
           data: [{
@@ -64,7 +65,10 @@ test("lists only the current user's feedback with reply read state", async () =>
 
   const result = await service.listFeedbackForUser("user-a");
 
-  assert.deepEqual(calls, [["eq", "user_feedback", "user_id", "user-a"]]);
+  assert.deepEqual(calls, [
+    ["eq", "user_feedback", "user_id", "user-a"],
+    ["not", "user_feedback", "admin_reply", "is", null],
+  ]);
   assert.equal(result.unreadReplyCount, 1);
   assert.deepEqual(result.items[0], {
     id: "11111111-1111-4111-8111-111111111111",

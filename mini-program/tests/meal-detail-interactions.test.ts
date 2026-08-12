@@ -38,8 +38,8 @@ describe("餐食详情交互", () => {
     expect(manual).toContain("createProductMeal");
     expect(manual).toContain("getProductMeals");
     expect(manual).toContain("loading={isSaving}");
-    expect(records).toContain("getProductDailySummary(store.selectedDate)");
-    expect(records).toContain("getProductMeals(store.selectedDate)");
+    expect(records).toContain("getProductDailySummary(selectedDate)");
+    expect(records).toContain("getProductMeals(selectedDate)");
     expect(records).toContain("dailySummary.meals");
     expect(detail).toContain("deleteProductMeal(meal.id)");
     expect(portion).toContain("updateProductMeal(editingId");

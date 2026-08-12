@@ -36,6 +36,14 @@ describe("local coach and profile", () => {
     expect(profile.getState().settings.theme).toBe("dark");
   });
 
+  it("shares one cached system-layout snapshot across headers rendered in the same frame", () => {
+    const source = readFileSync(resolve(import.meta.dirname, "../src/hooks/useSystemLayout.ts"), "utf8");
+
+    expect(source).toContain("function getCachedLayout()");
+    expect(source).toContain("cachedLayout = computeMetrics()");
+    expect(source).not.toContain("useEffect");
+  });
+
   it("uses the requested coach title without the duplicate intro identity", () => {
     const source = coachPageSource();
     const titleStart = source.indexOf('className="coach-chat__page-title"');

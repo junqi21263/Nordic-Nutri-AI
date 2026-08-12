@@ -91,6 +91,24 @@ describe("first-use onboarding domain", () => {
     );
   });
 
+  it("recalculates daily targets when each body input, activity level, or goal changes", () => {
+    const body = validateBodyProfile(validDraft, "2026-07-13").profile!;
+    const baseline = calculateNutritionPlan({ ...body, goalType: "performance" });
+    const variants = [
+      calculateNutritionPlan({ ...body, gender: "female", goalType: "performance" }),
+      calculateNutritionPlan({ ...body, age: 45, goalType: "performance" }),
+      calculateNutritionPlan({ ...body, heightCm: 185, goalType: "performance" }),
+      calculateNutritionPlan({ ...body, weightKg: 80, goalType: "performance" }),
+      calculateNutritionPlan({ ...body, activityLevel: "high", goalType: "performance" }),
+      calculateNutritionPlan({ ...body, goalType: "fat_loss" }),
+    ];
+
+    for (const plan of variants) expect(plan.calories).not.toBe(baseline.calories);
+    expect(baseline).toMatchObject({ calories: 2780, proteinG: 126, carbsG: 427, fatG: 63 });
+    const veryHigh = calculateNutritionPlan({ ...body, activityLevel: "very_high" as never, goalType: "performance" });
+    expect(veryHigh.calories).toBeGreaterThan(variants[4].calories);
+  });
+
   it("keeps macro calorie conversion within three percent of target calories", () => {
     const body = validateBodyProfile(validDraft, "2026-07-13").profile!;
     for (const goalType of ["muscle_gain", "fat_loss", "maintenance", "performance"] as const) {

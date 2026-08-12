@@ -111,10 +111,23 @@ export default function GoalAdjustPage() {
         carbs: nextCarbs,
         fat: nextFat,
       });
-      feedback.show({ message: "今日目标已更新", tone: "success" });
-      navigateBackOrHome("/pages/home/index");
+      feedback.showModal({
+        variant: "success",
+        title: "今日目标已更新",
+        description: "今日营养目标已同步。",
+        primaryText: "返回首页",
+        dismissible: true,
+        onPrimary: () => navigateBackOrHome("/pages/home/index"),
+        onClose: () => navigateBackOrHome("/pages/home/index"),
+      });
     } catch {
-      feedback.show({ message: "目标保存失败，请稍后重试", tone: "error" });
+      feedback.showModal({
+        variant: "error",
+        title: "目标保存失败",
+        description: "请稍后重试。",
+        primaryText: "知道了",
+        dismissible: true,
+      });
     } finally {
       setIsSaving(false);
     }

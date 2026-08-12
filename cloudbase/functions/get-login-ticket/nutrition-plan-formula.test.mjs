@@ -36,3 +36,29 @@ test("formula fallback insight includes avoidances and meals", () => {
   assert.match(plan.insight, /辛辣|乳制品/);
   assert.match(plan.insight, /4 餐/);
 });
+
+test("formula fallback deterministically recalculates every body input and goal", () => {
+  const baseline = formulaNutritionPlanFallback({
+    ...baseInput,
+    sex: "male",
+    heightCm: 175,
+    weightKg: 70,
+    goalType: "performance",
+  });
+  const variants = [
+    formulaNutritionPlanFallback({ ...baseInput, sex: "female", heightCm: 175, weightKg: 70, goalType: "performance" }),
+    formulaNutritionPlanFallback({ ...baseInput, age: 45, sex: "male", heightCm: 175, weightKg: 70, goalType: "performance" }),
+    formulaNutritionPlanFallback({ ...baseInput, sex: "male", heightCm: 185, weightKg: 70, goalType: "performance" }),
+    formulaNutritionPlanFallback({ ...baseInput, sex: "male", heightCm: 175, weightKg: 80, goalType: "performance" }),
+    formulaNutritionPlanFallback({ ...baseInput, sex: "male", heightCm: 175, weightKg: 70, activityLevel: "high", goalType: "performance" }),
+    formulaNutritionPlanFallback({ ...baseInput, sex: "male", heightCm: 175, weightKg: 70, goalType: "fat_loss" }),
+  ];
+
+  for (const plan of variants) assert.notEqual(plan.calories, baseline.calories);
+  assert.deepEqual(
+    { calories: baseline.calories, proteinG: baseline.proteinG, fatG: baseline.fatG },
+    { calories: 2780, proteinG: 126, fatG: 63 },
+  );
+  const veryHigh = formulaNutritionPlanFallback({ ...baseInput, sex: "male", heightCm: 175, weightKg: 70, activityLevel: "very_high", goalType: "performance" });
+  assert.ok(veryHigh.calories > variants[4].calories);
+});

@@ -23,6 +23,20 @@
   box-sizing: border-box;
   min-height: 100vh;
 }
+.page-layout__scroll--entered {
+  animation: page-layout-content-enter 180ms ease-out both;
+  will-change: opacity, transform;
+}
+@keyframes page-layout-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .page-layout__content {
   background: $color-background;
   box-sizing: border-box;
@@ -40,10 +54,9 @@
   padding-bottom: calc($tabbar-height + $safe-area-bottom + $section-gap);
 }
 .page-layout--analysis-result {
-  --analysis-result-bottom-bar-height: 148px;
 }
 .page-layout--analysis-result .page-layout__content {
-  padding-bottom: calc($safe-area-bottom + var(--analysis-result-bottom-bar-height) + $space-16);
+  padding-bottom: calc($safe-area-bottom + 148px + $space-16);
 }
 .page-layout--portion-adjustment .page-layout__content {
   padding-bottom: calc($safe-area-bottom + $space-32);
@@ -94,10 +107,11 @@
   padding-bottom: calc($safe-area-bottom + $space-48 + $space-48 + $space-24);
 }
 .page-layout--nutrition-plan .page-layout__content {
-  padding-bottom: calc(
-    ($stitch-action-height * 2) + $space-8 + ($space-8 * 2) + env(safe-area-inset-bottom) +
-      $space-16
-  );
+  padding-bottom: calc($safe-area-bottom + $space-24);
+}
+.page-layout--nutrition-plan.page-layout--nutrition-plan-animated .page-layout__content {
+  // Keep the last scrollable card reachable above the regenerated-plan CTA.
+  padding-bottom: calc($safe-area-bottom + 288px);
 }
 .content-stack {
   display: flex;

@@ -23,8 +23,8 @@ import { createCoachAdvice } from "../../features/coach/domain";
 import { createCoachMealContext } from "../../features/coach/meal-context";
 import { getCoachGreeting } from "../../features/coach/server-time";
 import { clampProgress, formatTargetStatus } from "../../features/meals/domain";
-import { assertImageWithinPickLimit } from "../../features/media/image-upload-limits";
 import { getLocalDateString } from "../../features/onboarding/domain";
+import { feedbackVariantForError } from "../../features/feedback/feedback-error";
 import { useAppShare } from "../../hooks/use-app-share";
 import { PageLayout } from "../../layouts/page-layout";
 import { createClientRequestId } from "../../repositories/client-request-id";
@@ -262,7 +262,13 @@ export default function CoachPage() {
     const userPrompt = value.trim();
     if ((!userPrompt && !imagePath) || sending) return;
     if (dailyUsage.remaining <= 0) {
-      feedback.show({ message: dailyLimitMessage, tone: "error" });
+      feedback.showModal({
+        variant: "limit",
+        title: "今日对话额度已用完",
+        description: dailyLimitMessage,
+        primaryText: "知道了",
+        dismissible: true,
+      });
       return;
     }
     let content = userPrompt;
@@ -273,12 +279,13 @@ export default function CoachPage() {
         content = `${userPrompt || "请分析这张食物图片。"}\n图片识别结果：${imageMeal.title}；${imageMeal.insight}`;
         attachment = { imagePath, imageLabel: `已上传：${imageMeal.title}` };
       } catch (error) {
-        feedback.show({
-          message:
-            error instanceof Error && error.name === "VISION_SERVICE_NOT_CONFIGURED"
-              ? "图片识别服务尚未配置，请先发送文字问题"
-              : "图片上传或识别失败，请重试",
-          tone: "error",
+        const isNotConfigured = error instanceof Error && error.name === "VISION_SERVICE_NOT_CONFIGURED";
+        feedback.showModal({
+          variant: feedbackVariantForError(error),
+          title: isNotConfigured ? "图片识别服务未配置" : "图片上传或识别失败",
+          description: isNotConfigured ? "请先发送文字问题。" : "请稍后重试。",
+          primaryText: "知道了",
+          dismissible: true,
         });
         return;
       }
@@ -330,7 +337,13 @@ export default function CoachPage() {
       if (streamError instanceof Error && streamError.name === "COACH_DAILY_LIMIT_REACHED") {
         setMessages((current) => current.filter((message) => message.id !== optimisticId && message.id !== streamingId));
         setDailyUsage((current) => ({ ...current, used: current.limit, remaining: 0 }));
-        feedback.show({ message: dailyLimitMessage, tone: "error" });
+        feedback.showModal({
+          variant: "limit",
+          title: "今日对话额度已用完",
+          description: dailyLimitMessage,
+          primaryText: "知道了",
+          dismissible: true,
+        });
         return;
       }
       try {
@@ -342,9 +355,21 @@ export default function CoachPage() {
         );
         if (sendError instanceof Error && sendError.name === "COACH_DAILY_LIMIT_REACHED") {
           setDailyUsage((current) => ({ ...current, used: current.limit, remaining: 0 }));
-          feedback.show({ message: dailyLimitMessage, tone: "error" });
+          feedback.showModal({
+            variant: "limit",
+            title: "今日对话额度已用完",
+            description: dailyLimitMessage,
+            primaryText: "知道了",
+            dismissible: true,
+          });
         } else {
-          feedback.show({ message: "营养教练暂时无法回答，请稍后重试", tone: "error" });
+          feedback.showModal({
+            variant: feedbackVariantForError(sendError),
+            title: "营养教练暂时无法回答",
+            description: "请稍后重试。",
+            primaryText: "知道了",
+            dismissible: true,
+          });
         }
       }
     } finally {
@@ -365,7 +390,6 @@ export default function CoachPage() {
       const picked = result.tempFiles[0];
       const path = picked?.tempFilePath;
       if (!path) throw new Error("没有获取到图片");
-      assertImageWithinPickLimit(picked?.size);
       setSelectedImagePath(path);
     } catch (error) {
       if (String(error).includes("cancel") || String(error).includes("取消")) return;

@@ -521,8 +521,9 @@
 .circular-progress {
   align-items: center;
   background: conic-gradient(
-    $color-forest-green var(--progress),
-    rgba($color-forest-green, 0.12) 0
+    from -90deg,
+    $color-forest-green 0 var(--progress, 0%),
+    rgba($color-forest-green, 0.14) var(--progress, 0%) 100%
   );
   border-radius: $radius-full;
   display: flex;
@@ -532,6 +533,7 @@
   position: relative;
   width: 176px;
 }
+
 .circular-progress::before {
   background: $color-soft-beige;
   border-radius: inherit;
@@ -541,7 +543,25 @@
   width: 144px;
 }
 .circular-progress--sage {
-  background: conic-gradient($color-success var(--progress), rgba($color-success, 0.12) 0);
+  background: conic-gradient(
+    from -90deg,
+    $color-success 0 var(--progress, 0%),
+    rgba($color-success, 0.18) var(--progress, 0%) 100%
+  );
+}
+.circular-progress--amber {
+  background: conic-gradient(
+    from -90deg,
+    $color-warning 0 var(--progress, 0%),
+    rgba($color-warning, 0.18) var(--progress, 0%) 100%
+  );
+}
+.circular-progress--score {
+  background: conic-gradient(
+    from -90deg,
+    #c9795d 0 var(--progress, 0%),
+    rgba(#c9795d, 0.16) var(--progress, 0%) 100%
+  );
 }
 .circular-progress--compact {
   height: 136px;
@@ -568,6 +588,12 @@
   color: $color-text-secondary;
   font-size: $font-overline;
   margin-top: $space-4;
+}
+.circular-progress__detail {
+  color: $color-text-secondary;
+  font-size: $font-overline;
+  line-height: 1.2;
+  margin-top: 4px;
 }
 
 .nutrition-tag,
@@ -1191,6 +1217,12 @@
 .bottom-sheet--closing {
   animation: sheet-exit $duration-base $ease-emphasized both;
 }
+.bottom-sheet--native-input {
+  animation: sheet-native-input-enter $duration-base $ease-emphasized both;
+}
+.bottom-sheet--native-input.bottom-sheet--closing {
+  animation: sheet-native-input-exit $duration-base $ease-emphasized both;
+}
 
 [data-reduced-motion="true"] .app-button,
 [data-reduced-motion="true"] .app-card,
@@ -1234,10 +1266,14 @@
   text-align: center;
 }
 .confirm-dialog__actions {
-  display: grid;
-  gap: $space-8;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  gap: $space-12;
+  justify-content: center;
   margin-top: $space-8;
+}
+.confirm-dialog__actions .app-button {
+  flex: 0 1 220px;
+  min-width: 0;
 }
 @keyframes breathe {
   to {
@@ -1300,6 +1336,22 @@
   }
   to {
     transform: translateY(100%);
+  }
+}
+@keyframes sheet-native-input-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-native-input-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 .progress-fallback {
@@ -1550,4 +1602,182 @@
   gap: $space-8;
   justify-content: center;
   min-height: 96px;
+}
+
+// Stitch Feedback Modal System. These styles are isolated from the frozen page layouts.
+.feedback-modal-overlay {
+  align-items: center;
+  background: rgba($color-text-primary, 0.4);
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  opacity: 1;
+  padding: $space-8;
+  position: fixed;
+  right: 0;
+  top: 0;
+  animation: feedback-modal-overlay-enter 420ms ease-out both;
+  z-index: 240;
+}
+.feedback-modal-overlay--closing {
+  animation: feedback-modal-overlay-exit 420ms ease-out both;
+  pointer-events: none;
+}
+.feedback-modal {
+  align-items: center;
+  background: $color-surface;
+  border-radius: $radius-24;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  max-width: 700px;
+  padding: $space-28 $space-24;
+  position: relative;
+  text-align: center;
+  width: calc(100% - #{$space-20});
+}
+.feedback-modal--success {
+  animation: feedback-modal-success 520ms cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+.feedback-modal--limit {
+  animation: feedback-modal-limit 460ms ease-out both;
+}
+.feedback-modal--error {
+  animation: feedback-modal-error 520ms ease-out both;
+}
+.feedback-modal--closing {
+  animation: feedback-modal-exit 420ms ease-out both !important;
+}
+.feedback-modal__close {
+  align-items: center;
+  color: $color-text-secondary;
+  display: flex;
+  font-size: 52px;
+  height: 64px;
+  justify-content: center;
+  line-height: 1;
+  position: absolute;
+  right: $space-12;
+  top: $space-8;
+  width: 64px;
+}
+.feedback-modal__icon {
+  align-items: center;
+  border-radius: $radius-full;
+  display: flex;
+  height: 128px;
+  justify-content: center;
+  margin-bottom: $space-16;
+  width: 128px;
+}
+.feedback-modal__icon--success {
+  background: $color-sage-light;
+  color: $color-dark-forest;
+}
+.feedback-modal__icon--success .nordic-icon {
+  animation: feedback-modal-success-icon 700ms ease-out 180ms both;
+  transform-origin: center;
+}
+.feedback-modal__icon--limit {
+  background: #f5eddc;
+  color: #8b6420;
+}
+.feedback-modal__icon--error {
+  background: #f7e9e4;
+  color: #914c3d;
+}
+.feedback-modal__icon-mark {
+  font-size: 64px;
+  font-weight: $font-weight-semibold;
+  line-height: 1;
+}
+.feedback-modal__title {
+  color: $color-text-primary;
+  font-size: $font-h2;
+  font-weight: $font-weight-semibold;
+  line-height: $line-heading;
+}
+.feedback-modal__description {
+  color: $color-text-secondary;
+  font-size: $font-caption;
+  line-height: $line-body;
+  margin-top: $space-8;
+  max-width: 480px;
+  white-space: nowrap;
+}
+.feedback-modal__actions {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
+  margin-top: $space-24;
+  width: 100%;
+}
+.feedback-modal__button {
+  align-items: center;
+  border-radius: $radius-full;
+  box-sizing: border-box;
+  display: flex;
+  font-size: $font-button;
+  font-weight: $font-weight-button;
+  justify-content: center;
+  min-height: 88px;
+  padding: $space-8 $space-16;
+  max-width: 100%;
+  width: 360px;
+}
+.feedback-modal__button--success {
+  background: $color-dark-forest;
+  color: $color-warm-white;
+}
+.feedback-modal__button--limit {
+  background: #8b6420;
+  color: $color-warm-white;
+}
+.feedback-modal__button--error {
+  background: #914c3d;
+  color: $color-warm-white;
+}
+.feedback-modal__button--secondary {
+  background: transparent;
+  border: 2px solid $color-divider;
+  color: $color-forest-green;
+}
+.feedback-modal__button--short {
+  align-self: center;
+  max-width: 100%;
+  width: 360px;
+}
+@keyframes feedback-modal-success {
+  0% { opacity: 0; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.015); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes feedback-modal-limit {
+  0% { opacity: 0; transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes feedback-modal-error {
+  0% { opacity: 0; transform: scale(0.98) translateX(0); }
+  30% { opacity: 1; transform: scale(1) translateX(-3px); }
+  60% { opacity: 1; transform: scale(1) translateX(3px); }
+  100% { opacity: 1; transform: scale(1) translateX(0); }
+}
+@keyframes feedback-modal-exit {
+  0% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.98) translateY(4px); }
+}
+@keyframes feedback-modal-overlay-enter {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes feedback-modal-overlay-exit {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes feedback-modal-success-icon {
+  0% { opacity: 0; transform: scale(0.72); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
 }

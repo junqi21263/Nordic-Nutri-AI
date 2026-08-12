@@ -150,4 +150,13 @@ describe("meal recognition result reveal motion", () => {
     expect(styles).toContain("background: rgba($color-sage, 0.5);");
     expect(styles).toContain("color: $color-forest-green;");
   });
+
+  it("uses a dedicated score ring tone separate from nutrition rings", () => {
+    const page = read("pages/analysis-result/index.tsx");
+    const styles = read("styles/page.scss");
+
+    expect(page).toContain('tone="score"');
+    expect(styles).toContain(".analysis-result-page .circular-progress--score");
+    expect(styles).toContain("#c9795d");
+  });
 });

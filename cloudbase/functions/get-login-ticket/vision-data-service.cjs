@@ -57,6 +57,9 @@ function createVisionDataService({
   return {
     provider,
     model: model || "vita-video-3.0",
+    validateImage(input) {
+      return readImage(input);
+    },
     async analyzeImage(userId, input) {
       if (typeof analyze !== "function") throw new PublicVisionDataError("VISION_SERVICE_NOT_CONFIGURED", "图片识别服务未配置");
       const image = readImage(input);

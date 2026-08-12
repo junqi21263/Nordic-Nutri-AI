@@ -7,7 +7,9 @@ import { OnboardingHeader } from "../../components/onboarding-header";
 import { getLocaleMessages } from "../../locales";
 import { PageLayout } from "../../layouts/page-layout";
 import { type GoalType } from "../../features/onboarding/domain";
+import { queueOnboardingDraftSync } from "../../features/onboarding/onboarding-draft-cloud-sync";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
+import { useEffect } from "react";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 const onboardingCopy = getLocaleMessages().onboarding;
@@ -21,6 +23,10 @@ const goals: Array<{ key: GoalType; icon: NordicIconName }> = [
 export default function OnboardingPage() {
   const { draft, setField } = useOnboardingDraftStore();
   const canContinue = Boolean(draft.goalType);
+
+  useEffect(() => {
+    queueOnboardingDraftSync(draft);
+  }, [draft]);
 
   const continueToBodyProfile = () => {
     if (!draft.goalType) return;

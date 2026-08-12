@@ -3,6 +3,7 @@ import { useDidHide, useDidShow } from "@tarojs/taro";
 import { useEffect, useState, type PropsWithChildren } from "react";
 import { AppSafeArea } from "../../components/app-safe-area";
 import { AppTopBar } from "../../components/app-top-bar";
+import { FeedbackHost } from "../../components/feedback-host";
 import { AchievementUnlockModal } from "../../components/achievement-unlock-modal";
 import { acknowledgeProductAchievementCelebration } from "../../api/insight-api";
 import { BottomTabBar } from "../../components/bottom-tab-bar";
@@ -11,6 +12,9 @@ import { TopNavigation } from "../../components/top-navigation";
 import { useSystemLayout } from "../../hooks/useSystemLayout";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 import { useAchievementStore } from "../../stores/achievement-store";
+import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
+import { MealSavedCelebration } from "../../components/meal-saved-celebration";
+import { getCelebrationOverlayPriority } from "../../features/coach/celebration-overlay-priority";
 import Taro from "@tarojs/taro";
 
 export interface PageLayoutProps extends PropsWithChildren {
@@ -38,6 +42,8 @@ export interface PageLayoutProps extends PropsWithChildren {
   topBarAction?: string;
   onTopBarAction?: () => void;
   refreshing?: boolean;
+  /** Disables the shared scroll-container entrance when a page owns its own reveal timing. */
+  disablePageEnterAnimation?: boolean;
   className?: string;
 }
 
@@ -60,6 +66,7 @@ export function PageLayout({
   topBarAction,
   onTopBarAction,
   refreshing = false,
+  disablePageEnterAnimation = false,
   className,
   children,
 }: PageLayoutProps) {
@@ -72,11 +79,17 @@ export function PageLayout({
   const dismissAchievementUnlocked = useAchievementStore((state) => state.dismissAchievementUnlocked);
   const dismissManualAchievementCelebration = useAchievementStore((state) => state.dismissManualAchievementCelebration);
   const markAchievementCelebrated = useAchievementStore((state) => state.markAchievementCelebrated);
+  const savedMeal = useMealSavedCelebrationStore((state) => state.savedMeal);
+  const dismissSavedMealCelebration = useMealSavedCelebrationStore((state) => state.dismiss);
   const [pageVisible, setPageVisible] = useState(false);
   const layout = useSystemLayout();
   const activeAchievement = manualAchievementCelebration ?? (achievementUnlocked
     ? achievements.find((item) => item.id === achievementUnlocked.achievementId) ?? null
     : null);
+  const celebrationPriority = getCelebrationOverlayPriority({
+    hasSavedMeal: Boolean(savedMeal),
+    hasAchievement: Boolean(activeAchievement),
+  });
   const dismissAchievementCelebration = async () => {
     if (!activeAchievement) return false;
     if (manualAchievementCelebration) {
@@ -89,7 +102,6 @@ export function PageLayout({
       dismissAchievementUnlocked();
       return true;
     } catch {
-      Taro.showToast({ title: "庆祝确认失败，请稍后重试", icon: "none" });
       return false;
     }
   };
@@ -136,7 +148,10 @@ export function PageLayout({
         />
       ) : null}
       <View
-        className="page-layout__scroll"
+        className={[
+          "page-layout__scroll",
+          pageVisible && !disablePageEnterAnimation ? "page-layout__scroll--entered" : "",
+        ].filter(Boolean).join(" ")}
         style={{
           ...cssVars,
           paddingTop: showBrandHeader ? `${layout.totalHeaderHeight}px` : "0px",
@@ -159,12 +174,40 @@ export function PageLayout({
         </View>
       </View>
       {showTabs && tabbarVisible ? <BottomTabBar activeKey={activeKey} /> : null}
-      {pageVisible ? (
+      {pageVisible && celebrationPriority === "achievement" && activeAchievement ? (
         <AchievementUnlockModal
           achievement={activeAchievement}
           onDismiss={dismissAchievementCelebration}
         />
       ) : null}
+      {pageVisible && celebrationPriority === "meal-saved" && savedMeal ? (
+        <MealSavedCelebration
+          visible
+          kind={savedMeal.kind}
+          calories={savedMeal.calories}
+          protein={savedMeal.protein}
+          carbs={savedMeal.carbs}
+          fat={savedMeal.fat}
+          previousCalories={savedMeal.previousCalories}
+          currentCalories={savedMeal.currentCalories}
+          targetCalories={savedMeal.targetCalories}
+          onViewMeal={() => {
+            dismissSavedMealCelebration();
+            const pages = Taro.getCurrentPages();
+            const currentPage = pages[pages.length - 1];
+            if (currentPage?.route === "pages/portion-adjustment/index") {
+              void Taro.navigateBack({ delta: 1 });
+              return;
+            }
+            void Taro.navigateTo({ url: `/pages/meal-detail/index?id=${savedMeal.mealId}` });
+          }}
+          onContinue={() => {
+            dismissSavedMealCelebration();
+            void Taro.switchTab({ url: "/pages/home/index" });
+          }}
+        />
+      ) : null}
+      <FeedbackHost enabled={pageVisible} />
     </AppSafeArea>
   );
 }

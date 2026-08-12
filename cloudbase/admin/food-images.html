@@ -576,7 +576,7 @@
               <div class="queue-summary"><span id="reviewCopy" class="summary-copy">连接后显示批次进度</span></div>
               <section id="batchStatusPanel" class="batch-status-panel" aria-live="polite"><div class="status-panel-head"><h3>运行状态</h3><span class="status-badge">等待连接</span></div><p id="schedulerHint" class="scheduler-hint">连接后台后会显示云端调度、重试和审核状态。</p><div class="status-metrics"></div></section>
               <div id="filterRow" class="filter-row" aria-label="批次项目筛选">
-                <button class="filter" data-filter="all">全部</button><button class="filter active" data-filter="needs_review">待审核</button><button class="filter" data-filter="needs_retry">待重试</button><button class="filter" data-filter="failed">失败</button><button class="filter" data-filter="generating">生成中</button>
+                <button class="filter" data-filter="all" type="button">全部</button><button class="filter active" data-filter="needs_review" type="button">待审核</button><button class="filter" data-filter="needs_retry" type="button">待重试</button><button class="filter" data-filter="failed" type="button">失败</button><button class="filter" data-filter="generating" type="button">生成中</button>
               </div>
               <div id="bulkReviewBar" class="bulk-review-bar" hidden><label class="bulk-review-label"><input id="selectAllReview" type="checkbox" /> 选择当前待审核候选图</label><button id="approveSelected" class="button" disabled>批量通过并设为主图（0）</button><button id="regenerateSelected" class="button secondary" disabled>批量重新生图（0）</button></div>
               <div id="reviewGrid" class="queue-loading">请连接后台后加载候选图。</div>
@@ -1510,7 +1510,9 @@
       renderBatchStatusPanel(); const host = $("reviewGrid"); if (!batch) { host.className = "empty-state"; host.innerHTML = "<div><strong>尚未选择批次</strong><p>连接后台后可在左侧选择一个批次。</p></div>"; syncBulkControls(); renderInspector(); return; }
       if (!items.length) { host.className = "empty-state"; host.innerHTML = `<div><strong>${state.activeFilter === "needs_review" ? "当前批次已审核完" : "没有匹配项目"}</strong><p>可切换筛选或在左侧选择其他批次。</p></div>`; syncBulkControls(); renderInspector(); return; }
       // Progressive: paint cards first; only hydrate image jobs for review-related filters.
-      const hydrateTargets = items.filter((item) => item.jobId && (state.activeFilter === "needs_review" || state.activeFilter === "all" || item.status === "needs_review"));
+      // Keep broad filters responsive: completed/failed history gets its job
+      // detail only after a card is opened in the inspector.
+      const hydrateTargets = items.filter((item) => item.jobId && item.status === "needs_review");
       let jobs = new Map();
       for (const item of items) {
         if (item.jobId && state.jobs.has(item.jobId)) jobs.set(item.jobId, state.jobs.get(item.jobId));
@@ -2668,7 +2670,7 @@
     $("startBatch").onclick = () => mutateBatch("start"); $("pauseBatch").onclick = () => mutateBatch("pause"); $("resumeBatch").onclick = () => mutateBatch("resume"); $("cancelBatch").onclick = () => mutateBatch("cancel");
     $("openTools").onclick = () => { setModule("system"); $("utilityDrawer").open = true; $("utilityDrawer").scrollIntoView({ behavior: "smooth", block: "start" }); };
     $("clearOperationFeed").onclick = () => { state.operations = []; renderOperationFeed(); };
-    $("filterRow").querySelectorAll("button[data-filter]").forEach((button) => { button.onclick = async () => { state.activeFilter = button.dataset.filter; $("filterRow").querySelectorAll(".filter").forEach((item) => item.classList.toggle("active", item === button)); await renderQueue(); }; });
+    $("filterRow").querySelectorAll("button[data-filter]").forEach((button) => { button.onclick = async (event) => { event.preventDefault(); state.activeFilter = button.dataset.filter; $("filterRow").querySelectorAll(".filter").forEach((item) => item.classList.toggle("active", item === button)); await renderQueue(); }; });
     $("selectAllReview").onchange = () => {
       const inputs = [...document.querySelectorAll("input[data-candidate-select]")];
       const candidateIds = inputs.map((input) => input.dataset.candidateSelect);

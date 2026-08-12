@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import test from "node:test";
 import { PublicOperationError } from "./operation-guard.cjs";
+import { PublicVisionDataError } from "./vision-data-service.cjs";
 
 import {
   buildModelCatalog,
@@ -216,6 +217,19 @@ test("maps deprecated DeepSeek aliases to the supported V4 Flash model", () => {
   assert.equal(selectDeepseekModel("deepseek-v4-pro"), "deepseek-v4-pro");
 });
 
+test("routes weekly reviews through the primary V4 Flash model", () => {
+  const entry = buildModelCatalog({
+    env: { DEEPSEEK_MODEL: "deepseek-v4-flash", DEEPSEEK_WEEKLY_MODEL: "deepseek-v4-pro" },
+  }).find((item) => item.feature === "weekly_review");
+
+  assert.deepEqual(entry, {
+    feature: "weekly_review",
+    featureLabel: "周回顾",
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+  });
+});
+
 test("lists NOVA proactive reminders separately in the admin model quota catalog", () => {
   const entry = buildModelCatalog({ env: { DEEPSEEK_MODEL: "deepseek-v4-flash" } })
     .find((item) => item.feature === "proactive_daily_brief");
@@ -226,6 +240,69 @@ test("lists NOVA proactive reminders separately in the admin model quota catalog
     provider: "deepseek",
     model: "deepseek-v4-flash",
   });
+});
+
+test("uses formula nutrition targets after a legacy shared DeepSeek budget is exhausted and records AI insight usage", async () => {
+  const metrics = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      // This represents a stale pre-change budget record. Nutrition plans must
+      // not consult it: only vision, coach, and admin food-image generation are capped.
+      deepseekBudget: {
+        assertCanCall: async () => { throw new Error("legacy shared budget must not be consulted"); },
+        recordTokens: async () => { throw new Error("legacy shared budget must not be written"); },
+      },
+      calculateNutritionPlan: async () => ({
+        calories: 2100,
+        proteinG: 130,
+        carbsG: 230,
+        fatG: 65,
+        insight: "AI 洞察只补充饮食建议。",
+        model: "deepseek-v4-flash",
+        usage: { promptTokens: 100, completionTokens: 20, totalTokens: 120 },
+      }),
+      observability: {
+        recordMetric: async (metric, value, meta) => metrics.push({ metric, value, meta }),
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/nutrition-plan/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer valid-session" },
+      body: JSON.stringify({ sex: "male", age: 30, heightCm: 175, weightKg: 70 }),
+    });
+
+    assert.equal(response.status, 200);
+    const plan = await response.json();
+    assert.deepEqual(
+      {
+        calories: plan.calories,
+        proteinG: plan.proteinG,
+        carbsG: plan.carbsG,
+        fatG: plan.fatG,
+        source: plan.source,
+        insight: plan.insight,
+      },
+      {
+        calories: 2560,
+        proteinG: 112,
+        carbsG: 386,
+        fatG: 63,
+        source: "formula",
+        insight: "AI 洞察只补充饮食建议。",
+      },
+    );
+  });
+
+  assert.deepEqual(metrics.map((item) => item.metric).sort(), [
+    "model_tokens",
+    "model_tokens_input",
+    "model_tokens_output",
+  ]);
+  assert.ok(metrics.every((item) => item.meta.feature === "nutrition_plan"));
 });
 
 test("routes Hunyuan generation through the signed worker when configured", async () => {
@@ -861,12 +938,15 @@ test("accepts authenticated visual analysis without trusting a client user id", 
   assert.equal(calls[0].userId, "user-1");
 });
 
-test("consumes the daily and burst vision quota before analysis", async () => {
+test("validates the vision image before consuming the daily and burst quota", async () => {
   const quotaOperations = [];
   const server = createHttpServer({
     service: {
       verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
-      vision: { analyzeImage: async () => ({ mealName: "午餐" }) },
+      vision: {
+        validateImage: () => { throw new PublicVisionDataError("VISION_IMAGE_INVALID", "图片过大，请压缩后重试"); },
+        analyzeImage: async () => ({ mealName: "午餐" }),
+      },
       operationGuard: {
         consumeQuota: async (_userId, operation) => {
           quotaOperations.push(operation);
@@ -882,10 +962,10 @@ test("consumes the daily and burst vision quota before analysis", async () => {
       headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
       body: JSON.stringify({ imageBase64: "AA==" }),
     });
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 400);
   });
 
-  assert.deepEqual(quotaOperations, ["vision_analysis_daily", "vision_analysis_burst"]);
+  assert.deepEqual(quotaOperations, []);
 });
 
 test("serves food categories and tags to authenticated users", async () => {

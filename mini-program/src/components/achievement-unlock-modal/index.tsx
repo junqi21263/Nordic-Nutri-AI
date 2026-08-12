@@ -1,8 +1,9 @@
 import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useEffect, useState } from "react";
 import { getAchievementRequirement } from "../../features/coach/achievement-catalog";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
-import { AchievementConfettiCanvas } from "../achievement-confetti-canvas";
+import { AchievementConfettiCanvas, achievementConfettiDelayMs, type CelebrationModalSize } from "../achievement-confetti-canvas";
 import { NordicIcon, type NordicIconName } from "../nordic-icon";
 
 export interface AchievementUnlockModalAchievement {
@@ -28,6 +29,8 @@ export interface AchievementUnlockModalProps {
 export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUnlockModalProps) {
   if (!achievement) return null;
 
+  const celebrationCardId = `achievement-unlock-card-${(achievement.id || achievement.title).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const [celebrationModalSize, setCelebrationModalSize] = useState<CelebrationModalSize | null>(null);
   const requirement = achievement.description || achievement.requirement || getAchievementRequirement(achievement.title);
   const icon = achievement.icon || getAchievementIcon({
     id: achievement.id || "",
@@ -37,10 +40,33 @@ export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUn
     if (!await onDismiss()) return;
     void Taro.navigateTo({ url: "/pages/achievements/index" });
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      Taro.createSelectorQuery()
+        .select(`#${celebrationCardId}`)
+        .boundingClientRect()
+        .exec((result) => {
+          const card = result[0] as CelebrationModalSize | undefined;
+          if (cancelled || !card?.width || !card.height) return;
+          setCelebrationModalSize({ width: card.width, height: card.height });
+        });
+    }, achievementConfettiDelayMs);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [celebrationCardId]);
   return (
     <View className="achievement-unlock-overlay" ariaLabel="成就已解锁">
       <View className="achievement-unlock-overlay__backdrop" onClick={() => { void onDismiss(); }} />
-      <View className="achievement-unlock-overlay__card">
+      <View className="achievement-unlock-overlay__group">
+        <AchievementConfettiCanvas
+          seed={achievement.id || achievement.title}
+          modalSize={celebrationModalSize}
+        />
+        <View id={celebrationCardId} className="achievement-unlock-overlay__card">
         <View
           className="achievement-unlock-overlay__close"
           ariaLabel="关闭成就弹窗"
@@ -66,8 +92,8 @@ export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUn
         <View className="achievement-unlock-overlay__secondary-action" onClick={() => { void openAchievements(); }}>
           <Text>查看全部成就</Text>
         </View>
+        </View>
       </View>
-      <AchievementConfettiCanvas seed={achievement.id || achievement.title} />
     </View>
   );
 }

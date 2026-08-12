@@ -1,6 +1,6 @@
 import { Text, Textarea, View } from "@tarojs/components";
 import Taro, { useDidShow, usePullDownRefresh } from "@tarojs/taro";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { AchievementDetailSheet } from "../../components/achievement-detail-sheet";
@@ -53,9 +53,11 @@ export default function ProfilePage() {
   const [feedbackDraft, setFeedbackDraft] = useState("");
   const [feedbackMode, setFeedbackMode] = useState<"submit" | "history">("submit");
   const [feedbackItems, setFeedbackItems] = useState<ProductFeedbackItem[]>([]);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [unreadReplyCount, setUnreadReplyCount] = useState(0);
   const [weeklyReview, setWeeklyReview] = useState<ProductWeeklyReview | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const profileSyncVersion = useRef(0);
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
   const showAchievementCelebration = useAchievementStore((state) => state.showAchievementCelebration);
@@ -110,15 +112,14 @@ export default function ProfilePage() {
       });
   });
 
-  useDidShow(() => {
-    refreshFeedbackHistory();
-  });
-
-  // Silently refresh the user profile from the backend on page show,
-  // so nickname/avatar/settings changes from other pages are reflected immediately.
-  useEffect(() => {
+  // A page can remain mounted under native back-navigation. The version guard
+  // prevents an earlier account request from restoring an outdated goal.
+  const syncProfileFromAccount = () => {
+    const requestVersion = profileSyncVersion.current + 1;
+    profileSyncVersion.current = requestVersion;
     void getProductAccount()
       .then((account) => {
+        if (requestVersion !== profileSyncVersion.current) return;
         const labels: Record<string, string> = {
           muscle_gain: "增益增肌",
           fat_loss: "轻盈减脂",
@@ -155,9 +156,13 @@ export default function ProfilePage() {
         }
       })
       .catch(() => undefined);
-  }, []);
+  };
 
-  const showNotice = (message: string) => feedback.show({ message, tone: "success" });
+  useDidShow(() => {
+    refreshFeedbackHistory();
+    syncProfileFromAccount();
+  });
+
   const openPage = (url: string) => void Taro.navigateTo({ url });
   const openCoach = () => {
     setActiveKey("coach");
@@ -169,16 +174,32 @@ export default function ProfilePage() {
   };
   const submitFeedback = async () => {
     if (!feedbackDraft.trim()) {
-      feedback.show({ message: "请先写下你的问题或建议", tone: "error" });
+      setFeedbackError("请先写下你的问题或建议");
       return;
     }
     try {
       await submitProductFeedback(feedbackDraft.trim());
       setFeedbackDraft("");
+      setFeedbackError(null);
       refreshFeedbackHistory();
-      showNotice("感谢你的反馈");
+      setActiveModal(null);
+      setTimeout(() => {
+        feedback.showModal({
+          variant: "success",
+          title: "感谢你的反馈",
+          description: "我们已收到，会用它持续改进体验。",
+          primaryText: "好的",
+          dismissible: false,
+        });
+      }, bottomSheetExitDuration);
     } catch {
-      feedback.show({ message: "反馈提交失败，请稍后重试", tone: "error" });
+      feedback.showModal({
+        variant: "error",
+        title: "反馈提交失败",
+        description: "内容已保留，请稍后重试。",
+        primaryText: "知道了",
+        dismissible: true,
+      });
     }
   };
   const changeFeedbackMode = (nextMode: "submit" | "history") => {
@@ -199,11 +220,13 @@ export default function ProfilePage() {
       })
       .catch(() => undefined);
   };
-  const hasFeedbackReply = feedbackItems.some((item) => Boolean(item.adminReply));
   const openFeedback = () => {
+    const hasFeedbackReply = feedbackItems.some((item) => Boolean(item.adminReply));
     setFeedbackMode(hasFeedbackReply ? "history" : "submit");
+    setFeedbackError(null);
     setActiveModal("feedback");
   };
+  const repliedFeedbackItems = feedbackItems.filter((item) => Boolean(item.adminReply));
   const logout = () => {
     void logoutFlow
       .run()
@@ -380,6 +403,7 @@ export default function ProfilePage() {
         open={activeModal === "feedback"}
         className="profile-sheet"
         onDismiss={() => setActiveModal(null)}
+        nativeInput
       >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">
@@ -416,9 +440,17 @@ export default function ProfilePage() {
                 value={feedbackDraft}
                 placeholder="例如：我希望回顾中能看到每餐的蛋白变化"
                 maxlength={120}
-                autoHeight
-                onInput={(event) => setFeedbackDraft(event.detail.value)}
+                adjustPosition
+                cursorSpacing={20}
+                disableDefaultPadding
+                showConfirmBar={false}
+                onTouchStart={(event) => event.stopPropagation()}
+                onInput={(event) => {
+                  setFeedbackDraft(event.detail.value);
+                  if (feedbackError) setFeedbackError(null);
+                }}
               />
+              {feedbackError ? <Text className="form-field__error">{feedbackError}</Text> : null}
               <Text className="profile-modal__hint">
                 提交后将安全保存，用于定位问题和改进体验。
               </Text>
@@ -430,8 +462,8 @@ export default function ProfilePage() {
             </>
           ) : (
             <View className="profile-feedback-list">
-              {feedbackItems.length ? (
-                feedbackItems.map((item) => (
+              {repliedFeedbackItems.length ? (
+                repliedFeedbackItems.map((item) => (
                   <View className="profile-feedback-card" key={item.id}>
                     <View className="profile-feedback-card__head">
                       <Text className="profile-feedback-status">

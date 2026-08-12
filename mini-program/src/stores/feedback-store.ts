@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export type FeedbackTone = "default" | "success" | "error";
 export type FeedbackPresentation = "native" | "prominent";
+export type FeedbackModalVariant = "success" | "limit" | "error";
 
 export interface FeedbackMessage {
   message: string;
@@ -10,10 +11,25 @@ export interface FeedbackMessage {
   presentation?: FeedbackPresentation;
 }
 
+export interface FeedbackModalOptions {
+  variant: FeedbackModalVariant;
+  title: string;
+  description?: string;
+  primaryText: string;
+  secondaryText?: string;
+  onPrimary?: () => void;
+  onSecondary?: () => void;
+  onClose?: () => void;
+  dismissible?: boolean;
+}
+
 export interface FeedbackStore {
   toast: Required<FeedbackMessage> | null;
+  modal: FeedbackModalOptions | null;
   show: (feedback: FeedbackMessage) => void;
   clear: () => void;
+  showModal: (modal: FeedbackModalOptions) => void;
+  closeModal: () => void;
 }
 
 export type FeedbackToastPresenter = (feedback: Required<FeedbackMessage>) => void;
@@ -22,6 +38,7 @@ const feedbackToastDuration = 2400;
 
 type NativeToastBridge = {
   showToast?: (options: { title: string; icon: "none"; duration: number }) => unknown;
+  hideToast?: () => unknown;
 };
 
 /** Prefer native WeChat/Taro toast so secondary pages always surface feedback. */
@@ -61,12 +78,28 @@ export const createFeedbackStore = (
 ) =>
   create<FeedbackStore>((set) => ({
     toast: null,
+    modal: null,
     show: ({ message, tone = "default", presentation = "native" }) => {
       const toast = { message, tone, presentation };
-      set({ toast });
-      presentToast(toast);
+      let blockedByModal = false;
+      set((state) => {
+        blockedByModal = Boolean(state.modal);
+        return blockedByModal ? { toast: null } : { toast };
+      });
+      if (!blockedByModal) presentToast(toast);
     },
     clear: () => set({ toast: null }),
+    showModal: (modal) => {
+      set({ modal, toast: null });
+      try {
+        const globalBridge = globalThis as { wx?: NativeToastBridge; taro?: NativeToastBridge };
+        const hideToast = globalBridge.wx?.hideToast ?? globalBridge.taro?.hideToast;
+        if (typeof hideToast === "function") hideToast();
+      } catch {
+        // Native toast dismissal is best-effort outside the WeChat runtime.
+      }
+    },
+    closeModal: () => set({ modal: null }),
   }));
 
 export const useFeedbackStore = createFeedbackStore();

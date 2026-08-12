@@ -9,7 +9,7 @@ describe("profile information bottom sheets", () => {
     const source = readSource("../src/components/bottom-sheet/index.tsx");
 
     expect(source).toContain("onDismiss?: () => void");
-    expect(source).toContain("onClick={onDismiss}");
+    expect(source).toContain("event.target === event.currentTarget");
     expect(source).toContain("event.stopPropagation()");
   });
 
@@ -43,6 +43,27 @@ describe("profile information bottom sheets", () => {
     expect(pageStyles).toContain(".profile-sheet__action");
   });
 
+  it("closes the feedback sheet before showing the former inline copy in the success confirmation", () => {
+    const profile = readSource("../src/pages/profile/index.tsx");
+    const submitStart = profile.indexOf("const submitFeedback = async () => {");
+    const submitEnd = profile.indexOf("} catch", submitStart);
+    const successStart = profile.indexOf('title: "感谢你的反馈"');
+    const successEnd = profile.indexOf("});", successStart);
+    const successModal = profile.slice(successStart, successEnd);
+    const submitFlow = profile.slice(submitStart, submitEnd);
+
+    expect(submitStart).toBeGreaterThan(-1);
+    expect(submitEnd).toBeGreaterThan(successStart);
+    expect(successStart).toBeGreaterThan(-1);
+    expect(submitFlow).toContain("setActiveModal(null);");
+    expect(submitFlow).toContain("setTimeout");
+    expect(submitFlow).toContain("bottomSheetExitDuration");
+    expect(successModal).toContain("dismissible: false");
+    expect(successModal).not.toContain("onPrimary: () => setActiveModal(null)");
+    expect(successModal).toContain('description: "我们已收到，会用它持续改进体验。"');
+    expect(profile).not.toContain("profile-feedback-submitted");
+  });
+
   it("hides the tab bar via the store visible flag until the sheet exit animation finishes", () => {
     const tabStore = readSource("../src/stores/tab-bar-store.ts");
     const pageLayout = readSource("../src/layouts/page-layout/index.tsx");
@@ -56,15 +77,36 @@ describe("profile information bottom sheets", () => {
     expect(profile).toContain("bottomSheetExitDuration");
   });
 
-  it("uses a multiline feedback field that wraps and grows while preserving the local draft", () => {
+  it("uses a native multiline feedback field with keyboard-safe Mini Program props", () => {
     const profile = readSource("../src/pages/profile/index.tsx");
+    const sheet = readSource("../src/components/bottom-sheet/index.tsx");
+    const componentStyles = readSource("../src/styles/components.scss");
     const styles = readSource("../src/styles/page.scss");
 
     expect(profile).toContain("Textarea");
-    expect(profile).toContain("autoHeight");
+    expect(profile).toContain("adjustPosition");
+    expect(profile).toContain("cursorSpacing={20}");
+    expect(profile).toContain("disableDefaultPadding");
+    expect(profile).toContain("showConfirmBar={false}");
+    expect(profile).not.toContain("autoHeight");
     expect(profile).not.toContain('<Input\n            className="profile-modal__input"');
     expect(styles).toContain("min-height: 416px");
     expect(styles).toContain("font-size: $font-body");
     expect(styles).toContain("white-space: pre-wrap");
+    expect(profile).toContain('nativeInput');
+    expect(sheet).toContain("nativeInput?: boolean");
+    expect(sheet).toContain('bottom-sheet--native-input');
+    expect(componentStyles).toContain("sheet-native-input-enter");
+    expect(componentStyles).toContain("sheet-native-input-exit");
+  });
+
+  it("always reopens feedback in a fresh submit state", () => {
+    const profile = readSource("../src/pages/profile/index.tsx");
+    const openFeedbackStart = profile.indexOf("const openFeedback = () => {");
+    const openFeedbackEnd = profile.indexOf("};", openFeedbackStart);
+    const openFeedback = profile.slice(openFeedbackStart, openFeedbackEnd);
+
+    expect(openFeedback).toContain('setFeedbackMode("submit")');
+    expect(openFeedback).not.toContain("setFeedbackSubmitted");
   });
 });

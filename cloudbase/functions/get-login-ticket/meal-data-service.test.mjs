@@ -64,7 +64,8 @@ const validMeal = {
   mealType: "lunch",
   name: "鸡胸肉沙拉",
   recordedAt: "2026-07-20T12:00:00.000Z",
-  items: [{ name: "鸡胸肉", quantityG: 150, caloriesPer100g: 133, proteinPer100g: 24, carbsPer100g: 0, fatPer100g: 3 }],
+  portionMultiplier: 0.75,
+  items: [{ name: "鸡胸肉", quantityG: 75, aiQuantityG: 100, caloriesPer100g: 133, proteinPer100g: 24, carbsPer100g: 0, fatPer100g: 3 }],
 };
 
 test("creates a meal and items under the authenticated product user", async () => {
@@ -77,8 +78,11 @@ test("creates a meal and items under the authenticated product user", async () =
   assert.equal(meal.items[0].name, "鸡胸肉");
   assert.deepEqual(calls.map((call) => call.table), ["meal_records", "meal_items"]);
   assert.equal(calls[0].payload.user_id, "user-1");
+  assert.equal(calls[0].payload.portion_multiplier, 0.75);
   assert.equal(calls[1].payload[0].meal_record_id, "meal_records-1");
   assert.equal(calls[1].payload[0].food_id, null);
+  assert.equal(calls[1].payload[0].confirmed_quantity_g, 75);
+  assert.equal(calls[1].payload[0].ai_quantity_g, 100);
 });
 
 test("does not auto-create or link catalog foods when saving a meal", async () => {

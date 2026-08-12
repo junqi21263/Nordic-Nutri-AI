@@ -1,8 +1,9 @@
-import { Image, Text, View } from "@tarojs/components";
+import { Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
+import { MealDetailHero } from "../../components/meal-detail-hero";
 import { ErrorState } from "../../components/error-state";
 import { MacroProgress } from "../../components/macro-progress";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -19,15 +20,6 @@ import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
 import { usePortionDraftStore } from "../../stores/portion-draft-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
-import mealBowlImage from "../../assets/meal-bowl.svg";
-import mealOatsImage from "../../assets/meal-oats.svg";
-import mealSalmonImage from "../../assets/meal-salmon.svg";
-
-const mealImages = {
-  bowl: mealBowlImage,
-  oats: mealOatsImage,
-  salmon: mealSalmonImage,
-};
 const scoreCopy = {
   A: {
     label: "优秀搭配",
@@ -110,8 +102,6 @@ export default function MealDetailPage() {
     { label: "碳水", target: 90, tone: "carbs" as const, value: nutrition.carbs },
     { label: "脂肪", target: 25, tone: "fat" as const, value: nutrition.fat },
   ];
-  const heroImage = meal.imageUrl || (meal.imageKey ? mealImages[meal.imageKey] : mealBowlImage);
-  const previewImage = () => Taro.previewImage({ current: heroImage, urls: [heroImage] });
   const edit = () => {
     store.setEditingMealId(meal.id);
     portion.startMealEdit(meal);
@@ -165,68 +155,14 @@ export default function MealDetailPage() {
             {meal.date} · {meal.time}
           </Text>
         </View>
-        <AppCard tone="beige" className="meal-detail-page__hero">
-          <View className="meal-detail-page__hero-visual">
-            <View
-              className="meal-detail-page__hero-image-hit"
-              ariaLabel="查看原始餐食照片"
-              onClick={previewImage}
-            >
-              <Image className="meal-detail-page__hero-image" mode="aspectFill" src={heroImage} />
-            </View>
-            <View
-              className="meal-detail-page__score-badge"
-              ariaLabel="查看本餐评分依据"
-              onClick={() => setDetailModal("score")}
-            >
-              <View className="meal-detail-page__score-grade">
-                <Text>{score}</Text>
-              </View>
-              <Text className="meal-detail-page__score-badge-label">{scoreDetail.label}</Text>
-            </View>
-            <View
-              className="meal-detail-page__image-preview-hint"
-              ariaLabel="查看原始餐食照片"
-              onClick={previewImage}
-            >
-              <Text>查看原图</Text>
-            </View>
-          </View>
-          <View className="meal-detail-page__hero-body">
-            <Text className="meal-detail-page__calories">
-              {nutrition.calories}
-              <Text>kcal</Text>
-            </Text>
-            <View className="meal-detail-page__hero-macros">
-              <View className="meal-detail-page__hero-macro-chip">
-                <Text className="meal-detail-page__hero-macro-value">{nutrition.protein}g</Text>
-                <Text className="meal-detail-page__hero-macro-label">蛋白质</Text>
-              </View>
-              <View className="meal-detail-page__hero-macro-chip">
-                <Text className="meal-detail-page__hero-macro-value">{nutrition.carbs}g</Text>
-                <Text className="meal-detail-page__hero-macro-label">碳水</Text>
-              </View>
-              <View className="meal-detail-page__hero-macro-chip">
-                <Text className="meal-detail-page__hero-macro-value">{nutrition.fat}g</Text>
-                <Text className="meal-detail-page__hero-macro-label">脂肪</Text>
-              </View>
-            </View>
-          </View>
-          <View
-            className="meal-detail-page__score-footer"
-            ariaLabel="查看本餐评分依据"
-            onClick={() => setDetailModal("score")}
-          >
-            <View className="meal-detail-page__score-footer-copy">
-              <Text className="meal-detail-page__score-footer-eyebrow">本餐评分</Text>
-              <Text className="meal-detail-page__score-footer-summary">{scoreDetail.summary}</Text>
-            </View>
-            <View className="meal-detail-page__score-footer-action">
-              <Text>依据</Text>
-              <NordicIcon name="chevron-right" size={16} ariaLabel="查看本餐评分依据" />
-            </View>
-          </View>
-        </AppCard>
+        <MealDetailHero
+          imageUrl={meal.imageUrl}
+          nutrition={nutrition}
+          score={score}
+          scoreLabel={scoreDetail.label}
+          scoreSummary={scoreDetail.summary}
+          onScorePress={() => setDetailModal("score")}
+        />
         <AppCard className="meal-detail-page__composition">
           <Text className="meal-detail-page__section-title">营养构成</Text>
           {macros.map((macro) => (
@@ -332,7 +268,10 @@ export default function MealDetailPage() {
         description="删除后，本地营养汇总会立即更新。"
         confirmLabel="删除"
         onCancel={() => setDeleteDialogOpen(false)}
-        onConfirm={() => void remove()}
+        onConfirm={() => {
+          setDeleteDialogOpen(false);
+          void remove();
+        }}
       />
     </PageLayout>
   );

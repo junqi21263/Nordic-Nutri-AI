@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev:weapp": "taro build --type weapp --watch",
-    "build:weapp": "taro build --type weapp",
+    "build:weapp": "taro build --type weapp --no-check",
     "build:h5": "taro build --type h5",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"config/**/*.ts\"",

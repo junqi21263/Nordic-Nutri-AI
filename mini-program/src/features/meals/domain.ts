@@ -9,6 +9,8 @@ export interface MealItem {
   protein: number;
   carbs: number;
   fat: number;
+  /** Original AI-recognized quantity, retained so a later edit can restore the saved ratio. */
+  aiQuantityG?: number | null;
   foodId?: string | null;
   imageUrl?: string | null;
 }
@@ -20,6 +22,8 @@ export interface Meal {
   title: string;
   mealType: MealType;
   favorite: boolean;
+  /** Persisted portion selection. Prefer this over inferring a ratio from item quantities. */
+  portionMultiplier?: number | null;
   imageKey: "bowl" | "salmon" | "oats" | null;
   imageUrl?: string | null;
   items: MealItem[];

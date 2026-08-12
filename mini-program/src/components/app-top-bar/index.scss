@@ -2,11 +2,16 @@
 
 .app-top-bar {
   left: 0;
+  pointer-events: none;
   position: fixed;
   right: 0;
   top: 0;
   z-index: 1000;
   background: $color-warm-white;
+}
+.app-top-bar__btn,
+.app-top-bar__right-action {
+  pointer-events: auto;
 }
 .app-top-bar--transparent {
   background: transparent;

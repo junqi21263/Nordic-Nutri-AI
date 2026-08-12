@@ -2,7 +2,7 @@ import { nicknameModerationError } from "../profile/nickname-moderation";
 
 export type GoalType = "muscle_gain" | "fat_loss" | "maintenance" | "performance";
 export type Gender = "male" | "female";
-export type ActivityLevel = "sedentary" | "light" | "moderate" | "high";
+export type ActivityLevel = "sedentary" | "light" | "moderate" | "high" | "very_high";
 export type DietaryPattern =
   "none" | "vegetarian" | "vegan" | "pescatarian" | "low_carb" | "keto" | "mediterranean" | "halal";
 export type FoodAvoidance =
@@ -61,6 +61,7 @@ const activityMultiplier: Record<ActivityLevel, number> = {
   light: 1.375,
   moderate: 1.55,
   high: 1.725,
+  very_high: 1.9,
 };
 
 const proteinPerKg: Record<GoalType, number> = {

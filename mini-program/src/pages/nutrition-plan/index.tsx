@@ -8,6 +8,7 @@ import { CircularProgress } from "../../components/circular-progress";
 import { EmptyState } from "../../components/empty-state";
 import { NordicIcon, type NordicIconName } from "../../components/nordic-icon";
 import { OnboardingHeader } from "../../components/onboarding-header";
+import { PlanSaveTransitionOverlay } from "../../components/plan-save-transition-overlay";
 import {
   calculateNutritionPlan,
   getLocalDateString,
@@ -32,9 +33,16 @@ import {
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 import { useProfileStore } from "../../stores/profile-store";
+import { useMealStore } from "../../stores/meal-store";
+import { usePlanRegenerationStore } from "../../stores/plan-regeneration-store";
+import { usePlanSaveTransitionStore } from "../../stores/plan-save-transition-store";
+import { planReadyMotion } from "../../features/onboarding/plan-regeneration-motion";
 import { markOnboardingCompleted } from "../../utils/local-experience";
+import { clearQueuedOnboardingDraftSync } from "../../features/onboarding/onboarding-draft-cloud-sync";
 
 const today = getLocalDateString();
+const planSaveSuccessDurationMs = 200;
+const planSaveCoverDurationMs = 200;
 const goalLabels = {
   muscle_gain: "增益增肌",
   fat_loss: "轻盈减脂",
@@ -56,12 +64,70 @@ export default function NutritionPlanPage() {
   const fromSettings = isSettingsEditMode(router.params);
   const { draft } = useOnboardingDraftStore();
   const feedback = useFeedbackStore();
+  const saveTransitionPhase = usePlanSaveTransitionStore((state) => state.phase);
+  const saveTransitionActive = usePlanSaveTransitionStore((state) => state.handoffActive);
+  const beginSaveSuccess = usePlanSaveTransitionStore((state) => state.succeed);
+  const coverSaveTransition = usePlanSaveTransitionStore((state) => state.cover);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingPlan, setIsLoadingPlan] = useState(true);
-  const [plan, setPlan] = useState<PlanView | null>(null);
+  const regenerated = router.params.regenerated === "1";
+  const initialTransition = router.params.initial === "1";
+  const planReadyTransition = regenerated || initialTransition;
+  const regenerationPreview = usePlanRegenerationStore((state) => state.preview);
+  // The regeneration store deliberately clears its preview once entrance finishes.
+  // Keep this route's copy stable so that cleanup cannot trigger a second plan request.
+  const [transitionPreview] = useState(() => planReadyTransition ? regenerationPreview : null);
+  const [isLoadingPlan, setIsLoadingPlan] = useState(() => !(planReadyTransition && transitionPreview));
+  const revealRegeneration = usePlanRegenerationStore((state) => state.reveal);
+  const finishRegeneration = usePlanRegenerationStore((state) => state.finish);
+  const [plan, setPlan] = useState<PlanView | null>(() => planReadyTransition && transitionPreview ? {
+    calories: transitionPreview.calories, proteinG: transitionPreview.proteinG,
+    carbsG: transitionPreview.carbsG, fatG: transitionPreview.fatG,
+    insight: transitionPreview.insight?.trim() || "", source: transitionPreview.source || "deepseek",
+  } : null);
+  const [initialRevealStarted, setInitialRevealStarted] = useState(false);
+  const [animatedCalories, setAnimatedCalories] = useState(0);
+  const initialPlanEntry = initialTransition;
+  const initialRevealRequested = initialPlanEntry && Boolean(plan) && !isLoadingPlan;
+  const shouldAnimatePlanReady = regenerated || initialRevealStarted;
+  const shouldPreparePlanReady = regenerated || initialRevealRequested;
   const validation = validateBodyProfile(draft, today);
 
   useEffect(() => {
+    if (!initialRevealRequested) {
+      setInitialRevealStarted(false);
+      return;
+    }
+    const revealTimer = setTimeout(() => setInitialRevealStarted(true), 80);
+    return () => clearTimeout(revealTimer);
+  }, [initialRevealRequested]);
+
+  useEffect(() => {
+    if (!initialPlanEntry || !initialRevealStarted || !plan) {
+      if (!initialPlanEntry && plan) setAnimatedCalories(plan.calories);
+      return;
+    }
+    let frame = 0;
+    const target = plan.calories;
+    const startedAt = Date.now() + planReadyMotion.calorieDelayMs;
+    const easeOutQuart = (value: number) => 1 - Math.pow(1 - value, 4);
+    const animate = () => {
+      const progress = Math.min(1, Math.max(0, (Date.now() - startedAt) / planReadyMotion.calorieDurationMs));
+      setAnimatedCalories(Math.round(target * easeOutQuart(progress)));
+      if (progress < 1) frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [initialPlanEntry, initialRevealStarted, plan]);
+
+  useEffect(() => {
+    if (planReadyTransition && transitionPreview) {
+      setIsLoadingPlan(false);
+      revealRegeneration();
+      const finishTimer = setTimeout(finishRegeneration, planReadyMotion.enterDurationMs);
+      return () => {
+        clearTimeout(finishTimer);
+      };
+    }
     if (!validation.valid || !validation.profile) {
       setIsLoadingPlan(false);
       return;
@@ -120,6 +186,7 @@ export default function NutritionPlanPage() {
       cancelled = true;
     };
   }, [
+    planReadyTransition, transitionPreview, revealRegeneration, finishRegeneration,
     validation.valid,
     draft.nickname,
     draft.age,
@@ -206,6 +273,8 @@ export default function NutritionPlanPage() {
         carbsG: plan.carbsG,
         fatG: plan.fatG,
       });
+      clearQueuedOnboardingDraftSync();
+      useOnboardingDraftStore.getState().reset();
       useProfileStore.getState().setProfile({
         nickname: profile.nickname,
         weight: profile.weightKg,
@@ -215,12 +284,14 @@ export default function NutritionPlanPage() {
       useProfileStore.getState().setSetting("dietaryPattern", draft.dietaryPattern);
       useProfileStore.getState().setSetting("foodAvoidances", draft.foodAvoidances);
       useProfileStore.getState().setSetting("mealsPerDay", Number(draft.mealsPerDay));
-      feedback.show({ message: "资料与营养目标已更新", tone: "success" });
       await Taro.switchTab({ url: "/pages/profile/index" });
     } catch (error) {
-      feedback.show({
-        message: error instanceof Error ? error.message : "保存失败，请稍后重试",
-        tone: "error",
+      feedback.showModal({
+        variant: "error",
+        title: "资料保存失败",
+        description: error instanceof Error ? error.message : "请稍后重试。",
+        primaryText: "知道了",
+        dismissible: true,
       });
     } finally {
       setIsSaving(false);
@@ -256,10 +327,20 @@ export default function NutritionPlanPage() {
         targetCalories: plan.calories,
         goalLabel: goalLabels[profile.goalType],
       });
+      useMealStore.getState().setDailyTargets({
+        calories: plan.calories,
+        protein: plan.proteinG,
+        carbs: plan.carbsG,
+        fat: plan.fatG,
+      });
       markOnboardingCompleted();
+      beginSaveSuccess();
+      await new Promise<void>((resolve) => setTimeout(resolve, planSaveSuccessDurationMs));
+      coverSaveTransition();
+      await new Promise<void>((resolve) => setTimeout(resolve, planSaveCoverDurationMs));
       try {
         const { refreshProductAchievements } = await import("../../features/coach/refresh-achievements");
-        await refreshProductAchievements();
+        void refreshProductAchievements();
       } catch (error) {
         console.warn("[achievements] onboarding refresh failed", error);
       }
@@ -279,11 +360,11 @@ export default function NutritionPlanPage() {
     value: number;
     percent: number;
     icon: NordicIconName;
-    tone: "forest" | "sage";
+    tone: "forest" | "sage" | "amber";
   }> = [
     { label: "蛋白质", value: activePlan.proteinG, percent: percents.proteinPct, icon: "protein", tone: "forest" },
     { label: "碳水", value: activePlan.carbsG, percent: percents.carbsPct, icon: "carbs", tone: "sage" },
-    { label: "脂肪", value: activePlan.fatG, percent: percents.fatPct, icon: "fat", tone: "forest" },
+    { label: "脂肪", value: activePlan.fatG, percent: percents.fatPct, icon: "fat", tone: "amber" },
   ];
 
   return (
@@ -292,19 +373,36 @@ export default function NutritionPlanPage() {
       showTabs={false}
       hideNavigation
       showBrandHeader={false}
-      className="page-layout--onboarding page-layout--nutrition-plan"
+      disablePageEnterAnimation={shouldPreparePlanReady}
+      className={`page-layout--onboarding page-layout--nutrition-plan ${
+        shouldPreparePlanReady ? "page-layout--nutrition-plan-animated" : ""
+      }`}
     >
-      <View className="nutrition-plan-page">
-        <OnboardingHeader
-          brand="Nordic Nutri AI"
-          step={fromSettings ? "更新计划" : "第 4 步，共 4 步"}
-          progress={1}
-          progressAriaLabel={fromSettings ? "确认更新后的营养计划" : "当前为第 4 步，共 4 步"}
-          backAriaLabel="返回饮食偏好与限制"
-          onBack={leaveToDiet}
-        />
+      <View className={`nutrition-plan-page ${
+        shouldPreparePlanReady ? "nutrition-plan-page--entering" : ""
+      } ${regenerated ? "nutrition-plan-page--regenerated" : ""} ${
+        initialPlanEntry && shouldAnimatePlanReady
+          ? "nutrition-plan-page--initial-entering"
+          : ""
+      } ${
+        initialRevealRequested && !initialRevealStarted
+          ? "nutrition-plan-page--initial-pending"
+          : ""
+      }`}>
+        <View className="nutrition-plan__sticky-header">
+          <OnboardingHeader
+            brand="Nordic Nutri AI"
+            step={fromSettings ? "更新计划" : "第 4 步，共 4 步"}
+            progress={1}
+            progressAriaLabel={fromSettings ? "确认更新后的营养计划" : "当前为第 4 步，共 4 步"}
+            backAriaLabel="返回饮食偏好与限制"
+            onBack={leaveToDiet}
+          />
+        </View>
 
-        <AppCard className="nutrition-plan__plan-ready">
+        <AppCard className={`nutrition-plan__plan-ready ${
+          shouldPreparePlanReady ? "nutrition-plan__reveal-item nutrition-plan__reveal-item--ready" : ""
+        }`}>
           <View className="nutrition-plan__plan-ready-icon">
             <NordicIcon name="celebration" size={28} ariaLabel="计划已生成" />
           </View>
@@ -316,24 +414,25 @@ export default function NutritionPlanPage() {
               ? "确认后将更新你的每日营养目标。"
               : "从今天开始，按自己的节奏稳步前进。"}
           </Text>
-          <View className="nutrition-plan__goal-tag">
-            <Text>{goalLabels[profile.goalType]}</Text>
-          </View>
         </AppCard>
 
-        <View className="nutrition-plan__insight">
+        <View className={`nutrition-plan__insight ${
+          shouldPreparePlanReady ? "nutrition-plan__reveal-item nutrition-plan__reveal-item--insight" : ""
+        }`}>
           <Text className="nutrition-plan__insight-label">AI INSIGHT</Text>
           <Text className="nutrition-plan__insight-copy">{activePlan.insight}</Text>
         </View>
 
-        <View className="nutrition-plan__section">
+        <View className={`nutrition-plan__section ${
+          shouldPreparePlanReady ? "nutrition-plan__reveal-item nutrition-plan__reveal-item--targets" : ""
+        }`}>
           <Text className="nutrition-plan__section-title">每日目标</Text>
           <AppCard tone="beige" className="nutrition-plan__targets-card">
             <View className="nutrition-plan__calorie-row">
               <View>
                 <Text className="nutrition-plan__calorie-label">热量</Text>
                 <Text className="nutrition-plan__calorie-value">
-                  {isLoadingPlan ? "…" : activePlan.calories}
+                  {isLoadingPlan ? "…" : initialPlanEntry ? animatedCalories : activePlan.calories}
                   <Text className="nutrition-plan__calorie-unit"> kcal</Text>
                 </Text>
               </View>
@@ -354,17 +453,18 @@ export default function NutritionPlanPage() {
                     label={macro.label}
                     compact
                     tone={macro.tone}
+                    empty
+                    detail={`${macro.value}g`}
                   />
-                  <Text className="nutrition-plan__macro-value">
-                    {isLoadingPlan ? "…" : `${macro.value}g`}
-                  </Text>
                 </View>
               ))}
             </View>
           </AppCard>
         </View>
 
-        <View className="nutrition-plan__section">
+        <View className={`nutrition-plan__section ${
+          shouldPreparePlanReady ? "nutrition-plan__reveal-item nutrition-plan__reveal-item--milestones" : ""
+        }`}>
           <Text className="nutrition-plan__section-title">第一阶段里程碑</Text>
           <AppCard className="nutrition-plan__milestone-list">
             <View className="nutrition-plan__milestone-row">
@@ -390,7 +490,9 @@ export default function NutritionPlanPage() {
           </AppCard>
         </View>
 
-        <BottomActionLayout>
+        <BottomActionLayout
+          className={shouldPreparePlanReady ? "nutrition-plan__regenerated-actions nutrition-plan__reveal-item nutrition-plan__reveal-item--actions" : undefined}
+        >
           <AppButton
             size="large"
             loading={isSaving || isLoadingPlan}
@@ -404,6 +506,10 @@ export default function NutritionPlanPage() {
           </AppButton>
         </BottomActionLayout>
       </View>
+      <PlanSaveTransitionOverlay
+        visible={saveTransitionActive}
+        phase={saveTransitionPhase === "idle" ? "success" : saveTransitionPhase}
+      />
     </PageLayout>
   );
 }

@@ -7,6 +7,7 @@ import { hasSeenWelcome } from "../features/welcome/welcome-seen";
 import { useMealStore } from "../stores/meal-store";
 import { useAchievementStore } from "../stores/achievement-store";
 import { useProfileStore } from "../stores/profile-store";
+import { useOnboardingDraftStore } from "../stores/onboarding-draft-store";
 import {
   clearOnboardingCompleted,
   isOnboardingCompleted,
@@ -52,6 +53,8 @@ async function loadIdentity(user: { id: string }) {
     } catch {
       // best-effort
     }
+    useOnboardingDraftStore.getState().reset();
+    if (account.onboardingDraft) useOnboardingDraftStore.getState().setDraft(account.onboardingDraft);
   }
   const labels: Record<string, string> = {
     muscle_gain: "增益增肌",

@@ -29,7 +29,6 @@ const { createWechatImageSecurity, PublicImageSecurityError } = require("./wecha
 const { createVisionImageRetentionService } = require("./vision-image-retention-service.cjs");
 const { createVisionImageReviewService } = require("./vision-image-review-service.cjs");
 const { createUserImageOpsService, PublicUserImageError } = require("./user-image-ops-service.cjs");
-const { createDeepseekBudgetService, PublicDeepseekBudgetError } = require("./deepseek-budget-service.cjs");
 const { createFoodCatalogService, PublicFoodCatalogError } = require("./food-catalog-service.cjs");
 const { createFoodQueryTranslator } = require("./food-query-translator.cjs");
 const { createNutritionBackfillService } = require("./nutrition-backfill-service.cjs");
@@ -95,8 +94,6 @@ const VISION_BURST_LIMIT = 3;
 const VISION_DAILY_WINDOW_SECONDS = 86400;
 const VISION_BURST_WINDOW_SECONDS = 600;
 const COACH_DAILY_MESSAGE_LIMIT = 20;
-const DEEPSEEK_DAILY_CALL_LIMIT = Number(process.env.DEEPSEEK_DAILY_CALL_LIMIT) || 50;
-const DEEPSEEK_DAILY_TOKEN_LIMIT = Number(process.env.DEEPSEEK_DAILY_TOKEN_LIMIT) || 120_000;
 // CloudBase HTTP access already injects Access-Control-Allow-Origin for the
 // request origin. Setting it here as "*" produces duplicate values and browsers
 // reject the response ("The 'Access-Control-Allow-Origin' header contains
@@ -331,7 +328,6 @@ function selectDeepseekModel(value) {
 }
 
 function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = null, deepseekModel = null } = {}) {
-  const weeklyModel = env.DEEPSEEK_WEEKLY_MODEL || "deepseek-v4-pro";
   const textModel = typeof env.HY_TEXT_MODEL === "string" && env.HY_TEXT_MODEL.trim()
     ? env.HY_TEXT_MODEL.trim()
     : "hunyuan-2.0-instruct-20251111";
@@ -363,7 +359,7 @@ function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = nu
       feature: "weekly_review",
       featureLabel: "周回顾",
       provider: "deepseek",
-      model: weeklyModel,
+      model: resolvedDeepseek,
     },
     {
       feature: "nutrition_plan",
@@ -440,7 +436,7 @@ function downloadImageBuffer(url) {
 
 function createRuntimeService(env = process.env, dependencies = {}) {
   const config = readRuntimeConfig(env);
-  const opsRef = { observability: null, withDeepseekBudget: null, deepseekBudget: null };
+  const opsRef = { observability: null };
   const cloudbase = dependencies.cloudbaseSdk ?? require("@cloudbase/js-sdk");
   const app = cloudbase.init({
     env: config.cloudbaseEnvId,
@@ -449,31 +445,13 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   });
   const db = typeof app.rdb === "function" ? app.rdb() : app.rdb;
   if (!db || typeof db.from !== "function") throw new Error("Relational database client is unavailable");
-  const deepseekBudget = createDeepseekBudgetService({
-    db,
-    callLimit: DEEPSEEK_DAILY_CALL_LIMIT,
-    tokenLimit: DEEPSEEK_DAILY_TOKEN_LIMIT,
-  });
-  const withDeepseekBudget = async (userId, run) => {
-    if (userId) await deepseekBudget.assertCanCall(userId);
-    const result = await run();
-    const usage = result?.usage || null;
-    if (userId && usage) {
-      deepseekBudget.recordTokens(userId, usage).catch((error) => {
-        console.warn("[deepseek-budget] recordTokens failed:", error?.message || error);
-      });
-    }
-    return result;
-  };
-  opsRef.deepseekBudget = deepseekBudget;
-  opsRef.withDeepseekBudget = withDeepseekBudget;
   const deepseekModel = selectDeepseekModel(env.DEEPSEEK_MODEL);
   const evaluateMealRaw = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
     ? createDeepseekEvaluationService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
     : null;
   const evaluateMeal = evaluateMealRaw
     ? async (input) => {
-      const result = await withDeepseekBudget(input?.userId, () => evaluateMealRaw(input));
+      const result = await evaluateMealRaw(input);
       if (result?.usage) {
         recordModelUsage(opsRef.observability, {
           model: result.model || deepseekModel,
@@ -801,7 +779,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     : null;
   const generateMealInsight = generateMealInsightRaw
     ? async (input) => {
-      const result = await withDeepseekBudget(input?.userId, () => generateMealInsightRaw(input));
+      const result = await generateMealInsightRaw(input);
       if (result && typeof result === "object" && result.usage) {
         recordModelUsage(opsRef.observability, {
           model: result.model || deepseekModel,
@@ -819,7 +797,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     : null;
   const analyzeMeal = analyzeMealRaw
     ? async (input) => {
-      const result = await withDeepseekBudget(input?.userId, () => analyzeMealRaw(input));
+      const result = await analyzeMealRaw(input);
       if (result?.usage) {
         recordModelUsage(opsRef.observability, {
           model: result.model || deepseekModel,
@@ -847,7 +825,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   });
   const weeklyReview = createDeepseekWeeklyReviewService({
     apiKey: env.DEEPSEEK_API_KEY,
-    model: env.DEEPSEEK_WEEKLY_MODEL || "deepseek-v4-pro",
+    model: deepseekModel,
   });
   const insights = createInsightDataService({
     db,
@@ -867,8 +845,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       };
     },
     getNutritionPlan: data.getNutritionPlan,
+    weeklyReviewModel: deepseekModel,
     generateDailyInsight: async (input) => {
-      const result = await withDeepseekBudget(input?.userId, () => dailyInsight(input));
+      const result = await dailyInsight(input);
       recordModelUsage(opsRef.observability, {
         model: result?.model,
         feature: "daily_insight",
@@ -879,7 +858,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       return result;
     },
     generateWeeklyReview: async (input) => {
-      const result = await withDeepseekBudget(input?.userId, () => weeklyReview(input));
+      const result = await weeklyReview(input);
       recordModelUsage(opsRef.observability, {
         model: result?.model,
         feature: "weekly_review",
@@ -1380,7 +1359,6 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     operationGuard,
     observability,
     contentModeration,
-    deepseekBudget,
     visionImageReview,
     visionImageRetention,
     userImageOps,
@@ -1424,6 +1402,7 @@ function getDataOperation(pathname) {
     "/body-profile": "saveBodyProfile",
     "/goal": "saveGoal",
     "/onboarding": "saveOnboarding",
+    "/onboarding-draft": "saveOnboardingDraft",
     "/account": "getAccount",
     "/account/cancel": "cancelAccount",
     "/account/usage": "accountUsage",
@@ -1611,9 +1590,6 @@ function isAvatarRoute(pathname) {
 }
 
 function sendMealError(res, error) {
-  if (error instanceof PublicDeepseekBudgetError) {
-    return sendJson(res, 429, { code: error.code, message: error.message });
-  }
   if (error instanceof PublicMealDataError || error instanceof PublicMealAnalysisError) {
     const statusCode = error.code === "MEAL_DATA_INVALID" ? 400 : 503;
     sendJson(res, statusCode, { code: error.code, message: error.message || error.code });
@@ -2440,14 +2416,7 @@ function createHttpServer({ service }) {
           return sendJson(res, 200, await service.meals.getMeal(session.sub, mealRoute.mealId, { hydrate: true }));
         }
         if (mealRoute.operation === "createAnalysis" && req.method === "POST") {
-          try {
-            return sendJson(res, 200, await service.meals.createAnalysis(session.sub, await readJsonBody(req)));
-          } catch (error) {
-            if (error instanceof PublicDeepseekBudgetError) {
-              return sendJson(res, 429, { code: error.code, message: error.message });
-            }
-            throw error;
-          }
+          return sendJson(res, 200, await service.meals.createAnalysis(session.sub, await readJsonBody(req)));
         }
         if (mealRoute.operation === "meals" && req.method === "POST") {
           return sendJson(res, 200, await service.meals.createMeal(session.sub, await readJsonBody(req)));
@@ -2510,9 +2479,6 @@ function createHttpServer({ service }) {
         return sendJson(res, 200, await service.insights[insightOperation](session.sub, date));
       } catch (error) {
         const code = error?.code || (String(error?.message || "").includes("Invalid date") ? "INSIGHT_DATA_INVALID" : "INSIGHT_SERVICE_UNAVAILABLE");
-        if (error instanceof PublicDeepseekBudgetError) {
-          return sendJson(res, 429, { code: error.code, message: error.message });
-        }
         const status = code === "INSIGHT_DATA_INVALID" || code === "MEAL_DATA_INVALID" ? 400 : 503;
         console.error("[insights] failed:", code, error?.message || error);
         return sendJson(res, status, { code, message: error?.message || code });
@@ -2586,9 +2552,6 @@ function createHttpServer({ service }) {
             }
             throw error;
           }
-          if (service.deepseekBudget?.assertCanCall) {
-            await service.deepseekBudget.assertCanCall(session.sub);
-          }
           const result = await service.coach.sendMessage(session.sub, body);
           const coachModel = result?.model
             || service.modelCatalog?.find((item) => item.feature === "coach")?.model
@@ -2605,9 +2568,6 @@ function createHttpServer({ service }) {
             usage: result?.usage || null,
             requests: 0,
           }).catch(() => {});
-          if (result?.usage) {
-            service.deepseekBudget?.recordTokens?.(session.sub, result.usage).catch(() => {});
-          }
           return sendJson(res, 200, result);
         }
         if (coachOperation === "streamMessage" && req.method === "POST") {
@@ -2630,9 +2590,6 @@ function createHttpServer({ service }) {
               return sendJson(res, 400, { code: error.code, message: error.message });
             }
             throw error;
-          }
-          if (service.deepseekBudget?.assertCanCall) {
-            await service.deepseekBudget.assertCanCall(session.sub);
           }
           res.writeHead(200, {
             "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -2657,15 +2614,12 @@ function createHttpServer({ service }) {
                   usage: event?.usage || null,
                   requests: 0,
                 }).catch(() => {});
-                if (event?.usage) {
-                  service.deepseekBudget?.recordTokens?.(session.sub, event.usage).catch(() => {});
-                }
               }
               res.write(`${JSON.stringify(event)}\n`);
             }
           } catch (error) {
             const code = error instanceof PublicCoachDataError || typeof error?.code === "string" ? error.code : "COACH_SERVICE_UNAVAILABLE";
-            const message = error instanceof PublicCoachDataError || error instanceof PublicDeepseekBudgetError ? error.message : undefined;
+            const message = error instanceof PublicCoachDataError ? error.message : undefined;
             res.write(`${JSON.stringify({ type: "error", code, ...(message ? { message } : {}) })}\n`);
           }
           res.end();
@@ -2673,9 +2627,6 @@ function createHttpServer({ service }) {
         }
         return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       } catch (error) {
-        if (error instanceof PublicDeepseekBudgetError) {
-          return sendJson(res, 429, { code: error.code, message: error.message });
-        }
         if (error instanceof PublicCoachDataError) {
           if (error.code === "COACH_DAILY_LIMIT_REACHED") {
             service.observability?.recordMetric?.("coach_limited", 1, {
@@ -2752,6 +2703,9 @@ function createHttpServer({ service }) {
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       const startedAt = Date.now();
       try {
+        const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+        // Invalid or oversized local camera files must not consume a daily scan.
+        service.vision?.validateImage?.(body);
         if (service.operationGuard?.consumeQuota) {
           await service.operationGuard.consumeQuota(session.sub, "vision_analysis_daily", {
             limit: VISION_DAILY_LIMIT,
@@ -2768,7 +2722,7 @@ function createHttpServer({ service }) {
           model: service.vision?.model || service.modelCatalog?.find((item) => item.feature === "vision")?.model || null,
           provider: service.vision?.provider || null,
         };
-        const result = await service.vision.analyzeImage(session.sub, await readJsonBody(req, MAX_VISION_BODY_BYTES));
+        const result = await service.vision.analyzeImage(session.sub, body);
         const visionModel = result?.model || visionMeta.model;
         const resolvedVisionMeta = {
           ...visionMeta,
@@ -2795,9 +2749,6 @@ function createHttpServer({ service }) {
             operation: "vision_analysis",
             feature: "vision",
           }).catch(() => {});
-          return sendJson(res, 429, { code: error.code, message: error.message });
-        }
-        if (error instanceof PublicDeepseekBudgetError) {
           return sendJson(res, 429, { code: error.code, message: error.message });
         }
         service.observability?.recordMetric?.("vision_failure", 1, {
@@ -2862,10 +2813,7 @@ function createHttpServer({ service }) {
               windowSeconds: VISION_DAILY_WINDOW_SECONDS,
             })
           : { used: 0, limit: VISION_DAILY_LIMIT, remaining: VISION_DAILY_LIMIT };
-        const deepseek = typeof service.deepseekBudget?.getUsage === "function"
-          ? await service.deepseekBudget.getUsage(session.sub)
-          : null;
-        return sendJson(res, 200, { vision, coach, deepseek });
+        return sendJson(res, 200, { vision, coach });
       } catch (error) {
         console.error("[account-usage] failed:", error?.message || error);
         return sendJson(res, 503, { code: "ACCOUNT_USAGE_UNAVAILABLE" });
@@ -2933,29 +2881,27 @@ function createHttpServer({ service }) {
       if (!session) return;
       try {
         const body = await readJsonBody(req);
-        let plan = null;
+        const formulaPlan = formulaNutritionPlanFallback(body);
+        let aiPlan = null;
         if (typeof service.calculateNutritionPlan === "function") {
-          if (service.deepseekBudget?.assertCanCall) {
-            await service.deepseekBudget.assertCanCall(session.sub);
-          }
-          plan = await service.calculateNutritionPlan(body);
+          aiPlan = await service.calculateNutritionPlan(body);
         }
-        if (!plan) plan = formulaNutritionPlanFallback(body);
-        if (plan?.usage && plan?.model) {
+        if (aiPlan?.usage && aiPlan?.model) {
           recordModelUsage(service.observability, {
-            model: plan.model,
+            model: aiPlan.model,
             feature: "nutrition_plan",
             provider: "deepseek",
-            usage: plan.usage,
+            usage: aiPlan.usage,
             requests: 0,
           }).catch(() => {});
-          service.deepseekBudget?.recordTokens?.(session.sub, plan.usage).catch(() => {});
         }
-        return sendJson(res, 200, plan);
+        return sendJson(res, 200, {
+          ...formulaPlan,
+          ...(typeof aiPlan?.insight === "string" && aiPlan.insight.trim()
+            ? { insight: aiPlan.insight.trim().slice(0, 80) }
+            : {}),
+        });
       } catch (error) {
-        if (error instanceof PublicDeepseekBudgetError) {
-          return sendJson(res, 429, { code: error.code, message: error.message });
-        }
         console.error("[nutrition-plan/preview] failed:", error?.message || error);
         return sendJson(res, 503, { code: "NUTRITION_PLAN_PREVIEW_FAILED" });
       }

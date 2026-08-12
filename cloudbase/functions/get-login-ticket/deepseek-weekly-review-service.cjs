@@ -111,7 +111,7 @@ function createFallbackWeeklyReview(context) {
 function createWeeklyCompletion({ apiKey, model, fetchImpl = globalThis.fetch, timeoutMs = WEEKLY_REVIEW_TIMEOUT_MS } = {}) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("DeepSeek configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
-  const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-pro";
+  const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
   return async ({ date, context }) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -150,7 +150,7 @@ function createWeeklyReviewHash(context) {
 }
 
 function createDeepseekWeeklyReviewService({ apiKey, model, requestCompletion, fetchImpl } = {}) {
-  const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-pro";
+  const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
   const complete = requestCompletion ?? (apiKey ? createWeeklyCompletion({ apiKey, model: selectedModel, fetchImpl }) : null);
   return async ({ date, context } = {}) => {
     const fallback = createFallbackWeeklyReview(context);

@@ -32,6 +32,8 @@ import { getProductMeals, mapProductMeal } from "../../api/meal-data-api";
 import { getProductDailySummary, type ProductDailySummary } from "../../api/insight-api";
 import { useProfileStore } from "../../stores/profile-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
+import { usePlanSaveTransitionStore } from "../../stores/plan-save-transition-store";
+import { PlanSaveTransitionOverlay } from "../../components/plan-save-transition-overlay";
 import { hasSeenWelcome } from "../../features/welcome/welcome-seen";
 import { useAppShare } from "../../hooks/use-app-share";
 import { isOnboardingCompleted } from "../../utils/local-experience";
@@ -50,6 +52,12 @@ export default function HomePage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const planSaveHandoffActive = usePlanSaveTransitionStore((state) => state.handoffActive);
+  const planSaveTransitionPhase = usePlanSaveTransitionStore((state) => state.phase);
+  const revealPlanSaveTransition = usePlanSaveTransitionStore((state) => state.reveal);
+  const finishPlanSaveTransition = usePlanSaveTransitionStore((state) => state.finish);
+  const planSaveEntranceStarted = useRef(false);
+  const [planSaveContentVisible, setPlanSaveContentVisible] = useState(false);
   const pullRefreshPending = useRef(false);
   const [guideFirstMeal, setGuideFirstMeal] = useState(
     () => !hasSeenFirstRunTip("home-first-meal"),
@@ -98,7 +106,7 @@ export default function HomePage() {
         console.warn("[achievements] home evaluation failed", error);
       });
     }
-    if (!remoteSummary && store.getMealsByDate(today).length === 0) {
+    if (!planSaveHandoffActive && !remoteSummary && store.getMealsByDate(today).length === 0) {
       store.setLoadingState("loading");
     }
     setSyncError(null);
@@ -128,7 +136,20 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshVersion, store.replaceRemoteMeals, today]);
+  }, [refreshVersion, store.replaceRemoteMeals, today, planSaveHandoffActive]);
+  useEffect(() => {
+    if (!planSaveHandoffActive || planSaveEntranceStarted.current) return;
+    planSaveEntranceStarted.current = true;
+    const revealTimer = setTimeout(() => {
+      setPlanSaveContentVisible(true);
+      revealPlanSaveTransition();
+    }, 32);
+    const finishTimer = setTimeout(finishPlanSaveTransition, 32 + 240);
+    return () => {
+      clearTimeout(revealTimer);
+      clearTimeout(finishTimer);
+    };
+  }, [planSaveHandoffActive, revealPlanSaveTransition, finishPlanSaveTransition]);
   const openDetail = (id: string) => Taro.navigateTo({ url: `/pages/meal-detail/index?id=${id}` });
   // Both destinations are native tabBar pages. navigateTo cannot open them.
   const openScanner = () => {
@@ -141,8 +162,9 @@ export default function HomePage() {
     useTabBarStore.getState().setActiveKey("meal-records");
     void Taro.switchTab({ url: "/pages/meal-records/index" });
   };
+  const openManualMeal = () => Taro.navigateTo({ url: "/pages/manual-meal/index" });
 
-  if (store.loadingState === "loading" && !meals.length && !remoteSummary)
+  if (store.loadingState === "loading" && !meals.length && !remoteSummary && !planSaveHandoffActive)
     return (
       <PageLayout
         title="今天的营养"
@@ -162,7 +184,7 @@ export default function HomePage() {
       refreshing={refreshing}
       className="page-layout--home"
     >
-      <View className="home-page">
+      <View className={`home-page ${planSaveContentVisible ? "home-page--plan-save-entered" : ""}`}>
         <View className="home-page__header">
           <Avatar
             label={profile.profile.nickname.slice(0, 1).toUpperCase()}
@@ -228,7 +250,7 @@ export default function HomePage() {
             <NordicIcon name="camera" size={20} ariaLabel="拍照识别" />
             <Text>拍照识别</Text>
           </View>
-          <View className="home-page__action" onClick={openRecords}>
+          <View className="home-page__action" onClick={openManualMeal}>
             <NordicIcon name="circle-plus" size={20} ariaLabel="记录饮食" />
             <Text>记录饮食</Text>
           </View>
@@ -263,6 +285,11 @@ export default function HomePage() {
           )}
         </View>
       </View>
+      <PlanSaveTransitionOverlay
+        visible={planSaveHandoffActive}
+        phase={planSaveTransitionPhase === "idle" ? "success" : planSaveTransitionPhase}
+        instant={planSaveTransitionPhase === "covering"}
+      />
     </PageLayout>
   );
 }

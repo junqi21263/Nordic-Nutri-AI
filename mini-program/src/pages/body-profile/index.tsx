@@ -32,6 +32,7 @@ import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { generateNickname } from "../../features/profile/nickname-generator";
 import { nicknameModerationError } from "../../features/profile/nickname-moderation";
+import { queueOnboardingDraftSync } from "../../features/onboarding/onboarding-draft-cloud-sync";
 
 const today = getLocalDateString();
 const PLACEHOLDER_NICKNAMES = new Set(["", "Lewis", "微信用户"]);
@@ -86,6 +87,13 @@ const activityOptions: Array<{
     trainingDays: "6",
     icon: "activity-high",
   },
+  {
+    value: "very_high",
+    title: "很高活动",
+    description: "体力劳动较多或几乎每天高强度训练。",
+    trainingDays: "7",
+    icon: "activity-high",
+  },
 ];
 
 function FormError({ message }: { message?: string }) {
@@ -101,6 +109,10 @@ export default function BodyProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const validation = validateBodyProfile(draft, today);
   const validate = () => setErrors(validation.errors);
+
+  useEffect(() => {
+    if (!fromSettings) queueOnboardingDraftSync(draft);
+  }, [draft, fromSettings]);
 
   useEffect(() => {
     if (!hydrateFromAccount) return;
@@ -169,7 +181,13 @@ export default function BodyProfilePage() {
         url: "/pages/diet-preferences/index" + settingsQuery(fromSettings),
       });
     } catch {
-      feedback.show({ message: "身体资料保存失败，请稍后重试", tone: "error" });
+      feedback.showModal({
+        variant: "error",
+        title: "身体资料保存失败",
+        description: "请稍后重试。",
+        primaryText: "知道了",
+        dismissible: true,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -184,16 +202,18 @@ export default function BodyProfilePage() {
       className="page-layout--onboarding"
     >
       <View className="body-profile-page">
-        <OnboardingHeader
-          brand="Nordic Nutri AI"
-          step={fromSettings ? "调整资料" : "第 2 步，共 4 步"}
-          progress={fromSettings ? 1 / 3 : 0.5}
-          progressAriaLabel={fromSettings ? "调整身体资料" : "当前为第 2 步，共 4 步"}
-          backAriaLabel={fromSettings ? "返回个人中心" : "返回目标选择"}
-          onBack={() =>
-            fromSettings ? leaveSettings() : navigateBackOrHome("/pages/onboarding/index")
-          }
-        />
+        <View className="onboarding-sticky-header">
+          <OnboardingHeader
+            brand="Nordic Nutri AI"
+            step={fromSettings ? "调整资料" : "第 2 步，共 4 步"}
+            progress={fromSettings ? 1 / 3 : 0.5}
+            progressAriaLabel={fromSettings ? "调整身体资料" : "当前为第 2 步，共 4 步"}
+            backAriaLabel={fromSettings ? "返回个人中心" : "返回目标选择"}
+            onBack={() =>
+              fromSettings ? leaveSettings() : navigateBackOrHome("/pages/onboarding/index")
+            }
+          />
+        </View>
         <View className="onboarding-heading body-profile__heading">
           <Text className="onboarding-heading__title">
             {fromSettings ? "更新你的身体情况" : "告诉我们你的身体情况"}

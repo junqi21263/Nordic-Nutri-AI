@@ -100,6 +100,19 @@ function isRecoverableBatchError(code) {
   return RECOVERABLE_BATCH_ERROR_CODES.has(String(code || ""));
 }
 
+// This is an idempotency outcome, not an image-generation failure. It can
+// happen when the batch preview was created before another operator approved
+// the same visual profile, or when an older batch did not exclude it.
+function isSkippableBatchError(code) {
+  return String(code || "") === "FOOD_IMAGE_ALREADY_READY";
+}
+
+// A running batch may only contain review/terminal items. Such a batch must
+// not spend one of the scheduler's limited generation slots.
+function shouldCountDispatchOutcome(outcome) {
+  return Number(outcome?.processed) > 0;
+}
+
 function resolveBatchCompletionStatus(batch, counts = {}) {
   if (batch?.status !== "running") return batch?.status;
   const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
@@ -450,6 +463,18 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
       }).eq("id", locked.data.id);
       return { processed: 1, itemId: locked.data.id, jobId: job.id, batch: await refreshSummary(batchId) };
     } catch (error) {
+      if (isSkippableBatchError(error?.code)) {
+        await db.from("food_image_batch_items").update({
+          status: "skipped",
+          error_code: null,
+          error_message: null,
+          retry_reason: "目标视觉形态已有审核通过的主图，已跳过生成",
+          next_retry_at: null,
+          locked_at: null,
+          locked_by: null,
+        }).eq("id", locked.data.id);
+        return { processed: 1, skipped: true, itemId: locked.data.id, batch: await refreshSummary(batchId) };
+      }
       const recoverable = isRecoverableBatchError(error?.code);
       const attempts = recoverable
         ? Number(locked.data.attempt_count || 0)
@@ -495,8 +520,10 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
       const counts = await countItems(batch.id);
       const available = Math.max(0, Math.min(Number(batch.concurrency) || 2, 5) - Number(counts.generating || 0));
       for (let index = 0; index < available && attempted.length < limit; index += 1) {
+        const outcome = await processNext(null, batch.id, { trusted: true });
+        outcomes.push(outcome);
+        if (!shouldCountDispatchOutcome(outcome)) break;
         attempted.push(batch.id);
-        outcomes.push(await processNext(null, batch.id, { trusted: true }));
       }
     }
     return {
@@ -612,6 +639,6 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
 module.exports = {
   BATCH_STATUSES, ITEM_STATUSES, FIRST_SAMPLE_FOODS, FoodImageBatchError,
   normalizeFoodIds, normalizeBatchPayload, normalizeCategoryBatchPayload, isClaimableBatchItemStatus,
-  isRecoverableBatchError, resolveBatchCompletionStatus,
+  isRecoverableBatchError, isSkippableBatchError, shouldCountDispatchOutcome, resolveBatchCompletionStatus,
   mapBatchRow, mapBatchItemRow, createFoodImageBatchService,
 };

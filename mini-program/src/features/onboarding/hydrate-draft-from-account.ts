@@ -20,10 +20,9 @@ const goalTypeFromAccount: Record<
 const mealCountValues = new Set(["2", "3", "4", "5"]);
 
 function asActivityLevel(value: ProductAccount["activityLevel"]): ActivityLevel | null {
-  if (value === "sedentary" || value === "light" || value === "moderate" || value === "high") {
+  if (value === "sedentary" || value === "light" || value === "moderate" || value === "high" || value === "very_high") {
     return value;
   }
-  if (value === "very_high") return "high";
   return null;
 }
 

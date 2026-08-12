@@ -4,10 +4,20 @@ import { useEffect, useMemo } from "react";
 
 const particleCountPerSide = 80;
 const colors = ["#0B3B24", "#bdeecc", "#e3e3de", "#F9F8F3"];
-const confettiDelayMs = 300;
+export const achievementConfettiDelayMs = 300;
 const gravity = 0.5;
 const drag = 0.95;
 const motionRate = 0.5;
+// Fade fully before a particle's visible bounds can reach the canvas edge.
+const bottomFadeDistance = 180;
+const bottomFadeRate = 0.06;
+const horizontalSpread = 300;
+const verticalSpread = 360;
+const CELEBRATION_EMITTER_CONFIG = {
+  xRatio: 0.53,
+  yRatio: 0.1,
+};
+const isDevelopment = process.env.NODE_ENV !== "production";
 
 type ParticleSide = "left" | "right";
 
@@ -30,6 +40,10 @@ interface CanvasNode {
   getContext: (contextId: "2d") => CanvasRenderingContext2D | null;
 }
 
+export interface CelebrationModalSize {
+  height: number;
+  width: number;
+}
 function createRandom(seed: string) {
   let state = Array.from(seed).reduce(
     (value, character) => ((value * 31 + character.charCodeAt(0)) >>> 0),
@@ -45,16 +59,16 @@ function createRandom(seed: string) {
 function createParticles(
   seed: string,
   side: ParticleSide,
-  width: number,
-  height: number,
+  emitterX: number,
+  emitterY: number,
 ): ConfettiParticle[] {
   const random = createRandom(`${seed}:${side}`);
 
   return Array.from({ length: particleCountPerSide }, () => {
     const isCircle = random() > 0.5;
     const size = random() * 8 + 4;
-    const startX = side === "left" ? -20 : width + 20;
-    const startY = height / 2 + random() * 200 - 100;
+    const startX = emitterX;
+    const startY = emitterY + random() * 200 - 100;
     const angle = side === "left" ? random() * 60 - 30 : random() * 60 + 150;
     const speed = random() * 15 + 10;
     const radians = (angle * Math.PI) / 180;
@@ -72,6 +86,31 @@ function createParticles(
       y: startY,
     };
   });
+}
+
+function drawEmitterDebugMarkers(
+  ctx: CanvasRenderingContext2D,
+  leftEmitter: { x: number; y: number },
+  rightEmitter: { x: number; y: number },
+) {
+  ctx.save();
+  ctx.fillStyle = "#e53935";
+  ctx.strokeStyle = "#e53935";
+  ctx.lineWidth = 2;
+
+  for (const emitter of [leftEmitter, rightEmitter]) {
+    ctx.beginPath();
+    ctx.arc(emitter.x, emitter.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(emitter.x - 7, emitter.y);
+    ctx.lineTo(emitter.x + 7, emitter.y);
+    ctx.moveTo(emitter.x, emitter.y - 7);
+    ctx.lineTo(emitter.x, emitter.y + 7);
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 function drawLeaf(ctx: CanvasRenderingContext2D, width: number, height: number) {
@@ -112,6 +151,8 @@ function drawParticle(ctx: CanvasRenderingContext2D, particle: ConfettiParticle)
 
 export interface AchievementConfettiCanvasProps {
   seed: string;
+  /** The modal's own dimensions in the celebration group's local coordinate system. */
+  modalSize: CelebrationModalSize | null;
 }
 
 /**
@@ -119,12 +160,16 @@ export interface AchievementConfettiCanvasProps {
  * The Canvas stays above the card, so the complete stream can cross the card
  * before the pieces fade naturally near the bottom edge.
  */
-export function AchievementConfettiCanvas({ seed }: AchievementConfettiCanvasProps) {
+export function AchievementConfettiCanvas({ seed, modalSize }: AchievementConfettiCanvasProps) {
   const canvasId = useMemo(() => `achievement-confetti-${seed.replace(/[^a-zA-Z0-9_-]/g, "-")}`, [seed]);
+  const canvasStyle = useMemo(() => {
+    if (!modalSize) return undefined;
+    return `height: ${modalSize.height + verticalSpread * 2}px; width: ${modalSize.width + horizontalSpread * 2}px;`;
+  }, [modalSize]);
 
   useEffect(() => {
+    if (!modalSize) return;
     let animationFrame = 0;
-    let launchTimer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
 
     const initialize = () => {
@@ -146,45 +191,58 @@ export function AchievementConfettiCanvas({ seed }: AchievementConfettiCanvasPro
           canvas.height = height * pixelRatio;
           ctx.scale(pixelRatio, pixelRatio);
 
-          launchTimer = setTimeout(() => {
+          const modalCenterX = width / 2;
+          const modalCenterY = height / 2;
+          const leftEmitter = {
+            x: modalCenterX - modalSize.width * CELEBRATION_EMITTER_CONFIG.xRatio,
+            y: modalCenterY + modalSize.height * CELEBRATION_EMITTER_CONFIG.yRatio,
+          };
+          const rightEmitter = {
+            x: modalCenterX + modalSize.width * CELEBRATION_EMITTER_CONFIG.xRatio,
+            y: modalCenterY + modalSize.height * CELEBRATION_EMITTER_CONFIG.yRatio,
+          };
+
+          if (isDevelopment) {
+            drawEmitterDebugMarkers(ctx, leftEmitter, rightEmitter);
+            return;
+          }
+
+          const particles = [
+            ...createParticles(seed, "left", leftEmitter.x, leftEmitter.y),
+            ...createParticles(seed, "right", rightEmitter.x, rightEmitter.y),
+          ];
+
+          const animate = () => {
             if (cancelled) return;
+            ctx.clearRect(0, 0, width, height);
 
-            const particles = [
-              ...createParticles(seed, "left", width, height),
-              ...createParticles(seed, "right", width, height),
-            ];
+            for (let index = particles.length - 1; index >= 0; index -= 1) {
+              const particle = particles[index]!;
+              particle.vx *= Math.pow(drag, motionRate);
+              particle.vy += gravity * motionRate;
+              particle.x += particle.vx * motionRate;
+              particle.y += particle.vy * motionRate;
+              particle.rotation += particle.rotationSpeed * motionRate;
 
-            const animate = () => {
-              if (cancelled) return;
-              ctx.clearRect(0, 0, width, height);
-
-              for (let index = particles.length - 1; index >= 0; index -= 1) {
-                const particle = particles[index]!;
-                particle.vx *= Math.pow(drag, motionRate);
-                particle.vy += gravity * motionRate;
-                particle.x += particle.vx * motionRate;
-                particle.y += particle.vy * motionRate;
-                particle.rotation += particle.rotationSpeed * motionRate;
-
-                if (particle.y > height - 100) {
-                  particle.opacity -= 0.05;
-                }
-
-                if (particle.opacity <= 0 || particle.y >= height + 50) {
-                  particles.splice(index, 1);
-                  continue;
-                }
-
-                drawParticle(ctx, particle);
+              if (particle.y > height - bottomFadeDistance) {
+                particle.opacity -= bottomFadeRate;
               }
 
-              if (particles.length > 0) {
-                animationFrame = requestAnimationFrame(animate);
+              const particleHalfHeight = particle.isCircle ? particle.size / 2 : particle.size * 0.75;
+              if (particle.opacity <= 0 || particle.y >= height - particleHalfHeight) {
+                particles.splice(index, 1);
+                continue;
               }
-            };
 
-            animationFrame = requestAnimationFrame(animate);
-          }, confettiDelayMs);
+              drawParticle(ctx, particle);
+            }
+
+            if (particles.length > 0) {
+              animationFrame = requestAnimationFrame(animate);
+            }
+          };
+
+          animationFrame = requestAnimationFrame(animate);
         });
     };
 
@@ -193,10 +251,11 @@ export function AchievementConfettiCanvas({ seed }: AchievementConfettiCanvasPro
     return () => {
       cancelled = true;
       if (initializationTimer) clearTimeout(initializationTimer);
-      if (launchTimer) clearTimeout(launchTimer);
       if (animationFrame) cancelAnimationFrame(animationFrame);
     };
-  }, [canvasId, seed]);
+  }, [canvasId, modalSize, seed]);
 
-  return <Canvas canvasId={canvasId} className="achievement-unlock-overlay__canvas" id={canvasId} type="2d" />;
+  if (!modalSize) return null;
+
+  return <Canvas canvasId={canvasId} className="achievement-unlock-overlay__canvas" id={canvasId} style={canvasStyle} type="2d" />;
 }

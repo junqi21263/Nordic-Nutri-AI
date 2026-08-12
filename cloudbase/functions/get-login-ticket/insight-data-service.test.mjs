@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { createDailyInsightHash } from "./daily-insight-service.cjs";
 import { createInsightDataService, dailyInsightContext } from "./insight-data-service.cjs";
+import { createWeeklyReviewHash, weeklyReviewContext } from "./deepseek-weekly-review-service.cjs";
 
 const meals = [
   { id: "meal-1", recordedAt: "2026-07-20T08:00:00.000Z", caloriesKcal: 500, proteinG: 40, carbsG: 50, fatG: 15 },
@@ -57,8 +58,8 @@ function createCachedInsightService({
   });
 }
 
-function createWeeklyCacheService({ generateWeeklyReview }) {
-  let cache = null;
+function createWeeklyCacheService({ generateWeeklyReview, initialCache = null, weeklyReviewModel = null }) {
+  let cache = initialCache;
   const db = {
     from(table) {
       assert.equal(table, "weekly_nutrition_reviews");
@@ -80,6 +81,7 @@ function createWeeklyCacheService({ generateWeeklyReview }) {
     listMealsRange: async (_userId, from, to) => meals.filter((meal) => meal.recordedAt.slice(0, 10) >= from && meal.recordedAt.slice(0, 10) <= to),
     getNutritionPlan: async () => ({ calories: 2400, proteinG: 180, carbsG: 300, fatG: 70 }),
     generateWeeklyReview,
+    weeklyReviewModel,
     clock: () => new Date("2026-07-20T09:30:00.000Z"),
   });
 }
@@ -406,6 +408,63 @@ test("uses rule weekly insight without DeepSeek when recorded days are sparse", 
   assert.equal(second.insight.cached, true);
   assert.equal(generationCount, 0);
   assert.match(first.insight.summary, /2\s*天/);
+});
+
+test("regenerates a weekly review cached with a different model", async () => {
+  const denseMeals = [
+    { id: "m1", recordedAt: "2026-07-14T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+    { id: "m2", recordedAt: "2026-07-15T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+    { id: "m3", recordedAt: "2026-07-16T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+  ];
+  let generationCount = 0;
+  const listMealsRange = async (_userId, from, to) => denseMeals.filter((meal) => meal.recordedAt.slice(0, 10) >= from && meal.recordedAt.slice(0, 10) <= to);
+  const getNutritionPlan = async () => ({ calories: 2400, proteinG: 180, carbsG: 300, fatG: 70 });
+  const clock = () => new Date("2026-07-20T09:30:00.000Z");
+  const snapshot = await createInsightDataService({ listMealsRange, getNutritionPlan, clock })
+    .getWeeklyReview("user-1", "2026-07-20", { preferFast: true });
+  let cache = {
+    context_hash: createWeeklyReviewHash(weeklyReviewContext(snapshot)),
+    payload: { headline: "旧周回顾", summary: "不应继续复用 V4 Pro 缓存。", strengths: [], nextSteps: [] },
+    provider: "deepseek",
+    model: "deepseek-v4-pro",
+  };
+  const db = {
+    from(table) {
+      assert.equal(table, "weekly_nutrition_reviews");
+      const query = {
+        select() { return query; },
+        eq() { return query; },
+        async maybeSingle() { return { data: cache, error: null }; },
+        async upsert(row) { cache = { ...row }; return { error: null }; },
+      };
+      return query;
+    },
+  };
+  const service = createInsightDataService({
+    db,
+    listMealsRange,
+    getNutritionPlan,
+    weeklyReviewModel: "deepseek-v4-flash",
+    generateWeeklyReview: async () => {
+      generationCount += 1;
+      return {
+        headline: "V4 Flash 周回顾",
+        summary: "已通过 V4 Flash 重新生成。",
+        strengths: ["完成多日记录"],
+        nextSteps: ["继续保持"],
+        source: "deepseek",
+        model: "deepseek-v4-flash",
+      };
+    },
+    clock,
+  });
+
+  const result = await service.getWeeklyReview("user-1", "2026-07-20");
+
+  assert.equal(generationCount, 1);
+  assert.equal(result.insight.cached, false);
+  assert.equal(result.insight.model, "deepseek-v4-flash");
+  assert.equal(cache.model, "deepseek-v4-flash");
 });
 
 test("generates and reuses a server-time weekly DeepSeek review cache when enough days exist", async () => {

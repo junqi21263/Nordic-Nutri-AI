@@ -9,6 +9,7 @@ import {
 export interface ScannerMealFixture {
   id: string;
   analysisId?: string;
+  portionMultiplier?: number;
   title: string;
   evaluation?: string;
   imageUrl?: string | null;
@@ -311,6 +312,7 @@ export function createMealFromAnalysis(
     favorite: false,
     imageKey: meal.imageKey,
     imageUrl: meal.imagePath || meal.imageUrl || null,
+    portionMultiplier: Math.min(2, Math.max(0.25, multiplier)),
     items: adjusted.items,
     insight: meal.insight,
   };

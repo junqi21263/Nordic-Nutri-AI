@@ -53,7 +53,7 @@ describe("hydrate draft from account", () => {
     expect(patch.mealsPerDay).toBe("4");
   });
 
-  it("falls back very_high activity to high and clamps unknown meal counts", () => {
+  it("preserves very_high activity and clamps unknown meal counts", () => {
     const patch = draftPatchFromAccount(
       sampleAccount({
         activityLevel: "very_high",
@@ -69,7 +69,7 @@ describe("hydrate draft from account", () => {
       }),
     );
 
-    expect(patch.activityLevel).toBe("high");
+    expect(patch.activityLevel).toBe("very_high");
     expect(patch.mealsPerDay).toBe("3");
     expect(patch.dietaryPattern).toBe("none");
   });

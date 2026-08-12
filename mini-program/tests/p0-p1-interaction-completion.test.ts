@@ -110,4 +110,20 @@ describe("P0 / P1 本地体验补全", () => {
     expect(layoutStyles).toContain(".page-layout--manual-meal .page-layout__content");
     expect(layoutStyles).toContain("page-layout__content");
   });
+
+  it("只在远端餐食同步完成后触发手动和拍照保存庆祝", () => {
+    const manualMeal = read("pages/manual-meal/index.tsx");
+    const analysis = read("pages/analysis-result/index.tsx");
+
+    expect(manualMeal).toContain("const previousCalories = meals.getDailySummary(date).consumed.calories");
+    expect(manualMeal).toContain("const syncedMeals = await getProductMeals(date)");
+    expect(manualMeal).toContain("useMealSavedCelebrationStore.getState().show");
+    expect(manualMeal).not.toContain("navigateBackOrHome(");
+    expect(analysis).toContain("const previousCalories = meals.getDailySummary(localMeal.date).consumed.calories");
+    expect(analysis).toContain("const syncedMeals = await getProductMeals(localMeal.date)");
+    expect(analysis).toContain("useMealSavedCelebrationStore.getState().show");
+    expect(analysis).not.toContain("Taro.redirectTo(");
+    expect(manualMeal).not.toContain('feedback.show({ message: "已保存并同步到饮食记录", tone: "success" })');
+    expect(analysis).not.toContain('feedback.show({ message: "AI 分析已保存到饮食记录", tone: "success" })');
+  });
 });

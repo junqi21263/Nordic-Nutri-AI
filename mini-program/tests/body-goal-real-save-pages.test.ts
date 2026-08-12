@@ -26,6 +26,8 @@ describe("body and goal real save pages", () => {
     expect(page).toContain("fatG");
     expect(page).toContain("evaluateProductAchievements");
     expect(page).toContain("await evaluateProductAchievements()");
+    expect(page).toContain('title: "今日目标已更新"');
+    expect(page).not.toContain('title: "目标方向已更新"');
     expect(page).not.toContain("getSupabaseClient");
     expect(page).toContain("loading={isSaving || loadingPlan}");
   });
@@ -42,6 +44,10 @@ describe("body and goal real save pages", () => {
 
   it("lets settings edits save body, prefs and nutrition plan without re-running onboarding", () => {
     const page = source("nutrition-plan");
+    const settingsSaveStart = page.indexOf("const saveSettingsPlan = async () => {");
+    const onboardingStart = page.indexOf("const completeOnboarding = async () => {");
+    const settingsSave = page.slice(settingsSaveStart, onboardingStart);
+    const onboardingSave = page.slice(onboardingStart);
 
     expect(page).toContain("fromSettings");
     expect(page).toContain("saveProductBodyProfile");
@@ -50,6 +56,10 @@ describe("body and goal real save pages", () => {
     expect(page).toContain("saveProductNutritionPlan");
     expect(page).toContain("保存并更新目标");
     expect(page).toContain('url: "/pages/profile/index"');
+    expect(settingsSave).not.toContain('variant: "success"');
+    expect(settingsSave).toContain('await Taro.switchTab({ url: "/pages/profile/index" })');
+    expect(onboardingSave).not.toContain('variant: "success"');
+    expect(onboardingSave).toContain('await Taro.switchTab({ url: "/pages/home/index" })');
   });
 
   it("evaluates profile completion immediately after profile edits persist", () => {

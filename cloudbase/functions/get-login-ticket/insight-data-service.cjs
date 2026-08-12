@@ -89,7 +89,7 @@ function serverMetadata(clock) {
   return { serverTime, serverDate: dateKey(serverTime) };
 }
 
-function createInsightDataService({ db, listMealsRange, countMeals, getNutritionPlan, getProfileCompletion, achievementState, generateDailyInsight, generateWeeklyReview, clock = () => new Date() }) {
+function createInsightDataService({ db, listMealsRange, countMeals, getNutritionPlan, getProfileCompletion, achievementState, generateDailyInsight, generateWeeklyReview, weeklyReviewModel = null, clock = () => new Date() }) {
   if (typeof listMealsRange !== "function" || typeof getNutritionPlan !== "function") {
     throw new Error("Insight dependencies are unavailable");
   }
@@ -260,7 +260,8 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
       try {
         const lookup = await db.from("weekly_nutrition_reviews").select("context_hash,payload,provider,model")
           .eq("user_id", userId).eq("end_date", endDate).maybeSingle();
-        if (!lookup.error && lookup.data?.context_hash === contextHash && lookup.data?.payload && typeof lookup.data.payload === "object") {
+        const cachedModelMatches = !weeklyReviewModel || lookup.data?.model === weeklyReviewModel;
+        if (!lookup.error && cachedModelMatches && lookup.data?.context_hash === contextHash && lookup.data?.payload && typeof lookup.data.payload === "object") {
           cached = { ...lookup.data.payload, source: lookup.data.provider ?? "rule_v1", model: lookup.data.model ?? null, cached: true };
         }
       } catch (error) {

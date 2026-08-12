@@ -22,6 +22,15 @@ function assertNumber(value) {
   return value;
 }
 
+function normalizePortionMultiplier(value, fallback = null) {
+  if (value == null) return fallback;
+  const multiplier = assertNumber(value);
+  if (multiplier < 0.25 || multiplier > 2 || Math.abs(multiplier * 4 - Math.round(multiplier * 4)) > 0.001) {
+    throw invalid("份量比例无效");
+  }
+  return multiplier;
+}
+
 function normalizeItems(items) {
   if (!Array.isArray(items) || items.length < 1 || items.length > 20) throw invalid();
   return items.map((item) => {
@@ -29,9 +38,12 @@ function normalizeItems(items) {
     if (!name || name.length > 100) throw invalid();
     const quantityG = assertNumber(item.quantityG);
     if (quantityG <= 0) throw invalid();
+    const aiQuantityG = item.aiQuantityG == null ? null : assertNumber(item.aiQuantityG);
+    if (aiQuantityG != null && aiQuantityG <= 0) throw invalid();
     return {
       name,
       quantityG,
+      aiQuantityG,
       caloriesPer100g: assertNumber(item.caloriesPer100g),
       proteinPer100g: assertNumber(item.proteinPer100g),
       carbsPer100g: assertNumber(item.carbsPer100g),
@@ -65,6 +77,7 @@ function normalizeMealInput(input) {
     name,
     recordedAt: recordedAt.toISOString(),
     isFavorite: Boolean(input.isFavorite),
+    portionMultiplier: normalizePortionMultiplier(input.portionMultiplier, 1),
     imageUrl,
     items: normalizeItems(input.items),
   };
@@ -95,6 +108,7 @@ function mapMeal(row, itemRows, imageByFoodId = new Map()) {
     name: row.name,
     recordedAt: row.recorded_at,
     isFavorite: Boolean(row.is_favorite),
+    portionMultiplier: row.portion_multiplier == null ? null : Number(row.portion_multiplier),
     imageUrl: row.image_path ?? null,
     insight: typeof row.insight === "string" && row.insight.trim() ? row.insight.trim() : null,
     caloriesKcal: Number(row.calories_kcal ?? 0),
@@ -361,6 +375,7 @@ function createMealDataService({
         name: meal.name,
         recorded_at: meal.recordedAt,
         is_favorite: meal.isFavorite,
+        portion_multiplier: meal.portionMultiplier,
         image_path: imagePath,
         insight,
       }).select("*").single();
@@ -369,7 +384,7 @@ function createMealDataService({
       const itemRows = meal.items.map((item) => ({
         meal_record_id: created.data.id,
         name: item.name,
-        ai_quantity_g: item.quantityG,
+        ai_quantity_g: item.aiQuantityG ?? item.quantityG,
         confirmed_quantity_g: item.quantityG,
         calories_per_100g: item.caloriesPer100g,
         protein_g_per_100g: item.proteinPer100g,
@@ -404,6 +419,7 @@ function createMealDataService({
         changes.recorded_at = recordedAt.toISOString();
       }
       if (input?.isFavorite !== undefined) changes.is_favorite = Boolean(input.isFavorite);
+      if (input?.portionMultiplier !== undefined) changes.portion_multiplier = normalizePortionMultiplier(input.portionMultiplier);
       const current = await getMeal(userId, mealId);
       if (!current) return null;
       if (input?.items !== undefined) {
@@ -411,7 +427,7 @@ function createMealDataService({
         const deleted = await db.from("meal_items").delete().eq("meal_record_id", mealId);
         if (deleted.error) throw new Error("Meal item clear failed");
         const savedItems = await db.from("meal_items").insert(items.map((item) => ({
-          meal_record_id: mealId, name: item.name, ai_quantity_g: item.quantityG, confirmed_quantity_g: item.quantityG,
+          meal_record_id: mealId, name: item.name, ai_quantity_g: item.aiQuantityG ?? item.quantityG, confirmed_quantity_g: item.quantityG,
           calories_per_100g: item.caloriesPer100g, protein_g_per_100g: item.proteinPer100g,
           carbs_g_per_100g: item.carbsPer100g, fat_g_per_100g: item.fatPer100g,
           food_id: null,

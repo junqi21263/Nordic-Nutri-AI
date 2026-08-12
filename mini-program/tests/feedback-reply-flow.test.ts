@@ -12,6 +12,8 @@ describe("feedback reply flow", () => {
     expect(page).toContain("反馈处理");
     expect(page).not.toContain("Picker");
     expect(page).toContain('hasFeedbackReply ? "history" : "submit"');
+    expect(page).toContain("const repliedFeedbackItems = feedbackItems.filter");
+    expect(page).toContain("repliedFeedbackItems.length");
     expect(page).toContain("useDidShow(() =>");
     expect(page).toContain('className="profile-feedback-title"');
     expect(page).toContain('className="profile-feedback-title__bell"');

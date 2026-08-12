@@ -35,6 +35,18 @@ describe("four-page Stitch visual contract", () => {
     expect(source).not.toContain("targetDate");
   });
 
+  it("keeps onboarding headers fixed while profile and preference content scrolls", () => {
+    const body = read("pages/body-profile/index.tsx");
+    const preferences = read("pages/diet-preferences/index.tsx");
+    const styles = read("styles/page.scss");
+
+    expect(body).toContain('className="onboarding-sticky-header"');
+    expect(preferences).toContain('className="onboarding-sticky-header"');
+    expect(styles).toContain(".body-profile-page .onboarding-sticky-header");
+    expect(styles).toContain("position: sticky;");
+    expect(styles).toContain("top: 0;");
+  });
+
   it("calibrates Body Profile typography and cards to the onboarding scale", () => {
     const styles = read("styles/page.scss");
     const start = styles.indexOf(".body-profile-page .body-profile__foundation-card");
@@ -257,8 +269,10 @@ describe("four-page Stitch visual contract", () => {
     expect(home).toContain("Taro.switchTab");
     expect(plan).toContain("Taro.switchTab");
     expect(detail).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');
-    expect(analysis).toContain("Taro.redirectTo");
-    expect(adjustment).toContain("Taro.redirectTo");
+    expect(analysis).toContain("useMealSavedCelebrationStore");
+    expect(analysis).not.toContain("Taro.redirectTo");
+    expect(adjustment).toContain("useMealSavedCelebrationStore");
+    expect(adjustment).not.toContain("Taro.redirectTo");
   });
 
   it("organizes Meal Records around a calendar, daily digest, and meal timeline", () => {
@@ -392,7 +406,7 @@ describe("four-page Stitch visual contract", () => {
     expect(detail).not.toContain('className="meal-detail-page__page-title"');
     expect(detail).toContain('className="page-layout--meal-detail"');
     expect(detail).toContain("hideNavigation");
-    expect(detail).toContain('className="meal-detail-page__hero"');
+    expect(detail).toContain("<MealDetailHero");
     expect(detail).toContain('className="meal-detail-page__composition"');
     expect(detail).not.toContain('className="meal-detail-page__ingredients"');
     expect(detail).toContain('className="meal-detail-page__actions"');

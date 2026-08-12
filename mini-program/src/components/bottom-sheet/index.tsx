@@ -7,9 +7,11 @@ export interface BottomSheetProps extends PropsWithChildren {
   open: boolean;
   className?: string;
   onDismiss?: () => void;
+  /** Keeps native inputs out of a transformed animation layer in WeChat. */
+  nativeInput?: boolean;
 }
 
-export function BottomSheet({ open, className = "", onDismiss, children }: BottomSheetProps) {
+export function BottomSheet({ open, className = "", onDismiss, children, nativeInput = false }: BottomSheetProps) {
   const [isRendered, setIsRendered] = useState(open);
   const [isClosing, setIsClosing] = useState(false);
 
@@ -32,10 +34,14 @@ export function BottomSheet({ open, className = "", onDismiss, children }: Botto
   return isRendered ? (
     <View
       className={`bottom-sheet-backdrop ${isClosing ? "bottom-sheet-backdrop--closing" : ""}`}
-      onClick={onDismiss}
+      onClick={(event) => {
+        // Native inputs do not reliably participate in Taro's inner View
+        // propagation. Only a tap directly on the backdrop may dismiss.
+        if (event.target === event.currentTarget) onDismiss?.();
+      }}
     >
       <View
-        className={`bottom-sheet ${className} ${isClosing ? "bottom-sheet--closing" : ""}`}
+        className={`bottom-sheet ${className} ${nativeInput ? "bottom-sheet--native-input" : ""} ${isClosing ? "bottom-sheet--closing" : ""}`}
         onClick={(event) => event.stopPropagation()}
       >
         <View className="bottom-sheet__handle" />

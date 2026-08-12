@@ -7,11 +7,10 @@ import { AppButton } from "../../components/app-button";
 import { BottomSheet } from "../../components/bottom-sheet";
 import { FirstRunTip } from "../../components/first-run-tip";
 import { NordicIcon } from "../../components/nordic-icon";
-import { Toast } from "../../components/toast";
 import bowlImage from "../../assets/meal-bowl.svg";
 import oatsImage from "../../assets/meal-oats.svg";
 import salmonImage from "../../assets/meal-salmon.svg";
-import { assertImageWithinPickLimit, formatVisionUploadHint } from "../../features/media/image-upload-limits";
+import { formatVisionUploadHint } from "../../features/media/image-upload-limits";
 import { isVisionQuotaExhausted, visionDailyQuotaEnforced } from "../../features/scanner/vision-quota";
 import {
   hasSeenFirstRunTip,
@@ -23,6 +22,7 @@ import { useAnalysisStore } from "../../stores/analysis-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
 import { useScannerStore } from "../../stores/scanner-store";
+import { feedbackVariantForError } from "../../features/feedback/feedback-error";
 
 function shouldShowScannerTip(): boolean {
   const meals = useMealStore.getState();
@@ -57,10 +57,8 @@ export default function FoodScannerPage() {
   const [fallbackMessage, setFallbackMessage] = useState("可检查相机、相册和网络权限；如果视觉服务尚未配置，可以先手动记录。");
   const [showScannerTip, setShowScannerTip] = useState(shouldShowScannerTip);
   const [visionRemaining, setVisionRemaining] = useState<number | null>(null);
-  const [quotaToastVisible, setQuotaToastVisible] = useState(false);
   const isScanningRef = useRef(false);
   const suppressPreviewResetRef = useRef(false);
-  const quotaToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preview = scanner.capturedMeal ?? scanner.candidates[0] ?? null;
   const visionQuotaExhausted = isVisionQuotaExhausted(visionRemaining);
 
@@ -89,10 +87,6 @@ export default function FoodScannerPage() {
       .catch(() => undefined);
   }, []);
 
-  useEffect(() => () => {
-    if (quotaToastTimerRef.current) clearTimeout(quotaToastTimerRef.current);
-  }, []);
-
   const refreshVisionUsage = async () => {
     try {
       const usage = await getProductAccountUsage();
@@ -103,10 +97,16 @@ export default function FoodScannerPage() {
     }
   };
 
-  const showVisionQuotaToast = () => {
-    if (quotaToastTimerRef.current) clearTimeout(quotaToastTimerRef.current);
-    setQuotaToastVisible(true);
-    quotaToastTimerRef.current = setTimeout(() => setQuotaToastVisible(false), 2600);
+  const showVisionQuotaModal = () => {
+    feedback.showModal({
+      variant: "limit",
+      title: "今日识别次数已用完",
+      description: "明天会恢复额度，也可以先手动记录这一餐。",
+      primaryText: "知道了",
+      secondaryText: "手动记录",
+      onSecondary: () => openManualMeal(),
+      dismissible: true,
+    });
   };
 
   const analyzeCurrentPreview = async (previewPath: string) => {
@@ -142,13 +142,16 @@ export default function FoodScannerPage() {
               : "图片识别失败，请重新选择图片或手动记录。";
       setFallbackKind(isDailyLimitReached ? "daily_limit" : "generic");
       setFallbackMessage(userMessage);
-      feedback.show({
-        message: isNotConfigured
-          ? "图片识别服务尚未配置，可先手动记录"
-          : userMessage.replace(/。$/, ""),
-        tone: "error",
+      feedback.showModal({
+        variant: isDailyLimitReached ? "limit" : feedbackVariantForError(error),
+        title: isDailyLimitReached ? "今日识别次数已用完" : "图片识别失败",
+        description: isDailyLimitReached ? "明天会恢复额度，也可以先手动记录这一餐。" : userMessage,
+        primaryText: "知道了",
+        secondaryText: "手动记录",
+        onSecondary: () => openManualMeal(),
+        dismissible: true,
       });
-      setFallbackOpen(true);
+      setFallbackOpen(false);
     } finally {
       isScanningRef.current = false;
       setIsScanning(false);
@@ -158,7 +161,7 @@ export default function FoodScannerPage() {
   const chooseImage = async (source: "camera" | "album") => {
     if (isScanningRef.current) return;
     if (visionQuotaExhausted) {
-      showVisionQuotaToast();
+      showVisionQuotaModal();
       return;
     }
     suppressPreviewResetRef.current = true;
@@ -172,7 +175,6 @@ export default function FoodScannerPage() {
       const picked = result.tempFiles[0];
       const previewPath = picked?.tempFilePath;
       if (!previewPath) throw new Error("没有获取到图片");
-      assertImageWithinPickLimit(picked?.size);
       scanner.setPreviewPath(previewPath);
       scanner.setGalleryMode(source === "album");
       setFallbackKind("generic");
@@ -188,8 +190,16 @@ export default function FoodScannerPage() {
           ? error.message
           : "暂时无法打开图片，请检查相机、相册和网络权限。";
       setFallbackMessage(message);
-      feedback.show({ message, tone: "error" });
-      setFallbackOpen(true);
+      feedback.showModal({
+        variant: "error",
+        title: "无法打开图片",
+        description: message,
+        primaryText: "知道了",
+        secondaryText: "手动记录",
+        onSecondary: () => openManualMeal(),
+        dismissible: true,
+      });
+      setFallbackOpen(false);
     } finally {
       suppressPreviewResetRef.current = false;
     }
@@ -197,7 +207,7 @@ export default function FoodScannerPage() {
 
   const retryChooseImage = () => {
     if (visionQuotaExhausted) {
-      showVisionQuotaToast();
+      showVisionQuotaModal();
       return;
     }
     setFallbackOpen(false);
@@ -261,13 +271,13 @@ export default function FoodScannerPage() {
               <Image
                 className="scanner-frame__preview"
                 src={scanner.previewPath}
-                mode="aspectFill"
+                mode="aspectFit"
               />
             ) : preview && scanner.galleryMode ? (
               <Image
                 className="scanner-frame__preview"
                 src={imageByKey[preview.imageKey]}
-                mode="aspectFill"
+                mode="aspectFit"
               />
             ) : (
               <NordicIcon name="food-pot" size={56} ariaLabel="餐盘取景提示" />
@@ -331,12 +341,6 @@ export default function FoodScannerPage() {
         </View>
         <Text className="scanner-upload-hint">{formatVisionUploadHint()}</Text>
       </View>
-      <Toast
-        message="今日图片识别次数已用完，请明天再试或手动记录"
-        tone="default"
-        presentation="prominent"
-        visible={quotaToastVisible}
-      />
       <BottomSheet
         open={fallbackOpen}
         className="scanner-fallback-sheet"

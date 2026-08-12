@@ -215,6 +215,13 @@ test("all-items filter is the leftmost queue filter control", async () => {
   assert.match(source, /id="filterRow"[\s\S]*?data-filter="all"[\s\S]*?data-filter="needs_review"/);
 });
 
+test("switching from failed to all renders immediately without hydrating every historical job", async () => {
+  const source = await pageSource();
+  assert.match(source, /data-filter="all" type="button"/);
+  assert.match(source, /const hydrateTargets = items\.filter\(\(item\) => item\.jobId && item\.status === "needs_review"\)/);
+  assert.match(source, /button\.onclick = async \(event\) => \{ event\.preventDefault\(\); state\.activeFilter = button\.dataset\.filter;/);
+});
+
 test("candidate cards keep a bare checkbox without repeating batch-select wording", async () => {
   const source = await pageSource();
   assert.match(source, /data-candidate-select=/);

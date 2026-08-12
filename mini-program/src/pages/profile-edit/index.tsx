@@ -29,6 +29,17 @@ const goalTypeByLabel: Record<string, "muscle_gain" | "fat_loss" | "maintain" | 
   健康饮食: "performance",
 };
 
+/** Achievement refresh is non-critical; it must not delay the save result. */
+async function refreshAchievementsInBackground() {
+  try {
+    const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
+    await evaluateProductAchievements();
+  } catch (error) {
+    // Never roll back a saved profile if the optional celebration refresh fails.
+    console.warn("[achievements] profile edit evaluation failed", error);
+  }
+}
+
 export default function ProfileEditPage() {
   const profile = useProfileStore();
   const feedback = useFeedbackStore();
@@ -147,13 +158,6 @@ export default function ProfileEditPage() {
         targetDate: null,
       });
       await saveProductNutritionPlan(preview);
-      try {
-        const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
-        await evaluateProductAchievements();
-      } catch (error) {
-        // Never roll back a saved profile if the non-critical celebration refresh fails.
-        console.warn("[achievements] profile edit evaluation failed", error);
-      }
       const savedNickname = saved.nickname || nextNickname;
       profile.setProfile({
         nickname: savedNickname,
@@ -161,18 +165,24 @@ export default function ProfileEditPage() {
         goalLabel,
         targetCalories: preview.calories,
       });
-      feedback.show({
-        message:
-          goalLabel !== profile.profile.goalLabel
-            ? "目标方向已更新，营养目标已重新生成"
-            : "资料已保存，营养目标已更新",
-        tone: "success",
+      const goalChanged = goalLabel !== profile.profile.goalLabel;
+      feedback.showModal({
+        variant: "success",
+        title: goalChanged ? "目标方向已更新" : "资料已保存",
+        description: goalChanged ? "营养目标已重新生成。" : "营养目标已同步更新。",
+        primaryText: "返回个人中心",
+        dismissible: true,
+        onPrimary: () => navigateBackOrHome("/pages/profile/index"),
+        onClose: () => navigateBackOrHome("/pages/profile/index"),
       });
-      navigateBackOrHome("/pages/profile/index");
+      void refreshAchievementsInBackground();
     } catch (error) {
-      feedback.show({
-        message: error instanceof Error ? error.message : "个人资料保存失败，请稍后重试",
-        tone: "error",
+      feedback.showModal({
+        variant: "error",
+        title: "资料保存失败",
+        description: error instanceof Error ? error.message : "请稍后重试。",
+        primaryText: "知道了",
+        dismissible: true,
       });
     } finally {
       setIsSaving(false);
@@ -186,6 +196,7 @@ export default function ProfileEditPage() {
       hideNavigation
       showBack
       onTopBarBack={() => Taro.navigateBack()}
+      disablePageEnterAnimation
       className="page-layout--profile-edit"
     >
       <View className="profile-flow">

@@ -24,4 +24,17 @@ describe("profile edit real save", () => {
     expect(page).not.toContain("getSupabaseClient");
     expect(page).toContain("loading={isSaving}");
   });
+
+  it("refreshes the profile hero on every page show and ignores an older account response", () => {
+    const page = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/profile/index.tsx"),
+      "utf8",
+    );
+
+    expect(page).toContain("const profileSyncVersion = useRef(0)");
+    expect(page).toContain("const syncProfileFromAccount = () =>");
+    expect(page).toContain("if (requestVersion !== profileSyncVersion.current) return;");
+    expect(page).toContain("useDidShow(() => {");
+    expect(page).toContain("syncProfileFromAccount();");
+  });
 });

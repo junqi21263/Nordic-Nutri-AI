@@ -16,6 +16,7 @@ import { PageLayout } from "../../layouts/page-layout";
 import type { MealType } from "../../features/meals/domain";
 import { mealTypeOptions } from "../../features/meals/meal-type";
 import { getAdjustedAnalysis } from "../../features/scanner/domain";
+import { toMealSavedCelebration } from "../../features/meals/meal-saved-celebration-data";
 import {
   getMealRecognitionMotionSchedule,
   mealRecognitionMotionConfig,
@@ -28,6 +29,7 @@ import { useMealStore } from "../../stores/meal-store";
 import { usePortionDraftStore } from "../../stores/portion-draft-store";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { useFeedbackStore } from "../../stores/feedback-store";
+import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
 import { useScannerStore } from "../../stores/scanner-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { useCountUp } from "../../hooks/useCountUp";
@@ -163,7 +165,8 @@ export default function AnalysisResultPage() {
         </AppButton>
       </PageLayout>
     );
-  const adjusted = getAdjustedAnalysis(meal, 1);
+  const portionMultiplier = portion.meal?.id === meal.id && portion.editingMealId === null ? portion.multiplier : 1;
+  const adjusted = getAdjustedAnalysis(meal, portionMultiplier);
   const motionSchedule = getMealRecognitionMotionSchedule(adjusted.items.length);
   const isRecognitionMotion = revealOnMount || replayKey > 0;
   const isBaseVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "baseReveal");
@@ -178,6 +181,7 @@ export default function AnalysisResultPage() {
       time: nowTime(),
       title: meal.title,
       mealType: meal.mealType,
+      portionMultiplier,
       favorite: false,
       imageKey: meal.imageKey,
       // Only durable refs — local wxfile preview is not restorable after save.
@@ -185,6 +189,7 @@ export default function AnalysisResultPage() {
       items: adjusted.items,
       insight: meal.insight,
     };
+    const previousCalories = meals.getDailySummary(localMeal.date).consumed.calories;
     try {
       const textAnalysis = meal.analysisId
         ? null
@@ -197,15 +202,22 @@ export default function AnalysisResultPage() {
           ? { ...request, name: textAnalysis.mealName, items: textAnalysis.items }
           : request,
       );
-      meals.replaceRemoteMeals(await getProductMeals(localMeal.date), localMeal.date);
+      const syncedMeals = await getProductMeals(localMeal.date);
+      meals.replaceRemoteMeals(syncedMeals, localMeal.date);
+      useMealSavedCelebrationStore.getState().show(
+        toMealSavedCelebration({
+          savedMeal: saved,
+          previousCalories,
+          syncedMeals,
+          targetCalories: meals.dailyTargets.calories,
+        }),
+      );
       try {
         const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
         await evaluateProductAchievements(localMeal.date);
       } catch {
         // The saved meal remains valid if achievement refresh is temporarily unavailable.
       }
-      feedback.show({ message: "AI 分析已保存到饮食记录", tone: "success" });
-      Taro.redirectTo({ url: `/pages/meal-detail/index?id=${saved.id}` });
     } catch {
       feedback.show({ message: "分析或保存失败，请检查网络后重试", tone: "error" });
     }
@@ -313,7 +325,7 @@ export default function AnalysisResultPage() {
             value={adjusted.score === "A" ? 92 : adjusted.score === "B" ? 76 : 58}
             total={100}
             label="餐点评分"
-            tone="sage"
+            tone="score"
             reveal={isRecognitionMotion ? isMetricsCounting : true}
             revealDurationMs={mealRecognitionMotionConfig.countDurationMs}
             animateValue={isRecognitionMotion}
@@ -453,7 +465,7 @@ export default function AnalysisResultPage() {
                 size="large"
                 disabled={!bottomAction.isAdjustInteractive}
                 onClick={() => {
-                  portion.start(meal);
+                  if (portion.meal?.id !== meal.id || portion.editingMealId !== null) portion.start(meal);
                   Taro.navigateTo({ url: "/pages/portion-adjustment/index" });
                 }}
               >

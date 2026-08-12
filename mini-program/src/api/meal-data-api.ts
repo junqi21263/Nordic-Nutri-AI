@@ -16,6 +16,7 @@ export interface ProductMealInput {
   name: string;
   recordedAt: string;
   isFavorite?: boolean;
+  portionMultiplier?: number | null;
   imageUrl?: string | null;
   imagePath?: string | null;
   items: Array<Omit<ProductMealItem, "id">>;
@@ -65,7 +66,7 @@ export async function createProductMeal(input: ProductMealInput): Promise<Meal> 
 export async function updateProductMeal(
   id: string,
   input: Partial<
-    Pick<ProductMealInput, "mealType" | "name" | "recordedAt" | "isFavorite" | "items">
+    Pick<ProductMealInput, "mealType" | "name" | "recordedAt" | "isFavorite" | "portionMultiplier" | "items">
   >,
 ): Promise<Meal | null> {
   const data = await requestProductApi<ProductMeal | null>(`/meals/${id}`, {

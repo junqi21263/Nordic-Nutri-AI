@@ -1,19 +1,23 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { FoodThumbnail } from "../../components/food-thumbnail";
 import { NordicIcon } from "../../components/nordic-icon";
-import { createProductMeal, getProductMeals } from "../../api/meal-data-api";
+import { RecordTimeEditor } from "../../components/record-time-editor";
+import { analyzeProductMeal, createProductMeal, getProductMeals } from "../../api/meal-data-api";
 import { type MealType } from "../../features/meals/domain";
+import { toMealSavedCelebration } from "../../features/meals/meal-saved-celebration-data";
+import { estimateNutritionFromAnalysis, type ManualMealNutrition } from "../../features/meals/manual-meal-estimate";
 import { inferMealTypeFromTime, mealTypeOptions } from "../../features/meals/meal-type";
 import { getLocalDateString } from "../../features/onboarding/domain";
+import { recordedAtFromLocal } from "../../features/meals/product-meal-input";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
+import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
 import type { ProductFoodCatalogItem } from "../../api/food-catalog-api";
-import { navigateBackOrHome } from "../../utils/navigation";
 
 const nowTime = () => {
   const date = new Date();
@@ -21,6 +25,7 @@ const nowTime = () => {
 };
 
 const readNumber = (value: string) => Number(value || 0);
+type NutritionField = "calories" | "protein" | "carbs" | "fat";
 const displayNumber = (value: unknown) => {
   const number = typeof value === "number" ? value : Number(value);
   return Number.isFinite(number) && number >= 0 ? String(Math.round(number * 10) / 10) : "";
@@ -41,6 +46,8 @@ export default function ManualMealPage() {
   const feedback = useFeedbackStore();
   const consumeSelectedFood = useFoodSelectionStore((state) => state.consumeSelectedFood);
   const [title, setTitle] = useState("");
+  const [recordDate, setRecordDate] = useState(getLocalDateString);
+  const [recordTime, setRecordTime] = useState(nowTime);
   const [mealType, setMealType] = useState<MealType>(() => inferMealTypeFromTime());
   const [calories, setCalories] = useState("");
   const [protein, setProtein] = useState("");
@@ -48,7 +55,43 @@ export default function ManualMealPage() {
   const [fat, setFat] = useState("");
   const [portionG, setPortionG] = useState("100");
   const [selectedFood, setSelectedFood] = useState<ProductFoodCatalogItem | null>(null);
+  const [isEstimating, setIsEstimating] = useState(false);
+  const [estimateCopy, setEstimateCopy] = useState("填写餐食名称后可自动估算，也可手动修改");
   const [isSaving, setIsSaving] = useState(false);
+  const manuallyEdited = useRef<Record<NutritionField, boolean>>({
+    calories: false,
+    protein: false,
+    carbs: false,
+    fat: false,
+  });
+
+  const setNutrition = (nutrition: ManualMealNutrition, force = false) => {
+    if (force || !manuallyEdited.current.calories) setCalories(nutrition.calories);
+    if (force || !manuallyEdited.current.protein) setProtein(nutrition.protein);
+    if (force || !manuallyEdited.current.carbs) setCarbs(nutrition.carbs);
+    if (force || !manuallyEdited.current.fat) setFat(nutrition.fat);
+  };
+
+  const estimateFromTitle = useCallback(async (force = false) => {
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle || selectedFood) return;
+    setIsEstimating(true);
+    try {
+      const analysis = await analyzeProductMeal([{ name: normalizedTitle, quantityG: 100 }]);
+      setNutrition(estimateNutritionFromAnalysis(analysis.items), force);
+      setEstimateCopy(`已按“${normalizedTitle}”自动估算，可继续手动修改`);
+    } catch {
+      setEstimateCopy("暂未获得自动估算，请按包装或常见份量手动填写");
+    } finally {
+      setIsEstimating(false);
+    }
+  }, [selectedFood, title]);
+
+  useEffect(() => {
+    if (selectedFood || !title.trim()) return;
+    const timer = setTimeout(() => void estimateFromTitle(), 600);
+    return () => clearTimeout(timer);
+  }, [estimateFromTitle, selectedFood, title]);
 
   useDidShow(() => {
     const food = consumeSelectedFood();
@@ -61,6 +104,8 @@ export default function ManualMealPage() {
     setProtein(nutrition.protein);
     setCarbs(nutrition.carbs);
     setFat(nutrition.fat);
+    manuallyEdited.current = { calories: false, protein: false, carbs: false, fat: false };
+    setEstimateCopy("已按当前份量自动计算，可继续手动修改");
   });
 
   const updatePortion = (value: string) => {
@@ -74,6 +119,21 @@ export default function ManualMealPage() {
     setFat(nutrition.fat);
   };
 
+  const updateTitle = (value: string) => {
+    setTitle(value);
+    setSelectedFood(null);
+    manuallyEdited.current = { calories: false, protein: false, carbs: false, fat: false };
+    setEstimateCopy(value.trim() ? "正在根据餐食名称准备估算…" : "填写餐食名称后可自动估算，也可手动修改");
+  };
+
+  const updateManualNutrition = (field: NutritionField, value: string) => {
+    manuallyEdited.current[field] = true;
+    if (field === "calories") setCalories(value);
+    if (field === "protein") setProtein(value);
+    if (field === "carbs") setCarbs(value);
+    if (field === "fat") setFat(value);
+  };
+
   const save = async () => {
     const nutrition = [calories, protein, carbs, fat].map(readNumber);
     if (!title.trim()) {
@@ -84,8 +144,8 @@ export default function ManualMealPage() {
       feedback.show({ message: "请填写有效的热量与营养数据", tone: "error" });
       return;
     }
-    const date = getLocalDateString();
-    const time = nowTime();
+    const date = recordDate;
+    const time = recordTime;
     const localMeal = {
       date,
       time,
@@ -106,6 +166,7 @@ export default function ManualMealPage() {
         },
       ],
     };
+    const previousCalories = meals.getDailySummary(date).consumed.calories;
     setIsSaving(true);
     try {
       const quantityG = Number(portionG);
@@ -113,7 +174,7 @@ export default function ManualMealPage() {
       const saved = await createProductMeal({
         mealType: localMeal.mealType,
         name: localMeal.title,
-        recordedAt: new Date(`${date}T${time}:00+08:00`).toISOString(),
+        recordedAt: recordedAtFromLocal(recordDate, recordTime),
         items: [
           {
             name: localMeal.title,
@@ -125,15 +186,22 @@ export default function ManualMealPage() {
           },
         ],
       });
-      meals.replaceRemoteMeals(await getProductMeals(date), date);
+      const syncedMeals = await getProductMeals(date);
+      meals.replaceRemoteMeals(syncedMeals, date);
+      useMealSavedCelebrationStore.getState().show(
+        toMealSavedCelebration({
+          savedMeal: saved,
+          previousCalories,
+          syncedMeals,
+          targetCalories: meals.dailyTargets.calories,
+        }),
+      );
       try {
         const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
         await evaluateProductAchievements(date);
       } catch {
         // The saved meal remains valid if achievement refresh is temporarily unavailable.
       }
-      feedback.show({ message: "已保存并同步到饮食记录", tone: "success" });
-      navigateBackOrHome(`/pages/meal-detail/index?id=${saved.id}`);
     } catch {
       feedback.show({ message: "保存失败，请检查网络后重试", tone: "error" });
     } finally {
@@ -162,17 +230,22 @@ export default function ManualMealPage() {
             </View>
           ) : null}
           <View className="manual-meal__field">
-            <Text>餐次名称</Text>
+            <Text>餐食名称</Text>
             <Input
               value={title}
               maxlength={24}
               placeholder="例如：鸡胸肉沙拉"
-              onInput={(event) => setTitle(event.detail.value)}
+              onInput={(event) => updateTitle(event.detail.value)}
             />
           </View>
           <View className="manual-meal__field">
-            <Text>餐次时间</Text>
-            <Text className="manual-meal__time">今天 · {nowTime()}</Text>
+            <Text>记录时间</Text>
+            <RecordTimeEditor
+              date={recordDate}
+              time={recordTime}
+              onDateChange={setRecordDate}
+              onTimeChange={setRecordTime}
+            />
           </View>
           <View className="manual-meal__field">
             <Text>餐次类型</Text>
@@ -190,7 +263,12 @@ export default function ManualMealPage() {
           </View>
           <View className="manual-meal__nutrition-title">
             <Text>营养估算</Text>
-            <Text>{selectedFood ? "已按当前份量自动计算" : "可按包装或常见份量填写"}</Text>
+            <View className="manual-meal__estimate-copy">
+              <Text>{isEstimating ? "正在自动估算…" : estimateCopy}</Text>
+              {!selectedFood && title.trim() ? (
+                <Text className="manual-meal__estimate-action" onClick={() => void estimateFromTitle(true)}>重新估算</Text>
+              ) : null}
+            </View>
           </View>
           {selectedFood ? (
             <View className="manual-meal__portion">
@@ -208,19 +286,19 @@ export default function ManualMealPage() {
           ) : null}
           <View className="manual-meal__nutrition-grid">
             {[
-              ["热量", "kcal", calories, setCalories],
-              ["蛋白质", "g", protein, setProtein],
-              ["碳水", "g", carbs, setCarbs],
-              ["脂肪", "g", fat, setFat],
+              ["热量", "kcal", "calories", calories],
+              ["蛋白质", "g", "protein", protein],
+              ["碳水", "g", "carbs", carbs],
+              ["脂肪", "g", "fat", fat],
             ].map(([label, unit, value, setter]) => (
               <View className="manual-meal__nutrition-field" key={label as string}>
                 <Text>{label as string}</Text>
                 <View>
                   <Input
                     type="digit"
-                    value={value as string}
+                    value={setter as string}
                     placeholder="0"
-                    onInput={(event) => (setter as (next: string) => void)(event.detail.value)}
+                    onInput={(event) => updateManualNutrition(value as NutritionField, event.detail.value)}
                   />
                   <Text>{unit as string}</Text>
                 </View>

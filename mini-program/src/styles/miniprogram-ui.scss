@@ -5,37 +5,6 @@
 @use "./tokens" as *;
 
 page {
-  --mp-color-primary: #{$color-primary};
-  --mp-color-text: #{$color-text-primary};
-  --mp-color-text-secondary: #{$color-text-secondary};
-  --mp-color-surface: #{$color-surface};
-  --mp-color-background: #{$color-background};
-  --mp-color-success: #{$color-success};
-  --mp-color-warning: #{$color-warning};
-  --mp-color-error: #{$color-error};
-  --mp-color-divider: #{$color-divider};
-
-  --mp-spacing-xs: #{$space-4};
-  --mp-spacing-sm: #{$space-8};
-  --mp-spacing-md: #{$space-12};
-  --mp-spacing-lg: #{$space-16};
-  --mp-spacing-xl: #{$space-20};
-  --mp-spacing-2xl: #{$space-24};
-  --mp-spacing-3xl: #{$space-32};
-
-  --mp-radius-sm: #{$radius-8};
-  --mp-radius-md: #{$radius-12};
-  --mp-radius-lg: #{$radius-16};
-  --mp-radius-full: #{$radius-full};
-
-  --mp-shadow-1: #{$shadow-subtle};
-  --mp-shadow-2: #{$shadow-card};
-  --mp-shadow-3: #{$shadow-floating};
-
-  --mp-touch-min: #{$touch-target-min};
-  --mp-touch-gap: #{$touch-target-gap};
-  --mp-duration-press: #{$duration-press};
-
   -webkit-tap-highlight-color: transparent;
 }
 
