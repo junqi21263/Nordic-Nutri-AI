@@ -1,6 +1,7 @@
 import Taro from "@tarojs/taro";
 import { setDefaultProductAvatar, uploadProductAvatar } from "./product-data-api";
 import { pickDefaultAvatarSentinel } from "../features/profile/avatar-defaults";
+import { getLocalFileInfo } from "../utils/file-system-info";
 
 const MAX_AVATAR_BYTES = 1_500_000;
 
@@ -26,8 +27,10 @@ function contentTypeForBase64(base64: string): "image/jpeg" | "image/png" | "ima
 export async function uploadProfileAvatar(sourcePath: string) {
   // Prefer a small JPEG so the Cloud Storage fallback (inline data URL) stays under DB/network limits.
   const compressed = await Taro.compressImage({ src: sourcePath, quality: 55 });
-  const info = await Taro.getFileInfo({ filePath: compressed.tempFilePath });
-  if (!("size" in info) || info.size > MAX_AVATAR_BYTES) throw new Error("头像过大，请选择 1.5MB 以内的图片");
+  const info = await getLocalFileInfo(compressed.tempFilePath);
+  if (typeof info.size !== "number" || info.size > MAX_AVATAR_BYTES) {
+    throw new Error("头像过大，请选择 1.5MB 以内的图片");
+  }
   const base64 = await readBase64(compressed.tempFilePath);
   return uploadProductAvatar({ mimeType: contentTypeForBase64(base64), base64 });
 }

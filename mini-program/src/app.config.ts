@@ -28,11 +28,6 @@ const pages = [
 export default defineAppConfig({
   pages,
   lazyCodeLoading: "requiredComponents",
-  permission: {
-    "scope.writePhotosAlbum": {
-      desc: "用于将推荐好友海报保存到相册",
-    },
-  },
   window: {
     navigationStyle: "custom",
     navigationBarBackgroundColor: "#fbfaf7",

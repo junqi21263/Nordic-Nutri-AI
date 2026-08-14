@@ -9,6 +9,7 @@ import {
 import { inferMealTypeFromTime } from "../features/meals/meal-type";
 import type { ScannerMealFixture } from "../features/scanner/domain";
 import { createClientRequestId } from "../repositories/client-request-id";
+import { getLocalFileInfo } from "../utils/file-system-info";
 import { productApiEndpoint } from "./product-api-config";
 const maxImageBytes = MAX_UPLOAD_HARD_BYTES;
 /** Network upload target — keep base64 payload small enough for mobile + cloud timeout. */
@@ -106,8 +107,7 @@ function mapVisionResult(result: ProductVisionResult): ScannerMealFixture {
 
 async function fileSizeOf(filePath: string) {
   try {
-    const info = await Taro.getFileInfo({ filePath });
-    return "size" in info ? info.size : 0;
+    return (await getLocalFileInfo(filePath)).size ?? 0;
   } catch {
     return 0;
   }
@@ -171,15 +171,15 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
   const filePath = await prepareImagePath(sourcePath);
   let info;
   try {
-    info = await Taro.getFileInfo({ filePath });
+    info = await getLocalFileInfo(filePath);
   } catch (err) {
     console.error("[vision] getFileInfo failed:", err);
     throw createVisionError("无法读取图片文件，请重新选择", err);
   }
-  if (!("size" in info) || info.size > maxImageBytes) {
+  if (typeof info.size !== "number" || info.size > maxImageBytes) {
     throw new Error(formatImageTooLargeMessage(MAX_UPLOAD_HARD_BYTES / (1024 * 1024)));
   }
-  assertImageWithinUploadHardLimit("size" in info ? info.size : null);
+  assertImageWithinUploadHardLimit(info.size);
   let imageBase64;
   try {
     imageBase64 = await readBase64(filePath);

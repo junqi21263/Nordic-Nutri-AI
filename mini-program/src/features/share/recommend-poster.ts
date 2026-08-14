@@ -1,4 +1,5 @@
 import Taro from "@tarojs/taro";
+import { getLocalFileInfo } from "../../utils/file-system-info";
 import { RECOMMEND_POSTER_IMAGE } from "./brand-cdn";
 
 export { RECOMMEND_POSTER_IMAGE };
@@ -9,7 +10,7 @@ let cachedLocalPath: string | null = null;
 export async function ensureRecommendPosterLocalPath(): Promise<string> {
   if (cachedLocalPath) {
     try {
-      await Taro.getFileInfo({ filePath: cachedLocalPath });
+      await getLocalFileInfo(cachedLocalPath);
       return cachedLocalPath;
     } catch {
       cachedLocalPath = null;
