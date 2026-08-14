@@ -37,7 +37,7 @@ function createDb({ meals = [], items = [] } = {}) {
         },
         order() { return chain; },
         select() { return chain; },
-        maybeSingle: async () => ({ data: null, error: null }),
+        maybeSingle: async () => ({ data: table === "meal_records" && meals.length ? meals[0] : null, error: null }),
         single: async () => ({ data: { id: `${table}-1` }, error: null }),
         then(resolve, reject) {
           return finalize().then(resolve, reject);
@@ -85,6 +85,30 @@ test("creates a meal and items under the authenticated product user", async () =
   assert.equal(calls[1].payload[0].ai_quantity_g, 100);
 });
 
+test("binds a newly saved meal to the active nutrition plan", async () => {
+  const { db, calls } = createDb();
+  const service = createMealDataService({
+    db,
+    getNutritionPlan: async (userId) => ({ id: `plan-for-${userId}` }),
+  });
+
+  await service.createMeal("user-1", validMeal);
+
+  assert.equal(calls[0].payload.plan_id, "plan-for-user-1");
+});
+
+test("does not reject a saved meal when active plan lookup is temporarily unavailable", async () => {
+  const { db, calls } = createDb();
+  const service = createMealDataService({
+    db,
+    getNutritionPlan: async () => { throw new Error("Nutrition plan read failed"); },
+  });
+
+  await service.createMeal("user-1", validMeal);
+
+  assert.equal(calls[0].payload.plan_id, null);
+});
+
 test("does not auto-create or link catalog foods when saving a meal", async () => {
   const { db, calls } = createDb();
   let resolveCalls = 0;
@@ -102,6 +126,18 @@ test("does not auto-create or link catalog foods when saving a meal", async () =
   assert.equal(calls[1].payload[0].food_id, null);
 });
 
+test("waits for a milestone reconciliation attempt without failing an already-saved meal", async () => {
+  const { db } = createDb();
+  let attempts = 0;
+  const service = createMealDataService({
+    db,
+    onMealMutation: async () => { attempts += 1; throw new Error("milestone tables not migrated yet"); },
+  });
+  const saved = await service.createMeal("user-1", validMeal);
+  assert.equal(saved.id, "meal_records-1");
+  assert.equal(attempts, 1);
+});
+
 test("rejects a meal before persistence when its client request or nutrients are invalid", async () => {
   const { db, calls } = createDb();
   const service = createMealDataService({ db });
@@ -114,12 +150,13 @@ test("rejects a meal before persistence when its client request or nutrients are
 });
 
 test("soft-deletes only the authenticated user's meal", async () => {
-  const { db, calls } = createDb();
+  const { db, calls } = createDb({ meals: [{ id: "22222222-2222-4222-8222-222222222222", recorded_at: "2026-08-13T08:00:00.000Z" }] });
   const service = createMealDataService({ db });
 
   await service.deleteMeal("user-1", "22222222-2222-4222-8222-222222222222");
 
-  assert.deepEqual(calls[0].filters, [
+  const write = calls.find((call) => call.operation === "update");
+  assert.deepEqual(write.filters, [
     ["id", "22222222-2222-4222-8222-222222222222"],
     ["user_id", "user-1"],
     ["deleted_at", null],

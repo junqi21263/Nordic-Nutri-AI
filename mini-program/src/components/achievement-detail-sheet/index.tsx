@@ -33,7 +33,12 @@ export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDe
   };
 
   return (
-    <BottomSheet open={Boolean(achievement)} onDismiss={onDismiss} className="achievement-detail-sheet">
+    <BottomSheet
+      open={Boolean(achievement)}
+      onDismiss={onDismiss}
+      className="achievement-detail-sheet"
+      lockScroll
+    >
       {achievement ? (
         <View className="achievement-detail">
           <View className={`achievement-detail__badge ${achievement.unlocked ? "" : "achievement-detail__badge--locked"}`}>

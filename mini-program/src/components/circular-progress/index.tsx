@@ -5,6 +5,18 @@ import { calculateCircularProgressPercent } from "../../features/meals/nutrition
 
 export { calculateCircularProgressPercent } from "../../features/meals/nutrition-progress";
 
+const CIRCULAR_PROGRESS_COLORS = {
+  forest: ["#163422", "rgba(22, 52, 34, 0.14)"],
+  sage: ["#2f6b45", "rgba(47, 107, 69, 0.18)"],
+  amber: ["#9a6700", "rgba(154, 103, 0, 0.18)"],
+  score: ["#c9795d", "rgba(201, 121, 93, 0.16)"],
+} as const;
+
+const circularProgressBackground = (tone: CircularProgressProps["tone"], progress: number) => {
+  const [foreground, track] = CIRCULAR_PROGRESS_COLORS[tone ?? "forest"];
+  return `conic-gradient(from -90deg, ${foreground} 0 ${progress}%, ${track} ${progress}% 100%)`;
+};
+
 export interface CircularProgressProps {
   value: number;
   total: number;
@@ -38,7 +50,7 @@ export function CircularProgress({
   return (
     <View
       className={`circular-progress circular-progress--${tone} ${compact ? "circular-progress--compact" : ""} ${empty ? "circular-progress--empty" : ""}`}
-      style={{ "--progress": `${animatedProgress}%` } as Record<string, string>}
+      style={{ background: circularProgressBackground(tone, animatedProgress) }}
     >
       <View className="circular-progress__content">
         {!empty ? <Text className="circular-progress__value">{`${animateValue ? animatedProgress : progress}%`}</Text> : null}

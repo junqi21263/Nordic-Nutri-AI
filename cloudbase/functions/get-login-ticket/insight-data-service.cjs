@@ -31,6 +31,34 @@ function shiftDate(value, days) {
   return parsed.toISOString().slice(0, 10);
 }
 
+const milestoneValues = new Set([3, 7, 14, 30]);
+
+function normalizeFoodName(value) {
+  return String(value || "")
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .replace(/\b\d+(?:\.\d+)?\s*(?:g|克|ml|毫升)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function milestoneMessage({ milestone, mealsLogged, recordedDays, mostLoggedFood }) {
+  const message = !recordedDays
+    ? "从记录第一餐开始，慢慢建立属于你的饮食节奏。"
+    : mostLoggedFood
+      ? `最近 ${milestone} 天记录了 ${mealsLogged} 餐，${mostLoggedFood}陪你稳住饮食节奏。`
+      : `最近 ${milestone} 天记录了 ${mealsLogged} 餐，持续记录会让建议更贴近你。`;
+  return message.slice(0, 40);
+}
+
+function stableMilestoneIllustrationVariant(userId, milestone, endDate, variantCount) {
+  const source = `${userId}:${milestone}:${endDate}`;
+  let hash = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = ((hash * 31) + source.charCodeAt(index)) >>> 0;
+  }
+  return hash % variantCount;
+}
+
 function normalizeInsightPreferences(settings) {
   if (!settings || typeof settings !== "object") return null;
   const dietaryPattern = settings.dietary_pattern ?? settings.dietaryPattern ?? null;
@@ -317,6 +345,75 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
     return { ...baseReview, insight: { ...payload, source: provider, model: insight?.model ?? null, cached: false } };
   }
 
+  async function getMilestoneStats(userId, milestone, endDate) {
+    assertDate(endDate);
+    const safeMilestone = Number(milestone);
+    if (!milestoneValues.has(safeMilestone)) {
+      const error = new Error("里程碑参数无效");
+      error.code = "INSIGHT_DATA_INVALID";
+      throw error;
+    }
+    const startDate = shiftDate(endDate, -(safeMilestone - 1));
+    const previousEndDate = shiftDate(startDate, -1);
+    const previousStartDate = shiftDate(previousEndDate, -(safeMilestone - 1));
+    const [meals, previousMeals, plan] = await Promise.all([
+      listMealsRange(userId, startDate, endDate, { resolveImages: false }),
+      listMealsRange(userId, previousStartDate, previousEndDate, { resolveImages: false }),
+      getNutritionPlan(userId),
+    ]);
+    const targetCalories = Number(plan?.calories ?? plan?.caloriesKcal ?? 0);
+    const days = new Map();
+    const foods = new Map();
+    for (const meal of meals) {
+      const date = dateKey(meal?.recordedAt);
+      if (!date) continue;
+      const current = days.get(date) ?? { calories: 0, protein: 0, carbs: 0, fat: 0 };
+      current.calories += Number(meal?.calories ?? meal?.caloriesKcal ?? 0) || 0;
+      current.protein += Number(meal?.protein ?? meal?.proteinG ?? 0) || 0;
+      current.carbs += Number(meal?.carbs ?? meal?.carbsG ?? 0) || 0;
+      current.fat += Number(meal?.fat ?? meal?.fatG ?? 0) || 0;
+      days.set(date, current);
+      for (const item of Array.isArray(meal?.items) ? meal.items : []) {
+        const name = normalizeFoodName(item?.name);
+        if (!name) continue;
+        const key = item?.foodId ? `id:${item.foodId}` : `name:${name.toLocaleLowerCase()}`;
+        const food = foods.get(key) ?? { name, count: 0 };
+        foods.set(key, { name: food.name, count: food.count + 1 });
+      }
+    }
+    const recordedDays = days.size;
+    const totals = [...days.values()].reduce((total, day) => ({
+      protein: total.protein + day.protein,
+      carbs: total.carbs + day.carbs,
+      fat: total.fat + day.fat,
+      completion: total.completion + (targetCalories > 0 ? Math.min(100, Math.round((day.calories / targetCalories) * 100)) : 0),
+      targetDays: total.targetDays + (targetCalories > 0 && day.calories / targetCalories >= 0.8 ? 1 : 0),
+    }), { protein: 0, carbs: 0, fat: 0, completion: 0, targetDays: 0 });
+    const mostLogged = [...foods.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-CN"))[0];
+    const previousLogged = Array.isArray(previousMeals) ? previousMeals.length : 0;
+    const stats = {
+      milestone: safeMilestone,
+      mealsLogged: meals.length,
+      recordedDays,
+      recordingConsistency: recordedDays ? Math.min(100, Math.round((recordedDays / safeMilestone) * 100)) : undefined,
+      targetCompletionRate: recordedDays && targetCalories > 0 ? Math.round(totals.completion / recordedDays) : undefined,
+      avgProtein: recordedDays ? Math.round(totals.protein / recordedDays) : undefined,
+      avgCarbs: recordedDays ? Math.round(totals.carbs / recordedDays) : undefined,
+      avgFat: recordedDays ? Math.round(totals.fat / recordedDays) : undefined,
+      mostLoggedFood: mostLogged?.name,
+      mostLoggedFoodCount: mostLogged?.count,
+      vsPreviousPeriod: previousLogged ? Math.round(((meals.length - previousLogged) / previousLogged) * 100) : undefined,
+      targetDays: totals.targetDays || undefined,
+    };
+    const illustrationVariant = stableMilestoneIllustrationVariant(
+      userId,
+      safeMilestone,
+      endDate,
+      safeMilestone === 3 || safeMilestone === 7 ? 3 : 2,
+    );
+    return { ...stats, illustrationVariant, personalizedMessage: milestoneMessage(stats), ...serverMetadata(clock) };
+  }
+
   async function getAchievements(userId, date) {
     assertDate(date);
     let meals = [];
@@ -367,6 +464,7 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
     getDailySummaryWithInsight,
     getDailyInsight,
     getWeeklyReview,
+    getMilestoneStats,
     getAchievements,
     acknowledgeAchievementCelebration,
   };

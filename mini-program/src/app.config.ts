@@ -23,6 +23,8 @@ const pages = [
   "pages/goal-adjust/index",
   "pages/achievements/index",
   "pages/weekly-review/index",
+  "pages/milestone-journey/index",
+  "pages/milestone-poster/index",
 ];
 
 export default defineAppConfig({

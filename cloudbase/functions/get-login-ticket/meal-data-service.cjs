@@ -141,6 +141,8 @@ function createMealDataService({
   model = "deepseek-v4-flash",
   resolveImageUrl,
   generateMealInsight,
+  getNutritionPlan,
+  onMealMutation,
 }) {
   if (!db || typeof db.from !== "function") throw new Error("Meal database is unavailable");
 
@@ -210,6 +212,18 @@ function createMealDataService({
       console.warn("[meals] insight generation failed:", error?.message || error);
     }
     return null;
+  }
+
+  async function notifyMealMutation(userId, recordedAt) {
+    if (typeof onMealMutation !== "function") return;
+    try {
+      await onMealMutation({ userId, recordedAt });
+    } catch (error) {
+      // Meal persistence is already committed. Streak reconciliation is
+      // recoverable and must never turn a successful save/edit/delete into a
+      // failed meal request.
+      console.warn("[meals] milestone reconciliation failed:", error?.message || error);
+    }
   }
 
   function scheduleBackgroundInsight(userId, mealId, itemRows, record) {
@@ -367,8 +381,24 @@ function createMealDataService({
         items: meal.items,
         allowGenerate: false,
       });
+      // Bind the immutable plan version that was active when this meal was
+      // saved. Historical milestones later read this relation instead of the
+      // user's current plan after it has been adjusted.
+      let activePlan = null;
+      if (typeof getNutritionPlan === "function") {
+        try {
+          activePlan = await getNutritionPlan(userId);
+        } catch (error) {
+          // A plan association enriches historical milestone analysis, but a
+          // temporary plan read failure must never turn a successful meal save
+          // into a failure. Phase 2 reconciles the missing association when
+          // it calculates any pending milestone snapshot.
+          console.warn("[meal] active nutrition plan lookup failed:", error?.message || error);
+        }
+      }
       const created = await db.from("meal_records").insert({
         user_id: userId,
+        plan_id: activePlan?.id ?? null,
         analysis_id: meal.analysisId,
         client_request_id: meal.clientRequestId,
         meal_type: meal.mealType,
@@ -398,7 +428,9 @@ function createMealDataService({
       if (!insight) {
         scheduleBackgroundInsight(userId, created.data.id, savedItems, { ...created.data, image_path: imagePath });
       }
-      return withResolvedImage(mapMeal({ ...created.data, image_path: imagePath, insight }, savedItems));
+      const result = await withResolvedImage(mapMeal({ ...created.data, image_path: imagePath, insight }, savedItems));
+      await notifyMealMutation(userId, result.recordedAt);
+      return result;
     },
 
     async updateMeal(userId, mealId, input) {
@@ -468,15 +500,21 @@ function createMealDataService({
           },
         );
       }
+      if (updated) await notifyMealMutation(userId, updated.recordedAt);
       return updated;
     },
 
     async deleteMeal(userId, mealId) {
       assertUuid(mealId, "餐食 ID");
+      const current = await db.from("meal_records").select("recorded_at").eq("id", mealId).eq("user_id", userId).is("deleted_at", null).maybeSingle();
+      if (current.error) throw new Error("Meal read failed");
+      if (!current.data) return false;
       const deleted = await db.from("meal_records").update({ deleted_at: new Date().toISOString() })
         .eq("id", mealId).eq("user_id", userId).is("deleted_at", null).select("id").maybeSingle();
       if (deleted.error) throw new Error("Meal delete failed");
-      return Boolean(deleted.data?.id);
+      const didDelete = Boolean(deleted.data?.id);
+      if (didDelete) await notifyMealMutation(userId, current.data.recorded_at);
+      return didDelete;
     },
 
     getMeal,

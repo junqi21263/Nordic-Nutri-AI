@@ -8,6 +8,7 @@ const { createDeepseekMealService, PublicMealAnalysisError } = require("./deepse
 const { createDeepseekEvaluationService } = require("./deepseek-evaluation-service.cjs");
 const { createDeepseekNutritionPlanService } = require("./deepseek-nutrition-plan-service.cjs");
 const { createMealDataService, PublicMealDataError } = require("./meal-data-service.cjs");
+const { createMilestoneStateService, eventSourceForMutation } = require("./milestone-state-service.cjs");
 const { createAchievementStateService } = require("./achievement-state-service.cjs");
 const {
   createDeepseekMealInsightService,
@@ -810,12 +811,17 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       return result;
     }
     : null;
+  const milestones = createMilestoneStateService({ db });
   const meals = createMealDataService({
     db,
     model: deepseekModel,
     analyze: analyzeMeal,
     generateMealInsight,
     resolveImageUrl: getTemporaryUrl,
+    getNutritionPlan: data.getNutritionPlan,
+    onMealMutation: ({ userId, recordedAt }) => milestones.recalculateStreak(userId, {
+      source: eventSourceForMutation(recordedAt),
+    }),
   });
   const dailyInsightFactory = dependencies.dailyInsightFactory ?? createDailyInsightService;
   const dailyInsight = dailyInsightFactory({
@@ -1300,6 +1306,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     productUserExists,
     data,
     meals,
+    milestones,
     insights,
     coach: createCoachDataService({
       db,
@@ -1425,6 +1432,7 @@ function getInsightRoute(pathname) {
   return ({
     "/meal-summary": "getDailySummaryWithInsight",
     "/weekly-review": "getWeeklyReview",
+    "/milestone-stats": "getMilestoneStats",
     "/achievements": "getAchievements",
   })[path] ?? null;
 }
@@ -1434,6 +1442,16 @@ function getAchievementCelebrationRoute(pathname) {
   if (path === "/achievements/evaluate") return { operation: "evaluate" };
   const match = path.match(/^\/achievements\/([a-z0-9_-]{1,80})\/celebrate$/i);
   return match ? { operation: "acknowledge", achievementId: match[1] } : null;
+}
+
+function getMilestoneRoute(pathname) {
+  const path = pathname.replace(/^\/get-login-ticket/, "");
+  if (path === "/milestone-journey" || path === "/milestone-journey/current") return { operation: "journey" };
+  if (path === "/milestones/claim-pending") return { operation: "claim" };
+  let match = path.match(/^\/milestone-events\/([0-9a-f-]{36})$/i);
+  if (match) return { operation: "event", eventId: match[1] };
+  match = path.match(/^\/milestones\/([0-9a-f-]{36})\/(present|share)$/i);
+  return match ? { operation: match[2], eventId: match[1] } : null;
 }
 
 function getCoachRoute(pathname) {
@@ -1612,6 +1630,7 @@ function createHttpServer({ service }) {
     const mealRoute = getMealRoute(url.pathname);
     const insightOperation = getInsightRoute(url.pathname);
     const achievementCelebrationRoute = getAchievementCelebrationRoute(url.pathname);
+    const milestoneRoute = getMilestoneRoute(url.pathname);
     const coachOperation = getCoachRoute(url.pathname);
     const foodRoute = getFoodRoute(url.pathname);
     const adminFoodRoute = getAdminFoodRoute(url.pathname);
@@ -1619,7 +1638,7 @@ function createHttpServer({ service }) {
     const feedbackRoute = getFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !achievementCelebrationRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
     }
@@ -2433,6 +2452,27 @@ function createHttpServer({ service }) {
         return;
       }
     }
+    if (milestoneRoute) {
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.milestones) return sendJson(res, 503, { code: "MILESTONE_SERVICE_UNAVAILABLE" });
+      try {
+        if (milestoneRoute.operation === "journey" && req.method === "GET") return sendJson(res, 200, await service.milestones.getCurrentJourney(session.sub));
+        if (milestoneRoute.operation === "claim" && req.method === "POST") return sendJson(res, 200, { event: await service.milestones.claimPendingMilestone(session.sub) });
+        if (milestoneRoute.operation === "event" && req.method === "GET") return sendJson(res, 200, await service.milestones.getPresentedEvent(session.sub, milestoneRoute.eventId));
+        if (milestoneRoute.operation === "present" && req.method === "POST") {
+          const body = await readJsonBody(req, 32 * 1024);
+          if (typeof body?.claimToken !== "string") return sendJson(res, 400, { code: "MILESTONE_CLAIM_INVALID" });
+          return sendJson(res, 200, { snapshot: await service.milestones.confirmMilestonePresented(session.sub, milestoneRoute.eventId, body.claimToken) });
+        }
+        if (milestoneRoute.operation === "share" && req.method === "POST") return sendJson(res, 200, await service.milestones.recordShare(session.sub, milestoneRoute.eventId));
+        return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      } catch (error) {
+        const message = error?.message || "MILESTONE_SERVICE_UNAVAILABLE";
+        const status = /not found|unavailable/i.test(message) ? 404 : /claim/i.test(message) ? 409 : 503;
+        return sendJson(res, status, { code: status === 409 ? "MILESTONE_CLAIM_INVALID" : "MILESTONE_SERVICE_UNAVAILABLE", message });
+      }
+    }
     if (achievementCelebrationRoute && req.method === "POST") {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
@@ -2475,6 +2515,10 @@ function createHttpServer({ service }) {
         }
         if (insightOperation === "getWeeklyReview") {
           return sendJson(res, 200, await service.insights.getWeeklyReview(session.sub, date, { preferFast }));
+        }
+        if (insightOperation === "getMilestoneStats") {
+          const milestone = Number(url.searchParams.get("milestone"));
+          return sendJson(res, 200, await service.insights.getMilestoneStats(session.sub, milestone, date));
         }
         return sendJson(res, 200, await service.insights[insightOperation](session.sub, date));
       } catch (error) {

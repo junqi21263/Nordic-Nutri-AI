@@ -31,6 +31,9 @@ export default function AchievementsPage() {
   const [filter, setFilter] = useState<AchievementFilter>("all");
   const [selected, setSelected] = useState<Achievement | null>(null);
   const showAchievementCelebration = useAchievementStore((state) => state.showAchievementCelebration);
+  const isPageScrollLocked = selected !== null
+    || achievements.manualAchievementCelebration !== null
+    || achievements.achievementUnlocked !== null;
 
   const list = useMemo(() => {
     const source = achievements.achievements.length
@@ -70,6 +73,7 @@ export default function AchievementsPage() {
       hideNavigation
       showBack
       onTopBarBack={() => Taro.navigateBack()}
+      scrollLocked={isPageScrollLocked}
       className="page-layout--achievements"
     >
       <View className="profile-subpage__page-title">

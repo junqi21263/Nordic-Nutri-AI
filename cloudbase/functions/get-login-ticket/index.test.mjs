@@ -703,6 +703,31 @@ test("serves meal ranges, individual meals, summaries, reviews, and achievements
   ]);
 });
 
+test("serves milestone routes for a signed-in user instead of rejecting them in the route whitelist", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      milestones: {
+        getCurrentJourney: async (userId) => { calls.push(["journey", userId]); return { cycle: null, events: [] }; },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const unauthorized = await fetch(`${baseUrl}/get-login-ticket/milestone-journey/current`);
+    assert.equal(unauthorized.status, 401);
+
+    const response = await fetch(`${baseUrl}/get-login-ticket/milestone-journey/current`, {
+      headers: { authorization: "Bearer valid-session" },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { cycle: null, events: [] });
+  });
+
+  assert.deepEqual(calls, [["journey", "user-1"]]);
+});
+
 test("evaluates and acknowledges achievement celebration events for the signed-in user", async () => {
   const calls = [];
   const server = createHttpServer({

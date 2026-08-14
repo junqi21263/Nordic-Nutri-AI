@@ -115,43 +115,51 @@ export default function FoodScannerPage() {
     setIsScanning(true);
     dismissScannerTip();
     try {
-      const meal = await analyzeProductImage(previewPath);
+      let meal;
+      try {
+        meal = await analyzeProductImage(previewPath);
+      } catch (error) {
+        scanner.clearResultRevealPending();
+        const errorName = error instanceof Error ? error.name : "";
+        const isNotConfigured = errorName === "VISION_SERVICE_NOT_CONFIGURED";
+        const isContentBlocked = errorName === "VISION_CONTENT_BLOCKED";
+        const isNonFood = errorName === "VISION_NON_FOOD";
+        console.error("[vision] analyzeProductImage failed:", error);
+        const visionRemainingAfterLimit = errorName === "RATE_LIMITED" ? await refreshVisionUsage() : null;
+        const isDailyLimitReached = isVisionQuotaExhausted(visionRemainingAfterLimit);
+        const userMessage = isDailyLimitReached
+          ? "今日图片识别次数已用完，请明天再试或手动记录。"
+          : isNotConfigured
+          ? "图片识别服务尚未配置，可先手动记录。"
+          : isContentBlocked
+            ? "图片未通过安全审核，请更换后重试"
+            : isNonFood
+              ? "上传的图片为非食物，请重新上传食物图片"
+              : error instanceof Error
+                ? error.message
+                : "图片识别失败，请重新选择图片或手动记录。";
+        setFallbackKind(isDailyLimitReached ? "daily_limit" : "generic");
+        setFallbackMessage(userMessage);
+        feedback.showModal({
+          variant: isDailyLimitReached ? "limit" : feedbackVariantForError(error),
+          title: isDailyLimitReached ? "今日识别次数已用完" : "图片识别失败",
+          description: isDailyLimitReached ? "明天会恢复额度，也可以先手动记录这一餐。" : userMessage,
+          primaryText: "知道了",
+          secondaryText: "手动记录",
+          onSecondary: () => openManualMeal(),
+          dismissible: true,
+        });
+        setFallbackOpen(false);
+        return;
+      }
       scanner.setCapturedMeal(meal);
       analysis.setAnalysis(meal);
       scanner.markResultRevealPending();
-      await Taro.navigateTo({ url: "/pages/analysis-result/index?reveal=1" });
-    } catch (error) {
-      scanner.clearResultRevealPending();
-      const errorName = error instanceof Error ? error.name : "";
-      const isNotConfigured = errorName === "VISION_SERVICE_NOT_CONFIGURED";
-      const isContentBlocked = errorName === "VISION_CONTENT_BLOCKED";
-      const isNonFood = errorName === "VISION_NON_FOOD";
-      console.error("[vision] analyzeProductImage failed:", error);
-      const visionRemainingAfterLimit = errorName === "RATE_LIMITED" ? await refreshVisionUsage() : null;
-      const isDailyLimitReached = isVisionQuotaExhausted(visionRemainingAfterLimit);
-      const userMessage = isDailyLimitReached
-        ? "今日图片识别次数已用完，请明天再试或手动记录。"
-        : isNotConfigured
-        ? "图片识别服务尚未配置，可先手动记录。"
-        : isContentBlocked
-          ? "图片未通过安全审核，请更换后重试"
-          : isNonFood
-            ? "上传的图片为非食物，请重新上传食物图片"
-            : error instanceof Error
-              ? error.message
-              : "图片识别失败，请重新选择图片或手动记录。";
-      setFallbackKind(isDailyLimitReached ? "daily_limit" : "generic");
-      setFallbackMessage(userMessage);
-      feedback.showModal({
-        variant: isDailyLimitReached ? "limit" : feedbackVariantForError(error),
-        title: isDailyLimitReached ? "今日识别次数已用完" : "图片识别失败",
-        description: isDailyLimitReached ? "明天会恢复额度，也可以先手动记录这一餐。" : userMessage,
-        primaryText: "知道了",
-        secondaryText: "手动记录",
-        onSecondary: () => openManualMeal(),
-        dismissible: true,
-      });
-      setFallbackOpen(false);
+      try {
+        await Taro.navigateTo({ url: "/pages/analysis-result/index?reveal=1" });
+      } catch (error) {
+        console.warn("[vision] result page navigation failed after successful analysis:", error);
+      }
     } finally {
       isScanningRef.current = false;
       setIsScanning(false);

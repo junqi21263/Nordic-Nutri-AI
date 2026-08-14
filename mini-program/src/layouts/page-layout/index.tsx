@@ -44,6 +44,8 @@ export interface PageLayoutProps extends PropsWithChildren {
   refreshing?: boolean;
   /** Disables the shared scroll-container entrance when a page owns its own reveal timing. */
   disablePageEnterAnimation?: boolean;
+  /** Freezes the page scroll container while a modal or sheet is open. */
+  scrollLocked?: boolean;
   className?: string;
 }
 
@@ -67,6 +69,7 @@ export function PageLayout({
   onTopBarAction,
   refreshing = false,
   disablePageEnterAnimation = false,
+  scrollLocked = false,
   className,
   children,
 }: PageLayoutProps) {
@@ -105,6 +108,7 @@ export function PageLayout({
       return false;
     }
   };
+  const finishMealSaveSuccessFlow = () => savedMeal?.afterContinue?.() ?? Promise.resolve(false);
 
   // Tab pages stay mounted under switchTab; sync highlight on show, not only mount.
   useDidShow(() => {
@@ -132,6 +136,7 @@ export function PageLayout({
         showTabs ? "" : "page-layout--without-tabs",
         hideNavigation ? "page-layout--custom-navigation" : "",
         showBrandHeader ? "page-layout--with-brand" : "",
+        scrollLocked ? "page-layout--scroll-locked" : "",
         className,
       ]
         .filter(Boolean)
@@ -193,17 +198,26 @@ export function PageLayout({
           targetCalories={savedMeal.targetCalories}
           onViewMeal={() => {
             dismissSavedMealCelebration();
-            const pages = Taro.getCurrentPages();
-            const currentPage = pages[pages.length - 1];
-            if (currentPage?.route === "pages/portion-adjustment/index") {
-              void Taro.navigateBack({ delta: 1 });
-              return;
-            }
-            void Taro.navigateTo({ url: `/pages/meal-detail/index?id=${savedMeal.mealId}` });
+            void finishMealSaveSuccessFlow()
+              .then((openedPoster) => {
+                if (openedPoster) return undefined;
+                const pages = Taro.getCurrentPages();
+                const currentPage = pages[pages.length - 1];
+                if (currentPage?.route === "pages/portion-adjustment/index") {
+                  return Taro.navigateBack({ delta: 1 });
+                }
+                return Taro.navigateTo({ url: `/pages/meal-detail/index?id=${savedMeal.mealId}` });
+              })
+              .catch(() => undefined);
           }}
           onContinue={() => {
             dismissSavedMealCelebration();
-            void Taro.switchTab({ url: "/pages/home/index" });
+            void finishMealSaveSuccessFlow()
+              .then((openedPoster) => {
+                if (!openedPoster) return Taro.switchTab({ url: "/pages/home/index" });
+                return undefined;
+              })
+              .catch(() => Taro.switchTab({ url: "/pages/home/index" }));
           }}
         />
       ) : null}

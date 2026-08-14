@@ -26,6 +26,11 @@ describe("profile information bottom sheets", () => {
     expect(styles).toContain(".profile-sheet {");
     expect(styles).toContain("min-height: 720px");
     expect(styles).toContain(".profile-sheet--info");
+    expect(source.match(/lockScroll/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(styles).toContain(".profile-sheet--fixed");
+    expect(styles).toContain("max-height: calc(100vh - 180px)");
+    expect(readSource("../src/styles/components.scss")).toContain("position: fixed");
+    expect(readSource("../src/styles/components.scss")).toContain("touch-action: none");
   });
 
   it("keeps the sheet mounted for a downward exit animation and lowers compact actions", () => {
@@ -98,6 +103,22 @@ describe("profile information bottom sheets", () => {
     expect(sheet).toContain('bottom-sheet--native-input');
     expect(componentStyles).toContain("sheet-native-input-enter");
     expect(componentStyles).toContain("sheet-native-input-exit");
+    expect(sheet).toContain("lockScroll?: boolean");
+    expect(componentStyles).toContain("bottom-sheet-backdrop--locked");
+    expect(componentStyles).toContain("bottom-sheet--locked");
+  });
+
+  it("locks the shared page scroll container while profile sheets are open", () => {
+    const profile = readSource("../src/pages/profile/index.tsx");
+    const layout = readSource("../src/layouts/page-layout/index.tsx");
+    const styles = readSource("../src/styles/layout.scss");
+
+    expect(profile).toContain("const isPageScrollLocked = activeModal !== null");
+    expect(profile).toContain("scrollLocked={isPageScrollLocked}");
+    expect(layout).toContain("scrollLocked?: boolean");
+    expect(layout).toContain('"page-layout--scroll-locked"');
+    expect(styles).toContain(".page-layout--scroll-locked .page-layout__scroll");
+    expect(styles).toContain("overflow: hidden");
   });
 
   it("always reopens feedback in a fresh submit state", () => {
@@ -106,7 +127,7 @@ describe("profile information bottom sheets", () => {
     const openFeedbackEnd = profile.indexOf("};", openFeedbackStart);
     const openFeedback = profile.slice(openFeedbackStart, openFeedbackEnd);
 
-    expect(openFeedback).toContain('setFeedbackMode("submit")');
+    expect(openFeedback).toContain('setFeedbackMode(hasFeedbackReply ? "history" : "submit")');
     expect(openFeedback).not.toContain("setFeedbackSubmitted");
   });
 });

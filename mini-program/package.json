@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev:weapp": "taro build --type weapp --watch",
-    "build:weapp": "taro build --type weapp --no-check",
+    "dev:weapp": "NODE_ENV=development TARO_APP_ENV=development taro build --type weapp --watch",
+    "build:weapp:dev": "NODE_ENV=development TARO_APP_ENV=development taro build --type weapp --no-check",
+    "build:weapp": "NODE_ENV=production TARO_APP_ENV=production taro build --type weapp --no-check",
     "build:h5": "taro build --type h5",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"config/**/*.ts\"",
     "format:check": "prettier --check .",
     "test:unit": "vitest run",
-    "verify:weapp": "node ../scripts/verify-weapp-wxss.mjs"
+    "verify:weapp": "node ../scripts/verify-weapp-wxss.mjs",
+    "verify:weapp:size": "node ../scripts/verify-weapp-size.mjs"
   },
   "dependencies": {
     "@babel/runtime": "7.29.2",

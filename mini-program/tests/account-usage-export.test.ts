@@ -25,7 +25,7 @@ describe("account usage HTTPS boundary", () => {
     expect(page).toContain("usage-quota-tip");
   });
 
-  it("blocks image picking with a clear daily-limit state while keeping a toast affordance", () => {
+  it("blocks image picking with the unified daily-limit modal", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/food-scanner/index.tsx"), "utf8");
     const button = readFileSync(resolve(sourceRoot, "components/app-button/index.tsx"), "utf8");
 
@@ -33,10 +33,10 @@ describe("account usage HTTPS boundary", () => {
     expect(page).toContain("今日图片识别次数已用完");
     expect(page).toContain("请明天再试或手动记录");
     expect(page).toContain("visualDisabled={visionQuotaExhausted}");
-    expect(page).toContain('presentation="prominent"');
-    expect(page).toContain("quotaToastVisible");
-    expect(page).toContain("<Toast");
-    expect(page).toContain("message=\"今日图片识别次数已用完，请明天再试或手动记录\"");
+    expect(page).toContain('variant: "limit"');
+    expect(page).toContain('title: "今日识别次数已用完"');
+    expect(page).toContain('secondaryText: "手动记录"');
+    expect(page).toContain("showVisionQuotaModal");
     expect(page).toContain("RATE_LIMITED");
     expect(button).toContain("visualDisabled");
   });

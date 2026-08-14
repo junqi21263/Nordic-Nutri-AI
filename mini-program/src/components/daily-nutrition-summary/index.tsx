@@ -106,7 +106,9 @@ function DailySummaryDashboard({
           className={`daily-summary__dashboard-ring ${
             calorieProgress.exceeded ? "daily-summary__dashboard-ring--exceeded" : ""
           }`}
-          style={{ "--progress": `${ringProgress}%` } as Record<string, string>}
+          style={{
+            background: `conic-gradient(from -90deg, ${calorieProgress.exceeded ? "#ba1a1a" : "#153f2b"} 0 ${ringProgress}%, ${calorieProgress.exceeded ? "rgba(186, 26, 26, 0.14)" : "rgba(21, 63, 43, 0.14)"} ${ringProgress}% 100%)`,
+          }}
         >
           <View className="daily-summary__dashboard-ring-copy">
             <Text className="daily-summary__dashboard-ring-value">{ringAmount}</Text>

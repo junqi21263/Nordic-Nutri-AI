@@ -23,6 +23,12 @@
   box-sizing: border-box;
   min-height: 100vh;
 }
+.page-layout--scroll-locked,
+.page-layout--scroll-locked .page-layout__scroll {
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
 .page-layout__scroll--entered {
   animation: page-layout-content-enter 180ms ease-out both;
   will-change: opacity, transform;
@@ -45,6 +51,12 @@
 }
 .page-layout--without-tabs .page-layout__content {
   padding-bottom: calc($safe-area-bottom + $section-gap);
+}
+.page-layout--milestone-journey .page-layout__content {
+  padding: 0;
+}
+.page-layout--milestone-journey .content-stack {
+  gap: 0;
 }
 .page-layout--onboarding .page-layout__content {
   padding: $space-8 $stitch-page-gutter

@@ -31,6 +31,7 @@ describe("achievement detail interactions", () => {
     const catalog = readFileSync(resolve(srcRoot, "features/coach/achievement-catalog.ts"), "utf8");
     expect(page).toContain("AchievementDetailSheet");
     expect(detailSheet).toContain("BottomSheet");
+    expect(detailSheet).toContain("lockScroll");
     expect(detailSheet).toContain("unlockedAt");
     expect(detailSheet).toContain("解锁目标");
     expect(detailSheet).toContain("当前进度");
@@ -43,6 +44,7 @@ describe("achievement detail interactions", () => {
     expect(detailSheet).toContain("Taro.navigateTo({ url: target })");
     expect(page).toContain("达成时间");
     expect(page).toContain("achievement-center__filters");
+    expect(page).toContain("scrollLocked={isPageScrollLocked}");
   });
 
   it("puts the latest unlocked achievements before locked achievements in the profile preview", () => {

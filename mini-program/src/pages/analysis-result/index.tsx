@@ -30,6 +30,7 @@ import { usePortionDraftStore } from "../../stores/portion-draft-store";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
+import { tryPresentPendingMilestone } from "../../features/milestones/presentation-flow";
 import { useScannerStore } from "../../stores/scanner-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { useCountUp } from "../../hooks/useCountUp";
@@ -210,6 +211,7 @@ export default function AnalysisResultPage() {
           previousCalories,
           syncedMeals,
           targetCalories: meals.dailyTargets.calories,
+          afterContinue: async () => Boolean(await tryPresentPendingMilestone("normal_record_success")),
         }),
       );
       try {

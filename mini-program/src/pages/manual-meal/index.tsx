@@ -12,6 +12,8 @@ import { estimateNutritionFromAnalysis, type ManualMealNutrition } from "../../f
 import { inferMealTypeFromTime, mealTypeOptions } from "../../features/meals/meal-type";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { recordedAtFromLocal } from "../../features/meals/product-meal-input";
+import { tryPresentPendingMilestone } from "../../features/milestones/presentation-flow";
+import { shouldClaimAfterMealSave } from "../../features/milestones/runtime";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
@@ -171,6 +173,7 @@ export default function ManualMealPage() {
     try {
       const quantityG = Number(portionG);
       const normalization = Number.isFinite(quantityG) && quantityG > 0 ? 100 / quantityG : 1;
+      const recordedAt = recordedAtFromLocal(recordDate, recordTime);
       const saved = await createProductMeal({
         mealType: localMeal.mealType,
         name: localMeal.title,
@@ -194,6 +197,9 @@ export default function ManualMealPage() {
           previousCalories,
           syncedMeals,
           targetCalories: meals.dailyTargets.calories,
+          afterContinue: shouldClaimAfterMealSave(recordedAt)
+            ? async () => Boolean(await tryPresentPendingMilestone("normal_record_success"))
+            : undefined,
         }),
       );
       try {

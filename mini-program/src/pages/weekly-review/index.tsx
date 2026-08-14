@@ -184,6 +184,14 @@ export default function WeeklyReviewPage() {
             </View>
           </View>
         </View>
+        <View
+          className="weekly-review__milestone-link"
+          onClick={() => Taro.navigateTo({ url: "/pages/milestone-poster/index?milestone=7" })}
+        >
+          <NordicIcon name="milestone" size={20} ariaLabel="生成里程碑分享卡" />
+          <Text>生成 7 天里程碑分享卡</Text>
+          <NordicIcon name="chevron-right" size={18} ariaLabel="前往" />
+        </View>
         <Text className="weekly-review__source">基于已同步到云端的饮食记录生成</Text>
       </View>
     </PageLayout>

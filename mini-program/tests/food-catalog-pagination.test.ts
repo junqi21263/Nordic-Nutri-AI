@@ -96,7 +96,7 @@ describe("food catalog pagination and category presentation", () => {
     expect(tagsIndex).toBeGreaterThan(-1);
     expect(tagsIndex).toBeLessThan(resultsIndex);
     expect(styles).toContain("position: sticky;");
-    expect(styles).toContain("top: var(--app-header-height, 0px);");
+    expect(styles).toContain("top: 0;");
   });
 
   it("keeps all, Nordic, and North American category chips in the catalog", () => {

@@ -4,7 +4,7 @@ import type { Achievement } from "./domain";
 /** Distinct visual for each achievement definition (aligned with server titles). */
 const ACHIEVEMENT_ICONS_BY_TITLE: Record<string, NordicIconName> = {
   第一餐记录: "utensils",
-  早餐节奏: "food-cup",
+  早餐节奏: "food-bread",
   午餐专注: "food-bowl",
   晚餐平衡: "food-pot",
   加餐有度: "food-apple",
@@ -17,7 +17,7 @@ const ACHIEVEMENT_ICONS_BY_TITLE: Record<string, NordicIconName> = {
   水分自律: "food-cup",
   睡眠优先: "timer",
   认识自己: "user-round",
-  恢复达人: "heart",
+  恢复达人: "zap",
   蔬菜优先: "food-carrot",
   碳水平衡: "carbs",
   低脂选择: "fat",
@@ -27,7 +27,7 @@ const ACHIEVEMENT_ICONS_BY_TITLE: Record<string, NordicIconName> = {
 
 const ACHIEVEMENT_ICONS_BY_ID: Record<string, NordicIconName> = {
   "achievement-0": "utensils",
-  "achievement-1": "food-cup",
+  "achievement-1": "food-bread",
   "achievement-2": "food-bowl",
   "achievement-3": "food-pot",
   "achievement-4": "food-apple",
@@ -40,7 +40,7 @@ const ACHIEVEMENT_ICONS_BY_ID: Record<string, NordicIconName> = {
   "achievement-11": "food-cup",
   "achievement-12": "timer",
   "achievement-13": "user-round",
-  "achievement-14": "heart",
+  "achievement-14": "zap",
   "achievement-15": "food-carrot",
   "achievement-16": "carbs",
   "achievement-17": "fat",

@@ -111,7 +111,7 @@ describe("four-page Stitch visual contract", () => {
     const source = read("pages/nutrition-plan/index.tsx");
     const styles = read("styles/page.scss");
 
-    expect(source).toContain('className="nutrition-plan-page"');
+    expect(source).toMatch(/className=\{`nutrition-plan-page/);
     expect(source).toContain("OnboardingHeader");
     expect(source).toContain("nutrition-plan__plan-ready");
     expect(source).toContain("nutrition-plan__insight");
@@ -123,16 +123,16 @@ describe("four-page Stitch visual contract", () => {
     expect(source).not.toContain("每周训练");
     expect(styles).toContain("font-size: 44px;");
     expect(styles).toContain("font-size: 56px;");
-    expect(styles).toContain("height: 140px;");
+    expect(styles).toContain("min-height: 136px;");
   });
 
   it("reserves enough scroll space for Nutrition Plan's stacked fixed actions", () => {
     const source = read("pages/nutrition-plan/index.tsx");
     const styles = read("styles/layout.scss");
 
-    expect(source).toContain('className="page-layout--onboarding page-layout--nutrition-plan"');
+    expect(source).toMatch(/className=\{`page-layout--onboarding page-layout--nutrition-plan/);
     expect(styles).toContain(".page-layout--nutrition-plan .page-layout__content");
-    expect(styles).toContain("($stitch-action-height * 2)");
+    expect(styles).toContain("calc($safe-area-bottom + 288px)");
   });
 
   it("uses Lucide assets for the plan's feedback and nutrition icons", () => {
@@ -162,11 +162,12 @@ describe("four-page Stitch visual contract", () => {
 
     expect(appConfig).toContain('"pages/diet-preferences/index"');
     expect(bodyProfile).toContain('url: "/pages/diet-preferences/index"');
-    expect(preferences).toContain('className="diet-preferences-page"');
+    expect(preferences).toMatch(/className=\{`diet-preferences-page/);
     expect(preferences).toContain("第 3 步，共 4 步");
     expect(preferences).toContain("饮食偏好与限制");
     expect(preferences).toContain("diet-preferences-config");
-    expect(preferences).toContain('url: "/pages/nutrition-plan/index"');
+    expect(preferences).toContain('"/pages/nutrition-plan/index" + settingsQuery(true)');
+    expect(preferences).toContain('"/pages/nutrition-plan/index?initial=1"');
     expect(preferenceConfig).toContain("dietaryPatternOptions");
     expect(preferenceConfig).toContain("foodAvoidanceOptions");
     expect(preferenceConfig).toContain("mealCountOptions");
@@ -198,7 +199,7 @@ describe("four-page Stitch visual contract", () => {
     const source = read("pages/home/index.tsx");
     const styles = read("styles/page.scss");
 
-    expect(source).toContain('className="home-page"');
+    expect(source).toMatch(/className=\{`home-page/);
     expect(source).toContain("page-layout--home");
     expect(source).toContain('name="camera"');
     expect(source).toContain('name="circle-plus"');

@@ -65,6 +65,33 @@ export interface ProductWeeklyReview {
   };
 }
 
+export interface ProductMilestoneStats {
+  milestone: 3 | 7 | 14 | 30;
+  mealsLogged: number;
+  recordedDays: number;
+  recordingConsistency?: number;
+  targetCompletionRate?: number;
+  avgProtein?: number;
+  avgCarbs?: number;
+  avgFat?: number;
+  mostLoggedFood?: string;
+  mostLoggedFoodCount?: number;
+  vsPreviousPeriod?: number;
+  targetDays?: number;
+  illustrationVariant: number;
+  personalizedMessage: string;
+  serverTime: string;
+  serverDate: string;
+}
+
+export function getProductMilestoneStats(milestone: ProductMilestoneStats["milestone"], date: string) {
+  const params = new URLSearchParams({ milestone: String(milestone), date });
+  return requestProductApi<ProductMilestoneStats>(`/milestone-stats?${params.toString()}`, {
+    method: "GET",
+    fallbackMessage: "里程碑数据读取失败，请稍后重试",
+  });
+}
+
 export function getProductDailySummary(date: string, options: { light?: boolean } = {}) {
   const params = new URLSearchParams({ date });
   if (options.light) params.set("light", "1");

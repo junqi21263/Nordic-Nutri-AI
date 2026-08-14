@@ -7,12 +7,14 @@ export function toMealSavedCelebration({
   syncedMeals,
   targetCalories,
   kind = "created",
+  afterContinue,
 }: {
   savedMeal: Meal;
   previousCalories: number;
   syncedMeals: Meal[];
   targetCalories: number;
   kind?: "created" | "updated";
+  afterContinue?: () => Promise<boolean>;
 }): SavedMealCelebration {
   const nutrition = getMealNutrition(savedMeal);
   const currentCalories = getDailySummary(syncedMeals, savedMeal.date, {
@@ -29,5 +31,6 @@ export function toMealSavedCelebration({
     previousCalories,
     currentCalories,
     targetCalories,
+    afterContinue,
   };
 }

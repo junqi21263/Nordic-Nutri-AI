@@ -10,6 +10,7 @@ mini-program/.swc/
 .env*
 .env.*
 !.env.example
+!.env.production
 .supabase/
 # WeChat developer-tool local files
 mini-program/project.private.config.json

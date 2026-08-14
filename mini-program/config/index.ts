@@ -4,10 +4,33 @@ import { defineConfig } from "@tarojs/cli";
 import devConfig from "./dev";
 import prodConfig from "./prod";
 
-const localEnvFile = resolve(__dirname, "../../.env.local");
-if (existsSync(localEnvFile)) process.loadEnvFile(localEnvFile);
+const projectRoot = resolve(__dirname, "../..");
+const requestedNodeEnv = process.env.NODE_ENV === "production" ? "production" : "development";
+// Taro does not reliably load env files for this project on its own. Node's
+// loadEnvFile keeps shell values highest priority. Production intentionally
+// excludes the ignored developer-local file so its configuration is portable.
+const environmentFiles = requestedNodeEnv === "production"
+  ? [resolve(projectRoot, ".env.production"), resolve(projectRoot, ".env")]
+  : [
+      resolve(projectRoot, ".env.local"),
+      resolve(projectRoot, `.env.${requestedNodeEnv}`),
+      resolve(projectRoot, ".env"),
+    ];
+for (const envFile of environmentFiles) {
+  if (existsSync(envFile)) process.loadEnvFile(envFile);
+}
 
-const isDevelopment = process.env.NODE_ENV === "development";
+const isProductionBuild = process.env.NODE_ENV === "production" || process.env.TARO_APP_ENV === "production";
+const appEnvironment = isProductionBuild
+  ? "production"
+  : process.env.TARO_APP_ENV ?? requestedNodeEnv;
+const isDevelopment = !isProductionBuild && appEnvironment === "development";
+const milestoneAssetCdn = (process.env.TARO_APP_MILESTONE_ASSET_CDN ?? "").trim().replace(/\/$/, "");
+if (isProductionBuild && !milestoneAssetCdn) {
+  throw new Error(
+    "TARO_APP_MILESTONE_ASSET_CDN 未配置。生产构建必须提供正式里程碑插画 CDN Root。",
+  );
+}
 const outputRoot = process.env.TARO_ENV === "h5" ? "dist/h5" : "dist/weapp";
 
 export default defineConfig({
@@ -25,7 +48,7 @@ export default defineConfig({
   compiler: "webpack5",
   plugins: ["@tarojs/plugin-platform-weapp", "@tarojs/plugin-platform-h5"],
   defineConstants: {
-    "process.env.TARO_APP_ENV": JSON.stringify(process.env.TARO_APP_ENV ?? "local"),
+    "process.env.TARO_APP_ENV": JSON.stringify(appEnvironment),
     "process.env.TARO_APP_ENABLE_REAL_AUTH": JSON.stringify(
       process.env.TARO_APP_ENABLE_REAL_AUTH ?? "false",
     ),
@@ -35,7 +58,24 @@ export default defineConfig({
     "process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY": JSON.stringify(
       process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY ?? "",
     ),
+    "process.env.TARO_APP_MILESTONE_ASSET_CDN": JSON.stringify(
+      milestoneAssetCdn,
+    ),
   },
+  ...(isDevelopment
+    ? {
+        // Development keeps formal illustrations only as an offline fallback.
+        // Production builds never copy these formal illustration files.
+        copy: {
+          // `copy.to` is resolved from the mini-program root by Taro's
+          // CopyWebpackPlugin. Point it at the generated mini-program root,
+          // otherwise it writes a sibling source directory that DevTools never
+          // serves as `/assets/...`.
+          patterns: [{ from: "src/assets/images/milestones", to: `${outputRoot}/assets/images/milestones` }],
+          options: {},
+        },
+      }
+    : {}),
   mini: {
     postcss: {
       pxtransform: { enable: true },

@@ -106,7 +106,8 @@ describe("meal recognition result reveal motion", () => {
     expect(styles).toContain("position: fixed");
     expect(styles).toContain(".analysis-result-page__bottom-bar .analysis-result-page__actions");
     expect(styles).not.toContain("transform: translate3d(0, 140%, 0)");
-    expect(layout).toContain("--analysis-result-bottom-bar-height");
+    expect(layout).toContain("page-layout--analysis-result .page-layout__content");
+    expect(layout).toContain("148px");
   });
 
   it("keeps replay development-only and free of recognition requests", () => {

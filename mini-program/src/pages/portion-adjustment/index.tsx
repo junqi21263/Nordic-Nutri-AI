@@ -18,6 +18,7 @@ import { usePortionDraftStore } from "../../stores/portion-draft-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
 import { navigateBackOrHome } from "../../utils/navigation";
+import { tryPresentPendingMilestone } from "../../features/milestones/presentation-flow";
 
 const nowTime = () => {
   const date = new Date();
@@ -113,6 +114,7 @@ export default function PortionAdjustmentPage() {
             syncedMeals,
             targetCalories: meals.dailyTargets.calories,
             kind: editingId ? "updated" : "created",
+            afterContinue: editingId ? undefined : async () => Boolean(await tryPresentPendingMilestone("normal_record_success")),
           }),
         );
         clearDraftAfterSuccess.current = true;

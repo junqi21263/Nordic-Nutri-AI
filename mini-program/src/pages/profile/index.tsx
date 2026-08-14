@@ -18,6 +18,7 @@ import {
 } from "../../api/feedback-api";
 import { getProductAccount } from "../../api/product-data-api";
 import { getProductWeeklyReview, type ProductWeeklyReview } from "../../api/insight-api";
+import { getMilestoneJourney, type ProductMilestoneJourney } from "../../api/milestone-api";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
 import { sortAchievementsForProfilePreview } from "../../features/coach/achievement-catalog";
 import { createAchievements, type Achievement } from "../../features/coach/domain";
@@ -56,7 +57,12 @@ export default function ProfilePage() {
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [unreadReplyCount, setUnreadReplyCount] = useState(0);
   const [weeklyReview, setWeeklyReview] = useState<ProductWeeklyReview | null>(null);
+  const [milestoneJourney, setMilestoneJourney] = useState<ProductMilestoneJourney | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const isPageScrollLocked = activeModal !== null
+    || selectedAchievement !== null
+    || achievements.manualAchievementCelebration !== null
+    || achievements.achievementUnlocked !== null;
   const profileSyncVersion = useRef(0);
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
@@ -81,9 +87,11 @@ export default function ProfilePage() {
     void Promise.all([
       refreshProductAchievements(date),
       getProductWeeklyReview(date, { preferFast: true }),
+      getMilestoneJourney().catch(() => null),
     ])
-      .then(([, review]) => {
+      .then(([, review, journey]) => {
         setWeeklyReview(review);
+        if (journey) setMilestoneJourney(journey);
       })
       .catch(() => undefined);
   }, [date]);
@@ -102,9 +110,11 @@ export default function ProfilePage() {
       refreshFeedbackHistory(),
       refreshProductAchievements(date),
       getProductWeeklyReview(date, { preferFast: true }),
+      getMilestoneJourney().catch(() => null),
     ])
-      .then(([, , review]) => {
+      .then(([, , review, journey]) => {
         setWeeklyReview(review);
+        if (journey) setMilestoneJourney(journey);
       })
       .finally(() => {
         setRefreshing(false);
@@ -172,6 +182,7 @@ export default function ProfilePage() {
     setActiveKey("meal-records");
     void Taro.switchTab({ url: "/pages/meal-records/index" });
   };
+  const openMilestoneJourney = () => Taro.navigateTo({ url: "/pages/milestone-journey/index" });
   const submitFeedback = async () => {
     if (!feedbackDraft.trim()) {
       setFeedbackError("请先写下你的问题或建议");
@@ -246,6 +257,7 @@ export default function ProfilePage() {
       activeTab="profile"
       hideNavigation
       refreshing={refreshing}
+      scrollLocked={isPageScrollLocked}
       className="page-layout--profile"
     >
       <View className="profile-rhythm">
@@ -290,11 +302,13 @@ export default function ProfilePage() {
               tone="beige"
             />
           </View>
-          <StatisticCard
-            label="本周坚持"
-            value={`${weeklyReview?.recordedDays ?? 0} 天`}
-            hint="保持节奏"
-          />
+          <View onClick={() => void openMilestoneJourney()}>
+            <StatisticCard
+              label="我的旅程"
+              value={`${milestoneJourney?.currentStreakDays ?? 0} 天`}
+              hint="连续记录"
+            />
+          </View>
         </View>
 
         <View className="profile-rhythm__section-head">
@@ -341,7 +355,7 @@ export default function ProfilePage() {
         <View className="profile-rhythm__settings-group">
           <View onClick={() => openPage("/pages/body-profile/index?from=settings&entry=1")}>
             <ListItem
-              icon={<NordicIcon name="user-round" size={20} ariaLabel="营养档案" />}
+              icon={<NordicIcon name="ruler" size={20} ariaLabel="营养档案" />}
               title="营养档案"
               description="身体数据、饮食偏好与忌口"
             />
@@ -355,7 +369,7 @@ export default function ProfilePage() {
           </View>
           <View onClick={openFeedback}>
             <ListItem
-              icon={<NordicIcon name="heart" size={20} ariaLabel="反馈与帮助" />}
+              icon={<NordicIcon name="pencil" size={20} ariaLabel="反馈与帮助" />}
               title={
                 <View className="profile-feedback-title">
                   <Text>反馈与帮助</Text>
@@ -372,7 +386,7 @@ export default function ProfilePage() {
           </View>
           <View onClick={() => setActiveModal("about")}>
             <ListItem
-              icon={<NordicIcon name="user-round" size={20} ariaLabel="关于我们" />}
+              icon={<NordicIcon name="nova" size={20} ariaLabel="关于我们" />}
               title="关于我们"
               description="产品介绍与使用说明"
             />
@@ -401,9 +415,10 @@ export default function ProfilePage() {
 
       <BottomSheet
         open={activeModal === "feedback"}
-        className="profile-sheet"
+        className="profile-sheet profile-sheet--fixed"
         onDismiss={() => setActiveModal(null)}
         nativeInput
+        lockScroll
       >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">
@@ -501,8 +516,9 @@ export default function ProfilePage() {
 
       <BottomSheet
         open={activeModal === "about"}
-        className="profile-sheet profile-sheet--info"
+        className="profile-sheet profile-sheet--info profile-sheet--fixed"
         onDismiss={() => setActiveModal(null)}
+        lockScroll
       >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">

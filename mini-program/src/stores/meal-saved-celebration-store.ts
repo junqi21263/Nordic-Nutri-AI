@@ -10,6 +10,8 @@ export interface SavedMealCelebration {
   previousCalories: number;
   currentCalories: number;
   targetCalories: number;
+  /** Optional, non-blocking handoff after the existing success celebration. */
+  afterContinue?: () => Promise<boolean>;
 }
 
 interface MealSavedCelebrationStore {
