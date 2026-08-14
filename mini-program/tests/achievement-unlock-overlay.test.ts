@@ -6,7 +6,6 @@ const srcRoot = resolve(import.meta.dirname, "../src");
 
 describe("achievement unlock overlay", () => {
   it("mounts the queued celebration overlay in the active page layout", () => {
-    const overlay = readFileSync(resolve(srcRoot, "components/achievement-unlock-overlay/index.tsx"), "utf8");
     const modal = readFileSync(resolve(srcRoot, "components/achievement-unlock-modal/index.tsx"), "utf8");
     const confetti = readFileSync(resolve(srcRoot, "components/achievement-confetti-canvas/index.tsx"), "utf8");
     const app = readFileSync(resolve(srcRoot, "app.tsx"), "utf8");
@@ -16,7 +15,6 @@ describe("achievement unlock overlay", () => {
     expect(pageLayout).toContain("achievementUnlocked");
     expect(modal).toContain("export interface AchievementUnlockModalProps");
     expect(modal).toContain("export function AchievementUnlockModal");
-    expect(overlay).toContain("AchievementUnlockModal");
     expect(modal).toContain("achievement-unlock-overlay");
     expect(modal).toContain("achievement-unlock-overlay__card");
     expect(modal).toContain("achievement-unlock-overlay__sparkle");

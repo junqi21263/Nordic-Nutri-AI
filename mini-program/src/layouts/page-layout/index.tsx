@@ -8,7 +8,7 @@ import { AchievementUnlockModal } from "../../components/achievement-unlock-moda
 import { acknowledgeProductAchievementCelebration } from "../../api/insight-api";
 import { BottomTabBar } from "../../components/bottom-tab-bar";
 import { PullDownRefreshIndicator } from "../../components/pull-down-refresh-indicator";
-import { TopNavigation } from "../../components/top-navigation";
+import { AppHeader } from "../../components/app-header";
 import { useSystemLayout } from "../../hooks/useSystemLayout";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 import { useAchievementStore } from "../../stores/achievement-store";
@@ -164,7 +164,7 @@ export function PageLayout({
       >
         <View className="page-layout__content">
           {!hideNavigation ? (
-            <TopNavigation
+            <AppHeader
               title={title}
               subtitle={subtitle}
               eyebrow={eyebrow}

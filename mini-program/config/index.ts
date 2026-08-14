@@ -88,10 +88,6 @@ export default defineConfig({
         // replacement files, which leaves WeChat DevTools on wx://not-found.
         chain.output.set("clean", false);
       }
-      chain.resolve.alias.set(
-        "@cloudbase/js-sdk$",
-        resolve(__dirname, "../node_modules/@cloudbase/js-sdk/miniprogram_dist/index.js"),
-      );
     },
   },
   h5: {

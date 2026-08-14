@@ -122,7 +122,7 @@ describe("global UI calibration contract", () => {
       expect(existsSync(source(`src/components/${component}/index.tsx`))).toBe(true);
     }
     expect(read("src/layouts/page-layout/index.tsx")).toContain("AppSafeArea");
-    expect(read("src/components/top-navigation/index.tsx")).toContain("AppHeader");
+    expect(read("src/layouts/page-layout/index.tsx")).toContain("AppHeader");
     expect(read("src/pages/onboarding/index.tsx")).toContain("OnboardingHeader");
     expect(read("src/pages/onboarding/index.tsx")).toContain("BottomActionLayout");
   });
