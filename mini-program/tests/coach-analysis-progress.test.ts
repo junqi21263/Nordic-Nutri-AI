@@ -82,6 +82,7 @@ describe("analysis progress presentation", () => {
     expect(page).toContain("<AnalysisProgress");
     expect(page).toContain("activeStreamRef");
     expect(page).toContain("COACH_STREAM_ABORTED");
+    expect(page).toContain("useDidHide");
     expect(api).toContain("ProductCoachStreamRequest");
     expect(api).toContain("abort: () => void");
   });

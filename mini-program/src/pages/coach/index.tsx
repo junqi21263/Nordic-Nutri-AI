@@ -1,5 +1,5 @@
 import { Image, MovableArea, MovableView, Text, View } from "@tarojs/components";
-import Taro, { useDidShow } from "@tarojs/taro";
+import Taro, { useDidHide, useDidShow } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import {
   getProductCoachMessages,
@@ -265,6 +265,11 @@ export default function CoachPage() {
         meals.setDailyTargets(dailySummary.targets);
       })
       .catch(() => undefined);
+  });
+
+  useDidHide(() => {
+    activeStreamRef.current?.abort();
+    activeStreamRef.current = null;
   });
 
   useEffect(() => {
