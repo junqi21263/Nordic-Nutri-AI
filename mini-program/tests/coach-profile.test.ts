@@ -196,7 +196,8 @@ describe("local coach and profile", () => {
     expect(source).toContain('className="coach-chat__hero"');
     expect(source).toContain('className="coach-chat__progress-card"');
     expect(source).toContain('"coach-chat__streaming-copy"');
-    expect(source).toContain('status={message.streaming ? "thinking" : "idle"}');
+    expect(source).toContain('status="idle"');
+    expect(source).toContain("<AnalysisProgress");
     expect(source).not.toContain('<CoachAvatar variant="hero"');
     expect(source).not.toContain('name="bot"');
     expect(styles).toContain(".coach-chat__hero");

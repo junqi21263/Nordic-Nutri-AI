@@ -18,7 +18,15 @@ import { AnimatedProgressBar } from "../../components/animated-progress-bar";
 import { CoachAvatar } from "../../components/coach-avatar";
 import { ConfirmDialog } from "../../components/confirm-dialog";
 import { NordicIcon } from "../../components/nordic-icon";
+import { AnalysisProgress } from "./components/AnalysisProgress";
 import { CoachComposer } from "./components/CoachComposer";
+import {
+  completeAnalysisForAnswer,
+  completeAnalysisForFallback,
+  createAnalysisProgress,
+  type AnalysisProgressState,
+  type AssistantGenerationStatus,
+} from "../../features/coach/analysis-progress";
 import { createCoachAdvice } from "../../features/coach/domain";
 import { createCoachMealContext } from "../../features/coach/meal-context";
 import { getCoachGreeting } from "../../features/coach/server-time";
@@ -38,6 +46,8 @@ type ChatMessage = {
   role: "coach" | "user";
   content: string;
   streaming?: boolean;
+  generationStatus?: AssistantGenerationStatus;
+  analysis?: AnalysisProgressState;
   imagePath?: string;
   imageLabel?: string;
 };
@@ -128,6 +138,8 @@ export default function CoachPage() {
   const [scrollTopSnapAnimating, setScrollTopSnapAnimating] = useState(false);
   const scrollTopPositionRef = useRef(scrollTopPosition);
   const scrollTopDraggedRef = useRef(false);
+  const activeStreamRef = useRef<{ id: string; abort: () => void } | null>(null);
+  const pageActiveRef = useRef(true);
   const [expandedSections, setExpandedSections] = useState({
     suggestion: false,
     progress: false,
@@ -153,6 +165,7 @@ export default function CoachPage() {
     result: { messages: ProductCoachMessage[]; dailyUsage: ProductCoachDailyUsage },
     temporaryIds: string[],
     attachment?: Pick<ChatMessage, "imagePath" | "imageLabel">,
+    analysis?: AnalysisProgressState,
   ) => {
     setMessages((current) => {
       const retained = current.filter((message) => !temporaryIds.includes(message.id));
@@ -166,6 +179,9 @@ export default function CoachPage() {
             role: message.role === "assistant" ? ("coach" as const) : ("user" as const),
             content: message.content,
             ...(attachment && index === 0 ? attachment : {}),
+            ...(message.role === "assistant" && analysis
+              ? { generationStatus: "completed" as const, analysis }
+              : {}),
           })),
       ];
     });
@@ -180,6 +196,14 @@ export default function CoachPage() {
     }, 0);
     return () => clearTimeout(timer);
   }, [completedReplyVersion]);
+
+  useEffect(() => {
+    return () => {
+      pageActiveRef.current = false;
+      activeStreamRef.current?.abort();
+      activeStreamRef.current = null;
+    };
+  }, []);
 
   const refreshCoachBrief = async () => {
     try {
@@ -258,6 +282,16 @@ export default function CoachPage() {
       .catch(() => undefined);
   }, []);
 
+  const toggleAnalysis = (messageId: string) => {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === messageId && message.analysis && message.generationStatus !== "analyzing"
+          ? { ...message, analysis: { ...message.analysis, expanded: !message.analysis.expanded } }
+          : message,
+      ),
+    );
+  };
+
   const sendMessage = async (value = draft, imagePath = selectedImagePath) => {
     const userPrompt = value.trim();
     if ((!userPrompt && !imagePath) || sending) return;
@@ -293,6 +327,7 @@ export default function CoachPage() {
     const requestId = createClientRequestId();
     const optimisticId = "pending-" + requestId;
     const streamingId = "stream-" + requestId;
+    let analysis = createAnalysisProgress(userPrompt || "请分析这张食物图片。", Date.now());
     setMessages((current) => [
       ...current,
       {
@@ -308,18 +343,39 @@ export default function CoachPage() {
     try {
       setMessages((current) => [
         ...current,
-        { id: streamingId, role: "coach", content: "", streaming: true },
+        {
+          id: streamingId,
+          role: "coach",
+          content: "",
+          streaming: true,
+          generationStatus: "analyzing",
+          analysis,
+        },
       ]);
       let completed = false;
-      await streamProductCoachMessage(
+      let receivedDelta = false;
+      activeStreamRef.current = { id: requestId, abort: () => undefined };
+      const streamRequest = streamProductCoachMessage(
         content,
         date,
         (event) => {
+          if (!pageActiveRef.current) return;
+          if (activeStreamRef.current?.id !== requestId) return;
           if (event.type === "delta") {
+            if (!event.text) return;
+            if (!receivedDelta) {
+              receivedDelta = true;
+              analysis = completeAnalysisForAnswer(analysis, Date.now());
+            }
             setMessages((current) =>
               current.map((message) =>
                 message.id === streamingId
-                  ? { ...message, content: message.content + event.text }
+                  ? {
+                      ...message,
+                      content: message.content + event.text,
+                      generationStatus: "answering",
+                      analysis,
+                    }
                   : message,
               ),
             );
@@ -327,13 +383,19 @@ export default function CoachPage() {
           }
           if (event.type === "complete") {
             completed = true;
-            mergeServerMessages(event, [optimisticId, streamingId], attachment);
+            analysis = analysis.completedAt ? analysis : completeAnalysisForAnswer(analysis, Date.now());
+            mergeServerMessages(event, [optimisticId, streamingId], attachment, analysis);
           }
         },
         requestId,
       );
+      if (activeStreamRef.current?.id === requestId) {
+        activeStreamRef.current = { id: requestId, abort: streamRequest.abort };
+      }
+      await streamRequest.promise;
       if (!completed) throw new Error("流式回复未完成");
     } catch (streamError) {
+      if (streamError instanceof Error && streamError.name === "COACH_STREAM_ABORTED") return;
       if (streamError instanceof Error && streamError.name === "COACH_DAILY_LIMIT_REACHED") {
         setMessages((current) => current.filter((message) => message.id !== optimisticId && message.id !== streamingId));
         setDailyUsage((current) => ({ ...current, used: current.limit, remaining: 0 }));
@@ -348,7 +410,9 @@ export default function CoachPage() {
       }
       try {
         const result = await sendProductCoachMessage(content, date, requestId);
-        mergeServerMessages(result, [optimisticId, streamingId], attachment);
+        if (!pageActiveRef.current) return;
+        analysis = completeAnalysisForFallback(analysis, Date.now());
+        mergeServerMessages(result, [optimisticId, streamingId], attachment, analysis);
       } catch (sendError) {
         setMessages((current) =>
           current.filter((message) => message.id !== optimisticId && message.id !== streamingId),
@@ -373,8 +437,11 @@ export default function CoachPage() {
         }
       }
     } finally {
-      setSending(false);
-      void refreshCoachBrief();
+      if (activeStreamRef.current?.id === requestId) activeStreamRef.current = null;
+      if (pageActiveRef.current) {
+        setSending(false);
+        void refreshCoachBrief();
+      }
     }
   };
 
@@ -627,7 +694,7 @@ export default function CoachPage() {
                 className={`coach-chat__message coach-chat__message--${message.role}`}
               >
                 {message.role === "coach" ? (
-                  <CoachAvatar status={message.streaming ? "thinking" : "idle"} />
+                  <CoachAvatar status="idle" />
                 ) : null}
                 <View className="coach-chat__message-body">
                   {message.imagePath ? (
@@ -640,13 +707,24 @@ export default function CoachPage() {
                   {message.imageLabel ? (
                     <Text className="coach-chat__message-image-label">{message.imageLabel}</Text>
                   ) : null}
-                  <Text
-                    className={
-                      message.streaming ? "coach-chat__streaming-copy" : "coach-chat__message-copy"
-                    }
-                  >
-                    {message.content || "NOVA 正在整理建议…"}
-                  </Text>
+                  {message.analysis && message.generationStatus ? (
+                    <AnalysisProgress
+                      analysis={message.analysis}
+                      generationStatus={message.generationStatus}
+                      onToggle={() => toggleAnalysis(message.id)}
+                    />
+                  ) : null}
+                  {message.content ? (
+                    <Text
+                      className={
+                        message.generationStatus === "answering"
+                          ? "coach-chat__streaming-copy"
+                          : "coach-chat__message-copy"
+                      }
+                    >
+                      {message.content}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
             ))}
