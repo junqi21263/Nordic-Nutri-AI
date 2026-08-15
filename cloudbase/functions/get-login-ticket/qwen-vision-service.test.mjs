@@ -22,8 +22,27 @@ test("uses flash for a clear simple meal", async () => {
   assert.equal(output.provider, "qwen");
 });
 
+test("captures a structured flash trace without changing the selected result", async () => {
+  let trace;
+  const service = createQwenVisionService({
+    apiKey: "qwen-test",
+    requestCompletion: async () => result(),
+  });
+  const output = await service({
+    imageUrl: "https://example.com/meal.jpg",
+    onTrace: (value) => { trace = value; },
+  });
+  assert.equal(output.mealName, "鸡胸肉沙拉");
+  assert.equal(output.model, "qwen3-vl-flash");
+  assert.equal(trace.selectedSource, "flash");
+  assert.equal(trace.flash.valid, true);
+  assert.deepEqual(trace.flash.items, result().items);
+  assert.equal(trace.plus.attempted, false);
+});
+
 test("upgrades uncertain multi-item recognition to plus", async () => {
   const calls = [];
+  let trace;
   const service = createQwenVisionService({
     apiKey: "qwen-test",
     requestCompletion: async ({ model }) => {
@@ -31,14 +50,20 @@ test("upgrades uncertain multi-item recognition to plus", async () => {
       return calls.length === 1 ? result({ confidence: 0.45, needsEscalation: true, uncertaintyReasons: ["遮挡"], items: [result().items[0], { ...result().items[0], name: "米饭" }, { ...result().items[0], name: "西兰花" }, { ...result().items[0], name: "鸡蛋" }] }) : result({ confidence: 0.82 });
     },
   });
-  const output = await service({ imageUrl: "https://example.com/meal.jpg" });
+  const output = await service({ imageUrl: "https://example.com/meal.jpg", onTrace: (value) => { trace = value; } });
   assert.deepEqual(calls, ["qwen3-vl-flash", "qwen3-vl-plus"]);
   assert.equal(output.model, "qwen3-vl-plus");
+  assert.equal(trace.selectedSource, "plus");
+  assert.equal(trace.flash.valid, true);
+  assert.equal(trace.plus.attempted, true);
+  assert.equal(trace.plus.success, true);
+  assert.equal(trace.plus.valid, true);
 });
 
 test("keeps a valid flash result when plus times out", async () => {
   const calls = [];
   const observations = [];
+  let trace;
   const service = createQwenVisionService({
     apiKey: "qwen-test",
     requestCompletion: async ({ model }) => {
@@ -47,10 +72,14 @@ test("keeps a valid flash result when plus times out", async () => {
       throw Object.assign(new Error("This operation was aborted"), { name: "AbortError" });
     },
   });
-  const output = await service({ imageUrl: "https://example.com/meal.jpg", observe: (event) => observations.push(event) });
+  const output = await service({ imageUrl: "https://example.com/meal.jpg", observe: (event) => observations.push(event), onTrace: (value) => { trace = value; } });
   assert.deepEqual(calls, ["qwen3-vl-flash", "qwen3-vl-plus"]);
   assert.equal(output.model, "qwen3-vl-flash");
   assert.equal(observations.some((event) => event.fallbackReason === "plus_abort"), true);
+  assert.equal(trace.selectedSource, "flash");
+  assert.equal(trace.plus.attempted, true);
+  assert.equal(trace.plus.valid, false);
+  assert.equal(trace.plus.fallbackReason, "plus_abort");
 });
 
 test("keeps flash when plus returns an invalid schema", async () => {
@@ -69,6 +98,7 @@ test("keeps flash when plus returns an invalid schema", async () => {
 
 test("skips plus when the mandatory downstream reserve cannot be protected", async () => {
   const calls = [];
+  let trace;
   const service = createQwenVisionService({
     apiKey: "qwen-test",
     requestCompletion: async ({ model }) => { calls.push(model); return result({ confidence: 0.45, needsEscalation: true }); },
@@ -76,9 +106,12 @@ test("skips plus when the mandatory downstream reserve cannot be protected", asy
   const output = await service({
     imageUrl: "https://example.com/meal.jpg",
     budget: { remainingAfterReserve: () => 0, stageTimeout: () => 1_000 },
+    onTrace: (value) => { trace = value; },
   });
   assert.deepEqual(calls, ["qwen3-vl-flash"]);
   assert.equal(output.model, "qwen3-vl-flash");
+  assert.equal(trace.plus.attempted, false);
+  assert.equal(trace.plus.skipReason, "insufficient_budget");
 });
 
 test("escalation predicate covers low confidence and unclear portions", () => {
