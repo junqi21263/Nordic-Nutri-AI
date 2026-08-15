@@ -1,3 +1,5 @@
+const { VISION_BUDGETS } = require("./vision-budget.cjs");
+
 class PublicVisionError extends Error {
   constructor(code, message = "图片识别暂不可用") {
     super(message);
@@ -44,9 +46,9 @@ function createVitaRequestCompletion({ apiKey, model, fetchImpl = globalThis.fet
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const { extractContentAndUsage } = require("./model-usage.cjs");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "vita-video-3.0";
-  return async ({ imageUrl }) => {
+  return async ({ imageUrl, timeoutMs: requestTimeoutMs }) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20_000);
+    const timer = setTimeout(() => controller.abort(), Math.max(1, Number(requestTimeoutMs) || 20_000));
     try {
       const response = await fetchImpl("https://api.vita.cloud.tencent.com/v1/video2text/chat/completions", {
         method: "POST",
@@ -84,7 +86,11 @@ function createVitaVisionService({ apiKey, model, requestCompletion, fetchImpl }
     if (typeof input?.imageUrl !== "string" || !/^https:\/\//i.test(input.imageUrl) || input.imageUrl.length > 2048) {
       throw new PublicVisionError("VISION_IMAGE_INVALID", "图片无效");
     }
-    const raw = await complete({ imageUrl: input.imageUrl });
+    const flashTimeoutMs = input?.budget?.stageTimeout
+      ? input.budget.stageTimeout(VISION_BUDGETS.flashMaxMs, 0)
+      : VISION_BUDGETS.flashMaxMs;
+    if (!(flashTimeoutMs > 0)) throw new PublicVisionError("VISION_TIMEOUT", "识别时间有点久，请重新试一次");
+    const raw = await complete({ imageUrl: input.imageUrl, timeoutMs: flashTimeoutMs });
     const content = typeof raw === "string"
       ? raw
       : (raw?.content ?? (raw && typeof raw === "object" && raw.mealName ? raw : null));

@@ -16,6 +16,10 @@ describe("real visual analysis boundary", () => {
     expect(api).toContain("compressedWidth");
     expect(api).toContain("VISION_CONTENT_BLOCKED");
     expect(api).toContain("图片未通过安全审核");
+    expect(api).toContain("CLIENT_TOTAL_BUDGET_MS");
+    expect(api).toContain("remainingClientMs");
+    expect(scanner).toContain("mediaAcquisitionMs");
+    expect(scanner).toContain("clientDeadlineAt");
     expect(scanner).toContain("analyzeProductImage");
     expect(scanner).toContain("VISION_CONTENT_BLOCKED");
     expect(scanner).toContain("formatVisionUploadHint");

@@ -6,7 +6,7 @@ const source = readFileSync(resolve(process.cwd(), "src/pages/food-scanner/index
 
 describe("food scanner error boundary", () => {
   it("does not classify a result-page navigation failure as a vision failure", () => {
-    const analysisStart = source.indexOf("await analyzeProductImage(previewPath);");
+    const analysisStart = source.indexOf("await analyzeProductImage(previewPath,");
     const analysisCatch = source.indexOf("} catch (error)", analysisStart);
     const navigate = source.indexOf('await Taro.navigateTo({ url: "/pages/analysis-result/index?reveal=1" });');
 
