@@ -53,9 +53,11 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
         <View className={`feedback-modal__icon feedback-modal__icon--${modal.variant}`}>
           {modal.variant === "success" ? (
             <NordicIcon name="check" size={52} ariaLabel="成功" />
+          ) : modal.variant === "limit" ? (
+            <NordicIcon name="hourglass" size={52} ariaLabel="额度提示" />
           ) : (
-            <Text className="feedback-modal__icon-mark" aria-label={modal.variant === "limit" ? "额度提示" : "错误"}>
-              {modal.variant === "limit" ? "!" : "×"}
+            <Text className="feedback-modal__icon-mark" aria-label="错误">
+              ×
             </Text>
           )}
         </View>

@@ -13,6 +13,7 @@ describe("FeedbackModal contract", () => {
     expect(source).toContain('variant: "success" | "limit" | "error"');
     expect(source).toContain('import { NordicIcon } from "../nordic-icon"');
     expect(source).toContain('<NordicIcon name="check" size={52} ariaLabel="成功" />');
+    expect(source).toContain('<NordicIcon name="hourglass" size={52} ariaLabel="额度提示" />');
     expect(source).toContain("feedback-modal-overlay");
     expect(source).toContain("feedback-modal--success");
     expect(source).toContain("feedback-modal--limit");
@@ -35,6 +36,8 @@ describe("FeedbackModal contract", () => {
     expect(componentSource).toContain("modal.dismissible && !modal.primaryText");
     expect(source).toContain("translateX(-3px)");
     expect(source).toContain("translateX(3px)");
+    expect(source).toContain("background: #e4e2df");
+    expect(source).toContain("background: #69716b");
   });
 
   it("keeps modal copy on one line and centers compact actions", () => {
