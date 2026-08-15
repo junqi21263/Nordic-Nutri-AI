@@ -27,7 +27,7 @@ const safeMessages: Record<string, string> = {
   VALIDATION_ERROR: "请求参数无效",
   NOT_FOUND: "请求的资源不存在",
   CONFLICT: "请求冲突或已重复使用",
-  RATE_LIMITED: "请求过于频繁，请稍后重试",
+  RATE_LIMITED: "识别次数已达到当前上限，请稍后再试",
   AI_SERVICE_ERROR: "外部认证服务暂不可用",
   STORAGE_ERROR: "存储服务暂不可用",
   DATABASE_ERROR: "服务端数据操作失败",

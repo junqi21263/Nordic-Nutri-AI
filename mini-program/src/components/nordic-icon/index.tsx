@@ -31,6 +31,7 @@ import camera from "../../assets/icons/camera.svg";
 import images from "../../assets/icons/images.svg";
 import zap from "../../assets/icons/zap.svg";
 import timer from "../../assets/icons/timer.svg";
+import hourglass from "../../assets/icons/hourglass.svg";
 import switchCamera from "../../assets/icons/switch-camera.svg";
 import utensils from "../../assets/icons/utensils.svg";
 import x from "../../assets/icons/x.svg";
@@ -96,6 +97,7 @@ export type NordicIconName =
   | "images"
   | "zap"
   | "timer"
+  | "hourglass"
   | "switch-camera"
   | "utensils"
   | "x"
@@ -167,6 +169,7 @@ const iconSources: Record<NordicIconName, string> = {
   images,
   zap,
   timer,
+  hourglass,
   "switch-camera": switchCamera,
   utensils,
   x,
