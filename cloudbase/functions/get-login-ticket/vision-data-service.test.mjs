@@ -163,3 +163,20 @@ test("backfills per-100g nutrition from USDA catalog when backfillNutrition is p
   assert.equal(result.items[0].caloriesPer100g, 165);
   assert.equal(result.items[1].nutritionSource, "ai_estimate");
 });
+
+test("does not return a synthetic analysisId when persistence fails", async () => {
+  const service = createVisionDataService({
+    db: { from() { return { insert() { throw new Error("database unavailable"); } }; } },
+    uploadImage: async () => ({ cloudPath: "cloud://env/x.jpg", imageUrl: "https://example.com/x.jpg" }),
+    analyze: async () => ({ mealName: "米饭", mealType: "lunch", confidence: 0.9, advice: "ok", items: [{ name: "米饭", quantityG: 150, caloriesPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3 }] }),
+  });
+
+  await assert.rejects(
+    () => service.analyzeImage("user-1", {
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      contentType: "image/jpeg",
+      imageBase64: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString("base64"),
+    }),
+    (error) => error.code === "VISION_PERSISTENCE_FAILED",
+  );
+});

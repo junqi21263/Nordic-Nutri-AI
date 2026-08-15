@@ -206,7 +206,8 @@ export function PageLayout({
                 if (currentPage?.route === "pages/portion-adjustment/index") {
                   return Taro.navigateBack({ delta: 1 });
                 }
-                return Taro.navigateTo({ url: `/pages/meal-detail/index?id=${savedMeal.mealId}` });
+                const detailSource = currentPage?.route === "pages/analysis-result/index" ? "&from=analysis" : "";
+                return Taro.navigateTo({ url: `/pages/meal-detail/index?id=${savedMeal.mealId}${detailSource}` });
               })
               .catch(() => undefined);
           }}

@@ -56,6 +56,7 @@ const { createFoodImageBatchService, FoodImageBatchError } = require("./food-ima
 const { createFoodImagePatrolService, FoodImagePatrolError } = require("./food-image-patrol-service.cjs");
 const { createFoodImageAuditVision } = require("./food-image-audit-vision.cjs");
 const { createFoodImageAuditService } = require("./food-image-audit-service.cjs");
+const { createVisionBudget, VISION_BUDGETS } = require("./vision-budget.cjs");
 const { getFoodDisplayName } = require("./food-display-name.cjs");
 const { formulaNutritionPlanFallback } = require("./nutrition-plan-formula.cjs");
 
@@ -86,6 +87,11 @@ function pickNickname() {
 const MAX_BODY_BYTES = 4096;
 // ~4MB decoded image ≈ ~5.4MB base64 + JSON envelope.
 const MAX_VISION_BODY_BYTES = 6 * 1024 * 1024;
+const VISION_SERVER_BUDGET_MS = VISION_BUDGETS.serverTotalMs;
+const VISION_DOWNSTREAM_RESERVE_MS = VISION_BUDGETS.flashMaxMs
+  + VISION_BUDGETS.nutritionReserveMs
+  + VISION_BUDGETS.evaluationReserveMs
+  + VISION_BUDGETS.persistenceReserveMs;
 const VISION_DAILY_LIMIT = 10;
 // Keep the model catalog and account-usage fallback aligned with the active
 // quota. This alias also protects the public login bootstrap from a missing
@@ -1111,11 +1117,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   } catch (securityInitError) {
     console.warn("[vision] image security init failed:", securityInitError?.message || securityInitError);
   }
-  const uploadVisionImage = async ({ cloudPath, content, contentType }) => {
-    const toDataUrl = () => {
-      const mime = contentType || "image/jpeg";
-      return `data:${mime};base64,${content.toString("base64")}`;
-    };
+  const uploadVisionImage = async ({ cloudPath, content, contentType, budget, observe = () => {} }) => {
     // Same dual-client pattern as food-library uploads: ambient SCF identity first,
     // API-key admin client only as fallback (API-key storage JWT is unreliable here).
     const clients = [storageRuntime, admin].filter(Boolean);
@@ -1141,19 +1143,48 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       }
       throw lastError || new Error("Vision upload failed");
     };
-    try {
-      return await Promise.race([
-        uploadOnce(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Vision upload timed out")), 25_000)),
-      ]);
-    } catch (uploadErr) {
-      console.error("[vision] Storage upload failed, retrying once:", uploadErr?.message || uploadErr);
+    const runAttempt = async (timeoutMs) => {
+      if (!(Number(timeoutMs) > 0)) {
+        throw new PublicVisionDataError("VISION_TIMEOUT", "识别时间有点久，请重新试一次");
+      }
+      let timer;
       try {
-        return await uploadOnce();
+        return await Promise.race([
+          uploadOnce(),
+          new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error("Vision upload timed out"), { code: "VISION_TIMEOUT" })), timeoutMs); }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    const firstTimeoutMs = budget?.stageTimeout
+      ? budget.stageTimeout(VISION_BUDGETS.uploadAttemptMaxMs, 0)
+      : VISION_BUDGETS.uploadAttemptMaxMs;
+    try {
+      const uploaded = await runAttempt(firstTimeoutMs);
+      observe({ stage: "upload", uploadRetryCount: 0 });
+      return uploaded;
+    } catch (uploadErr) {
+      console.error("[vision] Storage upload failed, checking retry budget:", uploadErr?.message || uploadErr);
+      const retryTimeoutMs = budget?.remainingAfterReserve
+        ? budget.remainingAfterReserve(VISION_DOWNSTREAM_RESERVE_MS)
+        : VISION_BUDGETS.uploadAttemptMaxMs;
+      if (!(retryTimeoutMs > 0)) {
+        throw new PublicVisionDataError(
+          uploadErr?.code === "VISION_TIMEOUT" ? "VISION_TIMEOUT" : "VISION_UPLOAD_FAILED",
+          uploadErr?.code === "VISION_TIMEOUT" ? "识别时间有点久，请重新试一次" : "图片上传失败，请检查网络后重试",
+        );
+      }
+      try {
+        const uploaded = await runAttempt(Math.min(VISION_BUDGETS.uploadAttemptMaxMs, retryTimeoutMs));
+        observe({ stage: "upload", uploadRetryCount: 1 });
+        return uploaded;
       } catch (retryErr) {
-        console.error("[vision] Storage retry failed, analyzing via data URL only:", retryErr?.message || retryErr);
-        // Do NOT invent cloud://env/path — that is not a valid fileID and breaks admin/meal previews.
-        return { cloudPath: null, imageUrl: toDataUrl() };
+        console.error("[vision] Storage retry failed:", retryErr?.message || retryErr);
+        throw new PublicVisionDataError(
+          retryErr?.code === "VISION_TIMEOUT" ? "VISION_TIMEOUT" : "VISION_UPLOAD_FAILED",
+          retryErr?.code === "VISION_TIMEOUT" ? "识别时间有点久，请重新试一次" : "图片上传失败，请检查网络后重试",
+        );
       }
     }
   };
@@ -2741,11 +2772,16 @@ function createHttpServer({ service }) {
       }
     }
     if (visionRoute) {
+      const startedAt = Date.now();
+      const budget = createVisionBudget({ startedAt, totalMs: VISION_SERVER_BUDGET_MS });
+      const stageEvents = [];
+      const observeVisionStage = (event) => {
+        if (event && typeof event === "object") stageEvents.push({ ...event, observedAt: Date.now() });
+      };
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.vision?.analyzeImage) return sendJson(res, 503, { code: "VISION_SERVICE_NOT_CONFIGURED" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
-      const startedAt = Date.now();
       try {
         const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
         // Invalid or oversized local camera files must not consume a daily scan.
@@ -2766,18 +2802,39 @@ function createHttpServer({ service }) {
           model: service.vision?.model || service.modelCatalog?.find((item) => item.feature === "vision")?.model || null,
           provider: service.vision?.provider || null,
         };
-        const result = await service.vision.analyzeImage(session.sub, body);
+        const result = await service.vision.analyzeImage(session.sub, body, { budget, observe: observeVisionStage });
         const visionModel = result?.model || visionMeta.model;
+        const lastStage = stageEvents[stageEvents.length - 1]?.stage || null;
+        const plusEvent = [...stageEvents].reverse().find((event) => event.stage === "plus") || {};
+        const flashEvent = [...stageEvents].reverse().find((event) => event.stage === "flash") || {};
+        const uploadEvent = [...stageEvents].reverse().find((event) => event.stage === "upload") || {};
         const resolvedVisionMeta = {
           ...visionMeta,
           model: visionModel,
           provider: result?.provider || visionMeta.provider,
           hops: Number(result?.modelHops) || 1,
+          plusAttempted: plusEvent.plusAttempted === true,
+          plusSuccess: plusEvent.plusSuccess === true,
+          plusTimeout: plusEvent.fallbackReason === "plus_timeout" || plusEvent.fallbackReason === "plus_abort",
+          fallbackToFlash: plusEvent.fallbackToFlash === true,
+          fallbackReason: plusEvent.fallbackReason || null,
+          plusSkipReason: plusEvent.plusSkipReason || null,
+          abortReason: flashEvent.abortReason || null,
+          uploadRetryCount: Number(uploadEvent.uploadRetryCount) || 0,
+          dishCount: Array.isArray(result?.items) ? result.items.length : 0,
+          deadlineExhaustedStage: budget.remainingMs() <= 0 ? lastStage : null,
         };
         const latencyMs = Date.now() - startedAt;
         service.observability?.recordMetric?.("vision_success", 1, resolvedVisionMeta).catch(() => {});
         service.observability?.recordMetric?.("vision_latency_ms", latencyMs, resolvedVisionMeta).catch(() => {});
+        service.observability?.recordMetric?.("server_total_ms", latencyMs, resolvedVisionMeta).catch(() => {});
+        service.observability?.recordMetric?.("total_ms", latencyMs, resolvedVisionMeta).catch(() => {});
         service.observability?.recordMetric?.("vision_model_hops", Number(result?.modelHops) || 1, resolvedVisionMeta).catch(() => {});
+        for (const event of stageEvents) {
+          if (Number.isFinite(event.ms) && event.stage) {
+            service.observability?.recordMetric?.(`${event.stage}_ms`, event.ms, { ...resolvedVisionMeta, ...event }).catch(() => {});
+          }
+        }
         recordModelUsage(service.observability, {
           model: visionModel,
           feature: "vision",
@@ -2801,6 +2858,8 @@ function createHttpServer({ service }) {
           model: service.vision?.model || null,
           provider: service.vision?.provider || null,
           latencyMs: Date.now() - startedAt,
+          serverTotalMs: Date.now() - startedAt,
+          deadlineExhaustedStage: budget.remainingMs() <= 0 ? stageEvents[stageEvents.length - 1]?.stage || null : null,
         }).catch(() => {});
         if (
           error instanceof PublicVisionDataError

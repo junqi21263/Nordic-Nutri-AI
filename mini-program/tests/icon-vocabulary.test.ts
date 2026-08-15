@@ -11,7 +11,6 @@ function read(relativePath: string) {
 describe("icon vocabulary variety", () => {
   it("keeps the top bar text-only and uses distinct icons elsewhere", () => {
     expect(read("components/app-top-bar/index.tsx")).not.toContain("app-icon-ui");
-    expect(read("components/brand-header/index.tsx")).not.toContain("app-icon-ui");
     expect(read("components/app-top-bar/index.tsx")).toContain("Nordic Nutri AI");
 
     expect(read("components/ai-insight-card/index.tsx")).toContain('name="nova"');

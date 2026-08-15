@@ -129,6 +129,21 @@ describe("meal recognition result reveal motion", () => {
     expect(page).toContain('cancelLabel="继续分析"');
   });
 
+  it("keeps the analysis exit dialog centered, fixed and single-line", () => {
+    const page = read("pages/analysis-result/index.tsx");
+    const layout = read("styles/layout.scss");
+    const styles = read("styles/page.scss");
+
+    expect(page).toContain("scrollLocked={exitConfirmOpen}");
+    expect(styles).toContain(".page-layout--analysis-result .modal-backdrop");
+    expect(styles).toContain("align-items: center;");
+    expect(styles).toContain("touch-action: none;");
+    expect(styles).toContain(".page-layout--analysis-result .confirm-dialog__actions .app-button");
+    expect(styles).toContain("white-space: nowrap;");
+    expect(layout).toContain("page-layout--scroll-locked .page-layout__scroll");
+    expect(layout).toContain("overflow: hidden;");
+  });
+
   it("collapses only ingredient rows while keeping nutrition progress visible", () => {
     const page = read("pages/analysis-result/index.tsx");
     const styles = read("styles/page.scss");

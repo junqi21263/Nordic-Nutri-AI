@@ -107,6 +107,13 @@ export default function MealDetailPage() {
     portion.startMealEdit(meal);
     Taro.navigateTo({ url: `/pages/portion-adjustment/index?id=${meal.id}` });
   };
+  const handleTopBarBack = () => {
+    if (router.params.from === "analysis") {
+      void Taro.switchTab({ url: "/pages/meal-records/index" });
+      return;
+    }
+    void Taro.navigateBack();
+  };
   const remove = async () => {
     try {
       const result = await deleteProductMeal(meal.id);
@@ -145,7 +152,7 @@ export default function MealDetailPage() {
       showTabs={false}
       hideNavigation
       showBack
-      onTopBarBack={() => Taro.navigateBack()}
+      onTopBarBack={handleTopBarBack}
       className="page-layout--meal-detail"
     >
       <View className="meal-detail-page">

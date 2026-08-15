@@ -2,7 +2,6 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "@tarojs/cli";
 import devConfig from "./dev";
-import prodConfig from "./prod";
 
 const projectRoot = resolve(__dirname, "../..");
 const requestedNodeEnv = process.env.NODE_ENV === "production" ? "production" : "development";
@@ -82,16 +81,9 @@ export default defineConfig({
       url: { enable: true, config: { limit: 1024 } },
       cssModules: { enable: false },
     },
-    webpackChain(chain) {
-      if (isDevelopment) {
-        // Taro's watch build otherwise removes app.json before emitting the
-        // replacement files, which leaves WeChat DevTools on wx://not-found.
-        chain.output.set("clean", false);
-      }
-    },
   },
   h5: {
     staticDirectory: "static",
   },
-  ...(isDevelopment ? devConfig : prodConfig),
+  ...(isDevelopment ? devConfig : {}),
 });

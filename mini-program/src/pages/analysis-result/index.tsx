@@ -233,6 +233,7 @@ export default function AnalysisResultPage() {
       showTabs={false}
       hideNavigation
       showBack
+      scrollLocked={exitConfirmOpen}
       onTopBarBack={() => setExitConfirmOpen(true)}
       className="page-layout--analysis-result"
     >

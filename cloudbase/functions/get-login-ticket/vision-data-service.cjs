@@ -1,5 +1,6 @@
 const crypto = require("node:crypto");
 const { compressVisionImageForStorage } = require("./vision-image-compress.cjs");
+const { VISION_BUDGETS } = require("./vision-budget.cjs");
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -9,6 +10,12 @@ const acceptedContentTypes = new Set([
 
 /** Hard ceiling after client compress; pick limit on device remains higher. */
 const MAX_DECODED_IMAGE_BYTES = 4 * 1024 * 1024;
+const NUTRITION_MAX_TIMEOUT_MS = VISION_BUDGETS.nutritionReserveMs;
+const EVALUATION_MAX_TIMEOUT_MS = VISION_BUDGETS.evaluationMaxMs;
+const PERSISTENCE_RESERVE_MS = VISION_BUDGETS.persistenceReserveMs;
+const SECURITY_MAX_TIMEOUT_MS = VISION_BUDGETS.securityMaxMs;
+const REQUIRED_NUTRITION_FIELDS = ["quantityG", "caloriesPer100g", "proteinPer100g", "carbsPer100g", "fatPer100g"];
+const timeoutSentinel = Symbol("vision-timeout");
 
 class PublicVisionDataError extends Error {
   constructor(code, message = "图片识别请求无效") {
@@ -36,10 +43,19 @@ function fallbackEvaluation(result) {
 }
 
 function withTimeout(promise, ms, fallbackValue) {
+  if (!(Number(ms) > 0)) return Promise.resolve(fallbackValue);
+  let timer;
   return Promise.race([
     promise,
-    new Promise((resolve) => setTimeout(() => resolve(fallbackValue), ms)),
-  ]);
+    new Promise((resolve) => { timer = setTimeout(() => resolve(fallbackValue), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+function isSaveableNutrition(items) {
+  return Array.isArray(items) && items.length > 0 && items.every((item) =>
+    typeof item?.name === "string" && item.name.trim() &&
+    Number.isFinite(item.quantityG) && item.quantityG > 0 &&
+    REQUIRED_NUTRITION_FIELDS.filter((field) => field !== "quantityG").every((field) => Number.isFinite(item[field]) && item[field] >= 0));
 }
 
 function createVisionDataService({
@@ -60,13 +76,24 @@ function createVisionDataService({
     validateImage(input) {
       return readImage(input);
     },
-    async analyzeImage(userId, input) {
+    async analyzeImage(userId, input, { budget, observe = () => {} } = {}) {
       if (typeof analyze !== "function") throw new PublicVisionDataError("VISION_SERVICE_NOT_CONFIGURED", "图片识别服务未配置");
       const image = readImage(input);
       if (typeof assertImageSafe === "function") {
+        const securityStartedAt = Date.now();
         try {
-          await assertImageSafe({ buffer: image.content, contentType: image.contentType });
+          const securityTimeoutMs = budget?.stageTimeout
+            ? budget.stageTimeout(SECURITY_MAX_TIMEOUT_MS, 0)
+            : SECURITY_MAX_TIMEOUT_MS;
+          const safeResult = await withTimeout(
+            assertImageSafe({ buffer: image.content, contentType: image.contentType, timeoutMs: securityTimeoutMs, budget }),
+            securityTimeoutMs,
+            timeoutSentinel,
+          );
+          if (safeResult === timeoutSentinel) throw new PublicVisionDataError("VISION_TIMEOUT", "图片安全检查超时，请重试");
+          observe({ stage: "safety_check", ms: Date.now() - securityStartedAt, safetyCheckSuccess: true });
         } catch (securityError) {
+          observe({ stage: "safety_check", ms: Date.now() - securityStartedAt, safetyCheckSuccess: false, abortReason: securityError?.code === "VISION_TIMEOUT" ? "timeout" : null });
           if (securityError?.code === "VISION_CONTENT_BLOCKED" && typeof uploadBlockedImage === "function") {
             try {
               const blockedMedia = await compressVisionImageForStorage(image.content, image.contentType, {
@@ -92,29 +119,47 @@ function createVisionDataService({
       const sha256 = crypto.createHash("sha256").update(storeContent).digest("hex");
       const extension = storeContentType === "image/png" ? "png" : storeContentType === "image/webp" ? "webp" : "jpg";
       const cloudPath = `food-images/${userId}/${crypto.randomUUID()}.${extension}`;
-      const uploaded = await uploadImage({ cloudPath, content: storeContent, contentType: storeContentType });
+      const uploadStartedAt = Date.now();
+      const uploaded = await uploadImage({ cloudPath, content: storeContent, contentType: storeContentType, budget, observe });
+      observe({ stage: "upload", ms: Date.now() - uploadStartedAt, uploadSuccess: true });
       if (typeof uploaded?.imageUrl !== "string" || !uploaded.imageUrl) throw new Error("Vision image upload failed");
-      const result = await analyze({ imageUrl: uploaded.imageUrl });
+      const result = await analyze({ imageUrl: uploaded.imageUrl, budget, observe });
 
-      // Backfill per-100g nutrition from USDA food catalog (non-blocking, falls back to AI estimates).
+      // Backfill per-100g nutrition from USDA food catalog. Flash nutrition remains usable
+      // when it already satisfies the save contract; otherwise backfill is required.
       let backfilledItems = result.items;
       let nutritionSource = "ai_estimate";
+      const nutritionMode = isSaveableNutrition(result.items) ? "enrichment" : "required";
+      let nutritionFallbackUsed = false;
       if (typeof backfillNutrition === "function") {
+        const nutritionStartedAt = Date.now();
+        const nutritionTimeoutMs = budget?.stageTimeout
+          ? budget.stageTimeout(NUTRITION_MAX_TIMEOUT_MS, EVALUATION_MAX_TIMEOUT_MS + PERSISTENCE_RESERVE_MS)
+          : 8_000;
         try {
           backfilledItems = await withTimeout(
             backfillNutrition(result.items),
-            8_000,
-            result.items.map((item) => ({ ...item, nutritionSource: "ai_estimate" })),
+            nutritionTimeoutMs,
+            timeoutSentinel,
           );
+          if (backfilledItems === timeoutSentinel) throw new PublicVisionDataError("VISION_TIMEOUT", "营养信息处理超时，请重试");
           const usdaCount = backfilledItems.filter((item) => item.nutritionSource === "usda").length;
           if (usdaCount > 0) nutritionSource = usdaCount === backfilledItems.length ? "usda" : "mixed";
         } catch (backfillErr) {
-          console.error("[vision] nutrition backfill failed (non-blocking):", backfillErr?.message || backfillErr);
+          console.error("[vision] nutrition backfill failed:", backfillErr?.message || backfillErr);
+          if (nutritionMode === "required") {
+            throw new PublicVisionDataError("VISION_NUTRITION_FAILED", "营养信息处理失败，请重试");
+          }
+          nutritionFallbackUsed = true;
           backfilledItems = result.items.map((item) => ({ ...item, nutritionSource: "ai_estimate" }));
         }
+        observe({ stage: "nutrition", ms: Date.now() - nutritionStartedAt, nutritionBlocking: nutritionMode === "required", nutritionFallbackUsed });
+      } else if (nutritionMode === "required") {
+        throw new PublicVisionDataError("VISION_NUTRITION_FAILED", "营养信息处理失败，请重试");
       }
 
-      // Evaluation + audit writes run in parallel and must not block recognition success.
+      // Evaluation and persistence remain synchronous in V1; both are bounded by the same deadline.
+      const evaluationStartedAt = Date.now();
       const evaluationPromise = typeof evaluateMeal === "function"
         ? withTimeout(
           evaluateMeal({
@@ -131,12 +176,17 @@ function createVisionDataService({
             console.error("[vision] evaluation failed (non-blocking):", evalErr?.message || evalErr);
             return null;
           }),
-          2_500,
+          budget?.stageTimeout ? budget.stageTimeout(EVALUATION_MAX_TIMEOUT_MS, PERSISTENCE_RESERVE_MS) : EVALUATION_MAX_TIMEOUT_MS,
           null,
         )
         : Promise.resolve(null);
+      evaluationPromise.then(() => observe({ stage: "evaluation", ms: Date.now() - evaluationStartedAt, evaluationSuccess: true })).catch(() => {});
 
+      const persistenceStartedAt = Date.now();
       const persistPromise = (async () => {
+        if (budget?.remainingMs && budget.remainingMs() <= 0) {
+          throw new PublicVisionDataError("VISION_TIMEOUT", "识别时间有点久，请重新试一次");
+        }
         // Only persist resolvable CloudBase fileIDs (cloud://...). Relative keys without a real upload
         // produce admin "暂无预览" forever.
         const durablePath = typeof uploaded.cloudPath === "string" && uploaded.cloudPath.startsWith("cloud://")
@@ -155,13 +205,18 @@ function createVisionDataService({
               status: "attached",
             }).select("id").single();
             assetId = asset.data?.id ?? null;
+            if (!assetId) throw new Error("uploaded_assets insert returned no id");
           } catch (dbErr) {
-            console.error("[vision] uploaded_assets insert failed (non-blocking):", dbErr?.message || dbErr);
+            console.error("[vision] uploaded_assets insert failed:", dbErr?.message || dbErr);
+            throw new PublicVisionDataError("VISION_PERSISTENCE_FAILED", "识别结果保存失败，请重试");
           }
         } else {
           console.warn("[vision] skipping uploaded_assets — no durable cloud fileID (upload used data-URL fallback)");
         }
-        let analysisId = assetId || crypto.randomUUID();
+        if (budget?.remainingMs && budget.remainingMs() <= 0) {
+          throw new PublicVisionDataError("VISION_TIMEOUT", "识别时间有点久，请重新试一次");
+        }
+        let analysisId = assetId;
         try {
           const saved = await db.from("ai_analysis").insert({
             user_id: userId,
@@ -177,11 +232,18 @@ function createVisionDataService({
             client_request_id: image.clientRequestId,
           }).select("id").single();
           if (saved.data?.id) analysisId = saved.data.id;
+          if (!analysisId) throw new Error("ai_analysis insert returned no id");
         } catch (dbErr) {
-          console.error("[vision] ai_analysis insert failed (non-blocking):", dbErr?.message || dbErr);
+          console.error("[vision] ai_analysis insert failed:", dbErr?.message || dbErr);
+          if (dbErr instanceof PublicVisionDataError) throw dbErr;
+          throw new PublicVisionDataError("VISION_PERSISTENCE_FAILED", "识别结果保存失败，请重试");
         }
         return analysisId;
       })();
+      persistPromise.then(
+        () => observe({ stage: "persistence", ms: Date.now() - persistenceStartedAt, persistenceSuccess: true }),
+        (error) => observe({ stage: "persistence", ms: Date.now() - persistenceStartedAt, persistenceSuccess: false, abortReason: error?.code === "VISION_TIMEOUT" ? "timeout" : null }),
+      );
 
       const [evaluation, analysisId] = await Promise.all([evaluationPromise, persistPromise]);
       // Prefer HTTPS for immediate display; always return durable cloud file ID when storage worked.

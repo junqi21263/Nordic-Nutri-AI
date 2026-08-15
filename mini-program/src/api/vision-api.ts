@@ -12,6 +12,7 @@ import { createClientRequestId } from "../repositories/client-request-id";
 import { getLocalFileInfo } from "../utils/file-system-info";
 import { productApiEndpoint } from "./product-api-config";
 const maxImageBytes = MAX_UPLOAD_HARD_BYTES;
+const CLIENT_TOTAL_BUDGET_MS = 15_000;
 /** Network upload target — keep base64 payload small enough for mobile + cloud timeout. */
 const targetUploadBytes = MAX_UPLOAD_IMAGE_BYTES;
 
@@ -70,10 +71,21 @@ function detectImageContentType(imageBase64: string, filePath?: string): string 
   return "image/jpeg";
 }
 
-function createVisionError(message: string, cause: unknown) {
+function createVisionError(message: string, cause: unknown, name?: string) {
   const error = new Error(message) as Error & { cause?: unknown };
   error.cause = cause;
+  if (name) error.name = name;
   return error;
+}
+
+function remainingClientMs(deadlineAt: number) {
+  return Math.max(0, deadlineAt - Date.now());
+}
+
+function throwIfClientDeadlineExceeded(deadlineAt: number) {
+  if (remainingClientMs(deadlineAt) <= 0) {
+    throw createVisionError("识别时间有点久，请重新试一次", { code: "VISION_TIMEOUT" }, "VISION_TIMEOUT");
+  }
 }
 
 function mapVisionResult(result: ProductVisionResult): ScannerMealFixture {
@@ -139,9 +151,11 @@ async function compressOnce(
   }
 }
 
-async function prepareImagePath(sourcePath: string) {
+async function prepareImagePath(sourcePath: string, deadlineAt: number, onTiming?: (event: { stage: string; ms: number }) => void) {
+  const startedAt = Date.now();
   let path = sourcePath;
   try {
+    throwIfClientDeadlineExceeded(deadlineAt);
     const originalSize = await fileSizeOf(sourcePath);
     // Keep the browser-side payload below WeChat image-security's 900KB fallback
     // limit. Quality-only often stalls on phone JPEGs, so shrink the long edge too.
@@ -153,22 +167,33 @@ async function prepareImagePath(sourcePath: string) {
       { quality: 36, width: 640 },
     ];
     for (const pass of passes) {
+      throwIfClientDeadlineExceeded(deadlineAt);
       path = await compressOnce(path, pass.quality, pass.width);
       if ((await fileSizeOf(path)) <= targetUploadBytes) break;
     }
   } catch {
+    if (remainingClientMs(deadlineAt) <= 0) throwIfClientDeadlineExceeded(deadlineAt);
+    onTiming?.({ stage: "image_prepare", ms: Date.now() - startedAt });
     return sourcePath;
   }
+  onTiming?.({ stage: "image_prepare", ms: Date.now() - startedAt });
   return path;
 }
 
-export async function analyzeProductImage(sourcePath: string): Promise<ScannerMealFixture> {
+export async function analyzeProductImage(
+  sourcePath: string,
+  options: { recognitionStartedAt?: number; deadlineAt?: number; onTiming?: (event: { stage: string; ms: number }) => void } = {},
+): Promise<ScannerMealFixture> {
+  const recognitionStartedAt = options.recognitionStartedAt ?? Date.now();
+  const deadlineAt = options.deadlineAt ?? recognitionStartedAt + CLIENT_TOTAL_BUDGET_MS;
+  const onTiming = options.onTiming;
   const token = useAuthStore.getState().session?.accessToken;
   if (!token) {
     console.error("[vision] No auth token in session:", useAuthStore.getState().session);
     throw new Error("登录状态已失效，请重新登录");
   }
-  const filePath = await prepareImagePath(sourcePath);
+  const filePath = await prepareImagePath(sourcePath, deadlineAt, onTiming);
+  throwIfClientDeadlineExceeded(deadlineAt);
   let info;
   try {
     info = await getLocalFileInfo(filePath);
@@ -181,8 +206,10 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
   }
   assertImageWithinUploadHardLimit(info.size);
   let imageBase64;
+  const readStartedAt = Date.now();
   try {
     imageBase64 = await readBase64(filePath);
+    onTiming?.({ stage: "image_read", ms: Date.now() - readStartedAt });
   } catch (err) {
     console.error("[vision] readBase64 failed:", err);
     throw createVisionError("图片读取失败，请重新选择", err);
@@ -204,6 +231,9 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
     "base64Length:",
     imageBase64.length,
   );
+  throwIfClientDeadlineExceeded(deadlineAt);
+  const requestStartedAt = Date.now();
+  const requestTimeout = remainingClientMs(deadlineAt);
   let response;
   try {
     response = await Taro.request<unknown>({
@@ -215,12 +245,20 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
         contentType,
         imageBase64,
       },
-      timeout: 55000,
+      timeout: requestTimeout,
     });
+    onTiming?.({ stage: "request", ms: Date.now() - requestStartedAt });
   } catch (err) {
     console.error("[vision] network request failed:", err);
-    throw createVisionError("识别超时或网络不稳定，请压缩后重试或换一张更清晰的近景照片", err);
+    const detail = String((err as { errMsg?: unknown })?.errMsg || (err as Error)?.message || "").toLowerCase();
+    const isTimeout = detail.includes("timeout") || detail.includes("aborted") || detail.includes("超时");
+    throw createVisionError(
+      isTimeout ? "识别时间有点久，请重新试一次" : "网络似乎不太稳定，请检查后重试",
+      err,
+      isTimeout ? "VISION_TIMEOUT" : "VISION_NETWORK_ERROR",
+    );
   }
+  const parseStartedAt = Date.now();
   const data = response.data as ProductVisionResult & { code?: unknown; message?: unknown };
   if (response.statusCode !== 200) {
     const backendMessage = typeof data.message === "string" ? data.message : "";
@@ -233,17 +271,27 @@ export async function analyzeProductImage(sourcePath: string): Promise<ScannerMe
     const messageByCode: Record<string, string> = {
       VISION_CONTENT_BLOCKED: "图片未通过安全审核，请更换后重试",
       VISION_NON_FOOD: "上传的图片为非食物，请重新上传食物图片",
+      VISION_TIMEOUT: "识别时间有点久，请重新试一次",
+      VISION_UPLOAD_FAILED: "图片上传失败，请检查网络后重试",
+      VISION_SECURITY_FAILED: "图片安全检查失败，请重新拍摄",
+      VISION_SECURITY_CHECK_FAILED: "图片安全检查失败，请重新拍摄",
+      VISION_NUTRITION_FAILED: "营养信息处理失败，请重试",
+      VISION_PERSISTENCE_FAILED: "识别结果保存失败，请重试",
+      VISION_MODEL_FAILED: "图片识别失败，请重新拍摄",
+      VISION_RETRYABLE: "图片识别失败，请重新拍摄",
     };
     const error = new Error(
-      timedOut
-        ? "识别超时，请换一张更清晰、更近的餐盘照片后重试"
-        : messageByCode[errorCode] ||
-            backendMessage ||
-            (response.statusCode === 503 ? "图片识别服务暂不可用" : "图片识别失败，请重新拍摄"),
+      messageByCode[errorCode] ||
+        (timedOut
+          ? "识别时间有点久，请重新试一次"
+          : backendMessage || (response.statusCode === 503 ? "图片识别服务暂不可用" : "图片识别失败，请重新拍摄")),
     );
     error.name = errorCode;
     console.error("[vision] request failed:", response.statusCode, data);
     throw error;
   }
-  return mapVisionResult(data);
+  const meal = mapVisionResult(data);
+  onTiming?.({ stage: "parse", ms: Date.now() - parseStartedAt });
+  onTiming?.({ stage: "client_total", ms: Date.now() - recognitionStartedAt });
+  return meal;
 }

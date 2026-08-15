@@ -50,6 +50,17 @@ describe("餐食详情交互", () => {
     });
   });
 
+  it("让扫描保存后的餐食详情返回饮食记录，而手动记录继续返回原页面", () => {
+    const layout = readFileSync(resolve(sourceRoot, "layouts/page-layout/index.tsx"), "utf8");
+    const detail = read("pages/meal-detail/index.tsx");
+
+    expect(layout).toContain('currentPage?.route === "pages/analysis-result/index"');
+    expect(layout).toContain("from=analysis");
+    expect(detail).toContain('router.params.from === "analysis"');
+    expect(detail).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');
+    expect(detail).toContain("Taro.navigateBack()");
+  });
+
   it("更新收藏后同步详情态，并给出可发现的反馈", () => {
     const detail = read("pages/meal-detail/index.tsx");
     const styles = read("styles/page.scss");

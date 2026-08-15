@@ -3,8 +3,6 @@ import { useAnimatedProgress } from "../../hooks/useAnimatedProgress";
 import { ProgressFallback } from "../progress-fallback";
 import { calculateCircularProgressPercent } from "../../features/meals/nutrition-progress";
 
-export { calculateCircularProgressPercent } from "../../features/meals/nutrition-progress";
-
 const CIRCULAR_PROGRESS_COLORS = {
   forest: ["#163422", "rgba(22, 52, 34, 0.14)"],
   sage: ["#2f6b45", "rgba(47, 107, 69, 0.18)"],

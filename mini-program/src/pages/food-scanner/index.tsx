@@ -31,6 +31,7 @@ function shouldShowScannerTip(): boolean {
 }
 
 const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
+const visionClientBudgetMs = 15_000;
 
 function isUserCancelMediaChoice(error: unknown): boolean {
   const pieces = [
@@ -109,7 +110,7 @@ export default function FoodScannerPage() {
     });
   };
 
-  const analyzeCurrentPreview = async (previewPath: string) => {
+  const analyzeCurrentPreview = async (previewPath: string, recognitionStartedAt = Date.now(), mediaAcquisitionMs = 0) => {
     if (isScanningRef.current) return;
     isScanningRef.current = true;
     setIsScanning(true);
@@ -117,13 +118,20 @@ export default function FoodScannerPage() {
     try {
       let meal;
       try {
-        meal = await analyzeProductImage(previewPath);
+        const clientDeadlineAt = recognitionStartedAt + visionClientBudgetMs;
+        meal = await analyzeProductImage(previewPath, {
+          recognitionStartedAt,
+          deadlineAt: clientDeadlineAt,
+          onTiming: (event) => console.info("[vision] client timing", { ...event, media_acquisition_ms: mediaAcquisitionMs }),
+        });
       } catch (error) {
         scanner.clearResultRevealPending();
         const errorName = error instanceof Error ? error.name : "";
         const isNotConfigured = errorName === "VISION_SERVICE_NOT_CONFIGURED";
         const isContentBlocked = errorName === "VISION_CONTENT_BLOCKED";
         const isNonFood = errorName === "VISION_NON_FOOD";
+        const isVisionTimeout = errorName === "VISION_TIMEOUT";
+        const isVisionNetworkError = errorName === "VISION_NETWORK_ERROR";
         console.error("[vision] analyzeProductImage failed:", error);
         const visionRemainingAfterLimit = errorName === "RATE_LIMITED" ? await refreshVisionUsage() : null;
         const isDailyLimitReached = isVisionQuotaExhausted(visionRemainingAfterLimit);
@@ -133,10 +141,14 @@ export default function FoodScannerPage() {
           ? "图片识别服务尚未配置，可先手动记录。"
           : isContentBlocked
             ? "图片未通过安全审核，请更换后重试"
-            : isNonFood
+          : isNonFood
               ? "上传的图片为非食物，请重新上传食物图片"
+              : isVisionTimeout
+                ? "识别时间有点久，请重新试一次"
+                : isVisionNetworkError
+                  ? "网络似乎不太稳定，请检查后重试"
               : error instanceof Error
-                ? error.message
+                ? (/aborted|timeout|timed out|operation was aborted/i.test(error.message) ? "识别时间有点久，请重新试一次" : error.message)
                 : "图片识别失败，请重新选择图片或手动记录。";
         setFallbackKind(isDailyLimitReached ? "daily_limit" : "generic");
         setFallbackMessage(userMessage);
@@ -154,6 +166,7 @@ export default function FoodScannerPage() {
       }
       scanner.setCapturedMeal(meal);
       analysis.setAnalysis(meal);
+      console.info("[vision] client timing", { stage: "analysis_result_ready", client_total_ms: Date.now() - recognitionStartedAt, media_acquisition_ms: mediaAcquisitionMs });
       scanner.markResultRevealPending();
       try {
         await Taro.navigateTo({ url: "/pages/analysis-result/index?reveal=1" });
@@ -174,6 +187,7 @@ export default function FoodScannerPage() {
     }
     suppressPreviewResetRef.current = true;
     try {
+      const mediaAcquisitionStartedAt = Date.now();
       const result = await Taro.chooseMedia({
         count: 1,
         mediaType: ["image"],
@@ -183,13 +197,16 @@ export default function FoodScannerPage() {
       const picked = result.tempFiles[0];
       const previewPath = picked?.tempFilePath;
       if (!previewPath) throw new Error("没有获取到图片");
+      const recognitionStartedAt = Date.now();
+      const mediaAcquisitionMs = recognitionStartedAt - mediaAcquisitionStartedAt;
+      console.info("[vision] client timing", { stage: "media_acquisition", media_acquisition_ms: mediaAcquisitionMs });
       scanner.setPreviewPath(previewPath);
       scanner.setGalleryMode(source === "album");
       setFallbackKind("generic");
       setFallbackOpen(false);
       // Any successful capture path completes step 2 — not only the tip CTA.
       dismissScannerTip();
-      await analyzeCurrentPreview(previewPath);
+      await analyzeCurrentPreview(previewPath, recognitionStartedAt, mediaAcquisitionMs);
     } catch (error) {
       // User closed the album/camera without picking — stay on the page quietly.
       if (isUserCancelMediaChoice(error)) return;

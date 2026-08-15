@@ -1,5 +1,6 @@
 const crypto = require("node:crypto");
 const https = require("node:https");
+const { VISION_BUDGETS } = require("./vision-budget.cjs");
 
 const MAX_SEC_BYTES = 900 * 1024;
 const MAX_SEC_WIDTH = 750;
@@ -21,7 +22,7 @@ function loadSharp() {
   }
 }
 
-function httpsJson(url, { method = "GET", headers = {}, body = null } = {}) {
+function httpsJson(url, { method = "GET", headers = {}, body = null, timeoutMs } = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
     const req = https.request(
@@ -46,6 +47,11 @@ function httpsJson(url, { method = "GET", headers = {}, body = null } = {}) {
       },
     );
     req.on("error", reject);
+    if (Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0) {
+      req.setTimeout(timeoutMs, () => {
+        req.destroy(Object.assign(new Error("WeChat request timed out"), { code: "VISION_TIMEOUT" }));
+      });
+    }
     if (body) req.write(body);
     req.end();
   });
@@ -161,12 +167,12 @@ function createWechatImageSecurity({
   let cachedToken = null;
   let cachedExpiresAt = 0;
 
-  async function getAccessToken({ forceRefresh = false } = {}) {
+  async function getAccessToken({ forceRefresh = false, timeoutMs } = {}) {
     if (!forceRefresh && cachedToken && now() < cachedExpiresAt - TOKEN_REFRESH_SKEW_MS) {
       return cachedToken;
     }
     const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${encodeURIComponent(appId)}&secret=${encodeURIComponent(appSecret)}`;
-    const { json } = await fetchJson(url);
+    const { json } = await fetchJson(url, { timeoutMs });
     if (!json?.access_token) {
       console.error("[wechat-image-security] token error:", json?.errcode, json?.errmsg);
       throw new PublicImageSecurityError("VISION_SECURITY_CHECK_FAILED", "图片安全审核暂时不可用，请稍后重试");
@@ -177,7 +183,9 @@ function createWechatImageSecurity({
     return cachedToken;
   }
 
-  async function assertImageAllowed({ buffer, contentType }) {
+  async function assertImageAllowed({ buffer, contentType, timeoutMs, budget } = {}) {
+    const startedAt = now();
+    const remaining = () => Math.max(0, (Number(timeoutMs) > 0 ? startedAt + timeoutMs : Infinity) - now());
     const prepared = await prepareMediaForImgSecCheck(buffer, contentType, { sharpFactory });
     const filename = `media.${extensionForContentType(prepared.contentType)}`;
     const multipart = buildMultipart(prepared.buffer, filename, prepared.contentType);
@@ -191,25 +199,39 @@ function createWechatImageSecurity({
           "Content-Length": String(multipart.body.length),
         },
         body: multipart.body,
+        timeoutMs: remaining(),
       });
     };
 
-    let token = await getAccessToken();
+    let token = await getAccessToken({ timeoutMs: remaining() });
     let response;
     try {
       response = await postCheck(token);
     } catch (error) {
       console.error("[wechat-image-security] request failed:", error?.message || error);
+      if (error?.code === "VISION_TIMEOUT") throw new PublicImageSecurityError("VISION_TIMEOUT", "图片安全检查超时，请重试");
       throw new PublicImageSecurityError("VISION_SECURITY_CHECK_FAILED", "图片安全审核暂时不可用，请稍后重试");
     }
 
     // Stale token — refresh once and retry.
     if (response.json?.errcode === 40001 || response.json?.errcode === 42001) {
-      token = await getAccessToken({ forceRefresh: true });
+      const retryBudget = budget?.remainingAfterReserve
+        ? budget.remainingAfterReserve(
+          VISION_BUDGETS.flashMaxMs
+          + VISION_BUDGETS.nutritionReserveMs
+          + VISION_BUDGETS.evaluationReserveMs
+          + VISION_BUDGETS.persistenceReserveMs,
+        )
+        : remaining();
+      if (!(retryBudget > 0)) {
+        throw new PublicImageSecurityError("VISION_TIMEOUT", "图片安全检查超时，请重试");
+      }
+      token = await getAccessToken({ forceRefresh: true, timeoutMs: Math.min(remaining(), retryBudget) });
       try {
         response = await postCheck(token);
       } catch (error) {
         console.error("[wechat-image-security] retry failed:", error?.message || error);
+        if (error?.code === "VISION_TIMEOUT") throw new PublicImageSecurityError("VISION_TIMEOUT", "图片安全检查超时，请重试");
         throw new PublicImageSecurityError("VISION_SECURITY_CHECK_FAILED", "图片安全审核暂时不可用，请稍后重试");
       }
     }

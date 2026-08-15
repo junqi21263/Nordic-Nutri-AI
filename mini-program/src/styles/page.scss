@@ -6782,6 +6782,15 @@
 }
 
 // Analysis result: scanner-aligned nutrition review.
+.page-layout--analysis-result .modal-backdrop {
+  align-items: center;
+  touch-action: none;
+}
+
+.page-layout--analysis-result .confirm-dialog__actions .app-button {
+  white-space: nowrap;
+}
+
 .analysis-result-page {
   display: flex;
   flex-direction: column;

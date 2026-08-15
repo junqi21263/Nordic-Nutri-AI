@@ -36,6 +36,51 @@ test("upgrades uncertain multi-item recognition to plus", async () => {
   assert.equal(output.model, "qwen3-vl-plus");
 });
 
+test("keeps a valid flash result when plus times out", async () => {
+  const calls = [];
+  const observations = [];
+  const service = createQwenVisionService({
+    apiKey: "qwen-test",
+    requestCompletion: async ({ model }) => {
+      calls.push(model);
+      if (calls.length === 1) return result({ confidence: 0.45, needsEscalation: true });
+      throw Object.assign(new Error("This operation was aborted"), { name: "AbortError" });
+    },
+  });
+  const output = await service({ imageUrl: "https://example.com/meal.jpg", observe: (event) => observations.push(event) });
+  assert.deepEqual(calls, ["qwen3-vl-flash", "qwen3-vl-plus"]);
+  assert.equal(output.model, "qwen3-vl-flash");
+  assert.equal(observations.some((event) => event.fallbackReason === "plus_abort"), true);
+});
+
+test("keeps flash when plus returns an invalid schema", async () => {
+  let calls = 0;
+  const service = createQwenVisionService({
+    apiKey: "qwen-test",
+    requestCompletion: async () => {
+      calls += 1;
+      return calls === 1 ? result({ confidence: 0.45, needsEscalation: true }) : { mealName: "不完整" };
+    },
+  });
+  const output = await service({ imageUrl: "https://example.com/meal.jpg" });
+  assert.equal(calls, 2);
+  assert.equal(output.model, "qwen3-vl-flash");
+});
+
+test("skips plus when the mandatory downstream reserve cannot be protected", async () => {
+  const calls = [];
+  const service = createQwenVisionService({
+    apiKey: "qwen-test",
+    requestCompletion: async ({ model }) => { calls.push(model); return result({ confidence: 0.45, needsEscalation: true }); },
+  });
+  const output = await service({
+    imageUrl: "https://example.com/meal.jpg",
+    budget: { remainingAfterReserve: () => 0, stageTimeout: () => 1_000 },
+  });
+  assert.deepEqual(calls, ["qwen3-vl-flash"]);
+  assert.equal(output.model, "qwen3-vl-flash");
+});
+
 test("escalation predicate covers low confidence and unclear portions", () => {
   assert.equal(shouldEscalate(result({ confidence: 0.5 })), true);
   assert.equal(shouldEscalate(result({ portionConfidence: 0.4 })), true);
