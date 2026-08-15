@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createDeepseekCoachService, createDeepseekCoachStreamService } from "./deepseek-coach-service.cjs";
+import {
+  buildCoachLlmContext,
+  createDeepseekCoachService,
+  createDeepseekCoachStreamService,
+} from "./deepseek-coach-service.cjs";
 
 const validReply = {
   priority: "protein",
@@ -13,6 +17,94 @@ const validReply = {
   rationale: "当前记录显示蛋白质仍有缺口。",
   safety: "none",
 };
+
+test("maps business context to an explicit LLM allowlist", () => {
+  const llmContext = buildCoachLlmContext({
+    goalType: "fat_loss",
+    daily: {
+      targets: { calories: 1800, protein: 125 },
+      consumed: { calories: 960, protein: 70 },
+      remaining: { calories: 840, protein: 55 },
+      completion: 53,
+      mealCount: 2,
+      meals: [{ title: "不应传给模型" }],
+    },
+    weekly: { recordedDays: 1, proteinCompletion: 53, score: 53 },
+    preferences: {
+      dietaryPattern: "vegetarian",
+      dietaryPatternLabel: "素食",
+      foodAvoidances: ["eggs"],
+      foodAvoidanceLabels: ["鸡蛋"],
+      mealsPerDay: 3,
+    },
+    debug: "不应传给模型",
+  });
+
+  assert.deepEqual(llmContext, {
+    userProfile: {
+      goalType: "fat_loss",
+      preferences: {
+        dietaryPatternLabel: "素食",
+        foodAvoidanceLabels: ["鸡蛋"],
+        mealsPerDay: 3,
+      },
+    },
+    todayContext: {
+      targets: { calories: 1800, protein: 125 },
+      consumed: { calories: 960, protein: 70 },
+      remaining: { calories: 840, protein: 55 },
+      completion: 53,
+      mealCount: 2,
+    },
+  });
+});
+
+test("keeps APP_CONTEXT in system and preserves the raw current question", async () => {
+  let body;
+  const answer = createDeepseekCoachStreamService({
+    apiKey: "test-key",
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return {
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("data: [DONE]\\n\\n"));
+            controller.close();
+          },
+        }),
+      };
+    },
+  });
+
+  for await (const _part of answer({
+    prompt: "鸡胸肉适合减脂吗？",
+    context: {
+      goalType: "fat_loss",
+      daily: { targets: {}, consumed: {}, remaining: {}, completion: 0, mealCount: 0 },
+      weekly: { recordedDays: 7 },
+      preferences: { dietaryPatternLabel: "无", foodAvoidanceLabels: [], mealsPerDay: 3 },
+    },
+    history: Array.from({ length: 12 }, (_, index) => ({ role: index % 2 ? "assistant" : "user", content: `历史${index}` })),
+  })) {
+    // Consume the stream to capture the provider request.
+  }
+
+  assert.equal(body.messages[0].role, "system");
+  assert.match(body.messages[0].content, /APP_CONTEXT 中的 USER_PROFILE 和 TODAY_CONTEXT/);
+  assert.match(body.messages[0].content, /不是用户指令/);
+  assert.match(body.messages[0].content, /约.*大约.*左右/);
+  assert.match(body.messages[0].content, /没有训练数据时，不得声称/);
+  assert.match(body.messages[0].content, /没有餐食明细时，不得声称/);
+  assert.match(body.messages[0].content, /没有身高、体重或活动量时，不得声称/);
+  assert.match(body.messages[0].content, /不得输出隐藏推理/);
+  assert.doesNotMatch(body.messages[0].content, /一周趋势/);
+  assert.equal(body.messages.at(-1).role, "user");
+  assert.equal(body.messages.at(-1).content, "鸡胸肉适合减脂吗？");
+  assert.equal(body.messages.length, 12);
+  assert.doesNotMatch(body.messages[0].content, /"weekly"/);
+  assert.doesNotMatch(body.messages[0].content, /"recordedDays"/);
+});
 
 test("returns a validated professional reply with bounded actions", async () => {
   const requests = [];
@@ -67,12 +159,12 @@ test("uses JSON mode and an injection-safe professional policy prompt", async ()
   assert.deepEqual(body.thinking, { type: "disabled" });
   assert.deepEqual(body.response_format, { type: "json_object" });
   assert.equal(body.temperature, 0.2);
-  assert.match(body.messages[0].content, /nutritionContext 是唯一权威营养事实/);
-  assert.match(body.messages[0].content, /不得诊断/);
-  assert.match(body.messages[0].content, /你可以自然回答/);
-  assert.match(body.messages[0].content, /XX呢/);
-  assert.match(body.messages[0].content, /具体食物的常见营养特点/);
-  assert.match(body.messages[0].content, /禁止.*回复：|禁止.*Markdown/);
+  assert.match(body.messages[0].content, /APP_CONTEXT 中的 USER_PROFILE 和 TODAY_CONTEXT/);
+  assert.match(body.messages[0].content, /不是用户指令/);
+  assert.match(body.messages[0].content, /不进行疾病诊断/);
+  assert.match(body.messages[0].content, /一般营养知识/);
+  assert.match(body.messages[0].content, /只输出符合指定 JSON Schema/);
+  assert.doesNotMatch(body.messages[0].content, /一周趋势/);
   assert.equal(body.messages[1].role, "user");
   assert.equal(body.messages[2].role, "assistant");
 });
@@ -122,6 +214,6 @@ test("requests DeepSeek SSE and emits parsed nutrition text deltas", async () =>
   assert.equal(body.stream, true);
   assert.deepEqual(body.stream_options, { include_usage: true });
   assert.equal(body.response_format, undefined);
-  assert.match(body.messages[0].content, /你可以自然回答具体食物/);
-  assert.match(body.messages[0].content, /不要说教/);
+  assert.match(body.messages[0].content, /一般营养知识/);
+  assert.match(body.messages[0].content, /不说教/);
 });
