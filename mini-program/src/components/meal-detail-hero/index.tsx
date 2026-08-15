@@ -6,8 +6,6 @@ import { NordicIcon } from "../nordic-icon";
 import type { DailyTargets } from "../../features/meals/domain";
 import { hasValidMealImage } from "./logic";
 
-export { hasValidMealImage } from "./logic";
-
 interface MealDetailHeroProps {
   imageUrl?: string | null;
   nutrition: DailyTargets;
