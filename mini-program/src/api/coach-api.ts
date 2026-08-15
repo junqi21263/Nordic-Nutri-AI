@@ -105,6 +105,11 @@ interface WechatRequestRuntime {
   }) => ChunkRequestTask;
 }
 
+export interface ProductCoachStreamRequest {
+  promise: Promise<void>;
+  abort: () => void;
+}
+
 function isCoachStreamEvent(value: unknown): value is ProductCoachStreamEvent {
   if (!value || typeof value !== "object") return false;
   const event = value as {
@@ -130,12 +135,18 @@ export function streamProductCoachMessage(
   date: string,
   onEvent: (event: ProductCoachStreamEvent) => void,
   clientRequestId = createClientRequestId(),
-) {
+): ProductCoachStreamRequest {
   const token = useAuthStore.getState().session?.accessToken;
   const runtime = (globalThis as unknown as { wx?: WechatRequestRuntime }).wx;
-  if (!token || !runtime?.request) return Promise.reject(new Error("流式能力暂不可用"));
+  if (!token || !runtime?.request) {
+    return {
+      promise: Promise.reject(new Error("流式能力暂不可用")),
+      abort: () => undefined,
+    };
+  }
 
-  return new Promise<void>((resolve, reject) => {
+  let abortRequest = () => undefined;
+  const promise = new Promise<void>((resolve, reject) => {
     let buffered = "";
     let settled = false;
     const finish = (callback: () => void) => {
@@ -155,12 +166,21 @@ export function streamProductCoachMessage(
       },
       fail: () => finish(() => reject(new Error("营养教练暂时无法回答，请稍后重试"))),
     });
+    abortRequest = () => {
+      task.abort();
+      finish(() => {
+        const error = new Error("流式请求已取消");
+        error.name = "COACH_STREAM_ABORTED";
+        reject(error);
+      });
+    };
     if (typeof task.onChunkReceived !== "function") {
       task.abort();
       finish(() => reject(new Error("流式能力暂不可用")));
       return;
     }
     task.onChunkReceived(({ data }) => {
+      if (settled) return;
       buffered += new TextDecoder().decode(new Uint8Array(data));
       const lines = buffered.split("\n");
       buffered = lines.pop() ?? "";
@@ -185,6 +205,7 @@ export function streamProductCoachMessage(
       }
     });
   });
+  return { promise, abort: () => abortRequest() };
 }
 
 export function getProductCoachMessages() {
