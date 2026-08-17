@@ -130,6 +130,24 @@ function mergeUsage(left, right) {
   };
 }
 
+function summarizeResult(result) {
+  return {
+    mealName: result.mealName,
+    foodName: result.mealName,
+    mealType: result.mealType,
+    confidence: result.confidence,
+    portionConfidence: result.portionConfidence,
+    items: result.items.map((item) => ({
+      name: item.name,
+      quantityG: item.quantityG,
+      caloriesPer100g: item.caloriesPer100g,
+      proteinPer100g: item.proteinPer100g,
+      carbsPer100g: item.carbsPer100g,
+      fatPer100g: item.fatPer100g,
+    })),
+  };
+}
+
 function unwrapVisionCompletion(raw) {
   if (typeof raw === "string") return { content: raw, usage: null };
   if (raw && typeof raw === "object") {
@@ -144,7 +162,7 @@ function unwrapVisionCompletion(raw) {
 function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-flash", plusModel = "qwen3-vl-plus", requestCompletion, fetchImpl } = {}) {
   const complete = requestCompletion ?? createQwenRequestCompletion({ apiKey, workspaceId, model: flashModel, timeoutMs: 18_000, fetchImpl });
   const plusComplete = requestCompletion ? requestCompletion : createQwenRequestCompletion({ apiKey, workspaceId, model: plusModel, timeoutMs: 10_000, fetchImpl });
-  return async ({ imageUrl, budget, observe = () => {} }) => {
+  return async ({ imageUrl, budget, observe = () => {}, onTrace = () => {} }) => {
     if (typeof imageUrl !== "string" || imageUrl.length > 30_000_000) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
     if (!/^https:\/\//i.test(imageUrl) && !/^data:image\//i.test(imageUrl)) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
     const flashTimeoutMs = budget?.stageTimeout
@@ -162,10 +180,19 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
     observe({ stage: "flash", ms: Date.now() - flashStartedAt, flashSuccess: true });
     const first = validateResult(firstRaw.content);
     let usage = firstRaw.usage;
+    const flashTrace = { valid: true, ...summarizeResult(first) };
     // Data-URL payloads are already large; a second plus pass often exceeds the cloud timeout.
     let canEscalate = !/^data:image\//i.test(imageUrl) && shouldEscalate(first);
     let plusTimeoutMs = PLUS_MAX_TIMEOUT_MS;
     let plusSkipReason = null;
+    const plusTrace = {
+      attempted: false,
+      success: false,
+      valid: null,
+      skipReason: null,
+      fallbackReason: null,
+      items: [],
+    };
     if (canEscalate && budget?.remainingAfterReserve) {
       plusTimeoutMs = Math.min(PLUS_MAX_TIMEOUT_MS, budget.remainingAfterReserve(DOWNSTREAM_MANDATORY_RESERVE_MS));
       if (plusTimeoutMs <= 0) {
@@ -174,28 +201,39 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       }
     }
     if (!canEscalate) {
+      plusTrace.skipReason = plusSkipReason || (/^data:image\//i.test(imageUrl) ? "data_url" : "not_needed");
       observe({ stage: "plus", plusAttempted: false, plusSkipReason: plusSkipReason || (/^data:image\//i.test(imageUrl) ? "data_url" : "not_needed") });
     }
     let selected = first;
     if (canEscalate) {
+      plusTrace.attempted = true;
       observe({ stage: "plus", plusAttempted: true });
       const plusStartedAt = Date.now();
       try {
         const plusRaw = unwrapVisionCompletion(await plusComplete({ imageUrl, model: plusModel, timeoutMs: plusTimeoutMs }));
         const validatedPlus = validateResult(plusRaw.content);
         selected = validatedPlus;
+        Object.assign(plusTrace, { success: true, valid: true, ...summarizeResult(validatedPlus) });
         usage = mergeUsage(usage, plusRaw.usage);
         observe({ stage: "plus", ms: Date.now() - plusStartedAt, plusSuccess: true });
       } catch (error) {
+        plusTrace.valid = false;
+        plusTrace.fallbackReason = classifyPlusFailure(error);
         observe({
           stage: "plus",
           ms: Date.now() - plusStartedAt,
           plusSuccess: false,
           fallbackToFlash: true,
-          fallbackReason: classifyPlusFailure(error),
+          fallbackReason: plusTrace.fallbackReason,
         });
       }
     }
+    onTrace({
+      selectedSource: selected === first ? "flash" : "plus",
+      flash: flashTrace,
+      plus: plusTrace,
+      selected: summarizeResult(selected),
+    });
     return { ...selected, provider: "qwen", model: selected === first ? flashModel : plusModel, usage, modelHops: selected === first ? 1 : 2 };
   };
 }

@@ -58,6 +58,28 @@ function isSaveableNutrition(items) {
     REQUIRED_NUTRITION_FIELDS.filter((field) => field !== "quantityG").every((field) => Number.isFinite(item[field]) && item[field] >= 0));
 }
 
+function summarizeItems(items) {
+  return (Array.isArray(items) ? items : []).slice(0, 20).map((item) => ({
+    name: item?.name ?? null,
+    quantityG: item?.quantityG ?? null,
+    caloriesPer100g: item?.caloriesPer100g ?? null,
+    proteinPer100g: item?.proteinPer100g ?? null,
+    carbsPer100g: item?.carbsPer100g ?? null,
+    fatPer100g: item?.fatPer100g ?? null,
+  }));
+}
+
+function summarizeRecognition(result) {
+  return {
+    mealName: result?.mealName ?? null,
+    foodName: result?.mealName ?? null,
+    mealType: result?.mealType ?? null,
+    confidence: result?.confidence ?? null,
+    portionConfidence: result?.portionConfidence ?? null,
+    items: summarizeItems(result?.items),
+  };
+}
+
 function createVisionDataService({
   db,
   uploadImage,
@@ -68,8 +90,15 @@ function createVisionDataService({
   backfillNutrition,
   assertImageSafe,
   uploadBlockedImage,
+  recordTrace,
 } = {}) {
   if (!db || typeof db.from !== "function" || typeof uploadImage !== "function") throw new Error("Vision dependencies are unavailable");
+  const emitTrace = (meta) => {
+    if (typeof recordTrace !== "function") return;
+    Promise.resolve()
+      .then(() => recordTrace("vision_recognition_trace", 1, meta))
+      .catch((error) => console.warn("[vision] trace recording failed:", error?.message || error));
+  };
   return {
     provider,
     model: model || "vita-video-3.0",
@@ -123,14 +152,42 @@ function createVisionDataService({
       const uploaded = await uploadImage({ cloudPath, content: storeContent, contentType: storeContentType, budget, observe });
       observe({ stage: "upload", ms: Date.now() - uploadStartedAt, uploadSuccess: true });
       if (typeof uploaded?.imageUrl !== "string" || !uploaded.imageUrl) throw new Error("Vision image upload failed");
-      const result = await analyze({ imageUrl: uploaded.imageUrl, budget, observe });
+      let modelTrace = null;
+      const result = await analyze({
+        imageUrl: uploaded.imageUrl,
+        budget,
+        observe,
+        onTrace: (trace) => { modelTrace = trace; },
+      });
 
       // Backfill per-100g nutrition from USDA food catalog. Flash nutrition remains usable
       // when it already satisfies the save contract; otherwise backfill is required.
       let backfilledItems = result.items;
       let nutritionSource = "ai_estimate";
       const nutritionMode = isSaveableNutrition(result.items) ? "enrichment" : "required";
+      const beforeBackfillItems = summarizeItems(result.items);
+      const backfillAttempted = typeof backfillNutrition === "function";
       let nutritionFallbackUsed = false;
+      const buildTrace = ({ analysisId, imagePath, persistence }) => ({
+        clientRequestId: image.clientRequestId,
+        analysisId,
+        imageSha256: sha256,
+        imagePath,
+        flash: modelTrace?.flash || { valid: true, ...summarizeRecognition(result) },
+        plus: modelTrace?.plus || { attempted: false, success: false, valid: null, skipReason: "not_recorded", items: [] },
+        selectedSource: modelTrace?.selectedSource || "flash",
+        selected: modelTrace?.selected || summarizeRecognition(result),
+        nutrition: {
+          mode: nutritionMode,
+          backfillAttempted,
+          backfillMatched: backfilledItems.filter((item) => item?.nutritionSource === "usda").length,
+          nutritionSource,
+          beforeItems: beforeBackfillItems,
+          afterItems: summarizeItems(backfilledItems),
+          fallbackUsed: nutritionFallbackUsed,
+        },
+        persistence,
+      });
       if (typeof backfillNutrition === "function") {
         const nutritionStartedAt = Date.now();
         const nutritionTimeoutMs = budget?.stageTimeout
@@ -183,6 +240,7 @@ function createVisionDataService({
       evaluationPromise.then(() => observe({ stage: "evaluation", ms: Date.now() - evaluationStartedAt, evaluationSuccess: true })).catch(() => {});
 
       const persistenceStartedAt = Date.now();
+      const persistenceState = { analysisId: null, errorCode: null };
       const persistPromise = (async () => {
         if (budget?.remainingMs && budget.remainingMs() <= 0) {
           throw new PublicVisionDataError("VISION_TIMEOUT", "识别时间有点久，请重新试一次");
@@ -233,6 +291,7 @@ function createVisionDataService({
           }).select("id").single();
           if (saved.data?.id) analysisId = saved.data.id;
           if (!analysisId) throw new Error("ai_analysis insert returned no id");
+          persistenceState.analysisId = analysisId;
         } catch (dbErr) {
           console.error("[vision] ai_analysis insert failed:", dbErr?.message || dbErr);
           if (dbErr instanceof PublicVisionDataError) throw dbErr;
@@ -241,25 +300,51 @@ function createVisionDataService({
         return analysisId;
       })();
       persistPromise.then(
-        () => observe({ stage: "persistence", ms: Date.now() - persistenceStartedAt, persistenceSuccess: true }),
-        (error) => observe({ stage: "persistence", ms: Date.now() - persistenceStartedAt, persistenceSuccess: false, abortReason: error?.code === "VISION_TIMEOUT" ? "timeout" : null }),
+        () => {
+          observe({ stage: "persistence", ms: Date.now() - persistenceStartedAt, persistenceSuccess: true });
+        },
+        (error) => {
+          persistenceState.errorCode = error?.code || "VISION_PERSISTENCE_FAILED";
+          observe({ stage: "persistence", ms: Date.now() - persistenceStartedAt, persistenceSuccess: false, abortReason: error?.code === "VISION_TIMEOUT" ? "timeout" : null });
+        },
       );
 
-      const [evaluation, analysisId] = await Promise.all([evaluationPromise, persistPromise]);
-      // Prefer HTTPS for immediate display; always return durable cloud file ID when storage worked.
-      const clientImageUrl = /^https:\/\//i.test(uploaded.imageUrl) ? uploaded.imageUrl : null;
-      const imagePath = typeof uploaded.cloudPath === "string" && uploaded.cloudPath.startsWith("cloud://")
-        ? uploaded.cloudPath
-        : null;
-      return {
-        analysisId,
-        evaluation: evaluation || fallbackEvaluation(result),
-        imageUrl: clientImageUrl,
-        imagePath,
-        nutritionSource,
-        ...result,
-        items: backfilledItems,
-      };
+      try {
+        const [evaluation, analysisId] = await Promise.all([evaluationPromise, persistPromise]);
+        // Prefer HTTPS for immediate display; always return durable cloud file ID when storage worked.
+        const clientImageUrl = /^https:\/\//i.test(uploaded.imageUrl) ? uploaded.imageUrl : null;
+        const imagePath = typeof uploaded.cloudPath === "string" && uploaded.cloudPath.startsWith("cloud://")
+          ? uploaded.cloudPath
+          : null;
+        emitTrace(buildTrace({
+          analysisId,
+          imagePath,
+          persistence: { success: true, analysisId, errorCode: null },
+        }));
+        return {
+          analysisId,
+          evaluation: evaluation || fallbackEvaluation(result),
+          imageUrl: clientImageUrl,
+          imagePath,
+          nutritionSource,
+          ...result,
+          items: backfilledItems,
+        };
+      } catch (error) {
+        const imagePath = typeof uploaded.cloudPath === "string" && uploaded.cloudPath.startsWith("cloud://")
+          ? uploaded.cloudPath
+          : null;
+        emitTrace(buildTrace({
+          analysisId: persistenceState.analysisId,
+          imagePath,
+          persistence: {
+            success: false,
+            analysisId: persistenceState.analysisId,
+            errorCode: persistenceState.errorCode || error?.code || "VISION_PERSISTENCE_FAILED",
+          },
+        }));
+        throw error;
+      }
     },
   };
 }

@@ -1233,6 +1233,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       assertImageSafe,
       uploadBlockedImage,
       uploadImage: uploadVisionImage,
+      recordTrace: (...args) => opsRef.observability?.recordMetric?.(...args),
     });
   } else if (typeof env.VITA_API_KEY === "string" && env.VITA_API_KEY) {
     vision = createVisionDataService({
@@ -1244,6 +1245,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       assertImageSafe,
       uploadBlockedImage,
       uploadImage: uploadVisionImage,
+      recordTrace: (...args) => opsRef.observability?.recordMetric?.(...args),
     });
   }
   // Old-image auditing is deliberately Qwen-only: it needs strict visual JSON
