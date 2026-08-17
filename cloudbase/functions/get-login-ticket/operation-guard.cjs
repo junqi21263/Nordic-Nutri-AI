@@ -111,6 +111,54 @@ function createOperationGuard({ db }) {
   }
 
   return {
+    async reserveVisionQuota(userId, clientRequestId, {
+      dailyLimit,
+      dailyWindowSeconds,
+      burstLimit,
+      burstWindowSeconds,
+      ttlSeconds,
+    }) {
+      const record = await call("reserve_vision_quota", {
+        p_user_id: userId,
+        p_client_request_id: clientRequestId,
+        p_daily_limit: Math.max(1, Number(dailyLimit) || 1),
+        p_daily_window_seconds: Math.max(1, Number(dailyWindowSeconds) || 1),
+        p_burst_limit: Math.max(1, Number(burstLimit) || 1),
+        p_burst_window_seconds: Math.max(1, Number(burstWindowSeconds) || 1),
+        p_ttl_seconds: Math.max(1, Number(ttlSeconds) || 1),
+      });
+      if (!record?.allowed) {
+        throw new PublicOperationError("RATE_LIMITED", "请求过于频繁，请稍后再试");
+      }
+      return {
+        allowed: true,
+        state: record.state || "reserved",
+        reused: Boolean(record.reused),
+        response: record.response ?? null,
+        dailyUsed: Number(record.daily_used ?? record.dailyUsed ?? 0),
+        burstUsed: Number(record.burst_used ?? record.burstUsed ?? 0),
+        expiresAt: record.expires_at ?? record.expiresAt ?? null,
+      };
+    },
+    async commitVisionQuota(userId, clientRequestId, response) {
+      const record = await call("commit_vision_quota", {
+        p_user_id: userId,
+        p_client_request_id: clientRequestId,
+        p_response: response,
+      });
+      return {
+        committed: record?.state === "committed" || record?.committed === true,
+        state: record?.state || null,
+        response: record?.response ?? null,
+      };
+    },
+    async releaseVisionQuota(userId, clientRequestId) {
+      const record = await call("release_vision_quota", {
+        p_user_id: userId,
+        p_client_request_id: clientRequestId,
+      });
+      return { released: record?.state === "released" || record?.released === true, state: record?.state || null };
+    },
     async claim(userId, operation, clientRequestId) {
       if (typeof db.rpc !== "function") throw new Error("Operation guard database RPC is unavailable");
       const record = await call("claim_operation_request", {

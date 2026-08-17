@@ -100,6 +100,7 @@ const VISION_EFFECTIVE_DAILY_LIMIT = VISION_DAILY_LIMIT;
 const VISION_BURST_LIMIT = 3;
 const VISION_DAILY_WINDOW_SECONDS = 86400;
 const VISION_BURST_WINDOW_SECONDS = 600;
+const VISION_QUOTA_RESERVATION_TTL_SECONDS = 30;
 const COACH_DAILY_MESSAGE_LIMIT = 20;
 // CloudBase HTTP access already injects Access-Control-Allow-Origin for the
 // request origin. Setting it here as "*" produces duplicate values and browsers
@@ -2782,19 +2783,39 @@ function createHttpServer({ service }) {
       if (!session) return;
       if (!service.vision?.analyzeImage) return sendJson(res, 503, { code: "VISION_SERVICE_NOT_CONFIGURED" });
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      let quotaReservation = null;
+      let quotaReservationOwned = false;
+      let clientRequestId = null;
       try {
         const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
+        clientRequestId = body?.clientRequestId ?? null;
         // Invalid or oversized local camera files must not consume a daily scan.
         service.vision?.validateImage?.(body);
-        if (service.operationGuard?.consumeQuota) {
-          await service.operationGuard.consumeQuota(session.sub, "vision_analysis_daily", {
-            limit: VISION_DAILY_LIMIT,
-            windowSeconds: VISION_DAILY_WINDOW_SECONDS,
+        if (service.operationGuard) {
+          if (
+            typeof service.operationGuard.reserveVisionQuota !== "function"
+            || typeof service.operationGuard.commitVisionQuota !== "function"
+            || typeof service.operationGuard.releaseVisionQuota !== "function"
+          ) {
+            throw new PublicOperationError("VISION_QUOTA_UNAVAILABLE", "识别额度服务暂时不可用，请稍后重试");
+          }
+          quotaReservation = await service.operationGuard.reserveVisionQuota(session.sub, clientRequestId, {
+            dailyLimit: VISION_DAILY_LIMIT,
+            dailyWindowSeconds: VISION_DAILY_WINDOW_SECONDS,
+            burstLimit: VISION_BURST_LIMIT,
+            burstWindowSeconds: VISION_BURST_WINDOW_SECONDS,
+            ttlSeconds: VISION_QUOTA_RESERVATION_TTL_SECONDS,
           });
-          await service.operationGuard.consumeQuota(session.sub, "vision_analysis_burst", {
-            limit: VISION_BURST_LIMIT,
-            windowSeconds: VISION_BURST_WINDOW_SECONDS,
-          });
+          if (quotaReservation.state === "committed") {
+            if (!quotaReservation.response) {
+              throw new PublicOperationError("VISION_QUOTA_COMMIT_FAILED", "识别结果提交失败，请重试");
+            }
+            return sendJson(res, 200, quotaReservation.response);
+          }
+          if (quotaReservation.reused) {
+            throw new PublicOperationError("OPERATION_IN_PROGRESS", "请求正在处理中，请勿重复提交");
+          }
+          quotaReservationOwned = true;
         }
         const visionMeta = {
           userId: session.sub,
@@ -2803,6 +2824,13 @@ function createHttpServer({ service }) {
           provider: service.vision?.provider || null,
         };
         const result = await service.vision.analyzeImage(session.sub, body, { budget, observe: observeVisionStage });
+        if (quotaReservationOwned) {
+          const committed = await service.operationGuard.commitVisionQuota(session.sub, clientRequestId, result);
+          if (!committed.committed) {
+            throw new PublicOperationError("VISION_QUOTA_COMMIT_FAILED", "识别结果提交失败，请重试");
+          }
+          quotaReservationOwned = false;
+        }
         const visionModel = result?.model || visionMeta.model;
         const lastStage = stageEvents[stageEvents.length - 1]?.stage || null;
         const plusEvent = [...stageEvents].reverse().find((event) => event.stage === "plus") || {};
@@ -2844,6 +2872,9 @@ function createHttpServer({ service }) {
         }).catch(() => {});
         return sendJson(res, 200, result);
       } catch (error) {
+        if (quotaReservationOwned && service.operationGuard?.releaseVisionQuota) {
+          await service.operationGuard.releaseVisionQuota(session.sub, clientRequestId).catch(() => {});
+        }
         if (error instanceof PublicOperationError && error.code === "RATE_LIMITED") {
           service.observability?.recordMetric?.("rate_limited", 1, {
             userId: session.sub,
@@ -2851,6 +2882,9 @@ function createHttpServer({ service }) {
             feature: "vision",
           }).catch(() => {});
           return sendJson(res, 429, { code: error.code, message: error.message });
+        }
+        if (error instanceof PublicOperationError) {
+          return sendJson(res, error.code === "OPERATION_IN_PROGRESS" ? 409 : 503, { code: error.code, message: error.message });
         }
         service.observability?.recordMetric?.("vision_failure", 1, {
           userId: session.sub,
