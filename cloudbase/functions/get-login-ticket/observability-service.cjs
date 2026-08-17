@@ -1,3 +1,5 @@
+const { sanitizeAuditSnapshot } = require("./observability-sanitizer.cjs");
+
 function percentile95(values) {
   const sorted = [...values].filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
   if (!sorted.length) return null;
@@ -112,6 +114,22 @@ function createObservabilityService({ db }) {
     } catch (error) {
       console.warn("[observability] recordMetric failed:", metric, error?.message || error);
     }
+  }
+
+  async function recordAdminAudit(input = {}) {
+    const result = await db.from("admin_audit_logs").insert({
+      actor_user_id: input.actorUserId || null,
+      action: typeof input.action === "string" ? input.action.trim().slice(0, 120) : "unknown",
+      resource_type: typeof input.resourceType === "string" ? input.resourceType.trim().slice(0, 80) : "unknown",
+      resource_id: typeof input.resourceId === "string" ? input.resourceId.trim().slice(0, 200) : null,
+      before_snapshot: sanitizeAuditSnapshot(input.before),
+      after_snapshot: sanitizeAuditSnapshot(input.after),
+      result: ["succeeded", "failed", "rejected"].includes(input.result) ? input.result : "failed",
+      error_code: typeof input.errorCode === "string" ? input.errorCode.trim().slice(0, 80) : null,
+      trace_id: typeof input.traceId === "string" ? input.traceId.trim().slice(0, 160) : null,
+    });
+    if (result?.error) throw new Error("admin audit insert failed");
+    return { recorded: true };
   }
 
   async function getOverview({ hours = 24 } = {}) {
@@ -374,6 +392,7 @@ function createObservabilityService({ db }) {
 
   return {
     recordMetric,
+    recordAdminAudit,
     getOverview,
     getUsageReport,
     getModelDetail,
