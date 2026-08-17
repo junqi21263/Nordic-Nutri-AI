@@ -31,6 +31,24 @@ describe("privacy policy and disclaimer", () => {
     }
   });
 
+  it("discloses the approved policy metadata", () => {
+    const policy = read("pages/privacy-policy/index.tsx");
+    for (const copy of [
+      "运营主体：李某某（个人开发者）",
+      "政策版本号：1.0.0",
+      "生效日期：2026-08-16",
+    ]) {
+      expect(policy).toContain(copy);
+    }
+  });
+
+  it("places policy metadata after the disclaimer section", () => {
+    const policy = read("pages/privacy-policy/index.tsx");
+    expect(policy.indexOf('title: "免责声明"')).toBeLessThan(
+      policy.indexOf(">政策信息</Text>"),
+    );
+  });
+
   it("keeps a visible non-medical disclaimer in home, analysis and coach", () => {
     for (const page of ["home/index.tsx", "analysis-result/index.tsx", "coach/index.tsx"]) {
       expect(read(`pages/${page}`)).toContain("不构成医疗诊断或治疗建议");

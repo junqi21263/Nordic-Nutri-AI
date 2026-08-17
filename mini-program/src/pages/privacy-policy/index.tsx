@@ -60,6 +60,15 @@ export default function PrivacyPolicyPage() {
           </View>
         ))}
 
+        <View className="privacy-policy-page__section">
+          <Text className="privacy-policy-page__section-title">政策信息</Text>
+          <Text className="privacy-policy-page__section-content">
+            运营主体：李某某（个人开发者）{ "\n" }
+            政策版本号：1.0.0{ "\n" }
+            生效日期：2026-08-16
+          </Text>
+        </View>
+
         <View
           className="privacy-policy-page__cancellation"
           ariaLabel="注销 Nordic Nutri AI 产品账号"
