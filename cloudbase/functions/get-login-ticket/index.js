@@ -58,6 +58,7 @@ const { createFoodImagePatrolService, FoodImagePatrolError } = require("./food-i
 const { createFoodImageAuditVision } = require("./food-image-audit-vision.cjs");
 const { createFoodImageAuditService } = require("./food-image-audit-service.cjs");
 const { createSystemHealthService } = require("./system-health-service.cjs");
+const { createJobOpsService, JobOpsError } = require("./job-ops-service.cjs");
 const { createVisionBudget, VISION_BUDGETS } = require("./vision-budget.cjs");
 const { getFoodDisplayName } = require("./food-display-name.cjs");
 const { formulaNutritionPlanFallback } = require("./nutrition-plan-formula.cjs");
@@ -1265,15 +1266,6 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     resolveTempFileUrls,
   });
-  const systemHealth = createSystemHealthService({
-    db,
-    observability,
-    providerConfig: {
-      vision: { configured: Boolean(vision?.provider) },
-      deepseek: { configured: Boolean(String(env.DEEPSEEK_API_KEY || "").trim()) },
-      hunyuan: { configured: Boolean(hunyuanImageService || workerEndpoint) },
-    },
-  });
   const deleteStorageCloudFiles = async ({ cloudPaths, label = "storage" } = {}) => {
     const paths = Array.isArray(cloudPaths) ? cloudPaths.filter(Boolean) : [];
     if (!paths.length) return { deleted: 0, attempted: 0 };
@@ -1318,6 +1310,23 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   const visionImageRetention = createVisionImageRetentionService({
     db,
     deleteFiles: deleteVisionCloudFiles,
+  });
+  const jobOps = createJobOpsService({
+    observability,
+    adminAudit,
+    foodImageBatches,
+    foodImagePatrol,
+    visionImageRetention,
+  });
+  const systemHealth = createSystemHealthService({
+    db,
+    observability,
+    jobOps,
+    providerConfig: {
+      vision: { configured: Boolean(vision?.provider) },
+      deepseek: { configured: Boolean(String(env.DEEPSEEK_API_KEY || "").trim()) },
+      hunyuan: { configured: Boolean(hunyuanImageService || workerEndpoint) },
+    },
   });
   const userImageOps = typeof db?.from === "function"
     ? createUserImageOpsService({
@@ -1412,6 +1421,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     observability,
     adminAudit,
     systemHealth,
+    jobOps,
     contentModeration,
     visionImageReview,
     visionImageRetention,
@@ -1540,6 +1550,9 @@ function getAdminFoodRoute(pathname) {
   const path = stripped.replace(/^\/api\/admin/, "") || "/";
   if (path === "/users") return { operation: "listUsers" };
   if (path === "/login") return { operation: "adminLogin" };
+  if (path === "/jobs") return { operation: "jobList" };
+  const jobRunMatch = path.match(/^\/jobs\/([a-z0-9_-]+)\/run-now$/i);
+  if (jobRunMatch) return { operation: "jobRunNow", jobKey: jobRunMatch[1] };
   if (path === "/system/health") return { operation: "systemHealth" };
   if (path === "/audit-logs") return { operation: "auditLogs" };
   if (path === "/traces") return { operation: "traceList" };
@@ -1888,6 +1901,22 @@ function createHttpServer({ service }) {
       const session = requireAdminConsoleSession(service, req);
       if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED", message: "请先使用帐号密码登录后台" });
       try {
+        if (adminFoodRoute.operation === "jobList") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.jobOps?.listJobs) return sendJson(res, 503, { code: "JOBS_UNAVAILABLE" });
+          return sendJson(res, 200, await service.jobOps.listJobs());
+        }
+        if (adminFoodRoute.operation === "jobRunNow") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.jobOps?.runNow) return sendJson(res, 503, { code: "JOBS_UNAVAILABLE" });
+          const body = await readJsonBody(req, 16 * 1024);
+          return sendJson(res, 200, await service.jobOps.runNow(adminFoodRoute.jobKey, {
+            actorUserId: session.sub,
+            traceId: res.__traceContext?.trace?.traceId,
+            maxItems: body?.maxItems,
+            limit: body?.limit,
+          }));
+        }
         if (adminFoodRoute.operation === "systemHealth") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.systemHealth?.getHealth) return sendJson(res, 503, { code: "SYSTEM_HEALTH_UNAVAILABLE" });
@@ -2480,6 +2509,10 @@ function createHttpServer({ service }) {
           return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         }
       } catch (error) {
+        if (error instanceof JobOpsError) {
+          const status = error.code === "JOB_NOT_ALLOWED" ? 400 : 503;
+          return sendJson(res, status, { code: error.code });
+        }
         if (error instanceof AdminConsoleError) {
           const code = error.code;
           const status = code === "FORBIDDEN" ? 403
