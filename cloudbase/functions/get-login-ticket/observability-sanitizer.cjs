@@ -1,13 +1,41 @@
 const MAX_STRING_LENGTH = 200;
 
+const TRACE_META_KEYS = new Set([
+  "feature",
+  "provider",
+  "model",
+  "fallbackUsed",
+  "errorCode",
+  "httpStatus",
+  "userHash",
+  "clientRequestId",
+  "providerRequestIdHash",
+]);
+
 const AUDIT_SNAPSHOT_KEYS = new Set([
-  "id", "name", "status", "reasonCode", "isPrimary", "isActive", "enabled",
-  "count", "outcome", "result", "errorCode", "feature", "jobKey", "schedule",
-  "runtimeBindingStatus", "provider", "durationMs", "note",
+  "id",
+  "name",
+  "status",
+  "reasonCode",
+  "isPrimary",
+  "isActive",
+  "enabled",
+  "count",
+  "outcome",
+  "result",
+  "errorCode",
+  "feature",
+  "jobKey",
+  "schedule",
+  "runtimeBindingStatus",
+  "provider",
+  "durationMs",
+  "note",
 ]);
 
 function boundedString(value) {
-  return typeof value === "string" ? value.trim().slice(0, MAX_STRING_LENGTH) : null;
+  if (typeof value !== "string") return null;
+  return value.trim().slice(0, MAX_STRING_LENGTH);
 }
 
 function copyScalar(value) {
@@ -15,15 +43,41 @@ function copyScalar(value) {
   return boundedString(value);
 }
 
-function sanitizeAuditSnapshot(snapshot) {
-  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return {};
+function sanitizeByKeys(input, keys) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
   const output = {};
-  for (const key of AUDIT_SNAPSHOT_KEYS) {
-    if (!(key in snapshot)) continue;
-    const value = copyScalar(snapshot[key]);
+  for (const key of keys) {
+    if (!(key in input)) continue;
+    const value = copyScalar(input[key]);
     if (value !== null) output[key] = value;
   }
   return output;
 }
 
-module.exports = { MAX_STRING_LENGTH, sanitizeAuditSnapshot };
+function sanitizeTraceStage(stage) {
+  const result = sanitizeByKeys(stage, [
+    "name",
+    "startedAt",
+    "durationMs",
+    "status",
+    "provider",
+    "providerRequestIdHash",
+  ]);
+  if (typeof result.name !== "string" || !result.name) return {};
+  return result;
+}
+
+function sanitizeTraceMeta(meta) {
+  return sanitizeByKeys(meta, TRACE_META_KEYS);
+}
+
+function sanitizeAuditSnapshot(snapshot) {
+  return sanitizeByKeys(snapshot, AUDIT_SNAPSHOT_KEYS);
+}
+
+module.exports = {
+  MAX_STRING_LENGTH,
+  sanitizeTraceStage,
+  sanitizeTraceMeta,
+  sanitizeAuditSnapshot,
+};

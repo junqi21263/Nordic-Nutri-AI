@@ -55,6 +55,14 @@ function createDb({ metrics = [], deletionLog = [] } = {}) {
           },
         };
       }
+      if (["ops_request_traces", "ops_job_runs", "admin_audit_logs"].includes(table)) {
+        return {
+          insert(payload) {
+            inserts.push({ table, payload });
+            return Promise.resolve({ error: null });
+          },
+        };
+      }
       return {
         insert() { return Promise.resolve({ error: null }); },
         select() { return { order() { return { limit() { return Promise.resolve({ data: [], error: null }); } }; } }; },
@@ -94,6 +102,206 @@ test("recordMetric swallows insert failures", async () => {
   };
   const service = createObservabilityService({ db });
   await assert.doesNotReject(() => service.recordMetric("vision_success", 1, { userId: "user-1" }));
+});
+
+test("startTrace generates a server trace id and ignores client trace overrides", async () => {
+  const { db } = createDb();
+  const service = createObservabilityService({ db });
+  const trace = service.startTrace({ traceId: "client-controlled", feature: "vision" });
+
+  assert.match(trace.traceId, /^trace_[0-9a-f-]{36}$/);
+  assert.notEqual(trace.traceId, "client-controlled");
+  assert.equal(trace.status, "running");
+  assert.equal(trace.lastStage, null);
+});
+
+test("finishTrace persists a fixed trace payload and swallows observability failures", async () => {
+  const { db, inserts } = createDb();
+  const service = createObservabilityService({ db });
+  const trace = service.startTrace({ feature: "vision", clientRequestId: "client-1" });
+  service.recordStage(trace, {
+    name: "vision.model",
+    durationMs: 4261,
+    status: "succeeded",
+    provider: "qwen",
+    rawResponse: "must not persist",
+  });
+
+  await assert.doesNotReject(() => service.finishTrace(trace, {
+    status: "succeeded",
+    httpStatus: 200,
+    provider: "qwen",
+    meta: { prompt: "must not persist", fallbackUsed: false },
+  }));
+
+  const insert = inserts.find((item) => item.table === "ops_request_traces");
+  assert.ok(insert);
+  assert.equal(insert.payload.trace_id, trace.traceId);
+  assert.equal(insert.payload.status, "succeeded");
+  assert.equal(insert.payload.last_stage, "vision.model");
+  assert.equal(insert.payload.stages_json[0].name, "vision.model");
+  assert.equal(insert.payload.meta_json.prompt, undefined);
+});
+
+test("finishTrace returns when the observability database write hangs", async () => {
+  const service = createObservabilityService({
+    db: {
+      from() {
+        return { insert: () => new Promise(() => {}) };
+      },
+    },
+  });
+  const trace = service.startTrace({ feature: "coach" });
+  const startedAt = Date.now();
+
+  const result = await service.finishTrace(trace, { status: "succeeded", httpStatus: 200 });
+
+  assert.equal(result.recorded, false);
+  assert.ok(Date.now() - startedAt < 500);
+});
+
+test("recordAdminAudit rejects when the audit insert fails", async () => {
+  const service = createObservabilityService({
+    db: {
+      from() {
+        return { insert: () => Promise.reject(new Error("audit unavailable")) };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => service.recordAdminAudit({ action: "food.archive", resourceType: "food", resourceId: "food-1" }),
+    /audit unavailable/,
+  );
+});
+
+test("listTraces applies bounded filters and returns a paginated safe projection", async () => {
+  const calls = [];
+  const rows = [{
+    trace_id: "trace_1",
+    client_request_id: "client_1",
+    user_hash: "user_hash",
+    feature: "vision",
+    status: "timed_out",
+    last_stage: "nutrition.enrichment",
+    started_at: "2026-08-15T00:00:00.000Z",
+    completed_at: null,
+    duration_ms: 1000,
+    http_status: 504,
+    error_code: "NUTRITION_TIMEOUT",
+    provider: "qwen",
+    fallback_used: true,
+    prompt: "must not persist",
+  }];
+  const db = {
+    from(table) {
+      assert.equal(table, "ops_request_traces");
+      const state = {};
+      const chain = {
+        eq(column, value) { calls.push(["eq", column, value]); return chain; },
+        gte(column, value) { calls.push(["gte", column, value]); return chain; },
+        lte(column, value) { calls.push(["lte", column, value]); return chain; },
+        order(column, options) { calls.push(["order", column, options]); return chain; },
+        range(from, to) { calls.push(["range", from, to]); return Promise.resolve({ data: rows, count: 41, error: null }); },
+        then(resolve, reject) { return Promise.resolve({ data: rows, count: 41, error: null }).then(resolve, reject); },
+      };
+      return { select(columns, options) { state.columns = columns; state.options = options; return chain; } };
+    },
+  };
+  const service = createObservabilityService({ db });
+  const result = await service.listTraces({
+    traceId: "trace_1",
+    userHash: "user_hash",
+    feature: "vision",
+    status: "timed_out",
+    errorCode: "NUTRITION_TIMEOUT",
+    from: "2026-08-14T00:00:00.000Z",
+    to: "2026-08-15T00:00:00.000Z",
+    page: 2,
+    limit: 9999,
+  });
+  assert.equal(result.page, 2);
+  assert.equal(result.pageSize, 200);
+  assert.equal(result.total, 41);
+  assert.deepEqual(result.items[0], {
+    traceId: "trace_1",
+    clientRequestId: "client_1",
+    userHash: "user_hash",
+    feature: "vision",
+    status: "timed_out",
+    lastStage: "nutrition.enrichment",
+    startedAt: "2026-08-15T00:00:00.000Z",
+    completedAt: null,
+    durationMs: 1000,
+    httpStatus: 504,
+    errorCode: "NUTRITION_TIMEOUT",
+    provider: "qwen",
+    fallbackUsed: true,
+    expiresAt: null,
+  });
+  assert.deepEqual(calls.at(-1), ["range", 200, 399]);
+});
+
+test("getTraceDetail returns only sanitized stage and meta fields", async () => {
+  const db = {
+    from(table) {
+      assert.equal(table, "ops_request_traces");
+      const chain = {
+        eq() { return chain; },
+        maybeSingle() {
+          return Promise.resolve({
+            data: {
+              trace_id: "trace_1",
+              status: "succeeded",
+              feature: "coach",
+              stages_json: [{ name: "coach.model", status: "succeeded", prompt: "secret" }],
+              meta_json: { provider: "deepseek", rawResponse: "secret", fallbackUsed: true },
+            },
+            error: null,
+          });
+        },
+      };
+      return { select() { return chain; } };
+    },
+  };
+  const service = createObservabilityService({ db });
+  const result = await service.getTraceDetail("trace_1");
+  assert.deepEqual(result.stages, [{ name: "coach.model", status: "succeeded" }]);
+  assert.deepEqual(result.meta, { provider: "deepseek", fallbackUsed: true });
+  assert.equal(result.meta.rawResponse, undefined);
+});
+
+test("listAuditLogs returns bounded filters and sanitized snapshots", async () => {
+  const calls = [];
+  const db = {
+    from(table) {
+      assert.equal(table, "admin_audit_logs");
+      const chain = {
+        eq(column, value) { calls.push(["eq", column, value]); return chain; },
+        gte(column, value) { calls.push(["gte", column, value]); return chain; },
+        lte(column, value) { calls.push(["lte", column, value]); return chain; },
+        order() { return chain; },
+        range(from, to) {
+          calls.push(["range", from, to]);
+          return Promise.resolve({ count: 1, error: null, data: [{
+            id: "audit-1",
+            action: "food.archive",
+            resource_type: "food",
+            result: "succeeded",
+            before_snapshot: { name: "鸡蛋", prompt: "secret" },
+            after_snapshot: { isActive: false, token: "secret" },
+          }] });
+        },
+      };
+      return { select() { return chain; } };
+    },
+  };
+  const service = createObservabilityService({ db });
+  const result = await service.listAuditLogs({ action: "food.archive", page: 2, limit: 9999 });
+  assert.equal(result.pageSize, 200);
+  assert.deepEqual(result.items[0].before, { name: "鸡蛋" });
+  assert.deepEqual(result.items[0].after, { isActive: false });
+  assert.deepEqual(calls.at(-1), ["range", 200, 399]);
 });
 
 test("getOverview aggregates vision, rate limit, cancel, and coach metrics", async () => {

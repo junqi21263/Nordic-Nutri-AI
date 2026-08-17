@@ -57,6 +57,7 @@ const { createFoodImageBatchService, FoodImageBatchError } = require("./food-ima
 const { createFoodImagePatrolService, FoodImagePatrolError } = require("./food-image-patrol-service.cjs");
 const { createFoodImageAuditVision } = require("./food-image-audit-vision.cjs");
 const { createFoodImageAuditService } = require("./food-image-audit-service.cjs");
+const { createSystemHealthService } = require("./system-health-service.cjs");
 const { createVisionBudget, VISION_BUDGETS } = require("./vision-budget.cjs");
 const { getFoodDisplayName } = require("./food-display-name.cjs");
 const { formulaNutritionPlanFallback } = require("./nutrition-plan-formula.cjs");
@@ -1264,6 +1265,15 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     resolveTempFileUrls,
   });
+  const systemHealth = createSystemHealthService({
+    db,
+    observability,
+    providerConfig: {
+      vision: { configured: Boolean(vision?.provider) },
+      deepseek: { configured: Boolean(String(env.DEEPSEEK_API_KEY || "").trim()) },
+      hunyuan: { configured: Boolean(hunyuanImageService || workerEndpoint) },
+    },
+  });
   const deleteStorageCloudFiles = async ({ cloudPaths, label = "storage" } = {}) => {
     const paths = Array.isArray(cloudPaths) ? cloudPaths.filter(Boolean) : [];
     if (!paths.length) return { deleted: 0, attempted: 0 };
@@ -1401,6 +1411,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     operationGuard,
     observability,
     adminAudit,
+    systemHealth,
     contentModeration,
     visionImageReview,
     visionImageRetention,
@@ -1529,6 +1540,11 @@ function getAdminFoodRoute(pathname) {
   const path = stripped.replace(/^\/api\/admin/, "") || "/";
   if (path === "/users") return { operation: "listUsers" };
   if (path === "/login") return { operation: "adminLogin" };
+  if (path === "/system/health") return { operation: "systemHealth" };
+  if (path === "/audit-logs") return { operation: "auditLogs" };
+  if (path === "/traces") return { operation: "traceList" };
+  const traceDetailMatch = path.match(/^\/traces\/([^/]+)$/);
+  if (traceDetailMatch) return { operation: "traceDetail", traceId: decodeURIComponent(traceDetailMatch[1]) };
   if (path === "/ops/overview") return { operation: "opsOverview" };
   if (path === "/ops/quota") return { operation: "opsQuota" };
   if (path === "/ops/quota/model") return { operation: "opsQuotaModel" };
@@ -1872,6 +1888,47 @@ function createHttpServer({ service }) {
       const session = requireAdminConsoleSession(service, req);
       if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED", message: "请先使用帐号密码登录后台" });
       try {
+        if (adminFoodRoute.operation === "systemHealth") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.systemHealth?.getHealth) return sendJson(res, 503, { code: "SYSTEM_HEALTH_UNAVAILABLE" });
+          return sendJson(res, 200, await service.systemHealth.getHealth());
+        }
+        if (adminFoodRoute.operation === "auditLogs") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.observability?.listAuditLogs) return sendJson(res, 503, { code: "OPS_AUDIT_LOGS_UNAVAILABLE" });
+          return sendJson(res, 200, await service.observability.listAuditLogs({
+            actorUserId: url.searchParams.get("actorUserId") || undefined,
+            action: url.searchParams.get("action") || undefined,
+            resourceType: url.searchParams.get("resourceType") || undefined,
+            resourceId: url.searchParams.get("resourceId") || undefined,
+            outcome: url.searchParams.get("outcome") || undefined,
+            from: url.searchParams.get("from") || undefined,
+            to: url.searchParams.get("to") || undefined,
+            page: url.searchParams.get("page"),
+            limit: url.searchParams.get("limit"),
+          }));
+        }
+        if (adminFoodRoute.operation === "traceList") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.observability?.listTraces) return sendJson(res, 503, { code: "OPS_TRACES_UNAVAILABLE" });
+          return sendJson(res, 200, await service.observability.listTraces({
+            traceId: url.searchParams.get("traceId") || undefined,
+            feature: url.searchParams.get("feature") || undefined,
+            status: url.searchParams.get("status") || undefined,
+            errorCode: url.searchParams.get("errorCode") || undefined,
+            from: url.searchParams.get("from") || undefined,
+            to: url.searchParams.get("to") || undefined,
+            page: url.searchParams.get("page"),
+            limit: url.searchParams.get("limit"),
+          }));
+        }
+        if (adminFoodRoute.operation === "traceDetail") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.observability?.getTraceDetail) return sendJson(res, 503, { code: "OPS_TRACES_UNAVAILABLE" });
+          const trace = await service.observability.getTraceDetail(adminFoodRoute.traceId);
+          if (!trace) return sendJson(res, 404, { code: "TRACE_NOT_FOUND" });
+          return sendJson(res, 200, trace);
+        }
         if (adminFoodRoute.operation === "listUsers") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.adminConsole) return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });

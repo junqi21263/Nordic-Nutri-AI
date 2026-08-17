@@ -1,4 +1,47 @@
-const { sanitizeAuditSnapshot } = require("./observability-sanitizer.cjs");
+const { randomUUID } = require("node:crypto");
+const {
+  sanitizeAuditSnapshot,
+  sanitizeTraceMeta,
+  sanitizeTraceStage,
+} = require("./observability-sanitizer.cjs");
+
+const TRACE_STATUSES = new Set([
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "rate_limited",
+  "timed_out",
+]);
+const OBSERVABILITY_WRITE_TIMEOUT_MS = 100;
+
+function withBestEffortTimeout(operation, timeoutMs = OBSERVABILITY_WRITE_TIMEOUT_MS) {
+  return Promise.race([
+    Promise.resolve(operation),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("observability write timed out")), timeoutMs);
+    }),
+  ]);
+}
+
+function createTraceId() {
+  return `trace_${randomUUID()}`;
+}
+
+function normalizeTraceStatus(status, fallback = "failed") {
+  return TRACE_STATUSES.has(status) ? status : fallback;
+}
+
+function durationBetween(startedAt, completedAt) {
+  const start = new Date(startedAt).getTime();
+  const end = new Date(completedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return Math.max(0, Math.round(end - start));
+}
+
+function boundedText(value, max = 200) {
+  return typeof value === "string" ? value.trim().slice(0, max) : null;
+}
 
 function percentile95(values) {
   const sorted = [...values].filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
@@ -74,6 +117,115 @@ function rowFeature(row) {
   return typeof meta.feature === "string" ? meta.feature.trim() : "";
 }
 
+const TRACE_LIST_COLUMNS = [
+  "trace_id",
+  "client_request_id",
+  "user_hash",
+  "feature",
+  "status",
+  "last_stage",
+  "started_at",
+  "completed_at",
+  "duration_ms",
+  "http_status",
+  "error_code",
+  "provider",
+  "fallback_used",
+  "expires_at",
+].join(",");
+
+const TRACE_DETAIL_COLUMNS = [
+  TRACE_LIST_COLUMNS,
+  "provider_request_id_hash",
+  "stages_json",
+  "meta_json",
+].join(",");
+
+function parseJsonObject(value) {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try { return JSON.parse(value) || {}; } catch { return {}; }
+  }
+  return typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function parseJsonArray(value) {
+  if (!value) return [];
+  if (typeof value === "string") {
+    try { value = JSON.parse(value); } catch { return []; }
+  }
+  return Array.isArray(value) ? value : [];
+}
+
+function mapTraceListRow(row = {}) {
+  return {
+    traceId: boundedText(row.trace_id, 160),
+    clientRequestId: boundedText(row.client_request_id, 80),
+    userHash: boundedText(row.user_hash, 200),
+    feature: boundedText(row.feature, 80),
+    status: normalizeTraceStatus(row.status),
+    lastStage: boundedText(row.last_stage, 120),
+    startedAt: row.started_at || null,
+    completedAt: row.completed_at || null,
+    durationMs: Number.isFinite(Number(row.duration_ms)) ? Number(row.duration_ms) : null,
+    httpStatus: Number.isInteger(row.http_status) ? row.http_status : null,
+    errorCode: boundedText(row.error_code, 80),
+    provider: boundedText(row.provider, 80),
+    fallbackUsed: row.fallback_used === true,
+    expiresAt: row.expires_at || null,
+  };
+}
+
+function mapTraceDetailRow(row = {}) {
+  return {
+    ...mapTraceListRow(row),
+    providerRequestIdHash: boundedText(row.provider_request_id_hash, 200),
+    stages: parseJsonArray(row.stages_json)
+      .map((stage) => sanitizeTraceStage(stage))
+      .filter((stage) => stage.name),
+    meta: sanitizeTraceMeta(parseJsonObject(row.meta_json)),
+  };
+}
+
+function mapAuditRow(row = {}) {
+  const safeSnapshot = (value) => sanitizeAuditSnapshot(parseJsonObject(value));
+  return {
+    id: boundedText(row.id, 160),
+    actorUserId: boundedText(row.actor_user_id, 160),
+    action: boundedText(row.action, 120),
+    resourceType: boundedText(row.resource_type, 80),
+    resourceId: boundedText(row.resource_id, 200),
+    before: safeSnapshot(row.before_snapshot),
+    after: safeSnapshot(row.after_snapshot),
+    result: ["succeeded", "failed", "rejected"].includes(row.result) ? row.result : "failed",
+    errorCode: boundedText(row.error_code, 80),
+    traceId: boundedText(row.trace_id, 160),
+    createdAt: row.created_at || null,
+    expiresAt: row.expires_at || null,
+  };
+}
+
+function mapJobRunRow(row = {}) {
+  return {
+    id: boundedText(row.id, 160),
+    jobKey: boundedText(row.job_key, 120),
+    configured: row.configured === true,
+    runtimeBindingStatus: ["verified", "unknown", "unavailable"].includes(row.runtime_binding_status)
+      ? row.runtime_binding_status : "unknown",
+    trigger: ["schedule", "manual", "internal", "startup", "unknown"].includes(row.trigger)
+      ? row.trigger : "unknown",
+    status: ["running", "succeeded", "failed", "cancelled"].includes(row.status) ? row.status : "failed",
+    startedAt: row.started_at || null,
+    completedAt: row.completed_at || null,
+    durationMs: Number.isFinite(Number(row.duration_ms)) ? Number(row.duration_ms) : null,
+    processedCount: Number.isInteger(row.processed_count) ? row.processed_count : null,
+    errorCode: boundedText(row.error_code, 80),
+    errorSummary: boundedText(row.error_summary, 200),
+    traceId: boundedText(row.trace_id, 160),
+    expiresAt: row.expires_at || null,
+  };
+}
+
 const MODEL_REQUEST_METRICS = new Set([
   "vision_success",
   "vision_failure",
@@ -106,30 +258,217 @@ function createObservabilityService({ db }) {
 
   async function recordMetric(metric, value = 1, meta = {}) {
     try {
-      await db.from("ops_metric_events").insert({
+      const result = await withBestEffortTimeout(db.from("ops_metric_events").insert({
         metric,
         value,
-        meta: meta && typeof meta === "object" ? meta : {},
-      });
+        meta: sanitizeTraceMeta(meta),
+      }));
+      if (result?.error) throw new Error("metric insert failed");
     } catch (error) {
       console.warn("[observability] recordMetric failed:", metric, error?.message || error);
+    }
+  }
+
+  function startTrace(input = {}) {
+    const startedAt = new Date().toISOString();
+    return {
+      traceId: createTraceId(),
+      clientRequestId: boundedText(input.clientRequestId, 80),
+      userHash: boundedText(input.userHash, 200),
+      feature: boundedText(input.feature, 80) || "unknown",
+      startedAt,
+      status: "running",
+      lastStage: null,
+      stages: [],
+    };
+  }
+
+  function recordStage(trace, stage = {}) {
+    if (!trace || typeof trace !== "object") return null;
+    const safeStage = sanitizeTraceStage(stage);
+    if (!safeStage.name) return null;
+    trace.stages.push(safeStage);
+    trace.lastStage = safeStage.name;
+    return safeStage;
+  }
+
+  async function finishTrace(trace, result = {}) {
+    if (!trace || typeof trace !== "object" || !trace.traceId) {
+      return { recorded: false, traceId: null };
+    }
+    const completedAt = new Date().toISOString();
+    const status = normalizeTraceStatus(result.status);
+    const payload = {
+      trace_id: trace.traceId,
+      client_request_id: trace.clientRequestId || null,
+      user_hash: trace.userHash || null,
+      feature: trace.feature,
+      status,
+      last_stage: trace.lastStage || null,
+      started_at: trace.startedAt,
+      completed_at: completedAt,
+      duration_ms: durationBetween(trace.startedAt, completedAt),
+      http_status: Number.isInteger(result.httpStatus) ? result.httpStatus : null,
+      error_code: boundedText(result.errorCode, 80),
+      provider: boundedText(result.provider, 80),
+      provider_request_id_hash: boundedText(result.providerRequestIdHash, 200),
+      fallback_used: result.fallbackUsed === true,
+      stages_json: trace.stages.map((stage) => sanitizeTraceStage(stage)).filter((stage) => stage.name),
+      meta_json: sanitizeTraceMeta(result.meta),
+    };
+    try {
+      const insertResult = await withBestEffortTimeout(db.from("ops_request_traces").insert(payload));
+      if (insertResult?.error) throw new Error("trace insert failed");
+      return { recorded: true, traceId: trace.traceId };
+    } catch (error) {
+      console.warn("[observability] finishTrace failed:", trace.traceId, error?.message || error);
+      return { recorded: false, traceId: trace.traceId };
+    }
+  }
+
+  async function recordJobRun(input = {}) {
+    const startedAt = input.startedAt || new Date().toISOString();
+    const completedAt = input.completedAt || null;
+    const payload = {
+      job_key: boundedText(input.jobKey, 120) || "unknown",
+      configured: input.configured === true,
+      runtime_binding_status: ["verified", "unknown", "unavailable"].includes(input.runtimeBindingStatus)
+        ? input.runtimeBindingStatus
+        : "unknown",
+      trigger: ["schedule", "manual", "internal", "startup", "unknown"].includes(input.trigger)
+        ? input.trigger
+        : "unknown",
+      status: ["running", "succeeded", "failed", "cancelled"].includes(input.status)
+        ? input.status
+        : "failed",
+      started_at: startedAt,
+      completed_at: completedAt,
+      duration_ms: completedAt ? durationBetween(startedAt, completedAt) : null,
+      processed_count: Number.isInteger(input.processedCount) && input.processedCount >= 0 ? input.processedCount : null,
+      error_code: boundedText(input.errorCode, 80),
+      error_summary: boundedText(input.errorSummary, 200),
+      trace_id: boundedText(input.traceId, 160),
+    };
+    try {
+      const result = await withBestEffortTimeout(db.from("ops_job_runs").insert(payload));
+      if (result?.error) throw new Error("job run insert failed");
+      return { recorded: true };
+    } catch (error) {
+      console.warn("[observability] recordJobRun failed:", payload.job_key, error?.message || error);
+      return { recorded: false };
     }
   }
 
   async function recordAdminAudit(input = {}) {
     const result = await db.from("admin_audit_logs").insert({
       actor_user_id: input.actorUserId || null,
-      action: typeof input.action === "string" ? input.action.trim().slice(0, 120) : "unknown",
-      resource_type: typeof input.resourceType === "string" ? input.resourceType.trim().slice(0, 80) : "unknown",
-      resource_id: typeof input.resourceId === "string" ? input.resourceId.trim().slice(0, 200) : null,
+      action: boundedText(input.action, 120) || "unknown",
+      resource_type: boundedText(input.resourceType, 80) || "unknown",
+      resource_id: boundedText(input.resourceId, 200),
       before_snapshot: sanitizeAuditSnapshot(input.before),
       after_snapshot: sanitizeAuditSnapshot(input.after),
       result: ["succeeded", "failed", "rejected"].includes(input.result) ? input.result : "failed",
-      error_code: typeof input.errorCode === "string" ? input.errorCode.trim().slice(0, 80) : null,
-      trace_id: typeof input.traceId === "string" ? input.traceId.trim().slice(0, 160) : null,
+      error_code: boundedText(input.errorCode, 80),
+      trace_id: boundedText(input.traceId, 160),
     });
     if (result?.error) throw new Error("admin audit insert failed");
     return { recorded: true };
+  }
+
+  async function listTraces({
+    traceId,
+    userHash,
+    feature,
+    status,
+    errorCode,
+    from,
+    to,
+    page = 1,
+    limit = 50,
+  } = {}) {
+    const pageSize = Math.min(200, Math.max(1, Number(limit) || 50));
+    const pageNumber = Math.min(100000, Math.max(1, Number(page) || 1));
+    let query = db
+      .from("ops_request_traces")
+      .select(TRACE_LIST_COLUMNS, { count: "exact" });
+    if (traceId) query = query.eq("trace_id", boundedText(traceId, 160));
+    if (userHash) query = query.eq("user_hash", boundedText(userHash, 200));
+    if (feature) query = query.eq("feature", boundedText(feature, 80));
+    if (status && TRACE_STATUSES.has(status)) query = query.eq("status", status);
+    if (errorCode) query = query.eq("error_code", boundedText(errorCode, 80));
+    if (from) query = query.gte("started_at", from);
+    if (to) query = query.lte("started_at", to);
+    const result = await query
+      .order("started_at", { ascending: false })
+      .range((pageNumber - 1) * pageSize, pageNumber * pageSize - 1);
+    if (result?.error) throw new Error("Trace query failed");
+    return {
+      items: (result?.data ?? []).map(mapTraceListRow),
+      page: pageNumber,
+      pageSize,
+      total: Number.isInteger(result?.count) ? result.count : (result?.data?.length ?? 0),
+    };
+  }
+
+  async function getTraceDetail(traceId) {
+    const safeTraceId = boundedText(traceId, 160);
+    if (!safeTraceId) return null;
+    const result = await db
+      .from("ops_request_traces")
+      .select(TRACE_DETAIL_COLUMNS)
+      .eq("trace_id", safeTraceId)
+      .maybeSingle();
+    if (result?.error) throw new Error("Trace query failed");
+    return result?.data ? mapTraceDetailRow(result.data) : null;
+  }
+
+  async function listAuditLogs({
+    actorUserId,
+    action,
+    resourceType,
+    resourceId,
+    result: outcome,
+    traceId,
+    from,
+    to,
+    page = 1,
+    limit = 50,
+  } = {}) {
+    const pageSize = Math.min(200, Math.max(1, Number(limit) || 50));
+    const pageNumber = Math.min(100000, Math.max(1, Number(page) || 1));
+    let query = db.from("admin_audit_logs").select(
+      "id,actor_user_id,action,resource_type,resource_id,before_snapshot,after_snapshot,result,error_code,trace_id,created_at,expires_at",
+      { count: "exact" },
+    );
+    if (actorUserId) query = query.eq("actor_user_id", boundedText(actorUserId, 160));
+    if (action) query = query.eq("action", boundedText(action, 120));
+    if (resourceType) query = query.eq("resource_type", boundedText(resourceType, 80));
+    if (resourceId) query = query.eq("resource_id", boundedText(resourceId, 200));
+    if (outcome && ["succeeded", "failed", "rejected"].includes(outcome)) query = query.eq("result", outcome);
+    if (traceId) query = query.eq("trace_id", boundedText(traceId, 160));
+    if (from) query = query.gte("created_at", from);
+    if (to) query = query.lte("created_at", to);
+    const response = await query
+      .order("created_at", { ascending: false })
+      .range((pageNumber - 1) * pageSize, pageNumber * pageSize - 1);
+    if (response?.error) throw new Error("Audit log query failed");
+    return {
+      items: (response?.data ?? []).map(mapAuditRow),
+      page: pageNumber,
+      pageSize,
+      total: Number.isInteger(response?.count) ? response.count : (response?.data?.length ?? 0),
+    };
+  }
+
+  async function listJobRuns({ jobKey, limit = 50 } = {}) {
+    const capped = Math.min(200, Math.max(1, Number(limit) || 50));
+    let query = db.from("ops_job_runs").select(
+      "id,job_key,configured,runtime_binding_status,trigger,status,started_at,completed_at,duration_ms,processed_count,error_code,error_summary,trace_id,expires_at",
+    );
+    if (jobKey) query = query.eq("job_key", boundedText(jobKey, 120));
+    const result = await query.order("started_at", { ascending: false }).limit(capped);
+    if (result?.error) throw new Error("Job run query failed");
+    return { items: (result?.data ?? []).map(mapJobRunRow) };
   }
 
   async function getOverview({ hours = 24 } = {}) {
@@ -392,7 +731,15 @@ function createObservabilityService({ db }) {
 
   return {
     recordMetric,
+    startTrace,
+    recordStage,
+    finishTrace,
+    recordJobRun,
     recordAdminAudit,
+    listTraces,
+    getTraceDetail,
+    listAuditLogs,
+    listJobRuns,
     getOverview,
     getUsageReport,
     getModelDetail,
@@ -405,6 +752,7 @@ function createObservabilityService({ db }) {
 
 module.exports = {
   createObservabilityService,
+  createTraceId,
   percentile95,
   shanghaiDayKey,
   todayShanghaiKey,
