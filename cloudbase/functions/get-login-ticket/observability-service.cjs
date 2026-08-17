@@ -187,6 +187,75 @@ function mapTraceDetailRow(row = {}) {
   };
 }
 
+function buildDiagnosticPackage(trace = {}) {
+  const meta = trace.meta || {};
+  const request = {
+    traceId: trace.traceId || null,
+    clientRequestId: trace.clientRequestId || null,
+    requestTime: meta.requestTime || trace.startedAt || null,
+    route: meta.route || null,
+    method: meta.method || null,
+    clientVersion: meta.clientVersion || null,
+    environment: meta.environment || null,
+    userHash: trace.userHash || null,
+  };
+  return {
+    request,
+    runtime: {
+      environment: meta.environment || null,
+      functionVersion: meta.functionVersion || null,
+      artifactSha: meta.artifactSha || null,
+      sanitizationVersion: meta.sanitizationVersion || null,
+    },
+    vision: {
+      feature: trace.feature || null,
+      provider: trace.provider || meta.provider || null,
+      model: meta.model || null,
+      providerRequestIdHash: trace.providerRequestIdHash || meta.providerRequestIdHash || null,
+      providerHttpStatus: meta.providerHttpStatus ?? null,
+      stage: meta.stage || trace.lastStage || null,
+      stageDurationMs: meta.stageDurationMs ?? null,
+      lastSuccessfulStage: meta.lastSuccessfulStage || null,
+      fallbackUsed: trace.fallbackUsed === true,
+      imageMimeType: meta.imageMimeType || null,
+      imageBytes: meta.imageBytes ?? null,
+      imageSha256: meta.imageSha256 || null,
+    },
+    quota: {
+      reservationId: meta.quotaReservationId || null,
+      state: meta.quotaState || null,
+      delta: meta.quotaDelta ?? null,
+    },
+    database: {
+      sqlstate: meta.sqlstate || null,
+      rpcName: meta.rpcName || null,
+      constraint: meta.constraint || null,
+    },
+    result: {
+      status: trace.status || null,
+      httpStatus: trace.httpStatus ?? null,
+      businessCode: meta.businessCode || trace.errorCode || null,
+      errorCode: trace.errorCode || null,
+      analysisId: meta.analysisId || null,
+      durationMs: trace.durationMs ?? null,
+      retryCount: meta.retryCount ?? 0,
+    },
+    replayHints: {
+      environment: meta.environment || null,
+      route: meta.route || null,
+      method: meta.method || null,
+      requestSchemaSummary: meta.requestSchemaSummary || null,
+      imageMimeType: meta.imageMimeType || null,
+      imageBytes: meta.imageBytes ?? null,
+      imageSha256: meta.imageSha256 || null,
+      provider: trace.provider || meta.provider || null,
+      model: meta.model || null,
+      failedStage: meta.stage || trace.lastStage || null,
+      fixtureRequired: true,
+    },
+  };
+}
+
 function mapAuditRow(row = {}) {
   const safeSnapshot = (value) => sanitizeAuditSnapshot(parseJsonObject(value));
   return {
@@ -420,6 +489,11 @@ function createObservabilityService({ db }) {
       .maybeSingle();
     if (result?.error) throw new Error("Trace query failed");
     return result?.data ? mapTraceDetailRow(result.data) : null;
+  }
+
+  async function getDiagnosticPackage(traceId) {
+    const trace = await getTraceDetail(traceId);
+    return trace ? buildDiagnosticPackage(trace) : null;
   }
 
   async function listAuditLogs({
@@ -738,6 +812,7 @@ function createObservabilityService({ db }) {
     recordAdminAudit,
     listTraces,
     getTraceDetail,
+    getDiagnosticPackage,
     listAuditLogs,
     listJobRuns,
     getOverview,
@@ -752,6 +827,7 @@ function createObservabilityService({ db }) {
 
 module.exports = {
   createObservabilityService,
+  buildDiagnosticPackage,
   createTraceId,
   percentile95,
   shanghaiDayKey,

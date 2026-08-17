@@ -271,6 +271,86 @@ test("getTraceDetail returns only sanitized stage and meta fields", async () => 
   assert.equal(result.meta.rawResponse, undefined);
 });
 
+test("getDiagnosticPackage returns structured replay hints without raw sensitive data", async () => {
+  const db = {
+    from(table) {
+      assert.equal(table, "ops_request_traces");
+      const chain = {
+        eq() { return chain; },
+        maybeSingle() {
+          return Promise.resolve({
+            data: {
+              trace_id: "trace_vision_1",
+              client_request_id: "request_1",
+              user_hash: "user_hash_1",
+              feature: "vision",
+              status: "failed",
+              last_stage: "persistence",
+              started_at: "2026-08-17T01:00:00.000Z",
+              completed_at: "2026-08-17T01:00:03.000Z",
+              duration_ms: 3000,
+              http_status: 503,
+              error_code: "VISION_PERSISTENCE_FAILED",
+              provider: "qwen",
+              fallback_used: true,
+              stages_json: [{ name: "persistence", status: "failed", durationMs: 120 }],
+              meta_json: {
+                route: "/vision-analysis",
+                method: "POST",
+                clientVersion: "1.1.9",
+                environment: "lewis-healthy",
+                functionVersion: "bd248f3",
+                artifactSha: "artifact-sha",
+                requestSchemaSummary: "clientRequestId:string,imageBase64:string,contentType:string",
+                imageMimeType: "image/jpeg",
+                imageBytes: 12345,
+                imageSha256: "a".repeat(64),
+                stage: "persistence",
+                stageDurationMs: 120,
+                providerHttpStatus: 502,
+                sqlstate: "23505",
+                rpcName: "persist_analysis",
+                constraint: "analysis_unique",
+                quotaReservationId: "reservation_1",
+                quotaState: "released",
+                quotaDelta: 0,
+                analysisId: null,
+                retryCount: 1,
+                sanitizationVersion: "1",
+                prompt: "must not return",
+                token: "must not return",
+              },
+            },
+            error: null,
+          });
+        },
+      };
+      return { select() { return chain; } };
+    },
+  };
+  const service = createObservabilityService({ db });
+  const result = await service.getDiagnosticPackage("trace_vision_1");
+
+  assert.deepEqual(result.request, {
+    traceId: "trace_vision_1",
+    clientRequestId: "request_1",
+    requestTime: "2026-08-17T01:00:00.000Z",
+    route: "/vision-analysis",
+    method: "POST",
+    clientVersion: "1.1.9",
+    environment: "lewis-healthy",
+    userHash: "user_hash_1",
+  });
+  assert.equal(result.runtime.functionVersion, "bd248f3");
+  assert.equal(result.vision.imageSha256, "a".repeat(64));
+  assert.equal(result.database.sqlstate, "23505");
+  assert.equal(result.quota.delta, 0);
+  assert.equal(result.result.errorCode, "VISION_PERSISTENCE_FAILED");
+  assert.equal(result.replayHints.imageBytes, 12345);
+  assert.equal(result.meta, undefined);
+  assert.equal(JSON.stringify(result).includes("must not return"), false);
+});
+
 test("listAuditLogs returns bounded filters and sanitized snapshots", async () => {
   const calls = [];
   const db = {

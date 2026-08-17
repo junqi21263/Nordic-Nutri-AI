@@ -1481,6 +1481,32 @@ test("admin users and feedback routes require session and accept admin", async (
   });
 });
 
+test("admin diagnostic package is read-only and admin-session protected", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => (token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null),
+      observability: {
+        getDiagnosticPackage: async (traceId) => {
+          calls.push(traceId);
+          return { request: { traceId }, replayHints: { fixtureRequired: true } };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const prefix = `${baseUrl}/get-login-ticket/api/admin/diagnostics/trace_1`;
+    assert.equal((await fetch(prefix)).status, 401);
+    const response = await fetch(prefix, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      request: { traceId: "trace_1" },
+      replayHints: { fixtureRequired: true },
+    });
+  });
+  assert.deepEqual(calls, ["trace_1"]);
+});
+
 test("omits Access-Control-Allow-Origin so CloudBase gateway does not duplicate it", async () => {
   const server = createHttpServer({ service: null });
 

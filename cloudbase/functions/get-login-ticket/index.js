@@ -119,6 +119,7 @@ function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    ...(res.__traceId ? { "X-Trace-Id": res.__traceId } : {}),
     ...CORS_HEADERS,
   });
   res.end(JSON.stringify(data));
@@ -1575,6 +1576,8 @@ function getAdminFoodRoute(pathname) {
   if (path === "/system/health") return { operation: "systemHealth" };
   if (path === "/audit-logs") return { operation: "auditLogs" };
   if (path === "/traces") return { operation: "traceList" };
+  const diagnosticMatch = path.match(/^\/diagnostics\/([^/]+)$/i);
+  if (diagnosticMatch) return { operation: "diagnosticPackage", traceId: decodeURIComponent(diagnosticMatch[1]) };
   const traceDetailMatch = path.match(/^\/traces\/([^/]+)$/);
   if (traceDetailMatch) return { operation: "traceDetail", traceId: decodeURIComponent(traceDetailMatch[1]) };
   if (path === "/ops/overview") return { operation: "opsOverview" };
@@ -1984,6 +1987,13 @@ function createHttpServer({ service }) {
           const trace = await service.observability.getTraceDetail(adminFoodRoute.traceId);
           if (!trace) return sendJson(res, 404, { code: "TRACE_NOT_FOUND" });
           return sendJson(res, 200, trace);
+        }
+        if (adminFoodRoute.operation === "diagnosticPackage") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.observability?.getDiagnosticPackage) return sendJson(res, 503, { code: "OPS_DIAGNOSTICS_UNAVAILABLE" });
+          const diagnostic = await service.observability.getDiagnosticPackage(adminFoodRoute.traceId);
+          if (!diagnostic) return sendJson(res, 404, { code: "TRACE_NOT_FOUND" });
+          return sendJson(res, 200, diagnostic);
         }
         if (adminFoodRoute.operation === "listUsers") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -2903,8 +2913,18 @@ function createHttpServer({ service }) {
       const startedAt = Date.now();
       const budget = createVisionBudget({ startedAt, totalMs: VISION_SERVER_BUDGET_MS });
       const stageEvents = [];
+      let visionTrace = null;
       const observeVisionStage = (event) => {
-        if (event && typeof event === "object") stageEvents.push({ ...event, observedAt: Date.now() });
+        if (event && typeof event === "object") {
+          const recorded = { ...event, observedAt: Date.now() };
+          stageEvents.push(recorded);
+          service?.observability?.recordStage?.(visionTrace, {
+            name: event.stage,
+            durationMs: event.ms,
+            status: event.success === false ? "failed" : "succeeded",
+            provider: event.provider,
+          });
+        }
       };
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
@@ -2916,6 +2936,23 @@ function createHttpServer({ service }) {
       try {
         const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
         clientRequestId = body?.clientRequestId ?? null;
+        visionTrace = service.observability?.startTrace?.({
+          clientRequestId,
+          userHash: service.hashTraceUserId?.(session.sub),
+          feature: "vision",
+        }) || null;
+        res.__traceId = visionTrace?.traceId || null;
+        const traceMetaBase = {
+          route: "/vision-analysis",
+          method: req.method,
+          environment: process.env.TCB_ENV || null,
+          functionVersion: process.env.FUNCTION_VERSION || process.env.K_REVISION || null,
+          artifactSha: process.env.RELEASE_ARTIFACT_SHA256 || process.env.ARTIFACT_SHA256 || null,
+          requestSchemaSummary: "clientRequestId:string,imageBase64:string,contentType:string",
+          imageMimeType: typeof body?.contentType === "string" ? body.contentType : null,
+          imageBytes: typeof body?.imageBase64 === "string" ? Math.floor(body.imageBase64.length * 0.75) : null,
+          sanitizationVersion: "1",
+        };
         // Invalid or oversized local camera files must not consume a daily scan.
         service.vision?.validateImage?.(body);
         if (service.operationGuard) {
@@ -2979,6 +3016,27 @@ function createHttpServer({ service }) {
           dishCount: Array.isArray(result?.items) ? result.items.length : 0,
           deadlineExhaustedStage: budget.remainingMs() <= 0 ? lastStage : null,
         };
+        const lastEvent = stageEvents[stageEvents.length - 1] || {};
+        const traceMeta = {
+          ...traceMetaBase,
+          ...resolvedVisionMeta,
+          imageSha256: result?.imageSha256 || null,
+          stage: lastStage,
+          stageDurationMs: Number(lastEvent.ms) || null,
+          lastSuccessfulStage: lastStage,
+          quotaState: "committed",
+          quotaDelta: 1,
+          analysisId: result?.analysisId || null,
+          retryCount: Number(resolvedVisionMeta.uploadRetryCount) || 0,
+          businessCode: null,
+        };
+        service.observability?.finishTrace?.(visionTrace, {
+          status: "succeeded",
+          httpStatus: 200,
+          provider: result?.provider || visionMeta.provider,
+          fallbackUsed: resolvedVisionMeta.fallbackToFlash === true,
+          meta: traceMeta,
+        }).catch(() => {});
         const latencyMs = Date.now() - startedAt;
         service.observability?.recordMetric?.("vision_success", 1, resolvedVisionMeta).catch(() => {});
         service.observability?.recordMetric?.("vision_latency_ms", latencyMs, resolvedVisionMeta).catch(() => {});
@@ -3002,6 +3060,38 @@ function createHttpServer({ service }) {
         if (quotaReservationOwned && service.operationGuard?.releaseVisionQuota) {
           await service.operationGuard.releaseVisionQuota(session.sub, clientRequestId).catch(() => {});
         }
+        const knownVisionError = error instanceof PublicVisionDataError
+          || error instanceof PublicVisionError
+          || error instanceof PublicQwenVisionError
+          || error instanceof PublicImageSecurityError;
+        const knownVisionStatus = knownVisionError && (
+          error.code === "VISION_IMAGE_INVALID"
+          || error.code === "VISION_RESULT_INVALID"
+          || error.code === "VISION_NON_FOOD"
+          || error.code === "VISION_CONTENT_BLOCKED"
+        ) ? 400 : 503;
+        const traceStage = stageEvents[stageEvents.length - 1] || {};
+        service.observability?.finishTrace?.(visionTrace, {
+          status: "failed",
+          httpStatus: error instanceof PublicOperationError && error.code === "RATE_LIMITED" ? 429
+            : error instanceof PublicOperationError && error.code === "OPERATION_IN_PROGRESS" ? 409
+              : knownVisionStatus,
+          errorCode: error?.code || "VISION_SERVICE_UNAVAILABLE",
+          provider: service.vision?.provider || null,
+          meta: {
+            route: "/vision-analysis",
+            method: req.method,
+            environment: process.env.TCB_ENV || null,
+            functionVersion: process.env.FUNCTION_VERSION || process.env.K_REVISION || null,
+            artifactSha: process.env.RELEASE_ARTIFACT_SHA256 || process.env.ARTIFACT_SHA256 || null,
+            stage: traceStage.stage || null,
+            stageDurationMs: Number(traceStage.ms) || null,
+            quotaState: quotaReservationOwned ? "released" : quotaReservation?.state || null,
+            quotaDelta: 0,
+            sanitizationVersion: "1",
+            businessCode: error?.code || "VISION_SERVICE_UNAVAILABLE",
+          },
+        }).catch(() => {});
         if (error instanceof PublicOperationError && error.code === "RATE_LIMITED") {
           service.observability?.recordMetric?.("rate_limited", 1, {
             userId: session.sub,
