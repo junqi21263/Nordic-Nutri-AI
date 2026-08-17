@@ -16,7 +16,19 @@ function parseNonNegativeNumber(value) {
   return n;
 }
 
-function createFoodAdminService({ repository, usdaService, normalizer, imageService }) {
+function toFoodPatch(patch = {}) {
+  const output = {};
+  const keyMap = {
+    nameZh: "name_zh", nameEn: "name_en", brandName: "brand_name", description: "description",
+    categoryId: "category_id", isFeatured: "is_featured", isVerified: "is_verified", isActive: "is_active",
+    publishStatus: "publish_status", imageSubjectZh: "image_subject_zh", defaultCookingMethod: "default_cooking_method",
+    normalizedName: "normalized_name", visualType: "visual_type",
+  };
+  for (const [key, value] of Object.entries(patch || {})) output[keyMap[key] || key] = value;
+  return output;
+}
+
+function createFoodAdminService({ repository, usdaService, normalizer, imageService, audit } = {}) {
   async function requireAdmin(userId) {
     if (!userId) throw new FoodAdminError("UNAUTHORIZED");
     const ok = await repository.isAdmin(userId);
@@ -210,6 +222,22 @@ function createFoodAdminService({ repository, usdaService, normalizer, imageServ
 
     async archiveFood(userId, foodId) {
       await requireAdmin(userId);
+      if (audit?.runAtomicRpc) {
+        try {
+          await audit.runAtomicRpc("admin_food_mutation_with_audit", {
+            p_actor_user_id: userId,
+            p_action: "food.archive",
+            p_food_id: foodId,
+            p_patch: {},
+          });
+        } catch (error) {
+          if (error.code === "FOOD_NOT_FOUND") throw new FoodAdminError("FOOD_NOT_FOUND");
+          throw error;
+        }
+        const food = await repository.getFoodByIdAdmin(foodId);
+        if (!food) throw new FoodAdminError("FOOD_NOT_FOUND");
+        return food;
+      }
       const food = await repository.archiveFood(foodId);
       if (!food) throw new FoodAdminError("FOOD_NOT_FOUND");
       return food;
@@ -217,6 +245,22 @@ function createFoodAdminService({ repository, usdaService, normalizer, imageServ
 
     async restoreFood(userId, foodId) {
       await requireAdmin(userId);
+      if (audit?.runAtomicRpc) {
+        try {
+          await audit.runAtomicRpc("admin_food_mutation_with_audit", {
+            p_actor_user_id: userId,
+            p_action: "food.restore",
+            p_food_id: foodId,
+            p_patch: {},
+          });
+        } catch (error) {
+          if (error.code === "FOOD_NOT_FOUND") throw new FoodAdminError("FOOD_NOT_FOUND");
+          throw error;
+        }
+        const food = await repository.getFoodByIdAdmin(foodId);
+        if (!food) throw new FoodAdminError("FOOD_NOT_FOUND");
+        return food;
+      }
       const food = await repository.restoreFood(foodId);
       if (!food) throw new FoodAdminError("FOOD_NOT_FOUND");
       return food;
@@ -224,6 +268,20 @@ function createFoodAdminService({ repository, usdaService, normalizer, imageServ
 
     async updateFood(userId, foodId, patch) {
       await requireAdmin(userId);
+      if (audit?.runAtomicRpc) {
+        try {
+          await audit.runAtomicRpc("admin_food_mutation_with_audit", {
+            p_actor_user_id: userId,
+            p_action: "food.update",
+            p_food_id: foodId,
+            p_patch: toFoodPatch(patch),
+          });
+        } catch (error) {
+          if (error.code === "FOOD_NOT_FOUND") throw new FoodAdminError("FOOD_NOT_FOUND");
+          throw error;
+        }
+        return { foodId };
+      }
       await repository.updateFood(foodId, patch);
       return { foodId };
     },

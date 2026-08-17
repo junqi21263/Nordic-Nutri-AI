@@ -38,6 +38,7 @@ const { createAccountDeletionService, PublicAccountDeletionError } = require("./
 const { createProductUserExists, resolveProductSession } = require("./product-session-auth.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
 const { createObservabilityService } = require("./observability-service.cjs");
+const { createAdminAuditService } = require("./admin-audit-service.cjs");
 const { recordModelUsage } = require("./model-usage.cjs");
 const { createContentModerationService, PublicContentModerationError } = require("./content-moderation-service.cjs");
 const { createAdminConsoleAuthService, createPersistentLoginAttemptTracker, PublicAdminAuthError } = require("./admin-console-auth-service.cjs");
@@ -453,6 +454,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   });
   const db = typeof app.rdb === "function" ? app.rdb() : app.rdb;
   if (!db || typeof db.from !== "function") throw new Error("Relational database client is unavailable");
+  const observability = createObservabilityService({ db });
+  opsRef.observability = observability;
+  const adminAudit = typeof db.rpc === "function" ? createAdminAuditService({ db, observability }) : null;
   const deepseekModel = selectDeepseekModel(env.DEEPSEEK_MODEL);
   const evaluateMealRaw = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
     ? createDeepseekEvaluationService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
@@ -1026,6 +1030,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     usdaService,
     normalizer: { normalizeFoodRecord },
     imageService: foodImageService,
+    audit: adminAudit,
   });
   // Password-gated admin console sessions already prove operator access; skip the
   // legacy app_users.is_admin flag so ops no longer depends on manually promoting a WeChat user.
@@ -1254,8 +1259,6 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     })
     : null;
   const operationGuard = typeof db?.from === "function" ? createOperationGuard({ db }) : null;
-  const observability = createObservabilityService({ db });
-  opsRef.observability = observability;
   const contentModeration = createContentModerationService({ db });
   const visionImageReview = createVisionImageReviewService({
     db,
@@ -1397,6 +1400,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     accountDeletion,
     operationGuard,
     observability,
+    adminAudit,
     contentModeration,
     visionImageReview,
     visionImageRetention,
