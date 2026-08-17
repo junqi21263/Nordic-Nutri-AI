@@ -521,6 +521,17 @@ export default function CoachPage() {
       activeTab="coach"
       hideNavigation
       title="你的营养教练"
+      scrollLocked={restartDialogOpen}
+      overlay={
+        <ConfirmDialog
+          open={restartDialogOpen}
+          title="新对话"
+          description="当前对话会清空，历史记录仍会保留。确定重新开始吗？"
+          confirmLabel="开启新对话"
+          onConfirm={() => void handleRestartConversation()}
+          onCancel={() => setRestartDialogOpen(false)}
+        />
+      }
       className="page-layout--coach-chat"
     >
       <View className="coach-chat">
@@ -808,14 +819,6 @@ export default function CoachPage() {
         onSend={() => void sendMessage()}
         onPickImage={() => void chooseCoachImage()}
         onClearImage={() => setSelectedImagePath(null)}
-      />
-      <ConfirmDialog
-        open={restartDialogOpen}
-        title="新对话"
-        description="当前对话会清空，历史记录仍会保留。确定重新开始吗？"
-        confirmLabel="开启新对话"
-        onConfirm={() => void handleRestartConversation()}
-        onCancel={() => setRestartDialogOpen(false)}
       />
     </PageLayout>
   );

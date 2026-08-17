@@ -22,7 +22,7 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   return (
-    <Modal open={open}>
+    <Modal open={open} lockScroll>
       <View className="confirm-dialog">
         <Text className="confirm-dialog__title">{title}</Text>
         <Text className="confirm-dialog__description">{description}</Text>

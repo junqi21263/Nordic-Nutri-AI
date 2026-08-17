@@ -1184,7 +1184,7 @@
 .modal-backdrop,
 .bottom-sheet-backdrop {
   align-items: flex-end;
-  background: $color-overlay;
+  background: rgba($color-text-primary, 0.52);
   bottom: 0;
   display: flex;
   justify-content: center;
@@ -1273,6 +1273,7 @@
   font-size: $font-caption;
   line-height: $line-body;
   text-align: center;
+  white-space: nowrap;
 }
 .confirm-dialog__actions {
   display: flex;
@@ -1283,6 +1284,7 @@
 .confirm-dialog__actions .app-button {
   flex: 0 1 220px;
   min-width: 0;
+  white-space: nowrap;
 }
 @keyframes breathe {
   to {

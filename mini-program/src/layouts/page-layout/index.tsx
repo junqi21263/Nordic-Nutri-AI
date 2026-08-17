@@ -1,6 +1,6 @@
 import { View } from "@tarojs/components";
 import { useDidHide, useDidShow } from "@tarojs/taro";
-import { useEffect, useState, type PropsWithChildren } from "react";
+import { useEffect, useState, type PropsWithChildren, type ReactNode } from "react";
 import { AppSafeArea } from "../../components/app-safe-area";
 import { AppTopBar } from "../../components/app-top-bar";
 import { FeedbackHost } from "../../components/feedback-host";
@@ -46,6 +46,8 @@ export interface PageLayoutProps extends PropsWithChildren {
   disablePageEnterAnimation?: boolean;
   /** Freezes the page scroll container while a modal or sheet is open. */
   scrollLocked?: boolean;
+  /** Renders page-level overlays after the fixed bottom tab bar. */
+  overlay?: ReactNode;
   className?: string;
 }
 
@@ -70,6 +72,7 @@ export function PageLayout({
   refreshing = false,
   disablePageEnterAnimation = false,
   scrollLocked = false,
+  overlay,
   className,
   children,
 }: PageLayoutProps) {
@@ -179,6 +182,7 @@ export function PageLayout({
         </View>
       </View>
       {showTabs && tabbarVisible ? <BottomTabBar activeKey={activeKey} /> : null}
+      {overlay}
       {pageVisible && celebrationPriority === "achievement" && activeAchievement ? (
         <AchievementUnlockModal
           achievement={activeAchievement}

@@ -23,11 +23,18 @@
   box-sizing: border-box;
   min-height: 100vh;
 }
-.page-layout--scroll-locked,
-.page-layout--scroll-locked .page-layout__scroll {
+.page-layout--scroll-locked {
   height: 100vh;
   min-height: 0;
   overflow: hidden;
+}
+.page-layout--scroll-locked .page-layout__scroll {
+  height: 100vh;
+  min-height: 0;
+  overflow: visible;
+}
+.page-layout--scroll-locked .bottom-tab-bar {
+  z-index: 0;
 }
 .page-layout__scroll--entered {
   animation: page-layout-content-enter 180ms ease-out both;
