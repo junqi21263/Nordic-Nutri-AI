@@ -50,7 +50,9 @@ describe("account usage HTTPS boundary", () => {
     expect(scanner).toContain("visionDailyQuotaEnforced && remaining === 0");
     expect(page).toContain("isVisionQuotaExhausted");
     expect(api).toContain("const VISION_DAILY_LIMIT = 10;");
-    expect(api).toContain('consumeQuota(session.sub, "vision_analysis_daily"');
+    expect(api).toContain("operationGuard.reserveVisionQuota(session.sub, clientRequestId");
+    expect(api).toContain("operationGuard.commitVisionQuota(session.sub, clientRequestId");
+    expect(api).toContain("operationGuard.releaseVisionQuota(session.sub, clientRequestId");
     expect(api).not.toContain("VISION_UNLIMITED_TESTING_LIMIT");
   });
 
