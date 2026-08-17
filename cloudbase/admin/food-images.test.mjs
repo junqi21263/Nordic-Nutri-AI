@@ -455,7 +455,7 @@ test("shows a login gate before revealing the admin console", async () => {
   const source = await pageSource();
   assert.match(source, /id="loginGate"/);
   assert.match(source, /id="adminApp"/);
-  assert.match(source, /admin-shell" hidden/);
+  assert.match(source, /class="[^"]*\badmin-shell\b[^"]*"[^>]*\bhidden\b/);
   assert.match(source, /登录管理后台/);
   assert.match(source, /function showLoginGate\(/);
   assert.match(source, /function showAdminApp\(/);

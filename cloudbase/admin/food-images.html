@@ -7,6 +7,9 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <title>Nordic Nutri · 管理后台</title>
   <!-- admin-ui-build: 2026-08-05-ops-v7 -->
+  <link rel="stylesheet" href="./admin-ui-v2-tokens.css" />
+  <link rel="stylesheet" href="./admin-ui-v2-components.css" />
+  <link rel="stylesheet" href="./admin-ui-v2-shell.css" />
   <style>
     :root {
       --ink: #173d2a;
@@ -247,11 +250,53 @@
     .quota-model-link code { font: inherit; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
     @media (max-width: 900px) { .quota-model-cards { grid-template-columns: 1fr; } }
     .admin-layout { max-width: 1540px; margin: 0 auto; display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: start; }
-    .admin-nav { position: sticky; top: 16px; display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
+    .admin-nav { position: sticky; top: 16px; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
+    .admin-nav__group { display: grid; gap: 3px; }
+    .admin-nav__label { padding: 3px 10px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
     .admin-nav__item { border: 1px solid transparent; border-radius: 10px; padding: 10px 12px; background: transparent; color: var(--ink); font-size: 13px; font-weight: 700; text-align: left; }
     .admin-nav__item:hover { background: var(--mist); }
     .admin-nav__item.active { border-color: var(--green); background: transparent; color: var(--green); }
     .admin-module[hidden] { display: none !important; }
+    .ops-page-grid { display: grid; gap: 14px; }
+    .ops-page-grid.two { grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); }
+    .ops-panel { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.76); }
+    .ops-panel h3 { margin-bottom: 10px; font-family: inherit; }
+    .ops-health-banner { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); }
+    .ops-health-banner.degraded { border-color: #d9b56a; background: #fbf1dc; }
+    .ops-health-banner.unhealthy { border-color: var(--danger); background: var(--danger-mist); }
+    .ops-health-status { color: var(--ink); font-size: 28px; font-weight: 800; letter-spacing: -.03em; }
+    .ops-health-banner.degraded .ops-health-status { color: #855b16; }
+    .ops-health-banner.unhealthy .ops-health-status { color: var(--danger); }
+    .ops-health-meta { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .ops-component-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 14px; }
+    .ops-component { padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--linen); }
+    .ops-component strong, .ops-component span { display: block; }
+    .ops-component strong { color: var(--ink); font-size: 12px; }
+    .ops-component span { margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .ops-component.warning { border-color: #d9b56a; background: #fbf1dc; }
+    .ops-component.danger { border-color: var(--danger); background: var(--danger-mist); }
+    .ops-window-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .ops-window { padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+    .ops-window h3 { margin-bottom: 8px; }
+    .ops-window .status-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
+    .ops-filter-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+    .ops-filter-row input, .ops-filter-row select { height: 38px; min-width: 150px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; background: var(--paper); color: var(--text); }
+    .ops-detail { min-height: 220px; }
+    .ops-detail pre { max-height: 260px; overflow: auto; margin: 10px 0 0; padding: 12px; border-radius: 10px; background: #f2f4ef; color: var(--text); font: 11px/1.55 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+    .ops-stage-list { display: grid; gap: 7px; margin-top: 10px; }
+    .ops-stage { display: flex; justify-content: space-between; gap: 10px; padding: 9px 10px; border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; background: var(--linen); font-size: 12px; }
+    .ops-stage.failed, .ops-stage.timed_out { border-left-color: var(--danger); background: var(--danger-mist); }
+    .ops-inline-link { border: 0; padding: 0; background: transparent; color: var(--green); font: inherit; cursor: pointer; text-decoration: underline; }
+    .ops-empty { display: grid; min-height: 160px; place-items: center; border: 1px dashed #c4cec2; border-radius: 14px; color: var(--muted); text-align: center; }
+    .ops-user-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-bottom: 14px; }
+    .ops-timeline { display: grid; gap: 8px; }
+    .ops-timeline-item { display: grid; grid-template-columns: 112px minmax(100px, 160px) 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); font-size: 12px; }
+    .ops-timeline-item time, .ops-timeline-item span { color: var(--muted); }
+    .ops-status-pill { display: inline-flex; width: fit-content; border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; color: var(--green); font-size: 11px; font-weight: 700; }
+    .ops-status-pill.warning { border-color: #d9b56a; color: #855b16; }
+    .ops-status-pill.danger { border-color: var(--danger); color: var(--danger); }
+    @media (max-width: 900px) { .ops-page-grid.two, .ops-window-grid { grid-template-columns: 1fr; } .ops-component-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ops-user-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ops-timeline-item { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .ops-component-grid { grid-template-columns: 1fr; } .ops-user-summary { grid-template-columns: 1fr 1fr; } .ops-timeline-item { grid-template-columns: 1fr; } }
     .module-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
     .module-toolbar h2 { flex: 1 1 auto; min-width: 120px; }
     .module-toolbar input, .module-toolbar select { height: 40px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; background: var(--paper); color: var(--text); min-width: 180px; }
@@ -400,27 +445,25 @@
     </form>
   </section>
 
-  <main id="adminApp" class="ops-shell admin-shell" hidden>
-    <header class="ops-header">
-      <div class="brand"><div class="brand-mark" aria-hidden="true">N</div><div><p class="eyebrow">Nordic Nutri · Admin Console</p><h1>管理后台</h1></div></div>
+  <main id="adminApp" class="ops-shell admin-shell nn-shell" hidden>
+    <header class="ops-header nn-topbar">
+      <div class="brand"><div class="brand-mark" aria-hidden="true">N</div><div><p class="eyebrow">Nordic Nutri · Admin Console</p><h1>管理后台</h1></div><span id="currentArea" class="topbar-context">食材生图</span></div>
       <div class="header-actions"><span id="connectionStatus" class="muted">尚未登录</span><button id="refreshAll" class="button secondary" type="button">刷新批次</button><button id="logoutBtn" class="button secondary" type="button">退出登录</button><button id="openTools" class="button secondary" type="button">系统配置</button></div>
     </header>
 
     <div class="admin-layout">
-      <nav class="admin-nav" aria-label="后台模块">
-        <button type="button" class="admin-nav__item" data-module="users">用户数据</button>
-        <button type="button" class="admin-nav__item" data-module="feedback">问题反馈</button>
-        <button type="button" class="admin-nav__item" data-module="foods">食材管理</button>
-        <button type="button" class="admin-nav__item active" data-module="images">食材生图</button>
-        <button type="button" class="admin-nav__item" data-module="audit">旧图审计</button>
-        <button type="button" class="admin-nav__item" data-module="ops">运营总览</button>
-        <button type="button" class="admin-nav__item" data-module="quota">额度管理</button>
-        <button type="button" class="admin-nav__item" data-module="user-images">用户图片</button>
-        <button type="button" class="admin-nav__item" data-module="moderation">内容安全</button>
-        <button type="button" class="admin-nav__item" data-module="system">系统配置</button>
+      <nav class="admin-nav nn-sidebar" aria-label="后台模块">
+        <div class="admin-nav__group" data-nav-domain="dashboard"><span class="admin-nav__label">概览</span><button type="button" class="admin-nav__item" data-module="dashboard">总览</button></div>
+        <div class="admin-nav__group" data-nav-domain="users"><span class="admin-nav__label">用户</span><button type="button" class="admin-nav__item" data-module="users">用户数据</button></div>
+        <div class="admin-nav__group" data-nav-domain="food-library"><span class="admin-nav__label">食材库</span><button type="button" class="admin-nav__item" data-module="foods">食材管理</button><button type="button" class="admin-nav__item active" data-module="images">食材生图</button><button type="button" class="admin-nav__item" data-module="audit">旧图审计</button></div>
+        <div class="admin-nav__group" data-nav-domain="ai-operations"><span class="admin-nav__label">AI 运营</span><button type="button" class="admin-nav__item" data-module="ops">运营总览</button><button type="button" class="admin-nav__item" data-module="quota">额度管理</button></div>
+        <div class="admin-nav__group" data-nav-domain="jobs"><span class="admin-nav__label">任务</span><button type="button" class="admin-nav__item" data-module="jobs">Jobs</button></div>
+        <div class="admin-nav__group" data-nav-domain="moderation"><span class="admin-nav__label">内容安全</span><button type="button" class="admin-nav__item" data-module="moderation">内容安全</button><button type="button" class="admin-nav__item" data-module="user-images">用户图片</button></div>
+        <div class="admin-nav__group" data-nav-domain="feedback"><span class="admin-nav__label">反馈</span><button type="button" class="admin-nav__item" data-module="feedback">问题反馈</button></div>
+        <div class="admin-nav__group" data-nav-domain="system"><span class="admin-nav__label">系统</span><button type="button" class="admin-nav__item" data-module="health">系统健康</button><button type="button" class="admin-nav__item" data-module="traces">Traces</button><button type="button" class="admin-nav__item" data-module="audit-logs">审计日志</button><button type="button" class="admin-nav__item" data-module="system">系统配置</button></div>
       </nav>
 
-      <div class="admin-main">
+      <div class="admin-main nn-content">
         <section id="moduleUsers" class="admin-module" hidden>
           <div class="module-toolbar">
             <h2>用户数据</h2>
@@ -445,9 +488,9 @@
           <div id="feedbackTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
         </section>
 
-        <section id="moduleFoods" class="admin-module" hidden>
-          <div class="module-toolbar">
-            <h2>食材管理</h2>
+        <section id="moduleFoods" class="admin-module nn-food-operations" hidden>
+          <div class="nn-page-header"><div><p class="eyebrow">Food Library / Explorer</p><h2>食材管理</h2><p class="muted">维护食材基础资料、营养摘要和主图状态。</p></div><div class="nn-filter-bar"><span class="nn-status-badge nn-status-badge--healthy">数据目录</span><button id="refreshFoodAdmin" class="button secondary" type="button">刷新</button><button id="createFoodAdmin" class="button" type="button">新建食材</button></div></div>
+          <div class="nn-filter-bar nn-status-filter nn-food-filter-bar">
             <input id="foodAdminSearch" type="search" placeholder="搜索食材名称" autocomplete="off" />
             <select id="foodAdminCategory"><option value="">全部分类</option></select>
             <select id="foodAdminActive">
@@ -457,14 +500,12 @@
             </select>
             <label class="food-admin-toggle"><input id="foodAdminMissingOnly" type="checkbox" /> 仅缺主图</label>
             <label class="food-admin-toggle"><input id="foodAdminMissingSubjectOnly" type="checkbox" /> 缺形态锚点</label>
-            <button id="refreshFoodAdmin" class="button secondary" type="button">刷新</button>
-            <button id="createFoodAdmin" class="button" type="button">新建食材</button>
           </div>
           <div id="foodAdminBulkBar" class="food-admin-bulk" hidden>
             <span id="foodAdminBulkLabel">已选择 0 条</span>
             <button id="foodAdminBulkBatch" class="button" type="button">批量加入生图</button>
           </div>
-          <div id="foodAdminTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+          <div id="foodAdminTable" class="data-table nn-data-table nn-food-operations__table"><p class="muted" style="padding:18px">请先连接后台</p></div>
           <div id="foodAdminPagination" class="food-admin-pagination" hidden>
             <button id="foodAdminPrevPage" class="button secondary" type="button">上一页</button>
             <div class="food-admin-pagination__jump">
@@ -477,7 +518,8 @@
         </section>
 
         <section id="moduleAudit" class="admin-module" hidden>
-          <details class="workflow-guide" open>
+          <div class="nn-page-header"><div><p class="eyebrow">Food Library / Review</p><h2>旧图审计</h2><p class="muted">复核高风险旧主图，旧图在新候选审核通过前始终保留。</p></div></div>
+          <details class="workflow-guide nn-food-operations" open>
             <summary>旧图审计说明</summary>
             <div class="workflow-steps"><div class="workflow-step"><b>1. 预览风险项</b><span>仅扫描高风险加工食品的已审核主图，不会修改现有图片。</span></div><div class="workflow-step"><b>2. AI 复核</b><span>选择风险项后执行视觉复核；AI 结论仅供人工判断。</span></div><div class="workflow-step"><b>3. 人工决策</b><span>可保留旧图，或加入重生队列。重新生图会使用当前最新的食物视觉形态提示词，旧主图会保留至新候选审核通过。</span></div></div>
           </details>
@@ -495,18 +537,19 @@
           <section id="auditReviewWorkspace" class="audit-review-workspace" hidden aria-label="旧图审计候选图工作台">
             <div class="queue-heading"><div><p class="eyebrow">Historical review queue</p><h2>旧图审计候选图</h2><p id="auditReviewCopy" class="muted">预览风险项后显示旧主图和 AI 复核状态。</p></div><button id="auditRefreshStatus" class="button secondary" type="button">刷新状态</button></div>
             <div id="auditStatusPanel" class="batch-status-panel"></div>
-            <div id="auditFilterRow" class="filter-row" aria-label="旧图审计状态筛选"><button class="filter active" type="button" data-audit-filter="all">全部</button><button class="filter" type="button" data-audit-filter="pending_review">待 AI 复核</button><button class="filter" type="button" data-audit-filter="manual_review">人工复核</button><button class="filter" type="button" data-audit-filter="generating">生成中</button><button class="filter" type="button" data-audit-filter="needs_review">待审核</button><button class="filter" type="button" data-audit-filter="completed">已通过</button><button class="filter" type="button" data-audit-filter="failed">失败</button></div>
+            <div id="auditFilterRow" class="filter-row nn-status-filter" aria-label="旧图审计状态筛选"><button class="filter active" type="button" data-audit-filter="all">全部</button><button class="filter" type="button" data-audit-filter="pending_review">待 AI 复核</button><button class="filter" type="button" data-audit-filter="manual_review">人工复核</button><button class="filter" type="button" data-audit-filter="generating">生成中</button><button class="filter" type="button" data-audit-filter="needs_review">待审核</button><button class="filter" type="button" data-audit-filter="completed">已通过</button><button class="filter" type="button" data-audit-filter="failed">失败</button></div>
             <div id="auditReviewGrid" class="review-grid"></div>
           </section>
         </section>
 
-        <section id="moduleImages" class="admin-module">
+        <section id="moduleImages" class="admin-module nn-food-operations">
+          <div class="nn-page-header"><div><p class="eyebrow">Food Library / Operations</p><h2>食材生图</h2><p class="muted">通过巡检、批次和审核队列管理食材图片生产。</p></div><span class="nn-status-badge nn-status-badge--healthy">受控工作流</span></div>
           <details id="workflowGuide" class="workflow-guide">
             <summary>操作流程与状态说明</summary>
             <div class="workflow-steps"><div class="workflow-step"><b>1. 自动巡检</b><span>选分类 → 添加规则或点「立即巡检」；云端自动建批生图。</span></div><div class="workflow-step"><b>2. 审核候选图</b><span>在下方队列通过/拒绝；拒绝会自动重试。</span></div><div class="workflow-step"><b>3. 必要时手工建批</b><span>展开「手工建批」预览选材后一键创建并启动。</span></div></div>
           </details>
 
-          <div class="composer-deck" aria-label="生图批次配置">
+          <div class="composer-deck nn-food-operations__composer" aria-label="生图批次配置">
             <section class="batch-controller composer-card" aria-label="自动巡检生图">
               <div class="composer-card__head">
                 <div class="composer-card__copy">
@@ -558,8 +601,8 @@
             </details>
           </div>
 
-          <section class="ops-workspace" aria-label="食物图片审核工作台">
-            <aside id="batchRail" class="batch-rail">
+          <section class="ops-workspace nn-food-operations__workspace" aria-label="食物图片审核工作台">
+            <aside id="batchRail" class="batch-rail nn-batch-rail">
               <div class="rail-heading">
                 <h2>批次</h2>
                 <div class="rail-heading-actions">
@@ -571,18 +614,18 @@
               <div id="batchList" class="batch-list"><p class="muted">请先登录后台。</p></div>
             </aside>
 
-            <section class="review-queue">
+            <section class="review-queue nn-food-operations__queue">
               <div class="queue-heading"><div><p class="eyebrow">Review queue</p><h2 id="queueTitle">待审核候选图</h2></div><button id="refreshQueue" class="button link">重新加载</button></div>
               <div class="queue-summary"><span id="reviewCopy" class="summary-copy">连接后显示批次进度</span></div>
               <section id="batchStatusPanel" class="batch-status-panel" aria-live="polite"><div class="status-panel-head"><h3>运行状态</h3><span class="status-badge">等待连接</span></div><p id="schedulerHint" class="scheduler-hint">连接后台后会显示云端调度、重试和审核状态。</p><div class="status-metrics"></div></section>
-              <div id="filterRow" class="filter-row" aria-label="批次项目筛选">
+              <div id="filterRow" class="filter-row nn-status-filter" aria-label="批次项目筛选">
                 <button class="filter" data-filter="all" type="button">全部</button><button class="filter active" data-filter="needs_review" type="button">待审核</button><button class="filter" data-filter="needs_retry" type="button">待重试</button><button class="filter" data-filter="failed" type="button">失败</button><button class="filter" data-filter="generating" type="button">生成中</button>
               </div>
               <div id="bulkReviewBar" class="bulk-review-bar" hidden><label class="bulk-review-label"><input id="selectAllReview" type="checkbox" /> 选择当前待审核候选图</label><button id="approveSelected" class="button" disabled>批量通过并设为主图（0）</button><button id="regenerateSelected" class="button secondary" disabled>批量重新生图（0）</button></div>
               <div id="reviewGrid" class="queue-loading">请连接后台后加载候选图。</div>
             </section>
 
-            <aside class="review-inspector">
+            <aside class="review-inspector nn-review-inspector">
               <div id="inspector" class="inspector-intro"><div><h2>选择一张候选图</h2><p>从中央审核队列点击食物，即可查看大图、自动提示词和审核操作。</p></div></div>
               <section class="operation-panel" aria-label="最近操作与接口异常"><div class="operation-panel-head"><h3>状态变化与接口异常</h3><button id="clearOperationFeed" class="button link">清空</button></div><div id="operationFeed" class="operation-feed"><p class="operation-empty">尚无操作记录。</p></div></section>
             </aside>
@@ -695,6 +738,63 @@
             <p class="muted" style="margin:0 0 12px">反馈、教练等文本命中写入此队列。用户上传图片请到「用户图片」管理（含违规隔离与识图审核）。</p>
             <div id="moderationTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
           </div>
+        </section>
+
+        <section id="moduleDashboard" class="admin-module" hidden>
+          <div class="nn-page-header"><div><p class="eyebrow">运营总览 · 排障入口</p><h2>Dashboard</h2><p class="muted">先判断系统是否需要处理，再进入请求、任务或用户上下文。</p></div><button id="refreshDashboard" class="button secondary" type="button">刷新</button></div>
+          <div id="dashboardHealthBanner" class="ops-health-banner nn-status-hero"><div><p class="eyebrow">System signal</p><div class="ops-health-status">等待连接</div><p class="ops-health-meta">连接后台后显示系统健康与最近运行结果。</p></div><button id="dashboardOpenHealth" class="button secondary" type="button">查看健康</button></div>
+          <div id="dashboardMetricStrip" class="nn-metric-strip" aria-label="关键系统指标"><div class="nn-metric-card"><span class="nn-metric-card__label">最近 1 小时成功率</span><strong class="nn-metric-card__value" data-dashboard-metric="successRate">—</strong></div><button class="nn-metric-card nn-metric-card--interactive" type="button" data-open-trace-status="timed_out"><span class="nn-metric-card__label">Timeout</span><strong class="nn-metric-card__value" data-dashboard-metric="timeout">—</strong><span class="nn-metric-card__hint">查看超时 Trace</span></button><button class="nn-metric-card nn-metric-card--interactive" type="button" data-open-trace-status="rate_limited"><span class="nn-metric-card__label">429 / 限流</span><strong class="nn-metric-card__value" data-dashboard-metric="rateLimited">—</strong><span class="nn-metric-card__hint">查看限流 Trace</span></button><div class="nn-metric-card"><span class="nn-metric-card__label">P95 响应</span><strong class="nn-metric-card__value" data-dashboard-metric="p95Ms">—</strong></div></div>
+          <div class="nn-dashboard-grid"><section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Next action</p><h3>排障路径</h3></div><span class="nn-status-badge nn-status-badge--healthy">按影响范围推进</span></div><div class="workflow-steps"><div class="workflow-step"><b>发现</b><span>System Health 查看组件与窗口指标。</span></div><div class="workflow-step"><b>定位</b><span>Trace Explorer 按状态和时间筛选请求。</span></div><div class="workflow-step"><b>确认</b><span>User Detail 查看影响用户与 Timeline。</span></div></div></section><section id="dashboardRecentIssues" class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Recent signals</p><h3>最近异常</h3></div><button class="button link" data-open-module="traces">打开 Traces</button></div><div class="nn-dashboard-list"><button class="nn-list-row" type="button" data-open-trace-status="timed_out"><span>Timeout</span><span class="nn-status-badge nn-status-badge--danger">查看</span></button><button class="nn-list-row" type="button" data-open-trace-status="rate_limited"><span>429 / 限流</span><span class="nn-status-badge nn-status-badge--warning">查看</span></button></div></section><section id="dashboardRecentJobs" class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Runtime</p><h3>最近 Worker</h3></div><button class="button link" data-open-module="jobs">查看 Jobs</button></div><div id="dashboardJobsPreview" class="nn-dashboard-list"><p class="ops-empty">连接后台后显示最近运行结果。</p></div></section><section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Shortcuts</p><h3>快捷入口</h3></div></div><div class="action-row"><button class="button link" data-open-module="health">System Health</button><button class="button link" data-open-module="traces">Trace Explorer</button><button class="button link" data-open-module="audit-logs">Audit Logs</button></div></section></div>
+        </section>
+
+        <section id="moduleHealth" class="admin-module" hidden>
+          <div class="nn-page-header"><div><p class="eyebrow">System / Runtime</p><h2>System Health</h2><p class="muted">真实运行指标；刷新不会调用收费 Provider。</p></div><button id="refreshHealth" class="button secondary" type="button">刷新</button></div>
+          <div id="healthBanner" class="ops-health-banner nn-status-hero"><div><p class="eyebrow">Overall status</p><div class="ops-health-status">加载中</div><p class="ops-health-meta">—</p></div></div>
+          <div id="healthMetricStrip" class="nn-metric-strip" aria-label="系统健康指标"></div>
+          <section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Components</p><h3>核心组件</h3></div><span class="muted">配置状态与近期真实观测分开显示</span></div><div id="healthComponents" class="ops-component-grid"></div></section>
+          <div id="healthWindows" class="ops-window-grid"></div>
+          <div class="nn-dashboard-grid nn-dashboard-grid--health"><section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Providers</p><h3>Provider</h3></div></div><div id="healthProviders" class="ops-component-grid"></div></section><section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Runtime</p><h3>最近 Worker</h3></div><button class="button link" data-open-module="jobs">查看 Jobs</button></div><div id="healthJobs" class="data-table"></div></section></div>
+        </section>
+
+        <section id="moduleTraces" class="admin-module" hidden>
+          <div class="module-toolbar"><h2>Trace Explorer</h2><span class="muted">按请求状态定位阶段耗时与 Provider</span><button id="refreshTraces" class="button secondary" type="button">刷新</button></div>
+          <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / Error Code" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="admin">admin</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
+          <div class="ops-page-grid"><section class="ops-panel"><div id="traceList" class="data-table"><p class="ops-empty">加载中…</p></div></section></div>
+          <section id="traceDrawer" class="nn-drawer" hidden aria-label="Trace Detail" role="dialog" aria-modal="true" aria-labelledby="traceDrawerTitle"><div class="nn-drawer__panel"><div class="nn-drawer__header"><div><span class="eyebrow">TRACE DETAIL</span><h3 id="traceDrawerTitle">Trace Detail</h3></div><button class="nn-drawer__close" type="button" data-trace-drawer-close aria-label="关闭 Trace Detail">关闭</button></div><div id="traceDetail"><p class="muted">选择一条 Trace 查看阶段。</p></div></div></section>
+        </section>
+
+        <section id="moduleJobs" class="admin-module" hidden>
+          <div class="nn-page-header"><div><p class="eyebrow">Operations / Runtime</p><h2>Jobs</h2><p class="muted">代码配置与真实调度状态分开展示。</p></div><button id="refreshJobs" class="button secondary" type="button">刷新</button></div>
+          <section class="ops-panel nn-compact-panel nn-jobs-panel"><div class="nn-section-heading"><div><p class="eyebrow">Controlled execution</p><h3>手动运行</h3></div><span class="nn-status-badge nn-status-badge--warning">白名单任务</span></div><div class="nn-filter-bar"><select id="runNowJobKey"><option value="">选择白名单 Job</option></select><button id="runNowJob" class="button" type="button">Run Now</button><span class="muted">手动运行会写入 Admin Audit，不接受命令或调度配置。</span></div></section>
+          <section class="ops-panel nn-compact-panel nn-jobs-list-panel"><div class="nn-section-heading"><div><p class="eyebrow">Job catalog</p><h3>运行目录</h3></div><span class="muted">Last Run 来自真实运行记录</span></div><div id="jobsTable" class="nn-jobs-list"><p class="ops-empty">加载中…</p></div></section>
+        </section>
+
+        <section id="moduleAuditLogs" class="admin-module" hidden>
+          <div class="nn-page-header"><div><p class="eyebrow">System / Accountability</p><h2>Audit Logs</h2><p class="muted">高风险管理操作的结果留痕，可沿 Trace 继续排障。</p></div><button id="refreshAuditLogs" class="button secondary" type="button">刷新</button></div>
+          <section class="ops-panel nn-compact-panel nn-audit-explorer"><div class="nn-filter-bar"><input id="auditActionFilter" type="search" placeholder="操作，如 food.archive" autocomplete="off" /><select id="auditResultFilter"><option value="">全部结果</option><option value="succeeded">succeeded</option><option value="failed">failed</option><option value="rejected">rejected</option></select><button id="auditApplyFilters" class="button" type="button">筛选</button></div><div id="auditLogsTable" class="nn-audit-table"><p class="ops-empty nn-audit-empty">加载中…</p></div></section>
+        </section>
+
+        <section id="moduleUserDetail" class="admin-module nn-user-detail" data-module="user-detail" hidden>
+          <div class="nn-page-header"><div><p class="eyebrow">Users / Detail</p><h2>User Detail</h2><p class="muted">用户摘要与运营事件 Timeline</p></div><div class="nn-filter-bar"><input id="userDetailId" class="nn-input" type="search" placeholder="输入内部用户 UUID" autocomplete="off" /><button id="loadUserDetail" class="button" type="button">查看</button></div></div>
+          <div id="userDetailTabs" class="nn-tabs nn-user-detail-tabs" role="tablist" aria-label="User Detail sections">
+            <button id="userDetailTabOverview" class="nn-tab" type="button" role="tab" aria-selected="true" aria-controls="userDetailPanelOverview" data-user-detail-tab="overview">Overview</button>
+            <button id="userDetailTabMeals" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelMeals" data-user-detail-tab="meals">Meals</button>
+            <button id="userDetailTabAiUsage" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelAiUsage" data-user-detail-tab="ai-usage">AI Usage</button>
+            <button id="userDetailTabImages" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelImages" data-user-detail-tab="images">Images</button>
+            <button id="userDetailTabFeedback" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelFeedback" data-user-detail-tab="feedback">Feedback</button>
+            <button id="userDetailTabModeration" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelModeration" data-user-detail-tab="moderation">Moderation</button>
+            <button id="userDetailTabDeletion" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelDeletion" data-user-detail-tab="deletion">Deletion</button>
+          </div>
+          <section id="userDetailPanelOverview" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabOverview">
+            <div id="userDetailSummary" class="ops-panel nn-user-detail-summary"><div class="ops-empty">从用户列表点击，或输入内部 UUID。</div></div>
+            <div class="ops-panel nn-user-detail-timeline"><div class="nn-section-heading"><div><p class="eyebrow">Operational events</p><h3>Timeline</h3></div><button id="refreshUserTimeline" class="button link" type="button">刷新</button></div><div id="userTimeline" class="ops-timeline"><div class="ops-empty">暂无用户事件。</div></div></div>
+          </section>
+          <section id="userDetailPanelMeals" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabMeals" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
+          <section id="userDetailPanelAiUsage" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabAiUsage" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
+          <section id="userDetailPanelImages" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabImages" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
+          <section id="userDetailPanelFeedback" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabFeedback" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
+          <section id="userDetailPanelModeration" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabModeration" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
+          <section id="userDetailPanelDeletion" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabDeletion" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
         </section>
 
         <section id="moduleSystem" class="admin-module" hidden>
@@ -908,6 +1008,11 @@
       if (code === "FOOD_ADMIN_UNAVAILABLE" && raw && raw !== "FOOD_ADMIN_UNAVAILABLE") return raw;
       if (code && ADMIN_ERROR_LABELS[code]) return ADMIN_ERROR_LABELS[code];
       return raw || code || "接口请求失败";
+    };
+    const traceDetailErrorMessage = (error) => {
+      const code = error?.json?.code || error?.code;
+      if (error?.status === 404 || code === "TRACE_NOT_FOUND") return "Trace 不存在或已过期（TRACE_NOT_FOUND）";
+      return apiErrorMessage(error);
     };
     function createApiError({ endpoint, method, status = 0, json = {}, cause } = {}) {
       const code = json.code || json.errorCode || (status ? `HTTP_${status}` : "NETWORK_ERROR");
@@ -1759,17 +1864,20 @@
     async function loadUsers({ force = false } = {}) {
       const host = $("userTable");
       if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
+      const bindUserDetailButtons = () => host.querySelectorAll("[data-user-detail]").forEach((button) => { button.onclick = () => openUserDetail(button.dataset.userDetail); });
       const q = ($("userSearch").value || "").trim();
       const cacheKey = `users:${q}`;
       if (!force && moduleCache.users?.key === cacheKey && moduleCacheFresh("users")) {
         host.innerHTML = moduleCache.users.html;
+        bindUserDetailButtons();
         return;
       }
       try {
         const data = await api(`/users?q=${encodeURIComponent(q)}&limit=50`);
         const items = data.items || [];
         if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">未找到匹配用户</p>"; moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() }; return; }
-        host.innerHTML = `<table><thead><tr><th>昵称</th><th>最近登录</th><th>管理员</th><th>注册时间</th><th>用户 ID</th></tr></thead><tbody>${items.map((user) => `<tr><td>${escapeHtml(user.nickname || "—")}</td><td>${escapeHtml(formatTime(user.lastLoginAt))}</td><td>${user.isAdmin ? "是" : "否"}</td><td>${escapeHtml(formatTime(user.createdAt))}</td><td><code>${escapeHtml(user.id)}</code></td></tr>`).join("")}</tbody></table>`;
+        host.innerHTML = `<table><thead><tr><th>昵称</th><th>最近登录</th><th>管理员</th><th>注册时间</th><th>用户 ID</th><th>排障</th></tr></thead><tbody>${items.map((user) => `<tr><td>${escapeHtml(user.nickname || "—")}</td><td>${escapeHtml(formatTime(user.lastLoginAt))}</td><td>${user.isAdmin ? "是" : "否"}</td><td>${escapeHtml(formatTime(user.createdAt))}</td><td><code>${escapeHtml(user.id)}</code></td><td><button class="button secondary" type="button" data-user-detail="${escapeHtml(user.id)}">查看详情</button></td></tr>`).join("")}</tbody></table>`;
+        bindUserDetailButtons();
         moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() };
       } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
     }
@@ -2427,8 +2535,161 @@
         toast(apiErrorMessage(error), true);
       }
     }
+    let selectedTraceId = "";
+    let selectedUserDetailId = "";
+    const opsStatusLabel = (status) => ({ healthy: "健康", configured: "已配置 · 未知", succeeded: "成功", degraded: "降级", unavailable: "不可用", unknown: "未知", running: "运行中", failed: "失败", cancelled: "已取消", timed_out: "超时", rate_limited: "限流", partial: "部分可用" }[status] || status || "未知");
+    const opsTone = (status) => ({ healthy: "good", succeeded: "good", degraded: "warn", partial: "warn", unavailable: "danger", failed: "danger", timed_out: "danger", rate_limited: "warn", cancelled: "muted", running: "warn" }[status] || "muted");
+    function setOpsMessage(host, message, tone = "muted") {
+      if (!host) return;
+      host.innerHTML = `<p class="ops-empty ${tone === "danger" ? "danger" : ""}">${escapeHtml(message)}</p>`;
+    }
+    function openTraceStatus(status) {
+      const filter = $("traceStatusFilter");
+      if (filter) filter.value = status || "";
+      setModule("traces");
+    }
+    function renderHealthMetricStrip(window, targetId = "healthMetricStrip") {
+      const host = $(targetId);
+      if (!host) return;
+      const value = window || {};
+      const rate = value.successRate == null ? "—" : `${Math.round(Number(value.successRate) * 100)}%`;
+      const display = (item, suffix = "") => item == null || item === "" ? "—" : `${item}${suffix}`;
+      host.innerHTML = `<div class="nn-metric-card"><span class="nn-metric-card__label">成功率 · ${escapeHtml(value.label || "最近 1 小时")}</span><strong class="nn-metric-card__value">${escapeHtml(rate)}</strong></div><button class="nn-metric-card nn-metric-card--interactive" type="button" data-open-trace-status="timed_out"><span class="nn-metric-card__label">Timeout</span><strong class="nn-metric-card__value">${escapeHtml(display(value.timeout))}</strong><span class="nn-metric-card__hint">查看超时 Trace</span></button><button class="nn-metric-card nn-metric-card--interactive" type="button" data-open-trace-status="rate_limited"><span class="nn-metric-card__label">429 / 限流</span><strong class="nn-metric-card__value">${escapeHtml(display(value.rateLimited))}</strong><span class="nn-metric-card__hint">查看限流 Trace</span></button><button class="nn-metric-card nn-metric-card--interactive" type="button" data-open-trace-status="failed"><span class="nn-metric-card__label">P95 / 5xx</span><strong class="nn-metric-card__value">${escapeHtml(display(value.p95Ms, " ms"))} <small>· ${escapeHtml(display(value.errors5xx))}</small></strong><span class="nn-metric-card__hint">查看失败 Trace</span></button>`;
+      host.querySelectorAll("[data-open-trace-status]").forEach((button) => { button.onclick = () => openTraceStatus(button.dataset.openTraceStatus); });
+    }
+    function renderHealthWindow(window) {
+      const value = window || {};
+      const rate = value.successRate == null ? "—" : `${Math.round(Number(value.successRate) * 100)}%`;
+      return `<div class="ops-panel"><div class="ops-panel__heading"><strong>${escapeHtml(value.label || "时间窗口")}</strong><span>${escapeHtml(value.requests ?? 0)} requests</span></div><div class="ops-window-grid"><span>成功率<b>${escapeHtml(rate)}</b></span><span>P50<b>${escapeHtml(value.p50Ms ?? "—")} ms</b></span><span>P95<b>${escapeHtml(value.p95Ms ?? "—")} ms</b></span><span>P99<b>${escapeHtml(value.p99Ms ?? "—")} ms</b></span><button type="button" data-open-trace-status="failed">4xx / 5xx<b>${escapeHtml(value.errors4xx ?? 0)} / ${escapeHtml(value.errors5xx ?? 0)}</b></button><button type="button" data-open-trace-status="timed_out">timeout / 429<b>${escapeHtml(value.timeout ?? 0)} / ${escapeHtml(value.rateLimited ?? 0)}</b></button></div></div>`;
+    }
+    function renderHealthPayload(data, { dashboard = false } = {}) {
+      const overall = data?.overall || "unknown";
+      const last1h = { ...(data?.windows?.last1h || {}), label: "最近 1 小时" };
+      const banner = dashboard ? $("dashboardHealthBanner") : $("healthBanner");
+      if (banner) banner.innerHTML = `<div class="ops-health-status ${opsTone(overall)}"><span class="ops-status-pill ${opsTone(overall)}">${escapeHtml(opsStatusLabel(overall))}</span><strong>系统总体状态</strong><span>${escapeHtml(formatTime(data?.generatedAt))}</span></div><p>${overall === "healthy" ? "关键组件和近期请求指标正常。" : "存在需要运营关注的组件或请求指标。"}</p>`;
+      if (dashboard) {
+        renderHealthMetricStrip(last1h, "dashboardMetricStrip");
+        const jobHost = $("dashboardJobsPreview");
+        if (jobHost) jobHost.innerHTML = (data?.latestJobs || []).length ? data.latestJobs.slice(0, 3).map((item) => `<div class="nn-list-row"><span><code>${escapeHtml(item.jobKey || item.key || "—")}</code></span><span class="ops-status-pill ${opsTone(item.status || item.lastRun?.status)}">${escapeHtml(opsStatusLabel(item.status || item.lastRun?.status))}</span></div>`).join("") : "<p class=\"ops-empty\">暂无 Worker 运行记录</p>";
+      }
+      if (!dashboard) {
+        const components = $("healthComponents");
+        const entries = Object.entries(data?.components || {});
+        components.innerHTML = entries.length ? `<div class="ops-component-grid">${entries.map(([key, value]) => `<div class="ops-component"><span>${escapeHtml(key)}</span><strong class="${opsTone(value?.status)}">${escapeHtml(opsStatusLabel(value?.status))}</strong><small>${escapeHtml(value?.detail || value?.lastError || "基于近期观测数据")}</small></div>`).join("")}</div>` : "<p class=\"ops-empty\">暂无组件数据</p>";
+        $("healthProviders").innerHTML = Object.entries(data?.providers || {}).map(([key, value]) => `<div class="ops-component"><span>${escapeHtml(key)}</span><strong class="${opsTone(value?.status)}">${escapeHtml(value?.configured ? opsStatusLabel(value?.status) : "未配置")}</strong><small>${escapeHtml(value?.lastSuccessAt ? `最近成功 ${formatTime(value.lastSuccessAt)}` : "暂无近期真实调用")}</small></div>`).join("") || "<p class=\"ops-empty\">暂无 Provider 观测数据</p>";
+        $("healthWindows").innerHTML = [renderHealthWindow(last1h), renderHealthWindow({ ...(data?.windows?.last24h || {}), label: "最近 24 小时" })].join("");
+        renderHealthMetricStrip(last1h);
+        document.querySelectorAll("#healthWindows [data-open-trace-status]").forEach((button) => { button.onclick = () => openTraceStatus(button.dataset.openTraceStatus); });
+        $("healthJobs").innerHTML = (data?.latestJobs || []).length ? `<table><thead><tr><th>Job</th><th>状态</th><th>触发方式</th><th>耗时</th><th>处理量</th><th>时间</th></tr></thead><tbody>${data.latestJobs.map((item) => `<tr><td><code>${escapeHtml(item.jobKey)}</code></td><td><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span></td><td>${escapeHtml(item.trigger || "—")}</td><td>${escapeHtml(item.durationMs ?? "—")} ms</td><td>${escapeHtml(item.processedCount ?? "—")}</td><td>${escapeHtml(formatTime(item.startedAt))}</td></tr>`).join("")}</tbody></table>` : "<p class=\"ops-empty\">暂无 Worker 运行记录</p>";
+      }
+    }
+    async function loadSystemHealth({ dashboard = false } = {}) {
+      const target = dashboard ? $("dashboardHealthBanner") : $("healthBanner");
+      if (target) target.innerHTML = "<p class=\"ops-empty\">加载中…</p>";
+      try { const data = await api("/system/health"); renderHealthPayload(data, { dashboard }); } catch (error) { setOpsMessage(target, apiErrorMessage(error), "danger"); if (!dashboard) { setOpsMessage($("healthComponents"), "健康组件暂时不可用", "danger"); setOpsMessage($("healthWindows"), "指标暂时不可用", "danger"); } }
+    }
+    function renderTraceList(data) {
+      const host = $("traceList"); const items = data?.items || [];
+      if (!items.length) return setOpsMessage(host, "暂无符合条件的 Trace");
+      host.innerHTML = `<table><thead><tr><th>Trace ID</th><th>功能</th><th>状态</th><th>阶段</th><th>耗时</th><th>时间</th></tr></thead><tbody>${items.map((item) => `<tr><td><button class="ops-inline-link" type="button" data-trace-id="${escapeHtml(item.traceId)}" aria-controls="traceDrawer" aria-expanded="false">${escapeHtml(item.traceId)}</button></td><td>${escapeHtml(item.feature || "—")}</td><td><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span></td><td>${escapeHtml(item.lastStage || "—")}</td><td>${escapeHtml(item.durationMs ?? "—")} ms</td><td>${escapeHtml(formatTime(item.startedAt))}</td></tr>`).join("")}</tbody></table>`;
+      host.querySelectorAll("[data-trace-id]").forEach((button) => { button.onclick = () => loadTraceDetail(button.dataset.traceId, button); });
+    }
+    let traceDrawerTrigger = null;
+    function openTraceDrawer(trigger) {
+      traceDrawerTrigger = trigger || traceDrawerTrigger;
+      const drawer = $("traceDrawer");
+      if (!drawer) return;
+      drawer.hidden = false;
+      if (traceDrawerTrigger) traceDrawerTrigger.setAttribute("aria-expanded", "true");
+      $("traceDrawer").querySelector("[data-trace-drawer-close]")?.focus();
+    }
+    function closeTraceDrawer() {
+      const drawer = $("traceDrawer");
+      if (!drawer) return;
+      drawer.hidden = true;
+      if (traceDrawerTrigger) {
+        traceDrawerTrigger.setAttribute("aria-expanded", "false");
+        traceDrawerTrigger.focus();
+      }
+      traceDrawerTrigger = null;
+    }
+    async function loadTraceDetail(traceId, trigger = null) {
+      selectedTraceId = traceId || "";
+      const host = $("traceDetail");
+      if (!host || !traceId) return;
+      openTraceDrawer(trigger);
+      setOpsMessage(host, "加载 Trace 详情…");
+      try {
+        const item = await api(`/traces/${encodeURIComponent(traceId)}`);
+        host.innerHTML = `<div class="ops-detail"><div class="ops-detail__heading"><div><span class="eyebrow">TRACE DETAIL</span><h3>${escapeHtml(item.traceId)}</h3></div><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span></div><div class="ops-window-grid"><span>功能<b>${escapeHtml(item.feature || "—")}</b></span><span>最后阶段<b>${escapeHtml(item.lastStage || "—")}</b></span><span>总耗时<b>${escapeHtml(item.durationMs ?? "—")} ms</b></span><span>HTTP<b>${escapeHtml(item.httpStatus ?? "—")}</b></span><span>错误码<b>${escapeHtml(item.errorCode || "—")}</b></span><span>Provider / fallback<b>${escapeHtml(item.provider || "—")} / ${item.fallbackUsed ? "是" : "否"}</b></span></div><h4>Stages</h4><div id="traceDrawerStages" class="ops-stage-list">${(item.stages || []).map((stage) => `<div class="ops-stage"><span>${escapeHtml(stage.name)}</span><strong class="${opsTone(stage.status)}">${escapeHtml(opsStatusLabel(stage.status))}</strong><small>${escapeHtml(stage.durationMs ?? "—")} ms${stage.provider ? ` · ${escapeHtml(stage.provider)}` : ""}</small></div>`).join("") || "<p class=\"ops-empty\">暂无阶段记录</p>"}</div><h4>安全元数据</h4><pre id="traceDrawerMeta">${escapeHtml(JSON.stringify(item.meta || {}, null, 2))}</pre></div>`;
+      } catch (error) { setOpsMessage(host, traceDetailErrorMessage(error), "danger"); }
+    }
+    async function loadTraces() {
+      const host = $("traceList"); setOpsMessage(host, "加载中…");
+      try {
+        const params = new URLSearchParams({ page: "1", limit: "50" }); const query = ($("traceSearch").value || "").trim();
+        if (query) params.set(query.startsWith("trace_") ? "traceId" : "errorCode", query);
+        if ($("traceStatusFilter").value) params.set("status", $("traceStatusFilter").value);
+        if ($("traceFeatureFilter").value) params.set("feature", $("traceFeatureFilter").value);
+        renderTraceList(await api(`/traces?${params.toString()}`));
+      } catch (error) { setOpsMessage(host, apiErrorMessage(error), "danger"); }
+    }
+    function renderJobs(data) {
+      const items = data?.items || []; const select = $("runNowJobKey");
+      select.innerHTML = items.filter((item) => item.manualAllowed).map((item) => `<option value="${escapeHtml(item.key || item.jobKey)}">${escapeHtml(item.label || item.key || item.jobKey)}</option>`).join("") || "<option value=\"\">没有允许手动运行的任务</option>";
+      $("jobsTable").innerHTML = items.length ? `<div class="nn-job-row nn-job-row--head"><span>任务</span><span>配置</span><span>Runtime Binding</span><span>Schedule</span><span>Last Run</span><span>Last Success</span><span>Processed</span></div>${items.map((item) => { const run = item.lastRun; const lastSuccess = run?.status === "succeeded" ? `${formatTime(run.completedAt || run.startedAt)}` : "—"; return `<div class="nn-job-row"><div><strong>${escapeHtml(item.label || item.key || item.jobKey)}</strong><code>${escapeHtml(item.key || item.jobKey)}</code></div><span class="nn-job-cell">${item.configured ? "已配置" : "未配置"}</span><span class="nn-job-cell"><span class="ops-status-pill ${opsTone(item.runtimeBindingStatus)}">${escapeHtml(item.runtimeBindingStatus || "unknown")}</span></span><span class="nn-job-cell nn-job-mono">${escapeHtml(item.schedule || "—")}</span><span class="nn-job-cell">${run ? `${escapeHtml(opsStatusLabel(run.status))}<small>${escapeHtml(formatTime(run.startedAt))}</small>` : "暂无真实运行记录"}</span><span class="nn-job-cell">${escapeHtml(lastSuccess)}</span><span class="nn-job-cell">${escapeHtml(run?.processedCount ?? "—")}</span></div>`; }).join("")}` : "<p class=\"ops-empty\">暂无任务目录</p>";
+    }
+    async function loadJobs() { setOpsMessage($("jobsTable"), "加载中…"); try { renderJobs(await api("/jobs")); } catch (error) { setOpsMessage($("jobsTable"), apiErrorMessage(error), "danger"); } }
+    async function runNowJob() {
+      const jobKey = $("runNowJobKey").value; if (!jobKey) return toast("当前没有可手动运行的任务", true);
+      if (!window.confirm(`确认手动运行 ${jobKey}？该操作会写入 Admin Audit。`)) return;
+      try { await api(`/jobs/${encodeURIComponent(jobKey)}/run-now`, { method: "POST", body: {} }); toast("任务已触发"); await loadJobs(); } catch (error) { toast(apiErrorMessage(error), true); }
+    }
+    async function loadAuditLogs() {
+      const host = $("auditLogsTable"); setOpsMessage(host, "加载中…");
+      try { const params = new URLSearchParams({ page: "1", limit: "50" }); if ($("auditActionFilter").value.trim()) params.set("action", $("auditActionFilter").value.trim()); if ($("auditResultFilter").value) params.set("result", $("auditResultFilter").value); const data = await api(`/audit-logs?${params.toString()}`); const items = data.items || []; host.innerHTML = items.length ? `<div class="nn-audit-row nn-audit-row--head"><span>时间</span><span>操作</span><span>资源</span><span>结果</span><span>Trace</span><span>管理员</span></div>${items.map((item) => `<div class="nn-audit-row"><span class="nn-audit-time">${escapeHtml(formatTime(item.createdAt || item.occurredAt))}</span><span><strong>${escapeHtml(item.action)}</strong></span><span>${escapeHtml(item.resourceType || "—")}<code>${escapeHtml(item.resourceId || "—")}</code></span><span><span class="ops-status-pill ${opsTone(item.result)}">${escapeHtml(opsStatusLabel(item.result))}</span></span><span>${item.traceId ? `<button class="ops-inline-link" type="button" data-audit-trace="${escapeHtml(item.traceId)}" aria-controls="traceDrawer">${escapeHtml(item.traceId)}</button>` : "—"}</span><span><code>${escapeHtml(item.actorUserId || "—")}</code></span></div>`).join("")}` : "<p class=\"ops-empty nn-audit-empty\">暂无审计记录</p>"; host.querySelectorAll("[data-audit-trace]").forEach((button) => { button.onclick = () => { setModule("traces"); loadTraceDetail(button.dataset.auditTrace, button); }; }); } catch (error) { setOpsMessage(host, apiErrorMessage(error), "danger"); }
+    }
+    function activateUserDetailTab(name, shouldFocus = false) {
+      const tabs = document.querySelectorAll("[data-user-detail-tab]");
+      tabs.forEach((tab) => {
+        const selected = tab.dataset.userDetailTab === name;
+        tab.setAttribute("aria-selected", selected ? "true" : "false");
+        const panel = $(tab.getAttribute("aria-controls"));
+        if (panel) panel.hidden = !selected;
+        if (selected && shouldFocus) tab.focus();
+      });
+    }
+    function bindUserDetailTabs() {
+      document.querySelectorAll("[data-user-detail-tab]").forEach((tab, index, tabs) => {
+        tab.onclick = () => activateUserDetailTab(tab.dataset.userDetailTab, false);
+        tab.onkeydown = (event) => {
+          if (!(["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key))) return;
+          event.preventDefault();
+          const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+          tabs[nextIndex].focus();
+          activateUserDetailTab(tabs[nextIndex].dataset.userDetailTab, false);
+        };
+      });
+    }
+    function renderUserDetail(data) {
+      const profile = data?.profile || {}; const overview = data?.overview || {};
+      $("userDetailSummary").innerHTML = `<div class="ops-user-summary"><div><span class="eyebrow">USER DETAIL</span><h3>${escapeHtml(profile.nickname || data.id)}</h3><code>${escapeHtml(data.id)}</code></div><div class="ops-window-grid">${[["餐食", overview.mealsCount], ["AI 使用", overview.aiUsageCount], ["图片", overview.imageCount], ["反馈", overview.feedbackCount], ["内容安全", overview.moderationCount], ["删除记录", overview.deletionCount]].map(([label, value]) => `<span>${label}<b>${escapeHtml(value ?? 0)}</b></span>`).join("")}</div></div><p class="muted">注册 ${escapeHtml(formatTime(profile.createdAt))} · 最近活跃 ${escapeHtml(formatTime(profile.lastActiveAt))}</p>`;
+    }
+    function renderUserTimeline(data) {
+      const host = $("userTimeline"); const items = data?.items || [];
+      if (!items.length) return setOpsMessage(host, "暂无运营事件");
+      host.innerHTML = `<div class="ops-timeline">${items.map((item) => `<div class="ops-timeline-item"><div><strong>${escapeHtml(item.type || "事件")}</strong><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span></div><p>${escapeHtml(formatTime(item.occurredAt))}${item.durationMs != null ? ` · ${escapeHtml(item.durationMs)} ms` : ""}${item.errorCode ? ` · ${escapeHtml(item.errorCode)}` : ""}</p><small>${item.resourceId ? `资源 ${escapeHtml(item.resourceId)}` : ""}${item.traceId ? ` · <button class="ops-inline-link" type="button" data-user-trace="${escapeHtml(item.traceId)}" aria-controls="traceDrawer" aria-expanded="false">查看 Trace</button>` : ""}</small></div>`).join("")}</div>`;
+      host.querySelectorAll("[data-user-trace]").forEach((button) => { button.onclick = () => { setModule("traces"); loadTraceDetail(button.dataset.userTrace, button); }; });
+    }
+    async function loadUserDetailModule() {
+      const id = ($("userDetailId").value || "").trim(); if (!id) return toast("请输入用户 ID", true); selectedUserDetailId = id; setOpsMessage($("userDetailSummary"), "加载用户资料…"); setOpsMessage($("userTimeline"), "加载用户 Timeline…");
+      try { const [detail, timeline] = await Promise.all([api(`/users/${encodeURIComponent(id)}`), api(`/users/${encodeURIComponent(id)}/timeline`)]); renderUserDetail(detail); renderUserTimeline(timeline); } catch (error) { setOpsMessage($("userDetailSummary"), apiErrorMessage(error), "danger"); setOpsMessage($("userTimeline"), "Timeline 暂时不可用", "danger"); }
+    }
+    function openUserDetail(userId) { $("userDetailId").value = userId || ""; setModule("user-detail"); loadUserDetailModule().catch(() => {}); }
+    const MODULE_LABELS = { dashboard: "总览", users: "用户数据", "user-detail": "用户详情", foods: "食材管理", images: "食材生图", audit: "旧图审计", ops: "运营总览", quota: "额度管理", jobs: "Jobs", moderation: "内容安全", "user-images": "用户图片", feedback: "问题反馈", health: "系统健康", traces: "Traces", "audit-logs": "审计日志", system: "系统配置" };
     function setModule(name) {
       document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.classList.toggle("active", btn.dataset.module === name); });
+      if ($("currentArea")) $("currentArea").textContent = MODULE_LABELS[name] || "管理后台";
       $("moduleUsers").hidden = name !== "users";
       $("moduleFeedback").hidden = name !== "feedback";
       $("moduleFoods").hidden = name !== "foods";
@@ -2436,6 +2697,13 @@
       $("moduleAudit").hidden = name !== "audit";
       $("moduleOps").hidden = name !== "ops";
       $("moduleQuota").hidden = name !== "quota";
+      $("moduleDashboard").hidden = name !== "dashboard";
+      $("moduleHealth").hidden = name !== "health";
+      $("moduleTraces").hidden = name !== "traces";
+      $("moduleJobs").hidden = name !== "jobs";
+      $("moduleAuditLogs").hidden = name !== "audit-logs";
+      $("moduleUserDetail").hidden = name !== "user-detail";
+      if (name === "user-detail") activateUserDetailTab("overview");
       if ($("moduleUserImages")) $("moduleUserImages").hidden = name !== "user-images";
       $("moduleModeration").hidden = name !== "moderation";
       $("moduleSystem").hidden = name !== "system";
@@ -2447,6 +2715,11 @@
       if (name === "quota") loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "user-images") loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "moderation") loadModerationModule().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "dashboard") loadSystemHealth({ dashboard: true }).catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "health") loadSystemHealth().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "traces") loadTraces().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "jobs") loadJobs().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "audit-logs") loadAuditLogs().catch((error) => toast(apiErrorMessage(error), true));
       syncQuotaAutoRefresh(name === "quota");
     }
     const QUOTA_AUTO_REFRESH_MS = 15 * 60 * 1000;
@@ -2463,6 +2736,23 @@
       }, QUOTA_AUTO_REFRESH_MS);
     }
     document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.onclick = () => setModule(btn.dataset.module); });
+    bindUserDetailTabs();
+    $("refreshDashboard").onclick = () => loadSystemHealth({ dashboard: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("dashboardOpenHealth").onclick = () => setModule("health");
+    document.querySelectorAll("[data-open-module]").forEach((button) => { button.onclick = () => setModule(button.dataset.openModule); });
+    document.querySelectorAll("[data-open-trace-status]").forEach((button) => { button.onclick = () => openTraceStatus(button.dataset.openTraceStatus); });
+    $("traceDrawer").querySelector("[data-trace-drawer-close]").onclick = closeTraceDrawer;
+    $("traceDrawer").onclick = (event) => { if (event.target === event.currentTarget) closeTraceDrawer(); };
+    $("refreshHealth").onclick = () => loadSystemHealth().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshTraces").onclick = () => loadTraces().catch((error) => toast(apiErrorMessage(error), true));
+    $("traceApplyFilters").onclick = () => loadTraces().catch((error) => toast(apiErrorMessage(error), true));
+    $("traceSearch").onkeydown = (event) => { if (event.key === "Enter") loadTraces().catch((error) => toast(apiErrorMessage(error), true)); };
+    $("refreshJobs").onclick = () => loadJobs().catch((error) => toast(apiErrorMessage(error), true));
+    $("runNowJob").onclick = () => runNowJob().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshAuditLogs").onclick = () => loadAuditLogs().catch((error) => toast(apiErrorMessage(error), true));
+    $("auditApplyFilters").onclick = () => loadAuditLogs().catch((error) => toast(apiErrorMessage(error), true));
+    $("loadUserDetail").onclick = () => loadUserDetailModule().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshUserTimeline").onclick = () => loadUserDetailModule().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshUsers").onclick = () => loadUsers({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("userSearch").onkeydown = (event) => { if (event.key === "Enter") loadUsers({ force: true }).catch((error) => toast(apiErrorMessage(error), true)); };
     $("refreshFeedback").onclick = () => loadFeedback({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
@@ -2561,6 +2851,7 @@
     $("foodAdminEditorBackdrop").onclick = hideFoodEditor;
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !$("foodAdminEditor").hidden) hideFoodEditor();
+      if (event.key === "Escape" && $("traceDrawer") && !$("traceDrawer").hidden) closeTraceDrawer();
     });
     $("foodAdminBulkBatch").onclick = () => createImageBatchForFoods([...state.foodAdminSelectedIds]).catch((error) => toast(apiErrorMessage(error), true));
     $("loginForm").onsubmit = (event) => {

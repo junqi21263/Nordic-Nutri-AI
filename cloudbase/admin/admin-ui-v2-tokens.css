@@ -1,0 +1,32 @@
+:root {
+  --nn-bg: #eef0ea;
+  --nn-surface: #ffffff;
+  --nn-surface-subtle: #faf8f3;
+  --nn-text: #24312b;
+  --nn-text-muted: #66746c;
+  --nn-brand: #2e6046;
+  --nn-success: #2e6046;
+  --nn-warning: #855b16;
+  --nn-danger: #b64a3b;
+  --nn-info: #496b73;
+  --nn-border: #d7ded5;
+  --nn-border-strong: #b8c5b9;
+  --nn-space-1: 4px;
+  --nn-space-2: 8px;
+  --nn-space-3: 12px;
+  --nn-space-4: 16px;
+  --nn-space-5: 20px;
+  --nn-space-6: 24px;
+  --nn-space-7: 32px;
+  --nn-space-8: 40px;
+  --nn-radius-sm: 6px;
+  --nn-radius-md: 10px;
+  --nn-radius-lg: 16px;
+  --nn-radius-pill: 999px;
+  --nn-control-height-sm: 32px;
+  --nn-control-height-md: 40px;
+  --nn-control-height-lg: 48px;
+  --nn-shadow-sm: 0 4px 12px rgba(23, 61, 42, .06);
+  --nn-shadow-md: 0 12px 28px rgba(23, 61, 42, .10);
+  --nn-shadow-drawer: 0 20px 48px rgba(23, 61, 42, .20);
+}
