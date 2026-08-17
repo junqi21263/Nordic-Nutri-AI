@@ -59,6 +59,7 @@ const { createFoodImageAuditVision } = require("./food-image-audit-vision.cjs");
 const { createFoodImageAuditService } = require("./food-image-audit-service.cjs");
 const { createSystemHealthService } = require("./system-health-service.cjs");
 const { createJobOpsService, JobOpsError } = require("./job-ops-service.cjs");
+const { createUserOpsService, UserOpsError } = require("./user-ops-service.cjs");
 const { createVisionBudget, VISION_BUDGETS } = require("./vision-budget.cjs");
 const { getFoodDisplayName } = require("./food-display-name.cjs");
 const { formulaNutritionPlanFallback } = require("./nutrition-plan-formula.cjs");
@@ -1328,6 +1329,16 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       hunyuan: { configured: Boolean(hunyuanImageService || workerEndpoint) },
     },
   });
+  const hashTraceUserId = (userId) => crypto
+    .createHmac("sha256", config.identityPepper)
+    .update(`user:${String(userId || "")}`)
+    .digest("hex");
+  const userOps = createUserOpsService({
+    db,
+    isAdmin: allowAdminConsole,
+    hashUserId: hashTraceUserId,
+    listTraces: (input) => observability.listTraces(input),
+  });
   const userImageOps = typeof db?.from === "function"
     ? createUserImageOpsService({
       db,
@@ -1422,6 +1433,8 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     adminAudit,
     systemHealth,
     jobOps,
+    userOps,
+    hashTraceUserId,
     contentModeration,
     visionImageReview,
     visionImageRetention,
@@ -1549,6 +1562,10 @@ function getAdminFoodRoute(pathname) {
   if (!stripped.startsWith("/api/admin")) return null;
   const path = stripped.replace(/^\/api\/admin/, "") || "/";
   if (path === "/users") return { operation: "listUsers" };
+  const userTimelineMatch = path.match(/^\/users\/([^/]+)\/timeline$/i);
+  if (userTimelineMatch) return { operation: "userTimeline", userId: decodeURIComponent(userTimelineMatch[1]) };
+  const userDetailMatch = path.match(/^\/users\/([^/]+)$/i);
+  if (userDetailMatch) return { operation: "userDetail", userId: decodeURIComponent(userDetailMatch[1]) };
   if (path === "/login") return { operation: "adminLogin" };
   if (path === "/jobs") return { operation: "jobList" };
   const jobRunMatch = path.match(/^\/jobs\/([a-z0-9_-]+)\/run-now$/i);
@@ -1916,6 +1933,14 @@ function createHttpServer({ service }) {
             maxItems: body?.maxItems,
             limit: body?.limit,
           }));
+        }
+        if (adminFoodRoute.operation === "userDetail" || adminFoodRoute.operation === "userTimeline") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.userOps) return sendJson(res, 503, { code: "USER_OPS_UNAVAILABLE" });
+          const result = adminFoodRoute.operation === "userDetail"
+            ? await service.userOps.getUserDetail(session.sub, adminFoodRoute.userId)
+            : await service.userOps.getUserTimeline(session.sub, adminFoodRoute.userId);
+          return sendJson(res, 200, result);
         }
         if (adminFoodRoute.operation === "systemHealth") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -2511,6 +2536,12 @@ function createHttpServer({ service }) {
       } catch (error) {
         if (error instanceof JobOpsError) {
           const status = error.code === "JOB_NOT_ALLOWED" ? 400 : 503;
+          return sendJson(res, status, { code: error.code });
+        }
+        if (error instanceof UserOpsError) {
+          const status = error.code === "FORBIDDEN" ? 403
+            : error.code === "UNAUTHORIZED" ? 401
+            : error.code === "USER_NOT_FOUND" ? 404 : 503;
           return sendJson(res, status, { code: error.code });
         }
         if (error instanceof AdminConsoleError) {
