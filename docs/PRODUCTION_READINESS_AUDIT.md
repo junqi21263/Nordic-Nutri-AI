@@ -310,7 +310,7 @@ Complex Timeout Fix     NOT CLOSED
 
 - Production read-only evidence initially found one terminal `timed_out` analysis with `quota_state=reserved`; its linked reservation was `state=expired` while `reservation_state` remained `reserved`.
 - Root cause is the existing automatic expiry function updating reservation `state` only, without synchronizing `reservation_state` and `ai_analysis.quota_state`.
-- Local forward-only migration `0051_vision_quota_expiry_reconcile` and 3/3 static contract tests are present. A disposable PostgreSQL 16 validation passed for existing stale-row reconciliation, live expiry synchronization, readback, and idempotency; production migration is **NOT EXECUTED**.
+- Local forward-only migration `0051_vision_quota_expiry_reconcile` and 3/3 static contract tests are present. A disposable PostgreSQL 16 validation passed for existing stale-row reconciliation, live expiry synchronization, readback, and idempotency; production migration was executed through the official runner.
 - 0051 production push succeeded through the official runner; registry/readback now show the migration present, stale expired reservations `0`, and terminal-reserved quota rows `0`. No business row was manually mutated and no expired reservation was restored to `reserved`.
 
 ## Future Architecture (6–12 Months)
