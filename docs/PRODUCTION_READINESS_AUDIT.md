@@ -206,7 +206,7 @@ Trace Explorer、processing 状态、stage timing、provider timing 和 sanitize
 
 ## Maintainability Audit
 
-优点：测试命名清晰、CAS/状态词汇显式、迁移有 readback/rollback 文件、敏感字段有 sanitizer。风险：主 HTTP 函数职责过多；Phase 2 尚未形成稳定提交和版本基线；部署 manifest 与实际函数集合分叉；生产和本地 runtime 版本不一致；多个设计文档仍保留已过时的 HOLD/PENDING 状态，容易造成运营误判。
+优点：测试命名清晰、CAS/状态词汇显式，迁移有 readback/rollback 文件，敏感字段有 sanitizer；本轮已固化 clean release baseline、manifest 和 normalized artifact SHA。剩余风险：主 HTTP 函数职责过多；生产客户端版本、secret 轮换、SRE/隐私证据和并发容量仍未闭环；多个设计文档仍保留历史 HOLD/PENDING 状态，发布时必须以最新 release evidence 为准。
 
 ## Scalability Audit
 
@@ -296,8 +296,8 @@ Complex Timeout Fix     NOT CLOSED
 
 | 维度 | 分数 | 依据 |
 |---|---:|---|
-| 当前架构 | 7/10 | durable state、CAS、lease、worker/reaper 方向正确；函数边界和部署 manifest 仍漂移 |
-| 可维护性 | 6/10 | 本地测试较强；`get-login-ticket` 过大、dirty release 和多套状态文档增加维护成本 |
+| 当前架构 | 7/10 | durable state、CAS、lease、worker/reaper 方向正确；函数边界仍较大，但部署 manifest 已固化 |
+| 可维护性 | 6/10 | 本地测试较强；`get-login-ticket` 过大、secret 轮换流程和多套状态文档增加维护成本 |
 | 可迭代性 | 6/10 | provider/状态扩展有抽象；跨主函数、PG、前端和 flag 的变更面仍大 |
 | 可扩展性 | 5/10 | 设计可支撑受控增长；没有生产容量、队列延迟和成本实测 |
 | 稳定性 | 6/10 | S2/S3 后端受控生产链路通过；并发、p95/p99、客户端恢复和告警演练不足 |
