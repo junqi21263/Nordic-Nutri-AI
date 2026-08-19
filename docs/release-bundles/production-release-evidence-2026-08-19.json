@@ -58,7 +58,7 @@
   "productionS3": "PASS — dedicated real-Storage fixture resumed from enriching; worker.checkpoint_resume succeeded, no worker.provider_start event was emitted, provider_attempt remained 1, and final status completed/quota committed",
   "transportHelper": "DEPLOYED/REACHABLE — invalid-HMAC probe returned 401 with zero-write path; production transport fixture invoke smoke PASS (dispatcher claim/invoke and worker handler reached; worker temp_url correctly rejected the synthetic non-storage path). Fixture was terminalized via CAS as timed_out with quota_state=none; terminal fixture row retained by the migration's non-destructive cleanup rule.",
   "quotaConsistency": "PASS — 0051 official migration push succeeded; function/readback confirms stale_expired_reservations=0 and terminal_reserved_quota_rows=0. Current production counts are ai_analysis=90 and uploaded_assets=44.",
-  "quotaMigrationPreflight": "PASS — PreviewPGUserMigrations with the three applied remote migrations plus 20260819000001 vision_quota_expiry_reconcile returned Conflicts=0, Executable=true, and 0051 Pending; no Push was executed.",
+  "quotaMigrationPreflight": "PASS — PreviewPGUserMigrations with the three applied remote migrations plus 20260819000001 vision_quota_expiry_reconcile returned Conflicts=0 and Executable=true; the pending migration was then pushed through the official runner.",
   "quotaMigrationPush": "PASS — PushPGUserMigrations task task-8ebc5dde reached Succeed; registry LatestVersion=20260819000001 and post-push readback passed.",
   "rollback": "Prepared locally; production rollback drill NOT_VERIFIED",
   "privacy": "DRAFT — OWNER INPUT REQUIRED",
