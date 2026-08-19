@@ -210,7 +210,7 @@ Trace Explorer、processing 状态、stage timing、provider timing 和 sanitize
 
 ### Scalability
 
-当前没有压测、峰值并发、队列延迟、数据库连接、provider 限流或 worker 扩缩容证据。默认每分钟 dispatcher 对用户体验存在上界延迟；公开发布前必须至少建立受控并发测试和 backlog 告警。
+当前没有压测、峰值并发、队列延迟、数据库连接、provider 限流或 worker 扩缩容证据。当前生产 dispatcher timer 为 15 秒、reaper 为 1 分钟；仍必须建立受控并发测试和 backlog 告警，不能只按 timer 配置推断实际 p95。
 
 ## Cost Audit
 

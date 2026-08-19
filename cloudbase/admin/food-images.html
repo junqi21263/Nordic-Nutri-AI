@@ -1078,7 +1078,7 @@
       if (batch.status === "cancelled") return { tone: "danger", text: "批次已取消；未完成项目不会再被调度。" };
       if (counts.failed) return { tone: "danger", text: `有 ${counts.failed} 条已耗尽重试次数；在“失败”筛选中查看失败码和原因。` };
       if (counts.needs_retry) return { tone: "warning", text: `有 ${counts.needs_retry} 条等待云端重试；调度器会按 next retry 时间继续处理。` };
-      if (counts.generating || counts.pending) return { tone: "", text: `云端调度中：待生成 ${counts.pending} 条、生成中 ${counts.generating} 条。调度器每分钟检查一次。` };
+      if (counts.generating || counts.pending) return { tone: "", text: `云端调度中：待生成 ${counts.pending} 条、生成中 ${counts.generating} 条。调度器每 15 秒检查一次。` };
       if (counts.needs_review) return { tone: "", text: `本批次有 ${counts.needs_review} 张候选图等待人工审核。` };
       if (batch.status === "completed_with_errors") return { tone: "danger", text: "批次已结束，但存在生成失败项；请在失败筛选中处理。" };
       if (batch.status === "completed") return { tone: "", text: "批次已完成，所有项目已通过审核、跳过或按规则结束。" };

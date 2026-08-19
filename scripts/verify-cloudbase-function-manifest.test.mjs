@@ -27,6 +27,7 @@ test("CloudBase manifest declares the Phase 2 vision foundation functions", asyn
     runtime: "Nodejs18.15",
     handler: "index.main",
     installDependency: true,
+    triggers: [{ name: "vision-analysis-dispatcher-every-15-seconds", type: "timer", config: "*/15 * * * * * *" }],
     ignore: ["*.test.mjs", ".git/**"],
   });
   assert.deepEqual(entries.get("vision-analysis-worker"), {
@@ -45,6 +46,7 @@ test("CloudBase manifest declares the Phase 2 vision foundation functions", asyn
     runtime: "Nodejs18.15",
     handler: "index.main",
     installDependency: false,
+    triggers: [{ name: "vision-analysis-reaper-every-minute", type: "timer", config: "0 * * * * * *" }],
     ignore: ["*.test.mjs", ".git/**"],
   });
 });

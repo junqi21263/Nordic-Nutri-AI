@@ -13,9 +13,12 @@ test("release bundle includes vision functions, trigger contracts, SHA, and unve
   }
   const dispatcher = bundle.functions.find((entry) => entry.name === "vision-analysis-dispatcher");
   const worker = bundle.functions.find((entry) => entry.name === "vision-analysis-worker");
+  const reaper = bundle.functions.find((entry) => entry.name === "vision-analysis-reaper");
   assert.equal(worker.artifactSource, "staged_function_directory_with_get_login_ticket_runtime");
   assert.ok(worker.localArtifact.files.some((file) => file.path === "get-login-ticket/index.js"));
   assert.equal(dispatcher.localArtifact.sha256.length, 64);
   assert.equal(dispatcher.trigger.currentReadback, "NOT_VERIFIED");
+  assert.equal(dispatcher.trigger.schedule, "*/15 * * * * * *");
+  assert.equal(reaper.trigger.schedule, "0 * * * * * *");
   assert.equal(dispatcher.productionReadback.status, "NOT_VERIFIED");
 });

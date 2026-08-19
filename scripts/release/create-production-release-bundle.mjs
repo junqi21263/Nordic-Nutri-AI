@@ -12,13 +12,13 @@ const manifestPath = join(projectRoot, "cloudbaserc.json");
 const triggerContracts = {
   "vision-analysis-dispatcher": {
     kind: "timer",
-    schedule: "every 1 minute",
+    schedule: "*/15 * * * * * *",
     invokes: "vision-analysis-worker via callFunction($LATEST)",
     currentReadback: "NOT_VERIFIED",
   },
   "vision-analysis-reaper": {
     kind: "timer",
-    schedule: "every 1 minute",
+    schedule: "0 * * * * * *",
     invokes: "get-login-ticket internal reap route",
     currentReadback: "NOT_VERIFIED",
   },
