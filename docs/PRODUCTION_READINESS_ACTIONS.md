@@ -14,8 +14,8 @@
 | P0-4 | P0 | Privacy/Compliance | 微信审核、主体、政策、删除核验未形成证据包 | `WECHAT_RELEASE_CHECKLIST.md` 关键项未勾选 | 无法合规公开发布 | 完成平台声明、审核账号、删除/保留证明 | 审核材料和管理员只读回读 | M | Yes |
 | P0-5 | P0 | SRE | 生产告警和值班演练缺失 | 未验证 5xx/timeout/p95/queue/quota/cost alerts | 事故无法及时发现或止损 | 配置阈值、接收人、runbook、回滚演练 | 触发测试告警并留证 | M | Yes |
 | P0-6 | P0 | Security | 函数详情回读曾包含敏感环境值 | 原文未进入发布包，但受影响 secret 需要轮换 | 旧 secret 暴露窗口/权限扩大 | 轮换受影响 secret、核对最小权限、重新做脱敏 readback | presence-only readback + invalidated-old-secret probe | M | Yes |
-| P1-1 | P1 | Performance | dispatcher/worker/AI 延迟分布未实测 | 仅有单次/截图 trace，缺少 p95/p99 和并发数据 | 并发扫描时队列和成本失控 | 小规模并发与 backlog 测试 | p50/p95/p99、error budget | M | Beta |
-| P1-2 | P1 | Correctness | 重复 POST、provider attempt、quota transition 的生产并发证据不足 | 本地 CAS tests 通过，生产并发未验证 | 重复调用/重复扣费 | 双请求、重试、worker 重入测试 | analysis/provider/quota 唯一性 | M | Beta |
+| P1-1 | P1 | Performance | dispatcher/worker/AI 延迟分布未实测 | 本地已验证 dispatcher 并发上限/claim 上限；生产仍缺 p50/p95/p99 和 backlog 数据 | 并发扫描时队列和成本失控 | 小规模并发与 backlog 测试 | p50/p95/p99、error budget | M | Beta |
+| P1-2 | P1 | Correctness | 重复 POST、provider attempt、quota transition 的生产并发证据不足 | 本地 CAS、dispatcher 去重、worker 重入和 S3 no-second-provider tests 通过；生产并发仍未验证 | 重复调用/重复扣费 | 双请求、重试、worker 重入测试 | analysis/provider/quota 唯一性 | M | Beta |
 | P1-3 | P1 | Maintainability | `get-login-ticket` 职责过多 | 单文件/多领域 route/service coupling | 视觉改动影响 auth/meal/admin | 分阶段拆分 vision/observability | contract/regression/artifact tests | L | No |
 | P2-1 | P2 | Tooling | Node 24 工具链与 CloudBase Node 18 runtime 矩阵未固定 | 本轮环境 Node 25.9.0，仓库要求 Node 24.18.x | 本地绿、生产运行时差异 | CI 固定 Node 24并验证函数 runtime | CI matrix + production smoke | S | No |
 | P2-2 | P2 | Cost | provider 双 attempt、存储和日志成本无预算模型 | 日成本/单分析成本未验证 | 成本不可控 | 记录单分析成本和日预算告警 | 100/1k/10k DAU model + alert | M | No |
@@ -35,6 +35,8 @@
 
 ## P1 — Limited Beta Blocking
 
+- 本地证据：dispatcher 定向测试覆盖 claim 上限、worker invocation 并发上限、同 lease 去重；worker 定向测试覆盖 already-claimed job、analyzing 第二次 provider attempt、enriching checkpoint 不调用第二次 provider；相关迁移测试覆盖 CAS、幂等 terminal transition 和 quota 语义。
+- 生产缺口：尚未执行受控多用户并发/队列 backlog 压测，因此不能把本地并发安全性外推为生产容量 SLO。
 - 完成两用户 ownership isolation、重复 POST/重试、保存幂等、弱网和 App background/reopen。
 - 对 dispatcher claim delay、worker invoke duration、provider attempt、quota transition 建立 p50/p95/p99。
 - 做受控并发测试，验证 `maxItems`、worker concurrency、数据库连接、provider 限流和队列公平性。
