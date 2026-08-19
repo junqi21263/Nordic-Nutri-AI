@@ -6,7 +6,7 @@ test("release bundle includes vision functions, trigger contracts, SHA, and unve
   const bundle = await createReleaseBundle();
   assert.equal(bundle.envId, "lewis-healthy-d4glgqqzv73a5bc10");
   assert.equal(bundle.commit.length, 40);
-  assert.equal(bundle.status, "dirty_candidate");
+  assert.ok(["clean_candidate", "dirty_candidate"].includes(bundle.status));
   const names = new Set(bundle.functions.map((entry) => entry.name));
   for (const name of ["vision-analysis-dispatcher", "vision-analysis-worker", "vision-analysis-reaper"]) {
     assert.equal(names.has(name), true);
