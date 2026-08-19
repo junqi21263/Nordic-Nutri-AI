@@ -9,10 +9,10 @@
     "runtime": "Nodejs18.15"
   },
   "productionFunctions": {
-    "get-login-ticket": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"7623a3c723bc65b4f7d8a9bf1c3ba24f5a736bb8769eb282446f7df09637296a","platformCodeSha256":"2c905bcea5e4de9b6b4231c3aa34b4b691d42cbdefe01f3a63f9fe3b263d3092","normalizedProductionSha":"NOT_VERIFIED"},
-    "vision-analysis-dispatcher": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"8e2da9592bca0f83584a0a5dc756444e5cbea3ae81a1aa8ec42076f740fef7c8","platformCodeSha256":"d1fce0324c758721569a7f831554df5a7e641f00c5f26b054f9f4b95fa66ec69","timer":"*/15 * * * * * *","normalizedProductionSha":"NOT_VERIFIED"},
-    "vision-analysis-worker": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"1a40d6e6f0cfdf1ae02393029c891e41dec7830e3fa5d8f460fd5cc29fa140b8","platformCodeSha256":"NOT_READ_BACK_IN_CURRENT_CHECK","normalizedProductionSha":"NOT_VERIFIED"},
-    "vision-analysis-reaper": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"c85ea6776e55769b41f9a090f616c53449b126517a53c469c076ba2d6b6a0120","platformCodeSha256":"45a5f742bd50b44809d15ca37972ca37dd2f18e84ca5d3a652a2805ca39f045","timer":"0 * * * * * *","normalizedProductionSha":"NOT_VERIFIED"}
+    "get-login-ticket": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"7623a3c723bc65b4f7d8a9bf1c3ba24f5a736bb8769eb282446f7df09637296a","platformCodeSha256":"2c905bcea5e4de9b6b4231c3aa34b4b691d42cbdefe01f3a63f9fe3b263d3092","normalizedProductionSha":"7623a3c723bc65b4f7d8a9bf1c3ba24f5a736bb8769eb282446f7df09637296a","normalizedShaMatch":true},
+    "vision-analysis-dispatcher": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"8e2da9592bca0f83584a0a5dc756444e5cbea3ae81a1aa8ec42076f740fef7c8","platformCodeSha256":"d1fce0324c758721569a7f831554df5a7e641f00c5f26b054f9f4b95fa66ec69","timer":"*/15 * * * * * *","normalizedProductionSha":"8e2da9592bca0f83584a0a5dc756444e5cbea3ae81a1aa8ec42076f740fef7c8","normalizedShaMatch":true},
+    "vision-analysis-worker": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"1a40d6e6f0cfdf1ae02393029c891e41dec7830e3fa5d8f460fd5cc29fa140b8","platformCodeSha256":"NOT_READ_BACK_IN_CURRENT_CHECK","normalizedProductionSha":"1a40d6e6f0cfdf1ae02393029c891e41dec7830e3fa5d8f460fd5cc29fa140b8","normalizedShaMatch":true},
+    "vision-analysis-reaper": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"c85ea6776e55769b41f9a090f616c53449b126517a53c469c076ba2d6b6a0120","platformCodeSha256":"45a5f742bd50b44809d15ca37972ca37dd2f18e84ca5d3a652a2805ca39f045","timer":"0 * * * * * *","normalizedProductionSha":"c85ea6776e55769b41f9a090f616c53449b126517a53c469c076ba2d6b6a0120","normalizedShaMatch":true}
   },
   "featureFlags": {
     "get-login-ticket": "true",
@@ -43,6 +43,6 @@
   "transportHelper": "DEPLOYED/REACHABLE — invalid-HMAC probe returned 401 with zero-write path; production transport fixture invoke smoke PASS (dispatcher claim/invoke and worker handler reached; worker temp_url correctly rejected the synthetic non-storage path). Fixture was terminalized via CAS as timed_out with quota_state=none; terminal fixture row retained by the migration's non-destructive cleanup rule.",
   "rollback": "Prepared locally; production rollback drill NOT_VERIFIED",
   "privacy": "DRAFT — OWNER INPUT REQUIRED",
-  "artifactShaNote": "platformCodeSha256 and normalized artifact SHA are different digest domains; remote package download was not accepted by the available download helper, so normalized production SHA remains NOT_VERIFIED",
+  "artifactShaNote": "Normalized production SHA was computed from each CloudBase $LATEST download using the same production ignore rules; platformCodeSha256 remains a separate digest domain",
   "sensitiveValues": "redacted"
 }
