@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | P0-1 | P0 | Release | 发布提交、函数 manifest 与实际 vision 函数集合不一致 | 历史记录曾存在 dirty worktree/manifest drift；当前已固化 clean baseline、完整 manifest 和 4/4 normalized SHA MATCH | 无法重建/回滚批准 artifact | 持续由 CI 固化 clean commit、完整 manifest、统一 ignore/SHA 规则 | CI manifest + normalized SHA + deployment readback | M | Yes |
 | P0-2 | P0 | Vision Async | 复杂图片 S2/S3 生产 E2E | S2 `202 → provider attempt #2 → completed → quota committed`；S3 checkpoint resume/no-second-provider 已有证据 | 仍需完整 rollout 验收 | 保留 recovery 与监控；转入客户端、并发和发布审计 | trace/job/quota/analysis 全链路 PASS | M | Yes |
-| P0-3 | P0 | Client Contract | Mini Program 异步版本与后端/flag 没有同一发布基线 | 本地 async client 有代码；正式生产前端版本未独立证明 | 202/polling/reopen 行为不一致 | 绑定 client build、backend artifact、flag 和回滚版本 | 真机 200/202/GET/background/reopen | M | Yes |
+| P0-3 | P0 | Client Contract | Mini Program 异步版本与后端/flag 没有同一发布基线 | 本地 async client 有代码并具备有界瞬时失败重试；正式生产前端版本未独立证明 | 202/polling/reopen 行为不一致 | 绑定 client build、backend artifact、flag 和回滚版本 | 真机 200/202/GET/background/reopen | M | Yes |
 | P0-4 | P0 | Privacy/Compliance | 微信审核、主体、政策、删除核验未形成证据包 | `WECHAT_RELEASE_CHECKLIST.md` 关键项未勾选 | 无法合规公开发布 | 完成平台声明、审核账号、删除/保留证明 | 审核材料和管理员只读回读 | M | Yes |
 | P0-5 | P0 | SRE | 生产告警和值班演练缺失 | 未验证 5xx/timeout/p95/queue/quota/cost alerts | 事故无法及时发现或止损 | 配置阈值、接收人、runbook、回滚演练 | 触发测试告警并留证 | M | Yes |
 | P1-1 | P1 | Performance | dispatcher/worker/AI 延迟分布未实测 | 仅有单次/截图 trace，缺少 p95/p99 和并发数据 | 并发扫描时队列和成本失控 | 小规模并发与 backlog 测试 | p50/p95/p99、error budget | M | Beta |

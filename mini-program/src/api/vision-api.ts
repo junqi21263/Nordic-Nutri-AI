@@ -13,6 +13,7 @@ import { getLocalFileInfo } from "../utils/file-system-info";
 import { productApiEndpoint } from "./product-api-config";
 import {
   isVisionTerminalStatus,
+  isRetryableVisionStatusError,
   nextVisionPollDelay,
   normalizeVisionStatus,
   type VisionAsyncResponse,
@@ -182,10 +183,23 @@ export async function resumeVisionAnalysis(
   if (!analysisId) return null;
   const deadlineAt = options.deadlineAt ?? pending?.deadlineAt ?? Date.now() + 30_000;
   let attempt = 0;
+  let statusFetchRetries = 0;
   let firstRead = true;
   while (firstRead || Date.now() < deadlineAt) {
     firstRead = false;
-    const status = await getVisionAnalysisStatus(analysisId);
+    let status: VisionStatusPayload;
+    try {
+      status = await getVisionAnalysisStatus(analysisId);
+      statusFetchRetries = 0;
+    } catch (error) {
+      if (!isRetryableVisionStatusError(error) || statusFetchRetries >= 2 || Date.now() >= deadlineAt) {
+        throw error;
+      }
+      statusFetchRetries += 1;
+      await new Promise((resolve) => setTimeout(resolve, nextVisionPollDelay(attempt)));
+      attempt += 1;
+      continue;
+    }
     options.onStatus?.(status);
     if (isVisionTerminalStatus(status.status)) {
       clearPendingAnalysis(analysisId);

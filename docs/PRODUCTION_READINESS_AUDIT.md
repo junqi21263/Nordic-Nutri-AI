@@ -65,7 +65,7 @@ PG migrations: cloudbase/pg/migrations/
 
 | 模块 | 当前证据 | 审计判断 |
 |---|---|---|
-| Mini Program | Taro build、531 tests、typecheck、lint 通过 | 本地质量通过；生产前端版本未独立证明 |
+| Mini Program | Taro build、532 tests、typecheck、lint 通过 | 本地质量通过；生产前端版本未独立证明 |
 | `get-login-ticket` | 统一 HTTPS/auth/API/AI 边界；代码约 3,000+ 行 | 已运行但耦合度高，需拆分/固化发布边界 |
 | Vision foundation/hybrid | 本地实现、CAS、checkpoint、deadline tests；生产 S2/S3 受控 fixture | 后端核心链路通过；客户端和发布审计仍未闭环 |
 | Dispatcher/worker/reaper | 独立函数目录和 30 个定向测试 | 仓库存在；manifest/生产可复现性不足 |
@@ -78,7 +78,7 @@ PG migrations: cloudbase/pg/migrations/
 |---|---|---|
 | 1. Architecture | PARTIAL | 设计、模块和数据流清楚；timer-only dispatch 延迟与容量仍缺少实测 |
 | 2. Core Functions | PASS（后端） | 真机识别/营养/保存通过；S2 fallback 和 S3 checkpoint resume 已有生产受控证据，完整产品发布仍未关闭 |
-| 3. Frontend | PARTIAL | 531 tests、typecheck、lint、build、WXSS/size 通过；异步 polling/后台恢复生产真机和正式上传未验证 |
+| 3. Frontend | PARTIAL | 532 tests、typecheck、lint、build、WXSS/size 通过；异步 polling/后台恢复生产真机和正式上传未验证 |
 | 4. API Contract | PARTIAL | auth/legacy/ownership/read-only 有证据；曾出现 `VISION_STATUS_INVALID`，202 客户端合约未完成生产闭环 |
 | 5. Backend | PASS（核心链路） | 目标后端测试与生产 S2/S3 受控 fixture 通过；并发/容量证据仍缺失 |
 | 6. Database | PASS（当前迁移链） | 0047-0050 本地测试通过；生产 registry 已回读，CAS/配额 fixture 已通过 |
@@ -139,7 +139,7 @@ PG migrations: cloudbase/pg/migrations/
 
 ## Frontend Audit
 
-已通过：`pnpm --dir mini-program test:unit`（138 files / 531 tests）、typecheck、lint、生产 WeChat build、WXSS compatibility、package size（1.129 MiB / 1.717 MiB）。
+已通过：`pnpm --dir mini-program test:unit`（138 files / 532 tests）、typecheck、lint、生产 WeChat build、WXSS compatibility、package size（1.129 MiB / 1.717 MiB）。异步状态轮询对瞬时网络/状态读取失败增加了有界重试；确定性状态错误仍立即失败。
 
 未验证：正式体验版/审核版是否包含当前 `vision-async-client.ts`；真机 202 页面、轮询、切后台、退出扫描页、重进和弱网恢复；旧客户端收到旧错误合约；多设备并发。
 
@@ -188,7 +188,7 @@ Trace Explorer、processing 状态、stage timing、provider timing 和 sanitize
 | 检查 | 结果 |
 |---|---|
 | root initialization | PASS 3/3 |
-| Mini Program unit | PASS 531/531 |
+| Mini Program unit | PASS 532/532 |
 | Mini Program typecheck | PASS |
 | Mini Program lint | PASS |
 | WeChat build | PASS |

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isVisionTerminalStatus,
+  isRetryableVisionStatusError,
   nextVisionPollDelay,
   normalizeVisionStatus,
 } from "../src/features/scanner/vision-async-client";
@@ -31,5 +32,12 @@ describe("vision async client contract", () => {
     expect(nextVisionPollDelay(1)).toBe(2250);
     expect(nextVisionPollDelay(8)).toBe(5000);
     expect(nextVisionPollDelay(99)).toBe(5000);
+  });
+
+  it("only retries transient status-fetch failures during async recovery", () => {
+    expect(isRetryableVisionStatusError({ name: "VISION_STATUS_FAILED" })).toBe(true);
+    expect(isRetryableVisionStatusError({ name: "VISION_NETWORK_ERROR" })).toBe(true);
+    expect(isRetryableVisionStatusError({ name: "VISION_STATUS_INVALID" })).toBe(false);
+    expect(isRetryableVisionStatusError({ name: "VISION_NOT_FOUND" })).toBe(false);
   });
 });

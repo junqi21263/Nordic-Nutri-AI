@@ -40,6 +40,13 @@ export function isVisionTerminalStatus(status: string): boolean {
   return status === "completed" || status === "failed" || status === "timed_out" || status === "cancelled";
 }
 
+export function isRetryableVisionStatusError(error: unknown): boolean {
+  const name = error && typeof error === "object" && "name" in error
+    ? String((error as { name?: unknown }).name ?? "")
+    : "";
+  return name === "VISION_STATUS_FAILED" || name === "VISION_NETWORK_ERROR";
+}
+
 export function nextVisionPollDelay(attempt: number): number {
   const normalizedAttempt = Math.max(0, Number(attempt) || 0);
   return Math.min(5000, Math.round(1500 * (1.5 ** normalizedAttempt)));
