@@ -19,10 +19,10 @@
 
 | 项目 | 当前状态 | 证据/动作 |
 |---|---|---|
-| 真实运营主体全称 | PENDING OWNER INPUT | 替换页面中的个人开发者占位信息 |
+| 真实运营主体全称 | PARTIAL — PLATFORM SHOWS VERIFIED PERSONAL ENTITY (NAME MASKED) | 微信平台截图显示主体类型为个人、认证已完成且小程序已备案；完整法定主体名称仍需由负责人按平台登记信息补入页面，不能根据脱敏截图猜测 |
 | 有效联系邮箱/电话 | PENDING OWNER INPUT | 与页面和微信平台主体信息一致 |
 | 微信公众平台隐私指引 | PASS — PLATFORM UPDATED / UGC DECLARED (2026-08-19) | 微信公众平台“服务内容声明”显示用户隐私保护指引已更新，且用户生成内容（UGC）场景已声明；仍需留存平台回读截图/记录并确认与页面文案一致 |
-| 审核测试微信号 | PENDING OWNER INPUT | 不使用真实用户凭据 |
+| 审核测试微信号 | PENDING OWNER INPUT | 项目成员截图不等于审核测试微信号；需明确指定一个专用体验/审核账号并记录脱敏标识 |
 | 生产 HTTPS 域名 | PARTIAL — CODE CONFIGURED / PLATFORM READBACK PENDING | 当前代码配置请求域名 `lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com`，下载/分享资源域名 `lewis-healthy-d4glgqqzv73a5bc10-1420560890.tcloudbaseapp.com`；仍需微信平台配置回读 |
 | CloudBase 套餐/EnvId 记录 | PARTIAL — PLATFORM READBACK 2026-08-19 | EnvId `lewis-healthy-d4glgqqzv73a5bc10`；套餐 `baas_personal`；环境状态 NORMAL；到期时间 2026-09-03；提交前仍需负责人确认套餐/续期安排 |
 | 删除核验 | PENDING PRODUCTION EVIDENCE | 测试账号注销后回读 PG 用户数据和私有对象 |
