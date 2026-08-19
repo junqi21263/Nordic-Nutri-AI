@@ -46,7 +46,7 @@
     "latestVersion":"20260819000001"
   },
   "tests": {
-    "localTargeted": "PASS",
+    "localTargeted": "PASS — backend 575/575; Mini Program 532/532; typecheck/lint/build PASS",
     "miniProgramUnit": "532 tests PASS",
     "miniProgramWeappBuild": {"status":"PASS","files":110,"normalizedSha256":"22467032a7c42be26cb2994cc4c87986a310dfe9f57cba61d94ecf5ecb8a5adc"},
     "miniProgramWxss": "PASS",

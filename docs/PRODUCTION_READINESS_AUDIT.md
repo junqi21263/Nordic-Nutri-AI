@@ -198,8 +198,7 @@ Trace Explorer、processing 状态、stage timing、provider timing 和 sanitize
 | Mini Program lint | PASS |
 | WeChat build | PASS |
 | WXSS/size | PASS |
-| get-login-ticket | PASS 545/545（在允许本地监听的环境重跑） |
-| dispatcher/worker/reaper | PASS 30/30 |
+| backend functions (get-login-ticket/dispatcher/worker/reaper) | PASS 575/575（在允许本地监听的环境重跑） |
 | PG migration tests | PASS 47/47 |
 | manifest/schema/init tests | PASS 16/16 |
 | `git diff --check` | PASS |
