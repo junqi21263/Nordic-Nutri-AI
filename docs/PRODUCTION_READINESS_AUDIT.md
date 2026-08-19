@@ -13,7 +13,7 @@
 - S3 独立真实 Storage fixture 已完成 async-worker enriching resume：`worker.checkpoint_resume` 成功、`provider_attempt=1`、无 `worker.provider_start`，最终 `completed` 且 quota committed。
 - 当前四个 Hybrid flag 均为 `true`；这证明受控链路已开启，不等于公开 rollout 已批准。
 - 当前可重建 release candidate 已更新为 `docs/release-bundles/production-release-candidate.json`，其 source commit 为 `6fbde98620034bdb29c48d7b47a8900491c6d8bd`，worktree 在生成时 clean；candidate 包含 9 个函数、Vision dispatcher/worker/reaper trigger contract、生产 ignore 规则和当前 normalized SHA。
-- 隐私审核材料自动门禁已通过 `11/11`，但只证明材料结构和敏感凭据扫描，不替代真实主体、联系方式、平台配置、删除回读和审核责任人确认。
+- 隐私审核材料自动门禁已通过 `11/11`；微信公众平台截图已证明用户隐私保护指引已更新且 UGC 场景已声明，但自动门禁和截图仍不替代真实主体、联系方式、删除回读和审核责任人确认。
 - 当前 worktree 已 clean；四个 `$LATEST` 生产包已按同一 ignore 规则完成 normalized SHA `4/4 MATCH`。平台 `codeSha256` 仍作为独立 digest domain 记录。
 - 隐私审核材料仍为 `DRAFT — OWNER INPUT REQUIRED`。
 - 2026-08-19 只读平台回读：目标环境 `lewis-healthy-d4glgqqzv73a5bc10` 状态 NORMAL，PG RUNNING，套餐 `baas_personal`，自动续费开启，到期时间 2026-09-03 23:59:59；dispatcher `$LATEST` timer 为 `*/15 * * * * * *`，reaper `$LATEST` timer 为 `0 * * * * * *`，两个触发器均 BindStatus=on / Enable=1。
