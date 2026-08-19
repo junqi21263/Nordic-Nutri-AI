@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "status": "clean_candidate",
-  "generatedAt": "2026-08-19T09:15:40.205Z",
+  "generatedAt": "2026-08-19T09:28:33.849Z",
   "envId": "lewis-healthy-d4glgqqzv73a5bc10",
-  "commit": "8dc64a0995322e6321ca2acbae6760620d52ce8b",
+  "commit": "da38082eb0d6239fd493dea1e3cf6e4978283595",
   "dirtyFiles": [],
   "runtimePolicy": "Nodejs18.15 functions; Node 24.18.x tooling required for local release checks",
   "featureFlags": {
