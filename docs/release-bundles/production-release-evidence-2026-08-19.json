@@ -2,6 +2,15 @@
   "capturedAt": "2026-08-19",
   "envId": "lewis-healthy-d4glgqqzv73a5bc10",
   "releaseStatus": "NO_GO_PUBLIC_RELEASE_PENDING_CLIENT_PRIVACY_SRE",
+  "currentReleaseCandidate": {
+    "path": "docs/release-bundles/production-release-candidate.json",
+    "sourceCommit": "da38082eb0d6239fd493dea1e3cf6e4978283595",
+    "worktreeAtGeneration": "clean",
+    "manifestFunctions": 9,
+    "visionFunctionSet": ["vision-analysis-dispatcher", "vision-analysis-worker", "vision-analysis-reaper"],
+    "privacyPacketAutomatedGate": "PASS — 11/11",
+    "productionReadbackFields": "current production evidence below; unreconciled fields remain NOT_VERIFIED"
+  },
   "baseline": {
     "commit": "2a3b90afe99c3723473e18f8634d7ca412cdf611",
     "worktree": "clean",

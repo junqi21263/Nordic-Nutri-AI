@@ -12,6 +12,8 @@
 - 生产数据库回读确认同一 `client_request_id` 只有 1 条 analysis，`lease_until=null`、`execution_owner=none`、`dispatch_state=completed`。
 - S3 独立真实 Storage fixture 已完成 async-worker enriching resume：`worker.checkpoint_resume` 成功、`provider_attempt=1`、无 `worker.provider_start`，最终 `completed` 且 quota committed。
 - 当前四个 Hybrid flag 均为 `true`；这证明受控链路已开启，不等于公开 rollout 已批准。
+- 当前可重建 release candidate 已更新为 `docs/release-bundles/production-release-candidate.json`，其 source commit 为 `da38082eb0d6239fd493dea1e3cf6e4978283595`，worktree 在生成时 clean；candidate 包含 9 个函数、Vision dispatcher/worker/reaper trigger contract、生产 ignore 规则和当前 normalized SHA。
+- 隐私审核材料自动门禁已通过 `11/11`，但只证明材料结构和敏感凭据扫描，不替代真实主体、联系方式、平台配置、删除回读和审核责任人确认。
 - 当前 worktree 已 clean；四个 `$LATEST` 生产包已按同一 ignore 规则完成 normalized SHA `4/4 MATCH`。平台 `codeSha256` 仍作为独立 digest domain 记录。
 - 隐私审核材料仍为 `DRAFT — OWNER INPUT REQUIRED`。
 - 2026-08-19 只读平台回读：目标环境 `lewis-healthy-d4glgqqzv73a5bc10` 状态 NORMAL，PG RUNNING，套餐 `baas_personal`，自动续费开启，到期时间 2026-09-03 23:59:59；dispatcher `$LATEST` timer 为 `*/15 * * * * * *`，reaper `$LATEST` timer 为 `0 * * * * * *`，两个触发器均 BindStatus=on / Enable=1。
@@ -89,7 +91,7 @@ PG migrations: cloudbase/pg/migrations/
 | 9. Security | PARTIAL | HMAC、auth、sanitizer 有本地测试；生产互调权限、密钥轮换和完整外部安全审计未验证 |
 | 10. Privacy/Compliance | NO-GO | 隐私页面存在，但 release checklist 的主体/联系方式/微信平台声明/审核材料仍是未勾选项 |
 | 11. Observability/SRE | PARTIAL | Trace/metric/processing 状态修复已实现并有测试；告警接收人、阈值、演练和可检索性未闭环 |
-| 12. Deployment/Release/Rollback | PARTIAL | 四个 `$LATEST` 生产包 normalized SHA `4/4 MATCH`，并回读 Active/Available、CodeResult=success；客户端绑定和 rollback drill 仍未完成 |
+| 12. Deployment/Release/Rollback | PARTIAL | 四个 `$LATEST` 生产包 normalized SHA `4/4 MATCH`，并回读 Active/Available、CodeResult=success；当前候选已绑定 source commit `da38082`，客户端绑定和 rollback drill 仍未完成 |
 | 13. Testing | PARTIAL | 本地测试和构建强；生产 authenticated concurrent/async/old-client/device matrix 未完成 |
 | 14. Maintainability/Evolvability | PARTIAL | 测试覆盖较好；`get-login-ticket` 过大、runtime coupling、未提交变更和多套历史设计增加风险 |
 | 15. Cost Control | NO-GO | provider 双 attempt、存储、日志和日预算告警尚无生产实测与演练证据 |
