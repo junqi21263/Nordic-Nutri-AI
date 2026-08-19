@@ -49,6 +49,7 @@
   "transportHelper": "DEPLOYED/REACHABLE — invalid-HMAC probe returned 401 with zero-write path; production transport fixture invoke smoke PASS (dispatcher claim/invoke and worker handler reached; worker temp_url correctly rejected the synthetic non-storage path). Fixture was terminalized via CAS as timed_out with quota_state=none; terminal fixture row retained by the migration's non-destructive cleanup rule.",
   "rollback": "Prepared locally; production rollback drill NOT_VERIFIED",
   "privacy": "DRAFT — OWNER INPUT REQUIRED",
+  "secretRotation": "REQUIRED — sensitive values were not persisted in this bundle; rotate before public release and repeat presence-only readback",
   "artifactShaNote": "Normalized production SHA was computed from each CloudBase $LATEST download using the same production ignore rules; platformCodeSha256 remains a separate digest domain",
   "sensitiveValues": "redacted"
 }

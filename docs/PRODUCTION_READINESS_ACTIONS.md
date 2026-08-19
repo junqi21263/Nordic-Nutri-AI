@@ -13,6 +13,7 @@
 | P0-3 | P0 | Client Contract | Mini Program 异步版本与后端/flag 没有同一发布基线 | 本地 async client 有代码并具备有界瞬时失败重试；正式生产前端版本未独立证明 | 202/polling/reopen 行为不一致 | 绑定 client build、backend artifact、flag 和回滚版本 | 真机 200/202/GET/background/reopen | M | Yes |
 | P0-4 | P0 | Privacy/Compliance | 微信审核、主体、政策、删除核验未形成证据包 | `WECHAT_RELEASE_CHECKLIST.md` 关键项未勾选 | 无法合规公开发布 | 完成平台声明、审核账号、删除/保留证明 | 审核材料和管理员只读回读 | M | Yes |
 | P0-5 | P0 | SRE | 生产告警和值班演练缺失 | 未验证 5xx/timeout/p95/queue/quota/cost alerts | 事故无法及时发现或止损 | 配置阈值、接收人、runbook、回滚演练 | 触发测试告警并留证 | M | Yes |
+| P0-6 | P0 | Security | 函数详情回读曾包含敏感环境值 | 原文未进入发布包，但受影响 secret 需要轮换 | 旧 secret 暴露窗口/权限扩大 | 轮换受影响 secret、核对最小权限、重新做脱敏 readback | presence-only readback + invalidated-old-secret probe | M | Yes |
 | P1-1 | P1 | Performance | dispatcher/worker/AI 延迟分布未实测 | 仅有单次/截图 trace，缺少 p95/p99 和并发数据 | 并发扫描时队列和成本失控 | 小规模并发与 backlog 测试 | p50/p95/p99、error budget | M | Beta |
 | P1-2 | P1 | Correctness | 重复 POST、provider attempt、quota transition 的生产并发证据不足 | 本地 CAS tests 通过，生产并发未验证 | 重复调用/重复扣费 | 双请求、重试、worker 重入测试 | analysis/provider/quota 唯一性 | M | Beta |
 | P1-3 | P1 | Maintainability | `get-login-ticket` 职责过多 | 单文件/多领域 route/service coupling | 视觉改动影响 auth/meal/admin | 分阶段拆分 vision/observability | contract/regression/artifact tests | L | No |
@@ -29,7 +30,8 @@
 | P0-3 | 完成单样本 Final S2 E2E | `202 → claim → invoke → worker.entry → provider_attempt=2 → completed → quota=committed` | PASS（见 `docs/release-bundles/s2-e2e-2026-08-19.json`） |
 | P0-4 | 完成 S3 checkpoint resume | `resume_stage=enriching`、Qwen second call=0、最终 completed | PASS；真实 Storage fixture 经独立 worker resume，`worker.checkpoint_resume`、`provider_attempt=1`、无 `worker.provider_start`、最终 completed/quota committed |
 | P0-5 | 建立生产告警和值班证据 | 5xx、vision failure、p95、queue age、quota leak、cost 80% 告警演练 | 未完成 |
-| P0-6 | 完成微信审核/隐私/删除证据包 | 主体、联系方式、版本/生效日期、权限声明、测试号、删除回读 | 未完成 |
+| P0-6 | 轮换生产敏感配置并完成脱敏回读 | 受影响 secret 已轮换、旧值失效、readback 不含原文 | 未完成 |
+| P0-7 | 完成微信审核/隐私/删除证据包 | 主体、联系方式、版本/生效日期、权限声明、测试号、删除回读 | 未完成 |
 
 ## P1 — Limited Beta Blocking
 

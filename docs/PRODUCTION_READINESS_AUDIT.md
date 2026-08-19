@@ -102,6 +102,7 @@ PG migrations: cloudbase/pg/migrations/
 2. **客户端与生产发布一致性仍未闭环**：后端 clean commit 和四个 normalized SHA 已闭环，但 Mini Program 正式版本、灰度范围和回滚绑定仍未形成可审计证据。
 3. **客户端与后端合约不同步风险**：本地已实现 200/202/polling，但 Mini Program 正式发布/体验版版本和生产后端 artifact 的同一 SHA/版本关联未验证。Hybrid flag 若确实保持 ON，会把未完成的异步链路暴露给新客户端。
 4. **公开发布的隐私、审核和运营证据未完成**：`docs/WECHAT_RELEASE_CHECKLIST.md` 中关键项目仍未勾选；这不是代码测试可以替代的合规门。
+5. **生产敏感配置需要轮换并重新核验**：一次函数详情回读包含敏感环境值；原文未写入发布包或本报告，但公开上线前必须轮换受影响 secret、确认最小权限，并验证 readback 只返回 presence/脱敏摘要。
 
 ### P1 — 受控 Beta 前必须关闭或明确豁免
 
@@ -167,7 +168,7 @@ Qwen Flash 有成功样本，故不是“provider 永远不可用”。但生产
 
 ## Security Audit
 
-本地测试证明了认证、HMAC-before-auth、fail-closed fixture provisioning、敏感字段 sanitizer、服务端密钥边界等若干控制；未发现本轮源码中客户端直接持有 DB/API key 的证据。仍需完成生产密钥轮换/回收、HMAC 独立 secret 归属、最小权限、函数互调权限、审计访问控制和外部攻击测试。
+本地测试证明了认证、HMAC-before-auth、fail-closed fixture provisioning、敏感字段 sanitizer、服务端密钥边界等若干控制；未发现本轮源码中客户端直接持有 DB/API key 的证据。一次函数详情回读包含敏感环境值，原文未进入 bundle；仍需完成生产密钥轮换/回收、HMAC 独立 secret 归属、最小权限、函数互调权限、审计访问控制和外部攻击测试。
 
 ## Privacy Audit
 
