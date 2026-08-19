@@ -4,7 +4,7 @@
   "releaseStatus": "NO_GO_PUBLIC_RELEASE_PENDING_CLIENT_PRIVACY_SRE",
   "currentReleaseCandidate": {
     "path": "docs/release-bundles/production-release-candidate.json",
-    "sourceCommit": "da38082eb0d6239fd493dea1e3cf6e4978283595",
+    "sourceCommit": "9e1ea14a34567994cb0499e30381db2686d19d4a",
     "worktreeAtGeneration": "clean",
     "manifestFunctions": 9,
     "visionFunctionSet": ["vision-analysis-dispatcher", "vision-analysis-worker", "vision-analysis-reaper"],
