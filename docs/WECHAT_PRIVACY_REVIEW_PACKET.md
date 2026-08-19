@@ -23,7 +23,7 @@
 | 有效联系邮箱/电话 | PENDING OWNER INPUT | 与页面和微信平台主体信息一致 |
 | 微信公众平台隐私指引 | PENDING PLATFORM CONFIG | 逐项声明相机、相册、头像用途 |
 | 审核测试微信号 | PENDING OWNER INPUT | 不使用真实用户凭据 |
-| 生产 HTTPS 域名 | PENDING PLATFORM READBACK | 回读请求、上传、下载域名配置 |
+| 生产 HTTPS 域名 | PARTIAL — CODE CONFIGURED / PLATFORM READBACK PENDING | 当前代码配置请求域名 `lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com`，下载/分享资源域名 `lewis-healthy-d4glgqqzv73a5bc10-1420560890.tcloudbaseapp.com`；仍需微信平台配置回读 |
 | CloudBase 套餐/EnvId 记录 | PARTIAL — PLATFORM READBACK 2026-08-19 | EnvId `lewis-healthy-d4glgqqzv73a5bc10`；套餐 `baas_personal`；环境状态 NORMAL；到期时间 2026-09-03；提交前仍需负责人确认套餐/续期安排 |
 | 删除核验 | PENDING PRODUCTION EVIDENCE | 测试账号注销后回读 PG 用户数据和私有对象 |
 | 告警接收人 | PENDING OPS CONFIG | 5xx、视觉失败率、p95、限流、注销失败、日成本 |

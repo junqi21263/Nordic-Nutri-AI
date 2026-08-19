@@ -12,7 +12,7 @@
 - 生产数据库回读确认同一 `client_request_id` 只有 1 条 analysis，`lease_until=null`、`execution_owner=none`、`dispatch_state=completed`。
 - S3 独立真实 Storage fixture 已完成 async-worker enriching resume：`worker.checkpoint_resume` 成功、`provider_attempt=1`、无 `worker.provider_start`，最终 `completed` 且 quota committed。
 - 当前四个 Hybrid flag 均为 `true`；这证明受控链路已开启，不等于公开 rollout 已批准。
-- 当前可重建 release candidate 已更新为 `docs/release-bundles/production-release-candidate.json`，其 source commit 为 `da38082eb0d6239fd493dea1e3cf6e4978283595`，worktree 在生成时 clean；candidate 包含 9 个函数、Vision dispatcher/worker/reaper trigger contract、生产 ignore 规则和当前 normalized SHA。
+- 当前可重建 release candidate 已更新为 `docs/release-bundles/production-release-candidate.json`，其 source commit 为 `6fbde98620034bdb29c48d7b47a8900491c6d8bd`，worktree 在生成时 clean；candidate 包含 9 个函数、Vision dispatcher/worker/reaper trigger contract、生产 ignore 规则和当前 normalized SHA。
 - 隐私审核材料自动门禁已通过 `11/11`，但只证明材料结构和敏感凭据扫描，不替代真实主体、联系方式、平台配置、删除回读和审核责任人确认。
 - 当前 worktree 已 clean；四个 `$LATEST` 生产包已按同一 ignore 规则完成 normalized SHA `4/4 MATCH`。平台 `codeSha256` 仍作为独立 digest domain 记录。
 - 隐私审核材料仍为 `DRAFT — OWNER INPUT REQUIRED`。
@@ -72,7 +72,7 @@ PG migrations: cloudbase/pg/migrations/
 | Mini Program | Taro build、532 tests、typecheck、lint 通过 | 本地质量通过；生产前端版本未独立证明 |
 | `get-login-ticket` | 统一 HTTPS/auth/API/AI 边界；代码约 3,000+ 行 | 已运行但耦合度高，需拆分/固化发布边界 |
 | Vision foundation/hybrid | 本地实现、CAS、checkpoint、deadline tests；生产 S2/S3 受控 fixture | 后端核心链路通过；客户端和发布审计仍未闭环 |
-| Dispatcher/worker/reaper | 独立函数目录和 30 个定向测试 | 仓库存在；manifest/生产可复现性不足 |
+| Dispatcher/worker/reaper | 独立函数目录、生产 manifest/trigger contract 和定向测试 | 生产 artifact/readback 已有证据；并发容量与持续 SLO 仍未闭环 |
 | PostgreSQL | 0047-0051 SQL/readback/rollback tests；0051 真实 PG 验证 | 生产 registry 已回读至 `20260819000001 vision_quota_expiry_reconcile`；CAS/配额 fixture 与 quota 一致性回读已通过 |
 | Observability/Admin | Trace Explorer、sanitizer、system health | 有基础能力；告警和持续 SLO 证据不足 |
 
@@ -91,7 +91,7 @@ PG migrations: cloudbase/pg/migrations/
 | 9. Security | PARTIAL | HMAC、auth、sanitizer 有本地测试；生产互调权限、密钥轮换和完整外部安全审计未验证 |
 | 10. Privacy/Compliance | NO-GO | 隐私页面存在，但 release checklist 的主体/联系方式/微信平台声明/审核材料仍是未勾选项 |
 | 11. Observability/SRE | PARTIAL | Trace/metric/processing 状态修复已实现并有测试；告警接收人、阈值、演练和可检索性未闭环 |
-| 12. Deployment/Release/Rollback | PARTIAL | 四个 `$LATEST` 生产包 normalized SHA `4/4 MATCH`，并回读 Active/Available、CodeResult=success；当前候选已绑定 source commit `da38082`，客户端绑定和 rollback drill 仍未完成 |
+| 12. Deployment/Release/Rollback | PARTIAL | 四个 `$LATEST` 生产包 normalized SHA `4/4 MATCH`，并回读 Active/Available、CodeResult=success；当前候选已绑定 source commit `6fbde98`，客户端绑定和 rollback drill 仍未完成 |
 | 13. Testing | PARTIAL | 本地测试和构建强；生产 authenticated concurrent/async/old-client/device matrix 未完成 |
 | 14. Maintainability/Evolvability | PARTIAL | 测试覆盖较好；`get-login-ticket` 过大、runtime coupling、未提交变更和多套历史设计增加风险 |
 | 15. Cost Control | NO-GO | provider 双 attempt、存储、日志和日预算告警尚无生产实测与演练证据 |
