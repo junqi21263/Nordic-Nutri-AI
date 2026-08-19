@@ -72,6 +72,7 @@ test("assembles every runtime service after the RDB client is available", () => 
   for (const capability of ["issue", "verifySession"]) assert.equal(typeof service[capability], "function");
   for (const capability of ["data", "meals", "insights", "coach", "feedback"]) assert.ok(service[capability]);
   assert.equal(service.vision, null);
+  assert.equal(service.visionAnalysisFoundationEnabled, false);
   assert.equal(service.foodImageDispatchSecret, "");
 });
 
@@ -99,6 +100,32 @@ test("uses the existing worker secret only as a first-rollout fallback for dispa
     CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret", AI_WORKER_SHARED_SECRET: "worker-secret",
   }, { cloudbaseSdk: { init: () => ({ rdb: () => db }) } });
   assert.equal(service.foodImageDispatchSecret, "worker-secret");
+});
+
+test("vision analysis status is read-only and enforces owner isolation", async () => {
+  let reads = 0;
+  let mutations = 0;
+  const service = {
+    visionAnalysisFoundationEnabled: true,
+    verifySession: (token) => ({ sub: token === "a" ? "user-a" : "user-b" }),
+    visionAnalysisFoundation: {
+      getOwnedAnalysis: async (userId) => {
+        reads += 1;
+        return userId === "user-a" ? { analysisId: "11111111-1111-4111-8111-111111111111", status: "completed" } : null;
+      },
+      createVisionAnalysis: async () => { mutations += 1; },
+    },
+  };
+  const server = createHttpServer({ service });
+  await withServer(server, async (baseUrl) => {
+    const first = await fetch(`${baseUrl}/vision-analysis/11111111-1111-4111-8111-111111111111`, { headers: { authorization: "Bearer a" } });
+    assert.equal(first.status, 200);
+    assert.equal((await first.json()).status, "completed");
+    const second = await fetch(`${baseUrl}/vision-analysis/11111111-1111-4111-8111-111111111111`, { headers: { authorization: "Bearer b" } });
+    assert.equal(second.status, 404);
+  });
+  assert.equal(reads, 2);
+  assert.equal(mutations, 0);
 });
 
 test("delegates food insight to dev through the existing signed worker configuration", async () => {
@@ -963,6 +990,64 @@ test("accepts authenticated visual analysis without trusting a client user id", 
   assert.equal(calls[0].userId, "user-1");
 });
 
+test("correlates vision timeout diagnostics across request, image, and provider stages", async () => {
+  const finished = [];
+  const stages = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      vision: {
+        validateImage: () => {},
+        analyzeImage: async () => { throw new PublicVisionDataError("VISION_TIMEOUT", "识别时间有点久，请重试"); },
+        provider: "qwen",
+        model: "qwen3-vl-flash",
+      },
+      observability: {
+        startTrace: () => ({ traceId: "trace_diagnostic", stages: [] }),
+        recordStage: (_trace, stage) => stages.push(stage),
+        finishTrace: async (_trace, result) => { finished.push(result); },
+        recordMetric: async () => {},
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/vision-analysis`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({
+        clientRequestId: "11111111-1111-4111-8111-111111111111",
+        source: "camera",
+        contentType: "image/heic",
+        imageBase64: "AA==",
+        diagnostics: {
+          originalContentType: "image/heic",
+          finalContentType: "image/jpeg",
+          originalBytes: 4000000,
+          finalBytes: 700000,
+          originalWidth: 3024,
+          originalHeight: 4032,
+          finalWidth: 1280,
+          finalHeight: 1706,
+          orientation: "right-top",
+          imagePrepareDurationMs: 420,
+        },
+      }),
+    });
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get("x-trace-id"), "trace_diagnostic");
+  });
+
+  assert.equal(finished[0].status, "timed_out");
+  assert.equal(finished[0].providerRequestIdHash, null);
+  assert.equal(finished[0].meta.source, "camera");
+  assert.equal(finished[0].meta.originalContentType, "image/heic");
+  assert.equal(finished[0].meta.finalWidth, 1280);
+  assert.equal(typeof finished[0].meta.requestTotalDurationMs, "number");
+  assert.equal(typeof finished[0].meta.remainingBudgetMs, "number");
+  assert.equal(stages.length, 0);
+});
+
 test("validates the vision image before consuming the daily and burst quota", async () => {
   const quotaOperations = [];
   const server = createHttpServer({
@@ -1233,6 +1318,33 @@ test("internal batch dispatcher requires an HMAC signature and does not use an a
     assert.equal(accepted.status, 200);
     assert.deepEqual(await accepted.json(), { dispatched: 2, attempted: 2 });
     assert.deepEqual(calls, [{ maxItems: 2 }]);
+  });
+});
+
+test("internal vision diagnostic records only the sanitized stage event", async () => {
+  const events = [];
+  const server = createHttpServer({
+    service: {
+      visionAnalysisDispatchSecret: "dispatch-test-secret",
+      observability: { recordMetric: async (metric, value, meta) => events.push({ metric, value, meta }) },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const path = "/get-login-ticket/api/internal/vision-analysis/diagnostic";
+    const body = JSON.stringify({ stage: "dispatcher.worker_invoke_start", status: "started", analysisId: "analysis-1", jobId: "job-1", version: 4, token: "must-not-persist" });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = signFoodImageDispatch("dispatch-test-secret", { timestamp, path: "/api/internal/vision-analysis/diagnostic", body });
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-vision-dispatch-timestamp": timestamp, "x-vision-dispatch-signature": signature },
+      body,
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { recorded: true });
+    assert.equal(events[0].metric, "vision_async_execution_stage");
+    assert.equal(events[0].meta.stage, "dispatcher.worker_invoke_start");
+    assert.equal(events[0].meta.jobId, "job-1");
+    assert.equal("token" in events[0].meta, false);
   });
 });
 

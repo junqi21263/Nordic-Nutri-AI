@@ -2,7 +2,7 @@ import { Image, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { getProductAccountUsage } from "../../api/product-data-api";
-import { analyzeProductImage } from "../../api/vision-api";
+import { analyzeProductImage, readPendingVisionAnalysisId, resumeVisionAnalysis } from "../../api/vision-api";
 import { AppButton } from "../../components/app-button";
 import { BottomSheet } from "../../components/bottom-sheet";
 import { FirstRunTip } from "../../components/first-run-tip";
@@ -59,6 +59,7 @@ export default function FoodScannerPage() {
   const [showScannerTip, setShowScannerTip] = useState(shouldShowScannerTip);
   const [visionRemaining, setVisionRemaining] = useState<number | null>(null);
   const isScanningRef = useRef(false);
+  const pendingResumeRef = useRef(false);
   const suppressPreviewResetRef = useRef(false);
   const preview = scanner.capturedMeal ?? scanner.candidates[0] ?? null;
   const visionQuotaExhausted = isVisionQuotaExhausted(visionRemaining);
@@ -80,6 +81,31 @@ export default function FoodScannerPage() {
     // session is active so chooseMedia onShow does not wipe the just-selected image.
     if (suppressPreviewResetRef.current || isScanningRef.current) return;
     clearPreviewDisplay();
+    const pendingAnalysisId = readPendingVisionAnalysisId();
+    if (!pendingAnalysisId || pendingResumeRef.current) return;
+    pendingResumeRef.current = true;
+    isScanningRef.current = true;
+    setIsScanning(true);
+    void resumeVisionAnalysis({
+      onStatus: (status) => console.info("[vision] async status", {
+        analysisId: status.analysisId,
+        status: status.status,
+        currentStage: status.currentStage,
+      }),
+    }).then((meal) => {
+      if (!meal) return;
+      scanner.setCapturedMeal(meal);
+      analysis.setAnalysis(meal);
+      scanner.markResultRevealPending();
+      return Taro.navigateTo({ url: "/pages/analysis-result/index?reveal=1" });
+    }).catch((error) => {
+      if (error instanceof Error && error.name === "VISION_ASYNC_PROCESSING") return;
+      console.warn("[vision] pending analysis recovery failed:", error);
+    }).finally(() => {
+      pendingResumeRef.current = false;
+      isScanningRef.current = false;
+      setIsScanning(false);
+    });
   });
 
   useEffect(() => {
@@ -110,7 +136,7 @@ export default function FoodScannerPage() {
     });
   };
 
-  const analyzeCurrentPreview = async (previewPath: string, recognitionStartedAt = Date.now(), mediaAcquisitionMs = 0) => {
+  const analyzeCurrentPreview = async (previewPath: string, recognitionStartedAt = Date.now(), mediaAcquisitionMs = 0, source: "camera" | "album" = "camera") => {
     if (isScanningRef.current) return;
     isScanningRef.current = true;
     setIsScanning(true);
@@ -122,6 +148,7 @@ export default function FoodScannerPage() {
         meal = await analyzeProductImage(previewPath, {
           recognitionStartedAt,
           deadlineAt: clientDeadlineAt,
+          source,
           onTiming: (event) => console.info("[vision] client timing", { ...event, media_acquisition_ms: mediaAcquisitionMs }),
         });
       } catch (error) {
@@ -131,6 +158,7 @@ export default function FoodScannerPage() {
         const isContentBlocked = errorName === "VISION_CONTENT_BLOCKED";
         const isNonFood = errorName === "VISION_NON_FOOD";
         const isVisionTimeout = errorName === "VISION_TIMEOUT";
+        const isAsyncProcessing = errorName === "VISION_ASYNC_PROCESSING";
         const isVisionNetworkError = errorName === "VISION_NETWORK_ERROR";
         console.error("[vision] analyzeProductImage failed:", error);
         const visionRemainingAfterLimit = errorName === "RATE_LIMITED" ? await refreshVisionUsage() : null;
@@ -145,6 +173,8 @@ export default function FoodScannerPage() {
               ? "上传的图片为非食物，请重新上传食物图片"
               : isVisionTimeout
                 ? "识别时间有点久，请重新试一次"
+                : isAsyncProcessing
+                  ? "识别仍在后台处理中，稍后回来查看"
                 : isVisionNetworkError
                   ? "网络似乎不太稳定，请检查后重试"
               : error instanceof Error
@@ -206,7 +236,7 @@ export default function FoodScannerPage() {
       setFallbackOpen(false);
       // Any successful capture path completes step 2 — not only the tip CTA.
       dismissScannerTip();
-      await analyzeCurrentPreview(previewPath, recognitionStartedAt, mediaAcquisitionMs);
+      await analyzeCurrentPreview(previewPath, recognitionStartedAt, mediaAcquisitionMs, source);
     } catch (error) {
       // User closed the album/camera without picking — stay on the page quietly.
       if (isUserCancelMediaChoice(error)) return;

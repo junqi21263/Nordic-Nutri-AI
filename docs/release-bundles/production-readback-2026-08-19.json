@@ -1,0 +1,56 @@
+{
+  "capturedAt": "2026-08-19",
+  "envId": "lewis-healthy-d4glgqqzv73a5bc10",
+  "authStatus": "READY",
+  "environmentStatus": "NORMAL",
+  "package": "baas_personal",
+  "runtime": "postgresql",
+  "functions": {
+    "get-login-ticket": {
+      "status": "Active",
+      "availableStatus": "Available",
+      "codeResult": "success",
+      "runtime": "Nodejs18.15",
+      "qualifier": "$LATEST",
+      "modTime": "2026-08-19 15:26:32",
+      "cloudbaseCodeSha256": "2c905bcea5e4de9b6b4231c3aa34b4b691d42cbdefe01f3a63f9fe3b263d3092"
+    },
+    "vision-analysis-dispatcher": {
+      "status": "Active",
+      "availableStatus": "Available",
+      "codeResult": "success",
+      "runtime": "Nodejs18.15",
+      "qualifier": "$LATEST",
+      "modTime": "2026-08-19 15:09:14",
+      "cloudbaseCodeSha256": "d1fce0324c758721569a7f831554df5a7e641f00c5f26b054f9f4b95fa66ec69",
+      "timer": "*/15 * * * * * *"
+    },
+    "vision-analysis-worker": {
+      "status": "Active",
+      "availableStatus": "Available",
+      "codeResult": "success",
+      "runtime": "Nodejs18.15",
+      "qualifier": "$LATEST",
+      "modTime": "2026-08-19 16:03:00",
+      "cloudbaseCodeSha256": "4b4c0370f953e1040b131919aa630b22664ee69f50af6bf84daad5dc3e4ab15f"
+    },
+    "vision-analysis-reaper": {
+      "status": "Active",
+      "availableStatus": "Available",
+      "codeResult": "success",
+      "runtime": "Nodejs18.15",
+      "qualifier": "$LATEST",
+      "modTime": "2026-08-19 14:49:29",
+      "cloudbaseCodeSha256": "45a5f742bd50b44809d15ca37972ca37dd2f18e84ca5d3a652a2805ca39f045",
+      "timer": "0 * * * * * *"
+    }
+  },
+  "featureFlags": {
+    "get-login-ticket": "true",
+    "vision-analysis-dispatcher": "true",
+    "vision-analysis-worker": "true",
+    "vision-analysis-reaper": "true"
+  },
+  "shaNote": "cloudbaseCodeSha256 is the platform-provided deployed-code digest; it is not the normalized artifact SHA and must not be compared directly.",
+  "sensitiveValues": "redacted"
+}

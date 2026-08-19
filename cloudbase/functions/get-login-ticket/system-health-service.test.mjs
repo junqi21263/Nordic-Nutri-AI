@@ -50,6 +50,22 @@ test("health reports windows, latency percentiles, provider state and latest job
   assert.equal(providerCalls, 0);
 });
 
+test("processing traces are in flight, not failures", async () => {
+  const now = Date.now();
+  const service = createSystemHealthService({
+    db: createDb({ traces: [
+      { status: "processing", http_status: 202, duration_ms: 6100, started_at: new Date(now - 10_000).toISOString(), provider: "vision", feature: "vision" },
+      { status: "succeeded", http_status: 200, duration_ms: 100, started_at: new Date(now - 20_000).toISOString(), provider: "vision", feature: "vision" },
+    ] }),
+    providerConfig: { vision: { configured: true } },
+  });
+
+  const health = await service.getHealth();
+  assert.equal(health.windows.last1h.processing, 1);
+  assert.equal(health.windows.last1h.failed, 0);
+  assert.equal(health.windows.last1h.successRate, 1);
+});
+
 test("database and trace data failure produces partial unhealthy response without raw errors", async () => {
   const service = createSystemHealthService({
     db: {
@@ -66,4 +82,3 @@ test("database and trace data failure produces partial unhealthy response withou
   assert.equal(health.components.traces.status, "unavailable");
   assert.equal(JSON.stringify(health).includes("secret"), false);
 });
-

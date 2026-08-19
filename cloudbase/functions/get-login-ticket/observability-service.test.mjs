@@ -6,6 +6,7 @@ import {
   shanghaiDayKey,
   buildDaySeries,
   enumerateDays,
+  buildDiagnosticPackage,
 } from "./observability-service.cjs";
 
 function createDb({ metrics = [], deletionLog = [] } = {}) {
@@ -115,6 +116,45 @@ test("startTrace generates a server trace id and ignores client trace overrides"
   assert.equal(trace.lastStage, null);
 });
 
+test("diagnostic package exposes vision payload and provider timing without raw content", () => {
+  const packageData = buildDiagnosticPackage({
+    traceId: "trace_1",
+    clientRequestId: "client_1",
+    feature: "vision",
+    provider: "qwen",
+    providerRequestIdHash: "a".repeat(64),
+    status: "timed_out",
+    durationMs: 6005,
+    meta: {
+      source: "camera",
+      originalContentType: "image/heic",
+      finalContentType: "image/jpeg",
+      originalBytes: 4000000,
+      finalBytes: 700000,
+      originalWidth: 3024,
+      originalHeight: 4032,
+      finalWidth: 1280,
+      finalHeight: 1706,
+      orientation: "right-top",
+      tempUrlGenerationMs: 120,
+      timeoutBudgetMs: 6000,
+      providerRequestDurationMs: 6001,
+      providerErrorType: "abort",
+      requestTotalDurationMs: 9000,
+      remainingBudgetMs: 3500,
+      rawImageBase64: "must not persist",
+    },
+  });
+
+  assert.equal(packageData.request.source, "camera");
+  assert.equal(packageData.vision.originalContentType, "image/heic");
+  assert.equal(packageData.vision.finalWidth, 1280);
+  assert.equal(packageData.vision.tempUrlGenerationMs, 120);
+  assert.equal(packageData.vision.providerErrorType, "abort");
+  assert.equal(packageData.result.requestTotalDurationMs, 9000);
+  assert.equal(packageData.replayHints.rawImageBase64, undefined);
+});
+
 test("finishTrace persists a fixed trace payload and swallows observability failures", async () => {
   const { db, inserts } = createDb();
   const service = createObservabilityService({ db });
@@ -141,6 +181,23 @@ test("finishTrace persists a fixed trace payload and swallows observability fail
   assert.equal(insert.payload.last_stage, "vision.model");
   assert.equal(insert.payload.stages_json[0].name, "vision.model");
   assert.equal(insert.payload.meta_json.prompt, undefined);
+});
+
+test("finishTrace preserves processing for an accepted async handoff", async () => {
+  const { db, inserts } = createDb();
+  const service = createObservabilityService({ db });
+  const trace = service.startTrace({ feature: "vision", clientRequestId: "client-async-1" });
+
+  await service.finishTrace(trace, {
+    status: "processing",
+    httpStatus: 202,
+    meta: { analysisId: "analysis-1", fastPathOutcome: "handed_off" },
+  });
+
+  const insert = inserts.find((item) => item.table === "ops_request_traces");
+  assert.equal(insert.payload.status, "processing");
+  assert.equal(insert.payload.http_status, 202);
+  assert.equal(insert.payload.meta_json.fastPathOutcome, "handed_off");
 });
 
 test("finishTrace returns when the observability database write hangs", async () => {

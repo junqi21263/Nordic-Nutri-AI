@@ -27,6 +27,9 @@ class PublicVisionDataError extends Error {
 function readImage(input) {
   if (typeof input?.clientRequestId !== "string" || !uuidPattern.test(input.clientRequestId)) throw new PublicVisionDataError("VISION_IMAGE_INVALID");
   if (!acceptedContentTypes.has(input.contentType)) throw new PublicVisionDataError("VISION_IMAGE_INVALID");
+  if (typeof input.storedImageUrl === "string" && /^https:\/\//i.test(input.storedImageUrl) && typeof input.imagePath === "string" && input.imagePath) {
+    return { content: null, contentType: input.contentType, clientRequestId: input.clientRequestId, stored: true };
+  }
   if (typeof input.imageBase64 !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(input.imageBase64)) throw new PublicVisionDataError("VISION_IMAGE_INVALID");
   const content = Buffer.from(input.imageBase64, "base64");
   if (content.length < 4 || content.length > MAX_DECODED_IMAGE_BYTES) {
@@ -105,10 +108,10 @@ function createVisionDataService({
     validateImage(input) {
       return readImage(input);
     },
-    async analyzeImage(userId, input, { budget, observe = () => {} } = {}) {
+    async analyzeImage(userId, input, { budget, observe = () => {}, onAssetReady, onProviderSuccess } = {}) {
       if (typeof analyze !== "function") throw new PublicVisionDataError("VISION_SERVICE_NOT_CONFIGURED", "图片识别服务未配置");
       const image = readImage(input);
-      if (typeof assertImageSafe === "function") {
+      if (typeof assertImageSafe === "function" && image.content) {
         const securityStartedAt = Date.now();
         try {
           const securityTimeoutMs = budget?.stageTimeout
@@ -142,23 +145,66 @@ function createVisionDataService({
           throw securityError;
         }
       }
-      const stored = await compressVisionImageForStorage(image.content, image.contentType);
+      const stored = image.stored ? { buffer: null, contentType: image.contentType } : await compressVisionImageForStorage(image.content, image.contentType);
       const storeContent = stored.buffer;
       const storeContentType = stored.contentType || "image/jpeg";
-      const sha256 = crypto.createHash("sha256").update(storeContent).digest("hex");
-      const extension = storeContentType === "image/png" ? "png" : storeContentType === "image/webp" ? "webp" : "jpg";
-      const cloudPath = `food-images/${userId}/${crypto.randomUUID()}.${extension}`;
-      const uploadStartedAt = Date.now();
-      const uploaded = await uploadImage({ cloudPath, content: storeContent, contentType: storeContentType, budget, observe });
-      observe({ stage: "upload", ms: Date.now() - uploadStartedAt, uploadSuccess: true });
+      const sha256 = image.stored && /^[0-9a-f]{64}$/i.test(String(input.imageSha256 || ""))
+        ? String(input.imageSha256).toLowerCase()
+        : crypto.createHash("sha256").update(storeContent).digest("hex");
+      const cloudPath = image.stored ? input.imagePath : `food-images/${userId}/${crypto.randomUUID()}.${storeContentType === "image/png" ? "png" : storeContentType === "image/webp" ? "webp" : "jpg"}`;
+      const uploaded = image.stored
+        ? { cloudPath, imageUrl: input.storedImageUrl }
+        : await (async () => {
+          const uploadStartedAt = Date.now();
+          const result = await uploadImage({ cloudPath, content: storeContent, contentType: storeContentType, budget, observe });
+          observe({ stage: "upload", ms: Date.now() - uploadStartedAt, uploadSuccess: true });
+          return result;
+        })();
       if (typeof uploaded?.imageUrl !== "string" || !uploaded.imageUrl) throw new Error("Vision image upload failed");
+      let assetPersisted = image.stored && input.storedAsset === true;
+      if (typeof onAssetReady === "function") {
+        const assetReady = await onAssetReady({
+          analysisId: input.analysisId || null,
+          userId,
+          cloudPath: uploaded.cloudPath,
+          contentType: storeContentType,
+          byteSize: image.stored ? Number(input.storedByteSize || 0) : storeContent.length,
+          imageSha256: sha256,
+        });
+        assetPersisted = assetReady?.assetId != null || assetReady === true;
+      }
       let modelTrace = null;
-      const result = await analyze({
-        imageUrl: uploaded.imageUrl,
-        budget,
-        observe,
-        onTrace: (trace) => { modelTrace = trace; },
-      });
+      const result = input.providerCheckpoint && typeof input.providerCheckpoint === "object"
+        ? input.providerCheckpoint
+        : await analyze({
+          imageUrl: uploaded.imageUrl,
+          budget,
+          observe,
+          onTrace: (trace) => { modelTrace = trace; },
+        });
+      let providerCheckpointed = false;
+      if (typeof onProviderSuccess === "function") {
+        await onProviderSuccess({
+          analysisId: input.analysisId || null,
+          userId,
+          providerResult: result,
+          imagePath: uploaded.cloudPath,
+          imageSha256: sha256,
+          providerAttempt: Number(input.providerAttempt || 1),
+        });
+        providerCheckpointed = true;
+      }
+      const downstreamReserveMs = NUTRITION_MAX_TIMEOUT_MS + EVALUATION_MAX_TIMEOUT_MS + PERSISTENCE_RESERVE_MS;
+      if (providerCheckpointed && budget?.remainingMs && budget.remainingMs() <= downstreamReserveMs) {
+        observe({ stage: "provider_checkpoint", ms: 0, status: "succeeded", resumeStage: "enriching" });
+        return {
+          kind: "checkpoint",
+          analysisId: input.analysisId || null,
+          providerResult: result,
+          providerAttempt: Number(input.providerAttempt || 1),
+          resumeStage: "enriching",
+        };
+      }
 
       // Backfill per-100g nutrition from USDA food catalog. Flash nutrition remains usable
       // when it already satisfies the save contract; otherwise backfill is required.
@@ -251,7 +297,7 @@ function createVisionDataService({
           ? uploaded.cloudPath
           : null;
         let assetId = null;
-        if (durablePath) {
+        if (durablePath && !assetPersisted && storeContent) {
           try {
             const asset = await db.from("uploaded_assets").insert({
               user_id: userId,
@@ -274,23 +320,36 @@ function createVisionDataService({
         if (budget?.remainingMs && budget.remainingMs() <= 0) {
           throw new PublicVisionDataError("VISION_TIMEOUT", "识别时间有点久，请重新试一次");
         }
-        let analysisId = assetId;
+        let analysisId = input.analysisId || assetId;
         try {
-          const saved = await db.from("ai_analysis").insert({
+          if (input.deferAnalysisPersistence === true) {
+            persistenceState.analysisId = analysisId;
+            return analysisId;
+          }
+          const analysisPayload = {
             user_id: userId,
             image_path: durablePath,
             image_sha256: sha256,
             provider: result.provider || provider,
             model: result.model || model,
-            status: "succeeded",
+            status: "completed",
             confidence: result.confidence,
             raw_recognition: result,
             normalized_items: backfilledItems,
             advice: result.advice || null,
             client_request_id: image.clientRequestId,
-          }).select("id").single();
-          if (saved.data?.id) analysisId = saved.data.id;
-          if (!analysisId) throw new Error("ai_analysis insert returned no id");
+            completed_at: new Date().toISOString(),
+          };
+          const saved = input.analysisId
+            ? await db.from("ai_analysis").update({ ...analysisPayload, status: "completed", current_stage: "persisting", completed_at: new Date().toISOString() }).eq("id", input.analysisId).eq("user_id", userId).select("id").single()
+            : await db.from("ai_analysis").insert(analysisPayload).select("id").single();
+          if (saved?.error) throw new Error(saved.error.message || "ai_analysis persistence failed");
+          if (!saved?.data?.id) throw new Error("ai_analysis persistence returned no id");
+          analysisId = saved.data.id;
+          if (assetId) {
+            const linked = await db.from("uploaded_assets").update({ analysis_id: analysisId }).eq("id", assetId);
+            if (linked?.error) throw new Error(linked.error.message || "uploaded_assets linkage failed");
+          }
           persistenceState.analysisId = analysisId;
         } catch (dbErr) {
           console.error("[vision] ai_analysis insert failed:", dbErr?.message || dbErr);
@@ -331,6 +390,7 @@ function createVisionDataService({
           items: backfilledItems,
         };
       } catch (error) {
+        if (providerCheckpointed && error && typeof error === "object") error.resumeStage = "enriching";
         const imagePath = typeof uploaded.cloudPath === "string" && uploaded.cloudPath.startsWith("cloud://")
           ? uploaded.cloudPath
           : null;

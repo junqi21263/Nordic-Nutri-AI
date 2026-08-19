@@ -38,6 +38,7 @@ const { createAccountDeletionService, PublicAccountDeletionError } = require("./
 const { createProductUserExists, resolveProductSession } = require("./product-session-auth.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
 const { createObservabilityService } = require("./observability-service.cjs");
+const { sanitizeTraceMeta } = require("./observability-sanitizer.cjs");
 const { createAdminAuditService } = require("./admin-audit-service.cjs");
 const { recordModelUsage } = require("./model-usage.cjs");
 const { createContentModerationService, PublicContentModerationError } = require("./content-moderation-service.cjs");
@@ -63,6 +64,15 @@ const { createUserOpsService, UserOpsError } = require("./user-ops-service.cjs")
 const { createVisionBudget, VISION_BUDGETS } = require("./vision-budget.cjs");
 const { getFoodDisplayName } = require("./food-display-name.cjs");
 const { formulaNutritionPlanFallback } = require("./nutrition-plan-formula.cjs");
+const { createVisionAnalysisService } = require("./vision-analysis-foundation.cjs");
+const { createHybridVisionController } = require("./vision-analysis-hybrid.cjs");
+const { createAsyncLifecycleDeadlines } = require("./vision-async-deadline.cjs");
+const { createTransportFixtureProvisioner } = require("./transport-fixture-provisioning.cjs");
+const {
+  createTransportFixtureDbAdapter,
+  safeProvisionResponse,
+  verifyTransportFixtureSignature,
+} = require("./transport-fixture-integration.cjs");
 
 // Random 5–6 hanzi Chinese nickname generator for default profile seeding.
 // Mirrors the frontend generator in features/profile/nickname-generator.ts.
@@ -273,6 +283,24 @@ function verifyFoodImageDispatchSignature(secret, req, { path, body, now = Date.
   const numericTimestamp = Number(timestamp);
   if (!Number.isInteger(numericTimestamp) || Math.abs(Math.floor(now / 1000) - numericTimestamp) > 300) return false;
   const expected = signFoodImageDispatch(secret, { timestamp, method: req.method, path, body });
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const actualBuffer = Buffer.from(signature, "utf8");
+  return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function signVisionAnalysisInternal(secret, { timestamp, method = "POST", path, body = "" } = {}) {
+  const canonical = `${timestamp}\n${String(method).toUpperCase()}\n${path}\n${body}`;
+  return crypto.createHmac("sha256", String(secret || "")).update(canonical).digest("hex");
+}
+
+function verifyVisionAnalysisInternalSignature(secret, req, { path, body, kind, now = Date.now() } = {}) {
+  if (!secret || !path || !kind) return false;
+  const prefix = kind === "reaper" ? "x-vision-reaper" : "x-vision-dispatch";
+  const timestamp = String(req.headers[`${prefix}-timestamp`] || "");
+  const signature = String(req.headers[`${prefix}-signature`] || "");
+  const numericTimestamp = Number(timestamp);
+  if (!Number.isInteger(numericTimestamp) || Math.abs(Math.floor(now / 1000) - numericTimestamp) > 300) return false;
+  const expected = signVisionAnalysisInternal(secret, { timestamp, method: req.method, path, body });
   const expectedBuffer = Buffer.from(expected, "utf8");
   const actualBuffer = Buffer.from(signature, "utf8");
   return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
@@ -1135,15 +1163,37 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       let lastError = null;
       for (const client of clients) {
         if (typeof client?.uploadFile !== "function") continue;
+        const storageStartedAt = Date.now();
         try {
           const result = await client.uploadFile({ cloudPath, fileContent: content });
           const fileID = result?.fileID;
           if (!fileID) throw new Error("Vision upload failed");
+          observe({
+            stage: "storage_upload",
+            startedAt: new Date(storageStartedAt).toISOString(),
+            ms: Date.now() - storageStartedAt,
+            status: "succeeded",
+            objectSize: content.length,
+          });
           let imageUrl = null;
+          const tempUrlStartedAt = Date.now();
           try {
             imageUrl = await getTemporaryUrl(fileID);
+            observe({
+              stage: "temp_url_generation",
+              startedAt: new Date(tempUrlStartedAt).toISOString(),
+              ms: Date.now() - tempUrlStartedAt,
+              status: imageUrl ? "succeeded" : "failed",
+            });
           } catch (tempErr) {
             console.warn("[vision] getTempFileURL after upload failed:", tempErr?.message || tempErr);
+            observe({
+              stage: "temp_url_generation",
+              startedAt: new Date(tempUrlStartedAt).toISOString(),
+              ms: Date.now() - tempUrlStartedAt,
+              status: "failed",
+              providerErrorType: "temp_url_generation",
+            });
           }
           void contentType;
           return { cloudPath: fileID, imageUrl: imageUrl || toDataUrl() };
@@ -1367,6 +1417,29 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     },
   });
   const productUserExists = createProductUserExists(db);
+  const visionAnalysisFoundationEnabled = env.VISION_ASYNC_FOUNDATION_ENABLED === "true";
+  const visionAnalysisFoundation = createVisionAnalysisService({
+    db,
+    featureEnabled: visionAnalysisFoundationEnabled,
+  });
+  const visionTransportFixtureSecret = typeof env.VISION_TRANSPORT_FIXTURE_SECRET === "string"
+    ? env.VISION_TRANSPORT_FIXTURE_SECRET.trim()
+    : "";
+  const transportFixtureProvisioning = visionTransportFixtureSecret && typeof db.rpc === "function"
+    ? createTransportFixtureProvisioner({
+      authenticate: async (token) => {
+        const session = verifyAccessToken(token, config.sessionSecret);
+        if (!session?.sub || !(await productUserExists(session.sub))) {
+          const error = new Error("UNAUTHORIZED");
+          error.code = "UNAUTHORIZED";
+          throw error;
+        }
+        return session;
+      },
+      ...createTransportFixtureDbAdapter({ db }),
+      ownerFingerprintSecret: env.VISION_TRANSPORT_FIXTURE_FINGERPRINT_SECRET || config.identityPepper,
+    })
+    : null;
 
   return {
     issue: session.issue,
@@ -1429,6 +1502,8 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     // compatible with the already protected image-worker deployment, without
     // replacing the main function's complete environment-variable set.
     foodImageDispatchSecret: env.FOOD_IMAGE_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
+    visionAnalysisDispatchSecret: env.VISION_ANALYSIS_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
+    visionAnalysisReaperSecret: env.VISION_ANALYSIS_REAPER_SECRET || env.AI_WORKER_SHARED_SECRET || "",
     avatar,
     accountDeletion,
     operationGuard,
@@ -1442,7 +1517,12 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     visionImageReview,
     visionImageRetention,
     userImageOps,
+    resolveVisionImageUrl: getTemporaryUrl,
     vision,
+    visionAnalysisFoundation,
+    visionAnalysisFoundationEnabled,
+    visionTransportFixtureSecret,
+    transportFixtureProvisioning,
     modelCatalog: buildModelCatalog({
       env,
       vision,
@@ -1675,6 +1755,16 @@ function getInternalFoodImageRoute(pathname) {
   return null;
 }
 
+function getInternalVisionAnalysisRoute(pathname) {
+  const path = normalizeFoodImageDispatchPath(pathname);
+  if (path === "/api/internal/vision-analysis/dispatch") return { operation: "dispatchVisionAnalysis" };
+  if (path === "/api/internal/vision-analysis/reap") return { operation: "reapVisionAnalysis" };
+  if (path === "/api/internal/vision-analysis/diagnostic") return { operation: "diagnosticVisionAnalysis" };
+  if (path === "/api/internal/vision-analysis/transport-fixture/provision") return { operation: "provisionTransportFixture" };
+  if (path === "/api/internal/vision-analysis/transport-fixture/cleanup") return { operation: "cleanupTransportFixture" };
+  return null;
+}
+
 function normalizeFoodImageDispatchPath(pathname) {
   return String(pathname || "").replace(/^\/get-login-ticket/, "");
 }
@@ -1688,6 +1778,12 @@ function getFeedbackRoute(pathname) {
 
 function isVisionRoute(pathname) {
   return pathname.replace(/^\/get-login-ticket/, "") === "/vision-analysis";
+}
+
+function getVisionAnalysisStatusRoute(pathname) {
+  const path = pathname.replace(/^\/get-login-ticket/, "");
+  const match = path.match(/^\/vision-analysis\/([0-9a-f-]{36})$/i);
+  return match ? { analysisId: match[1] } : null;
 }
 
 function isAvatarRoute(pathname) {
@@ -1722,12 +1818,101 @@ function createHttpServer({ service }) {
     const foodRoute = getFoodRoute(url.pathname);
     const adminFoodRoute = getAdminFoodRoute(url.pathname);
     const internalFoodImageRoute = getInternalFoodImageRoute(url.pathname);
+    const internalVisionAnalysisRoute = getInternalVisionAnalysisRoute(url.pathname);
     const feedbackRoute = getFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
+    const visionAnalysisStatusRoute = getVisionAnalysisStatusRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !feedbackRoute && !visionRoute && !avatarRoute) {
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !internalVisionAnalysisRoute && !feedbackRoute && !visionRoute && !visionAnalysisStatusRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
+    }
+    if (internalVisionAnalysisRoute) {
+      if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      try {
+        const payload = await readRawJsonBody(req);
+        if (internalVisionAnalysisRoute.operation === "provisionTransportFixture"
+          || internalVisionAnalysisRoute.operation === "cleanupTransportFixture") {
+          const valid = verifyTransportFixtureSignature(
+            service?.visionTransportFixtureSecret,
+            req,
+            { path: normalizeFoodImageDispatchPath(url.pathname), body: payload.raw },
+          );
+          if (!valid) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+          if (!service?.transportFixtureProvisioning) {
+            return sendJson(res, 503, { code: "TRANSPORT_FIXTURE_UNAVAILABLE" });
+          }
+          if (internalVisionAnalysisRoute.operation === "cleanupTransportFixture") {
+            const result = await service.transportFixtureProvisioning.cleanup({
+              fixtureAnalysisId: payload.body?.fixtureAnalysisId,
+              fixtureJobId: payload.body?.fixtureJobId,
+              clientRequestId: payload.body?.clientRequestId,
+            });
+            return sendJson(res, 200, { removed: result?.removed === true });
+          }
+          const result = await service.transportFixtureProvisioning.provision({
+            token: payload.body?.token,
+            testRunId: payload.body?.testRunId,
+          });
+          return sendJson(res, 200, safeProvisionResponse(result));
+        }
+        const isReaper = internalVisionAnalysisRoute.operation === "reapVisionAnalysis";
+        const valid = verifyVisionAnalysisInternalSignature(
+          isReaper ? service?.visionAnalysisReaperSecret : service?.visionAnalysisDispatchSecret,
+          req,
+          { path: normalizeFoodImageDispatchPath(url.pathname), body: payload.raw, kind: isReaper ? "reaper" : "dispatch" },
+        );
+        if (!valid) return sendJson(res, 401, { code: "UNAUTHORIZED" });
+        if (internalVisionAnalysisRoute.operation === "diagnosticVisionAnalysis") {
+          const event = payload.body && typeof payload.body === "object" ? payload.body : {};
+          await service?.observability?.recordMetric?.("vision_async_execution_stage", 1, sanitizeTraceMeta(event));
+          return sendJson(res, 200, { recorded: true });
+        }
+        if (isReaper) {
+          const rows = await service?.visionAnalysisFoundation?.reclaimExpiredJobs?.({ limit: payload.body?.limit });
+          return sendJson(res, 200, { reclaimed: Array.isArray(rows) ? rows.length : 0 });
+        }
+        const rows = await service?.visionAnalysisFoundation?.claimQueuedJob?.({ limit: payload.body?.maxItems });
+        const jobs = (Array.isArray(rows) ? rows : []).map((row) => ({
+          id: row.id,
+          job_id: row.job_id,
+          version: row.version,
+          lease_until: row.lease_until,
+        }));
+        return sendJson(res, 200, { claimed: jobs.length, jobs });
+      } catch (error) {
+        if (internalVisionAnalysisRoute.operation === "provisionTransportFixture"
+          || internalVisionAnalysisRoute.operation === "cleanupTransportFixture") {
+          const code = /^[A-Z0-9_:-]{1,80}$/.test(String(error?.code || ""))
+            ? error.code
+            : "TRANSPORT_FIXTURE_UNAVAILABLE";
+          const status = code === "UNAUTHORIZED"
+            ? 401
+            : code.includes("IDENTITY") || code.includes("ACTIVE")
+              ? 409
+              : 503;
+          return sendJson(res, status, { code });
+        }
+        console.error("[vision-analysis-internal] failed:", error?.message || error);
+        return sendJson(res, 503, { code: "VISION_ANALYSIS_INTERNAL_FAILED" });
+      }
+    }
+    if (visionAnalysisStatusRoute) {
+      if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      if (service?.visionAnalysisFoundationEnabled !== true) return sendJson(res, 404, { code: "NOT_FOUND" });
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      try {
+        const analysis = await service.visionAnalysisFoundation?.getOwnedAnalysis?.(
+          session.sub,
+          visionAnalysisStatusRoute.analysisId,
+        );
+        if (!analysis) return sendJson(res, 404, { code: "NOT_FOUND" });
+        return sendJson(res, 200, analysis);
+      } catch (error) {
+        console.error("[vision-analysis-status] failed:", error?.message || error);
+        return sendJson(res, 503, { code: "VISION_ANALYSIS_STATUS_UNAVAILABLE" });
+      }
     }
     if (internalFoodImageRoute) {
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -2914,15 +3099,31 @@ function createHttpServer({ service }) {
       const budget = createVisionBudget({ startedAt, totalMs: VISION_SERVER_BUDGET_MS });
       const stageEvents = [];
       let visionTrace = null;
+      let traceMetaBase = {
+        route: "/vision-analysis",
+        method: req.method,
+        environment: process.env.TCB_ENV || null,
+        functionVersion: process.env.FUNCTION_VERSION || process.env.K_REVISION || null,
+        artifactSha: process.env.RELEASE_ARTIFACT_SHA256 || process.env.ARTIFACT_SHA256 || null,
+        sanitizationVersion: "1",
+      };
       const observeVisionStage = (event) => {
         if (event && typeof event === "object") {
           const recorded = { ...event, observedAt: Date.now() };
           stageEvents.push(recorded);
           service?.observability?.recordStage?.(visionTrace, {
             name: event.stage,
+            startedAt: event.startedAt,
             durationMs: event.ms,
-            status: event.success === false ? "failed" : "succeeded",
+            status: event.status || (event.success === false || event.flashSuccess === false ? "failed" : "succeeded"),
             provider: event.provider,
+            providerRequestIdHash: event.providerRequestIdHash,
+            timeoutBudgetMs: event.timeoutBudgetMs,
+            providerHttpStatus: event.providerHttpStatus,
+            providerErrorCode: event.providerErrorCode,
+            providerErrorType: event.providerErrorType,
+            providerRequestDurationMs: event.providerRequestDurationMs,
+            objectSize: event.objectSize,
           });
         }
       };
@@ -2932,6 +3133,8 @@ function createHttpServer({ service }) {
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       let quotaReservation = null;
       let quotaReservationOwned = false;
+      let hybridAnalysisId = null;
+      let hybridHandoffAccepted = false;
       let clientRequestId = null;
       try {
         const body = await readJsonBody(req, MAX_VISION_BODY_BYTES);
@@ -2942,19 +3145,117 @@ function createHttpServer({ service }) {
           feature: "vision",
         }) || null;
         res.__traceId = visionTrace?.traceId || null;
-        const traceMetaBase = {
+        traceMetaBase = {
           route: "/vision-analysis",
           method: req.method,
           environment: process.env.TCB_ENV || null,
           functionVersion: process.env.FUNCTION_VERSION || process.env.K_REVISION || null,
           artifactSha: process.env.RELEASE_ARTIFACT_SHA256 || process.env.ARTIFACT_SHA256 || null,
-          requestSchemaSummary: "clientRequestId:string,imageBase64:string,contentType:string",
+          requestSchemaSummary: "clientRequestId:string,imageBase64:string,contentType:string,source?:string,diagnostics?:object",
           imageMimeType: typeof body?.contentType === "string" ? body.contentType : null,
           imageBytes: typeof body?.imageBase64 === "string" ? Math.floor(body.imageBase64.length * 0.75) : null,
+          source: body?.source === "camera" || body?.source === "album" ? body.source : null,
           sanitizationVersion: "1",
         };
+        const diagnostics = body?.diagnostics && typeof body.diagnostics === "object" && !Array.isArray(body.diagnostics)
+          ? body.diagnostics
+          : {};
+        Object.assign(traceMetaBase, {
+          originalContentType: typeof diagnostics.originalContentType === "string" ? diagnostics.originalContentType : null,
+          finalContentType: typeof diagnostics.finalContentType === "string" ? diagnostics.finalContentType : null,
+          originalBytes: Number.isFinite(Number(diagnostics.originalBytes)) ? Number(diagnostics.originalBytes) : null,
+          finalBytes: Number.isFinite(Number(diagnostics.finalBytes)) ? Number(diagnostics.finalBytes) : null,
+          originalWidth: Number.isFinite(Number(diagnostics.originalWidth)) ? Number(diagnostics.originalWidth) : null,
+          originalHeight: Number.isFinite(Number(diagnostics.originalHeight)) ? Number(diagnostics.originalHeight) : null,
+          finalWidth: Number.isFinite(Number(diagnostics.finalWidth)) ? Number(diagnostics.finalWidth) : null,
+          finalHeight: Number.isFinite(Number(diagnostics.finalHeight)) ? Number(diagnostics.finalHeight) : null,
+          orientation: typeof diagnostics.orientation === "string" ? diagnostics.orientation : null,
+          imagePrepareDurationMs: Number.isFinite(Number(diagnostics.imagePrepareDurationMs)) ? Number(diagnostics.imagePrepareDurationMs) : null,
+          imageReadDurationMs: Number.isFinite(Number(diagnostics.imageReadDurationMs)) ? Number(diagnostics.imageReadDurationMs) : null,
+        });
         // Invalid or oversized local camera files must not consume a daily scan.
         service.vision?.validateImage?.(body);
+        const supportsAsyncVision = body?.clientCapabilities?.supportsAsyncVision === true;
+        if (service.visionAnalysisFoundationEnabled && supportsAsyncVision) {
+          // Keep the synchronous request budget unchanged; the durable async
+          // task receives a separately derived lifecycle deadline that covers
+          // the dispatcher fallback, worker startup, provider, enrichment,
+          // persistence, and an explicit grace period.
+          const asyncDeadlines = createAsyncLifecycleDeadlines({ startedAt });
+          const deadlineAt = asyncDeadlines.asyncDeadlineAt;
+          const reservationExpiresAt = asyncDeadlines.reservationExpiresAt;
+          let hybridVersion = 0;
+          const controller = createHybridVisionController({
+            featureEnabled: true,
+            createAnalysis: async () => {
+              const created = await service.visionAnalysisFoundation.createVisionAnalysis({
+                userId: session.sub,
+                clientRequestId,
+                provider: service.vision?.provider || "qwen",
+                model: service.vision?.model || "qwen3-vl-flash",
+                deadlineAt,
+                reservationExpiresAt,
+              });
+              hybridAnalysisId = created.analysisId;
+              hybridVersion = Number(created.version || 0);
+              if (created.reused) {
+                const existing = await service.visionAnalysisFoundation.getOwnedAnalysis(session.sub, created.analysisId);
+                hybridVersion = Number(existing?.version || hybridVersion);
+                return { ...created, ...existing, result: existing?.result };
+              }
+              return created;
+            },
+            runFast: async ({ analysisId }) => service.vision.analyzeImage(session.sub, { ...body, analysisId }, {
+              budget,
+              observe: observeVisionStage,
+              onAssetReady: async (asset) => {
+                const updated = await service.visionAnalysisFoundation.markAssetReady({ ...asset, analysisId, expectedVersion: hybridVersion });
+                if (updated?.version != null) hybridVersion = Number(updated.version);
+                return updated;
+              },
+              onProviderSuccess: async (checkpoint) => {
+                const updated = await service.visionAnalysisFoundation.checkpointProvider({ ...checkpoint, analysisId, expectedVersion: hybridVersion });
+                if (updated?.version != null) hybridVersion = Number(updated.version);
+                return updated;
+              },
+            }),
+            handoff: async (handoff) => {
+              const accepted = await service.visionAnalysisFoundation.queueAsyncAnalysis({ ...handoff, expectedVersion: hybridVersion });
+              if (accepted?.version != null) hybridVersion = Number(accepted.version);
+              hybridHandoffAccepted = accepted?.accepted === true;
+              return accepted;
+            },
+          });
+          const hybridResponse = await controller.post({
+            clientRequestId,
+            supportsAsyncVision: true,
+          });
+          if (hybridResponse.httpStatus === 200) {
+            const committed = await service.visionAnalysisFoundation.commitQuota(
+              hybridResponse.body.analysisId,
+              hybridResponse.body.result,
+            );
+            if (committed === false) throw new PublicOperationError("VISION_QUOTA_COMMIT_FAILED", "识别结果提交失败，请重试");
+          }
+          const hybridStatus = hybridResponse.httpStatus === 202 ? "processing" : "succeeded";
+          service.observability?.finishTrace?.(visionTrace, {
+            status: hybridStatus,
+            httpStatus: hybridResponse.httpStatus,
+            provider: service.vision?.provider || null,
+            meta: {
+              ...traceMetaBase,
+              analysisId: hybridResponse.body.analysisId,
+              fastPathOutcome: hybridResponse.httpStatus === 202 ? "handed_off" : "completed",
+              asyncTriggerReason: hybridResponse.httpStatus === 202 ? "fast_timeout_or_checkpoint" : null,
+              requestTotalDurationMs: Date.now() - startedAt,
+              remainingBudgetMs: budget.remainingMs(),
+              quotaState: hybridResponse.httpStatus === 202 ? "reserved" : "committed",
+              quotaDelta: hybridResponse.httpStatus === 202 ? 0 : 1,
+              businessCode: null,
+            },
+          }).catch(() => {});
+          return sendJson(res, hybridResponse.httpStatus, hybridResponse.body);
+        }
         if (service.operationGuard) {
           if (
             typeof service.operationGuard.reserveVisionQuota !== "function"
@@ -3000,6 +3301,8 @@ function createHttpServer({ service }) {
         const plusEvent = [...stageEvents].reverse().find((event) => event.stage === "plus") || {};
         const flashEvent = [...stageEvents].reverse().find((event) => event.stage === "flash") || {};
         const uploadEvent = [...stageEvents].reverse().find((event) => event.stage === "upload") || {};
+        const storageUploadEvent = [...stageEvents].reverse().find((event) => event.stage === "storage_upload") || {};
+        const tempUrlEvent = [...stageEvents].reverse().find((event) => event.stage === "temp_url_generation") || {};
         const resolvedVisionMeta = {
           ...visionMeta,
           model: visionModel,
@@ -3012,7 +3315,15 @@ function createHttpServer({ service }) {
           fallbackReason: plusEvent.fallbackReason || null,
           plusSkipReason: plusEvent.plusSkipReason || null,
           abortReason: flashEvent.abortReason || null,
+          timeoutBudgetMs: Number(flashEvent.timeoutBudgetMs) || null,
+          providerHttpStatus: flashEvent.providerHttpStatus ?? null,
+          providerRequestIdHash: flashEvent.providerRequestIdHash || null,
+          providerRequestDurationMs: Number(flashEvent.providerRequestDurationMs) || null,
+          providerErrorCode: flashEvent.providerErrorCode || null,
+          providerErrorType: flashEvent.providerErrorType || null,
           uploadRetryCount: Number(uploadEvent.uploadRetryCount) || 0,
+          objectSize: Number(storageUploadEvent.objectSize) || null,
+          tempUrlGenerationMs: Number(tempUrlEvent.ms) || null,
           dishCount: Array.isArray(result?.items) ? result.items.length : 0,
           deadlineExhaustedStage: budget.remainingMs() <= 0 ? lastStage : null,
         };
@@ -3020,6 +3331,8 @@ function createHttpServer({ service }) {
         const traceMeta = {
           ...traceMetaBase,
           ...resolvedVisionMeta,
+          requestTotalDurationMs: Date.now() - startedAt,
+          remainingBudgetMs: budget.remainingMs(),
           imageSha256: result?.imageSha256 || null,
           stage: lastStage,
           stageDurationMs: Number(lastEvent.ms) || null,
@@ -3034,6 +3347,7 @@ function createHttpServer({ service }) {
           status: "succeeded",
           httpStatus: 200,
           provider: result?.provider || visionMeta.provider,
+          providerRequestIdHash: resolvedVisionMeta.providerRequestIdHash || null,
           fallbackUsed: resolvedVisionMeta.fallbackToFlash === true,
           meta: traceMeta,
         }).catch(() => {});
@@ -3057,6 +3371,9 @@ function createHttpServer({ service }) {
         }).catch(() => {});
         return sendJson(res, 200, result);
       } catch (error) {
+        if (hybridAnalysisId && !hybridHandoffAccepted) {
+          await Promise.resolve(service.visionAnalysisFoundation?.releaseQuota?.(hybridAnalysisId)).catch(() => {});
+        }
         if (quotaReservationOwned && service.operationGuard?.releaseVisionQuota) {
           await service.operationGuard.releaseVisionQuota(session.sub, clientRequestId).catch(() => {});
         }
@@ -3071,14 +3388,20 @@ function createHttpServer({ service }) {
           || error.code === "VISION_CONTENT_BLOCKED"
         ) ? 400 : 503;
         const traceStage = stageEvents[stageEvents.length - 1] || {};
+        const requestTotalDurationMs = Date.now() - startedAt;
+        const traceStatus = error?.code === "VISION_TIMEOUT" ? "timed_out" : "failed";
+        const storageUploadEvent = [...stageEvents].reverse().find((event) => event.stage === "storage_upload") || {};
+        const tempUrlEvent = [...stageEvents].reverse().find((event) => event.stage === "temp_url_generation") || {};
         service.observability?.finishTrace?.(visionTrace, {
-          status: "failed",
+          status: traceStatus,
           httpStatus: error instanceof PublicOperationError && error.code === "RATE_LIMITED" ? 429
             : error instanceof PublicOperationError && error.code === "OPERATION_IN_PROGRESS" ? 409
               : knownVisionStatus,
           errorCode: error?.code || "VISION_SERVICE_UNAVAILABLE",
           provider: service.vision?.provider || null,
+          providerRequestIdHash: traceStage.providerRequestIdHash || null,
           meta: {
+            ...traceMetaBase,
             route: "/vision-analysis",
             method: req.method,
             environment: process.env.TCB_ENV || null,
@@ -3086,6 +3409,24 @@ function createHttpServer({ service }) {
             artifactSha: process.env.RELEASE_ARTIFACT_SHA256 || process.env.ARTIFACT_SHA256 || null,
             stage: traceStage.stage || null,
             stageDurationMs: Number(traceStage.ms) || null,
+            lastSuccessfulStage: [...stageEvents].reverse().find((event) => (
+              event.status === "succeeded"
+              || event.success === true
+              || event.uploadSuccess === true
+              || event.safetyCheckSuccess === true
+              || event.evaluationSuccess === true
+              || event.persistenceSuccess === true
+            ))?.stage || null,
+            requestTotalDurationMs,
+            remainingBudgetMs: budget.remainingMs(),
+            timeoutBudgetMs: Number(traceStage.timeoutBudgetMs) || null,
+            providerHttpStatus: traceStage.providerHttpStatus ?? null,
+            providerRequestIdHash: traceStage.providerRequestIdHash || null,
+            providerRequestDurationMs: Number(traceStage.providerRequestDurationMs) || null,
+            providerErrorCode: traceStage.providerErrorCode || null,
+            providerErrorType: traceStage.providerErrorType || null,
+            objectSize: Number(storageUploadEvent.objectSize) || null,
+            tempUrlGenerationMs: Number(tempUrlEvent.ms) || null,
             quotaState: quotaReservationOwned ? "released" : quotaReservation?.state || null,
             quotaDelta: 0,
             sanitizationVersion: "1",
@@ -3319,7 +3660,9 @@ module.exports = {
   readRuntimeConfig,
   selectDeepseekModel,
   requestWechatSession,
+  signVisionAnalysisInternal,
   shuffleCatalogItems,
   signFoodImageDispatch,
+  verifyVisionAnalysisInternalSignature,
   verifyFoodImageDispatchSignature,
 };

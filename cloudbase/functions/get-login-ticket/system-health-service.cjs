@@ -12,10 +12,12 @@ function percentile(values, fraction) {
 function statusForProvider({ configured, traces }) {
   if (!configured) return "unavailable";
   if (!traces.length) return "configured";
-  const failures = traces.filter((row) => row.status !== "succeeded").length;
-  const timeouts = traces.filter((row) => row.status === "timed_out").length;
-  const failureRate = failures / traces.length;
-  const timeoutRate = timeouts / traces.length;
+  const terminalTraces = traces.filter((row) => row.status !== "processing");
+  if (!terminalTraces.length) return "healthy";
+  const failures = terminalTraces.filter((row) => row.status !== "succeeded").length;
+  const timeouts = terminalTraces.filter((row) => row.status === "timed_out").length;
+  const failureRate = failures / terminalTraces.length;
+  const timeoutRate = timeouts / terminalTraces.length;
   return failureRate > 0.1 || timeoutRate > 0.05 || (percentile(traces.map((row) => Number(row.duration_ms)), 0.95) || 0) > 10000
     ? "degraded"
     : "healthy";
@@ -31,8 +33,8 @@ function mapProvider(key, configured, traces) {
     status: statusForProvider({ configured, traces: safeTraces }),
     configured,
     recentRequests: safeTraces.length,
-    successRate: safeTraces.length
-      ? safeTraces.filter((row) => row.status === "succeeded").length / safeTraces.length
+    successRate: safeTraces.filter((row) => row.status !== "processing").length
+      ? safeTraces.filter((row) => row.status === "succeeded").length / safeTraces.filter((row) => row.status !== "processing").length
       : null,
   };
 }
@@ -43,13 +45,16 @@ function summarizeWindow(rows, sinceMs) {
   const count4xx = selected.filter((row) => Number(row.http_status) >= 400 && Number(row.http_status) < 500).length;
   const count5xx = selected.filter((row) => Number(row.http_status) >= 500).length;
   const timeout = selected.filter((row) => row.status === "timed_out").length;
+  const processing = selected.filter((row) => row.status === "processing").length;
   const rateLimited = selected.filter((row) => row.status === "rate_limited" || Number(row.http_status) === 429).length;
-  const succeeded = selected.filter((row) => row.status === "succeeded").length;
+  const terminal = selected.filter((row) => row.status !== "processing");
+  const succeeded = terminal.filter((row) => row.status === "succeeded").length;
   return {
     requests: selected.length,
+    processing,
     succeeded,
-    failed: selected.length - succeeded,
-    successRate: selected.length ? succeeded / selected.length : null,
+    failed: terminal.length - succeeded,
+    successRate: terminal.length ? succeeded / terminal.length : null,
     p50Ms: percentile(durations, 0.5),
     p95Ms: percentile(durations, 0.95),
     p99Ms: percentile(durations, 0.99),
@@ -145,4 +150,3 @@ function createSystemHealthService({ db, observability, jobOps, providerConfig =
 }
 
 module.exports = { HEALTH_STATUSES, createSystemHealthService, percentile, summarizeWindow, statusForProvider };
-

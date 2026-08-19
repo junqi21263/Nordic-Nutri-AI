@@ -114,6 +114,19 @@ test("skips plus when the mandatory downstream reserve cannot be protected", asy
   assert.equal(trace.plus.skipReason, "insufficient_budget");
 });
 
+test("uses an explicit async provider budget without changing the fast-path cap", async () => {
+  const timeouts = [];
+  const service = createQwenVisionService({
+    apiKey: "qwen-test",
+    requestCompletion: async ({ timeoutMs }) => { timeouts.push(timeoutMs); return result(); },
+  });
+  await service({
+    imageUrl: "https://example.com/meal.jpg",
+    budget: { providerTimeoutMs: 18_000, remainingMs: () => 20_000 },
+  });
+  assert.deepEqual(timeouts, [18_000]);
+});
+
 test("escalation predicate covers low confidence and unclear portions", () => {
   assert.equal(shouldEscalate(result({ confidence: 0.5 })), true);
   assert.equal(shouldEscalate(result({ portionConfidence: 0.4 })), true);
@@ -150,6 +163,30 @@ test("sends the workspace header for the default flash model", async () => {
   assert.equal(request.options.headers["X-DashScope-WorkSpace"], "llm-test");
   assert.equal(request.body.model, "qwen3-vl-flash");
   assert.equal(request.body.enable_thinking, undefined);
+});
+
+test("records provider request timing and sanitized response metadata", async () => {
+  const observations = [];
+  const service = createQwenVisionService({
+    apiKey: "qwen-test",
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({ id: "provider-request-1", choices: [{ message: { content: JSON.stringify(result()) } }] }),
+    }),
+  });
+
+  await service({
+    imageUrl: "https://example.com/meal.jpg",
+    observe: (event) => observations.push(event),
+  });
+
+  const flash = observations.find((event) => event.stage === "flash");
+  assert.equal(flash.providerHttpStatus, 200);
+  assert.match(flash.providerRequestIdHash, /^[0-9a-f]{64}$/);
+  assert.equal(typeof flash.providerRequestDurationMs, "number");
+  assert.equal(flash.providerErrorCode, null);
 });
 
 test("throws VISION_NON_FOOD when model reports isFood=false", async () => {

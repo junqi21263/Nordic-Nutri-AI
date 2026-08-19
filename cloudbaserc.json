@@ -7,7 +7,6 @@
       "type": "HTTP",
       "timeout": 900,
       "runtime": "Nodejs18.15",
-      "handler": "index.main",
       "installDependency": true,
       "ignore": ["*.test.mjs", "node_modules/**", ".git/**"]
     },
@@ -50,6 +49,33 @@
       "timeout": 900,
       "runtime": "Nodejs18.15",
       "installDependency": true,
+      "ignore": ["*.test.mjs", ".git/**"]
+    },
+    {
+      "name": "vision-analysis-dispatcher",
+      "type": "HTTP",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": true,
+      "ignore": ["*.test.mjs", ".git/**"]
+    },
+    {
+      "name": "vision-analysis-worker",
+      "type": "HTTP",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": true,
+      "ignore": ["*.test.mjs", ".git/**"]
+    },
+    {
+      "name": "vision-analysis-reaper",
+      "type": "HTTP",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": false,
       "ignore": ["*.test.mjs", ".git/**"]
     }
   ]

@@ -6,7 +6,7 @@ import { createVisionDataService } from "./vision-data-service.cjs";
 test("uploads, recognizes, and persists an authenticated user's food image", async () => {
   const writes = [];
   const traces = [];
-  const db = { from(table) { return { insert(payload) { writes.push({ table, payload }); return { select: () => ({ single: async () => ({ data: { id: `${table}-1`, ...payload }, error: null }) }) }; } }; } };
+  const db = { from(table) { return { insert(payload) { writes.push({ table, payload }); return { select: () => ({ single: async () => ({ data: { id: `${table}-1`, ...payload }, error: null }) }) }; }, update(payload) { writes.push({ table, payload, operation: "update" }); return { eq: async () => ({ data: { id: `${table}-1` }, error: null }) }; } }; } };
   const service = createVisionDataService({
     db,
     uploadImage: async () => ({ cloudPath: "cloud://env/food-images/user-1/image.jpg", imageUrl: "https://example.com/temp.jpg" }),
@@ -23,8 +23,10 @@ test("uploads, recognizes, and persists an authenticated user's food image", asy
 
   assert.equal(result.mealName, "鸡胸肉");
   assert.equal(result.imagePath, "cloud://env/food-images/user-1/image.jpg");
-  assert.deepEqual(writes.map((write) => write.table), ["uploaded_assets", "ai_analysis"]);
+  assert.deepEqual(writes.map((write) => write.table), ["uploaded_assets", "ai_analysis", "uploaded_assets"]);
   assert.equal(writes[0].payload.user_id, "user-1");
+  assert.equal(writes[1].payload.status, "completed");
+  assert.ok(writes[1].payload.completed_at);
   assert.equal(traces.length, 1);
   assert.equal(traces[0][0], "vision_recognition_trace");
   assert.equal(traces[0][2].clientRequestId, "11111111-1111-4111-8111-111111111111");
@@ -34,7 +36,7 @@ test("uploads, recognizes, and persists an authenticated user's food image", asy
 });
 
 test("trace write failures never fail an otherwise successful analysis", async () => {
-  const db = { from() { return { insert() { return { select: () => ({ single: async () => ({ data: { id: "a-1" }, error: null }) }) }; } }; } };
+  const db = { from() { return { insert() { return { select: () => ({ single: async () => ({ data: { id: "a-1" }, error: null }) }) }; }, update() { return { eq: async () => ({ data: { id: "asset-1" }, error: null }) }; } }; } };
   const service = createVisionDataService({
     db,
     uploadImage: async () => ({ cloudPath: "x.jpg", imageUrl: "https://example.com/x.jpg" }),
@@ -103,7 +105,7 @@ test("falls back to local evaluation and omits data-URL imageUrl", async () => {
 });
 
 test("accepts WebP content type and rejects GIF", async () => {
-  const db = { from() { return { insert() { return { select: () => ({ single: async () => ({ data: { id: "a-1" }, error: null }) }) }; } }; } };
+  const db = { from() { return { insert() { return { select: () => ({ single: async () => ({ data: { id: "a-1" }, error: null }) }) }; }, update() { return { eq: async () => ({ data: { id: "asset-1" }, error: null }) }; } }; } };
   const service = createVisionDataService({
     db,
     uploadImage: async () => ({ cloudPath: "cloud://env/x.webp", imageUrl: "https://example.com/x.webp" }),
@@ -211,4 +213,142 @@ test("does not return a synthetic analysisId when persistence fails", async () =
   assert.equal(traces.length, 1);
   assert.equal(traces[0][2].analysisId, null);
   assert.equal(traces[0][2].persistence.success, false);
+});
+
+test("treats an analysis insert error or missing id as persistence failure", async () => {
+  const service = createVisionDataService({
+    db: {
+      from(table) {
+        if (table === "uploaded_assets") {
+          return { insert: () => ({ select: () => ({ single: async () => ({ data: { id: "asset-1" }, error: null }) }) }) };
+        }
+        return { insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { message: "analysis insert failed" } }) }) }) };
+      },
+    },
+    uploadImage: async () => ({ cloudPath: "cloud://env/x.jpg", imageUrl: "https://example.com/x.jpg" }),
+    analyze: async () => ({ mealName: "米饭", mealType: "lunch", confidence: 0.9, advice: "ok", items: [{ name: "米饭", quantityG: 150, caloriesPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3 }] }),
+  });
+
+  await assert.rejects(
+    () => service.analyzeImage("user-1", {
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      contentType: "image/jpeg",
+      imageBase64: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString("base64"),
+    }),
+    (error) => error.code === "VISION_PERSISTENCE_FAILED",
+  );
+});
+
+test("links the uploaded asset to the persisted analysis id", async () => {
+  const updates = [];
+  const db = {
+    from(table) {
+      if (table === "uploaded_assets") {
+        return {
+          insert: () => ({ select: () => ({ single: async () => ({ data: { id: "asset-1" }, error: null }) }) }),
+          update: (payload) => ({ eq: async () => { updates.push(payload); return { data: { id: "asset-1" }, error: null }; } }),
+        };
+      }
+      return { insert: () => ({ select: () => ({ single: async () => ({ data: { id: "analysis-1" }, error: null }) }) }) };
+    },
+  };
+  const service = createVisionDataService({
+    db,
+    uploadImage: async () => ({ cloudPath: "cloud://env/x.jpg", imageUrl: "https://example.com/x.jpg" }),
+    analyze: async () => ({ mealName: "米饭", mealType: "lunch", confidence: 0.9, advice: "ok", items: [{ name: "米饭", quantityG: 150, caloriesPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3 }] }),
+  });
+
+  const result = await service.analyzeImage("user-1", {
+    clientRequestId: "11111111-1111-4111-8111-111111111111",
+    contentType: "image/jpeg",
+    imageBase64: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString("base64"),
+  });
+
+  assert.equal(result.analysisId, "analysis-1");
+  assert.deepEqual(updates, [{ analysis_id: "analysis-1" }]);
+});
+
+test("exposes an uploaded asset and provider checkpoint before downstream enrichment", async () => {
+  const assetEvents = [];
+  const providerEvents = [];
+  const writes = [];
+  const db = {
+    from(table) {
+      return {
+        insert(payload) {
+          writes.push({ table, payload });
+          return { select: () => ({ single: async () => ({ data: { id: `${table}-1` }, error: null }) }) };
+        },
+      };
+    },
+  };
+  const service = createVisionDataService({
+    db,
+    uploadImage: async () => ({ cloudPath: "cloud://env/x.jpg", imageUrl: "https://example.com/x.jpg" }),
+    analyze: async () => ({ mealName: "套餐", mealType: "lunch", confidence: 0.8, advice: "ok", items: [{ name: "米饭", quantityG: 150, caloriesPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3 }] }),
+  });
+
+  const result = await service.analyzeImage("user-1", {
+    analysisId: "33333333-3333-4333-8333-333333333333",
+    clientRequestId: "11111111-1111-4111-8111-111111111111",
+    contentType: "image/jpeg",
+    imageBase64: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString("base64"),
+  }, {
+    budget: { stageTimeout: (value) => value, remainingMs: () => 100 },
+    onAssetReady: async (event) => { assetEvents.push(event); return { assetId: "asset-1" }; },
+    onProviderSuccess: async (event) => { providerEvents.push(event); },
+  });
+
+  assert.equal(result.kind, "checkpoint");
+  assert.equal(result.resumeStage, "enriching");
+  assert.equal(assetEvents[0].analysisId, "33333333-3333-4333-8333-333333333333");
+  assert.equal(providerEvents[0].analysisId, "33333333-3333-4333-8333-333333333333");
+  assert.equal(writes.length, 0);
+});
+
+test("processes an already-uploaded analysis image without re-uploading it", async () => {
+  const writes = [];
+  const providerInputs = [];
+  const db = {
+    from(table) {
+      return {
+        update(payload) {
+          writes.push({ table, payload, operation: "update" });
+          return { eq: () => ({ eq: () => ({ select: () => ({ single: async () => ({ data: { id: "33333333-3333-4333-8333-333333333333" }, error: null }) }) }) }) };
+        },
+        insert(payload) {
+          writes.push({ table, payload });
+          return { select: () => ({ single: async () => ({ data: { id: "analysis-1", ...payload }, error: null }) }) };
+        },
+      };
+    },
+  };
+  const service = createVisionDataService({
+    db,
+    uploadImage: async () => { throw new Error("worker must not upload"); },
+    analyze: async (input) => { providerInputs.push(input); return {
+      mealName: "已上传图片",
+      mealType: "lunch",
+      confidence: 0.9,
+      advice: "ok",
+      items: [{ name: "米饭", quantityG: 150, caloriesPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3 }],
+    }; },
+  });
+
+  const result = await service.analyzeImage("user-1", {
+    analysisId: "33333333-3333-4333-8333-333333333333",
+    clientRequestId: "11111111-1111-4111-8111-111111111111",
+    contentType: "image/jpeg",
+    storedImageUrl: "https://storage.example/temporary.jpg",
+    imagePath: "cloud://env/food-images/user-1/image.jpg",
+    imageSha256: "a".repeat(64),
+    storedByteSize: 12345,
+    storedAsset: true,
+    deferAnalysisPersistence: true,
+  });
+
+  assert.equal(result.mealName, "已上传图片");
+  assert.equal(providerInputs[0].imageUrl, "https://storage.example/temporary.jpg");
+  assert.equal(writes.filter((write) => write.table === "uploaded_assets").length, 0);
+  assert.equal(writes.filter((write) => write.table === "ai_analysis").length, 0);
 });

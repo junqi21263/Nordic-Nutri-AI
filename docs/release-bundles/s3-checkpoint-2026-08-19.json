@@ -1,0 +1,33 @@
+{
+  "capturedAt": "2026-08-19",
+  "envId": "lewis-healthy-d4glgqqzv73a5bc10",
+  "sample": {
+    "imageSha256": "0fec97b38ae34ad936851b8e96df5ac599149508e92839448e70e7887235b97c",
+    "clientRequestId": "525ea540-ae85-4175-9647-a068148ff374",
+    "analysisId": "b2eba6c2-a8f8-4a3d-9347-a9ca8b206a33"
+  },
+  "observed": {
+    "httpResponse": 200,
+    "status": "completed",
+    "currentStage": "persisting",
+    "executionOwner": "fast",
+    "dispatchState": "none",
+    "resumeStage": "enriching",
+    "providerAttempt": 1,
+    "providerCheckpoint": true,
+    "quotaState": "committed",
+    "completedAt": "2026-08-19 16:12:28.803 +0800 CST"
+  },
+  "interpretation": "A dedicated production fixture with a real Storage image completed through dispatcher claim and worker checkpoint resume. The worker emitted worker.checkpoint_resume, providerAttempt remained 1, no worker.provider_start event was emitted, and the final row reached completed with quota_state committed.",
+  "gate": "PASS — independent async enriching resume/no-second-provider production evidence captured in the controlled fixture",
+  "controlledFixture": {
+    "analysisId": "409aae24-cd77-4bb5-aa4a-f1f9e4d20f7b",
+    "jobId": "504d623c-93ea-4844-a016-21132541f92b",
+    "providerAttempt": 1,
+    "checkpointResumeStage": "worker.checkpoint_resume",
+    "providerStartEvent": false,
+    "finalStatus": "completed",
+    "quotaState": "committed"
+  },
+  "sensitiveValues": "redacted"
+}

@@ -1,0 +1,1125 @@
+{
+  "schemaVersion": 1,
+  "status": "dirty_candidate",
+  "generatedAt": "2026-08-19T08:47:44.082Z",
+  "envId": "lewis-healthy-d4glgqqzv73a5bc10",
+  "commit": "7b06316946d95c1956ed6fa16b0024db013909c0",
+  "dirtyFiles": [
+    "M cloudbase/admin/food-images.html",
+    " M cloudbase/admin/food-images.test.mjs",
+    " M cloudbase/functions/get-login-ticket/index.js",
+    " M cloudbase/functions/get-login-ticket/index.test.mjs",
+    " M cloudbase/functions/get-login-ticket/observability-sanitizer.cjs",
+    " M cloudbase/functions/get-login-ticket/observability-sanitizer.test.mjs",
+    " M cloudbase/functions/get-login-ticket/observability-service.cjs",
+    " M cloudbase/functions/get-login-ticket/observability-service.test.mjs",
+    " M cloudbase/functions/get-login-ticket/package-lock.json",
+    " M cloudbase/functions/get-login-ticket/package.json",
+    " M cloudbase/functions/get-login-ticket/qwen-vision-service.cjs",
+    " M cloudbase/functions/get-login-ticket/qwen-vision-service.test.mjs",
+    " M cloudbase/functions/get-login-ticket/system-health-service.cjs",
+    " M cloudbase/functions/get-login-ticket/system-health-service.test.mjs",
+    " M cloudbase/functions/get-login-ticket/vision-data-service.cjs",
+    " M cloudbase/functions/get-login-ticket/vision-data-service.test.mjs",
+    " M cloudbaserc.json",
+    " M mini-program/src/api/vision-api.ts",
+    " M mini-program/src/pages/food-scanner/index.tsx",
+    " M mini-program/tests/vision-api-boundary.test.ts",
+    " M scripts/api-integrity/.env.example",
+    " M scripts/verify-cloudbase-function-manifest.test.mjs",
+    "?? cloudbase/functions/get-login-ticket/transport-fixture-integration.cjs",
+    "?? cloudbase/functions/get-login-ticket/transport-fixture-integration.test.mjs",
+    "?? cloudbase/functions/get-login-ticket/transport-fixture-provisioning.cjs",
+    "?? cloudbase/functions/get-login-ticket/transport-fixture-provisioning.test.mjs",
+    "?? cloudbase/functions/get-login-ticket/vision-analysis-foundation.cjs",
+    "?? cloudbase/functions/get-login-ticket/vision-analysis-foundation.test.mjs",
+    "?? cloudbase/functions/get-login-ticket/vision-analysis-hybrid.cjs",
+    "?? cloudbase/functions/get-login-ticket/vision-analysis-hybrid.test.mjs",
+    "?? cloudbase/functions/get-login-ticket/vision-async-deadline.cjs",
+    "?? cloudbase/functions/get-login-ticket/vision-async-deadline.test.mjs",
+    "?? cloudbase/functions/vision-analysis-dispatcher/",
+    "?? cloudbase/functions/vision-analysis-reaper/",
+    "?? cloudbase/functions/vision-analysis-worker/",
+    "?? cloudbase/pg/migrations/0047_vision_async_foundation.readback.sql",
+    "?? cloudbase/pg/migrations/0047_vision_async_foundation.rollback.sql",
+    "?? cloudbase/pg/migrations/0047_vision_async_foundation.sql",
+    "?? cloudbase/pg/migrations/0047_vision_async_foundation.test.mjs",
+    "?? cloudbase/pg/migrations/0048_vision_hybrid_runtime.readback.sql",
+    "?? cloudbase/pg/migrations/0048_vision_hybrid_runtime.rollback.sql",
+    "?? cloudbase/pg/migrations/0048_vision_hybrid_runtime.sql",
+    "?? cloudbase/pg/migrations/0048_vision_hybrid_runtime.test.mjs",
+    "?? cloudbase/pg/migrations/0049_vision_hybrid_runtime_reconcile.readback.sql",
+    "?? cloudbase/pg/migrations/0049_vision_hybrid_runtime_reconcile.rollback.sql",
+    "?? cloudbase/pg/migrations/0049_vision_hybrid_runtime_reconcile.sql",
+    "?? cloudbase/pg/migrations/0049_vision_hybrid_runtime_reconcile.test.mjs",
+    "?? cloudbase/pg/migrations/0050_transport_fixture_rpc.readback.sql",
+    "?? cloudbase/pg/migrations/0050_transport_fixture_rpc.rollback.sql",
+    "?? cloudbase/pg/migrations/0050_transport_fixture_rpc.sql",
+    "?? cloudbase/pg/migrations/0050_transport_fixture_rpc.test.mjs",
+    "?? docs/PRODUCTION_READINESS_ACTIONS.md",
+    "?? docs/PRODUCTION_READINESS_AUDIT.md",
+    "?? docs/WECHAT_PRIVACY_REVIEW_PACKET.md",
+    "?? docs/release-bundles/",
+    "?? docs/superpowers/specs/2026-08-17-hybrid-vision-analysis/",
+    "?? mini-program/src/features/scanner/vision-async-client.ts",
+    "?? mini-program/tests/vision-async-client.test.ts",
+    "?? scripts/api-integrity/run-final-s2-e2e.mjs",
+    "?? scripts/api-integrity/run-phase2-authenticated-regression.mjs",
+    "?? scripts/release/"
+  ],
+  "runtimePolicy": "Nodejs18.15 functions; Node 24.18.x tooling required for local release checks",
+  "featureFlags": {
+    "VISION_ASYNC_FOUNDATION_ENABLED": "NOT_VERIFIED"
+  },
+  "migrationRegistry": "NOT_VERIFIED",
+  "functions": [
+    {
+      "name": "get-login-ticket",
+      "type": "HTTP",
+      "timeout": 900,
+      "runtime": "Nodejs18.15",
+      "installDependency": true,
+      "ignore": [
+        "*.test.mjs",
+        "node_modules/**",
+        ".git/**"
+      ],
+      "root": "cloudbase/functions/get-login-ticket",
+      "artifactSource": "manifest_function_directory",
+      "deploymentCommand": "tcb fn deploy get-login-ticket",
+      "localArtifact": {
+        "sha256": "7623a3c723bc65b4f7d8a9bf1c3ba24f5a736bb8769eb282446f7df09637296a",
+        "files": [
+          {
+            "path": ".gitignore",
+            "bytes": 36
+          },
+          {
+            "path": "account-deletion-service.cjs",
+            "bytes": 6655
+          },
+          {
+            "path": "achievement-state-service.cjs",
+            "bytes": 2775
+          },
+          {
+            "path": "admin-audit-service.cjs",
+            "bytes": 3266
+          },
+          {
+            "path": "admin-console-auth-service.cjs",
+            "bytes": 6837
+          },
+          {
+            "path": "admin-console-service.cjs",
+            "bytes": 5842
+          },
+          {
+            "path": "coach-data-service.cjs",
+            "bytes": 41070
+          },
+          {
+            "path": "content-moderation-service.cjs",
+            "bytes": 5679
+          },
+          {
+            "path": "daily-insight-service.cjs",
+            "bytes": 11588
+          },
+          {
+            "path": "daily-tip-service.cjs",
+            "bytes": 12829
+          },
+          {
+            "path": "deepseek-budget-service.cjs",
+            "bytes": 3328
+          },
+          {
+            "path": "deepseek-coach-service.cjs",
+            "bytes": 13322
+          },
+          {
+            "path": "deepseek-evaluation-service.cjs",
+            "bytes": 2213
+          },
+          {
+            "path": "deepseek-meal-service.cjs",
+            "bytes": 5045
+          },
+          {
+            "path": "deepseek-nutrition-plan-service.cjs",
+            "bytes": 5981
+          },
+          {
+            "path": "deepseek-weekly-review-service.cjs",
+            "bytes": 8704
+          },
+          {
+            "path": "diet-preference-labels.cjs",
+            "bytes": 1832
+          },
+          {
+            "path": "feedback-data-service.cjs",
+            "bytes": 3673
+          },
+          {
+            "path": "food-admin-service.cjs",
+            "bytes": 12446
+          },
+          {
+            "path": "food-barcode-service.cjs",
+            "bytes": 5861
+          },
+          {
+            "path": "food-catalog-service.cjs",
+            "bytes": 23394
+          },
+          {
+            "path": "food-display-name.cjs",
+            "bytes": 2243
+          },
+          {
+            "path": "food-image-audit-service.cjs",
+            "bytes": 12179
+          },
+          {
+            "path": "food-image-audit-vision.cjs",
+            "bytes": 6827
+          },
+          {
+            "path": "food-image-batch-service.cjs",
+            "bytes": 30926
+          },
+          {
+            "path": "food-image-job-service.cjs",
+            "bytes": 28302
+          },
+          {
+            "path": "food-image-patrol-service.cjs",
+            "bytes": 12533
+          },
+          {
+            "path": "food-image-prompts.cjs",
+            "bytes": 21110
+          },
+          {
+            "path": "food-image-service.cjs",
+            "bytes": 14886
+          },
+          {
+            "path": "food-image-visual-profile.cjs",
+            "bytes": 4361
+          },
+          {
+            "path": "food-image-visual-type.cjs",
+            "bytes": 26404
+          },
+          {
+            "path": "food-insight-service.cjs",
+            "bytes": 10487
+          },
+          {
+            "path": "food-normalization-service.cjs",
+            "bytes": 3988
+          },
+          {
+            "path": "food-query-translator.cjs",
+            "bytes": 3652
+          },
+          {
+            "path": "food-repository.cjs",
+            "bytes": 50053
+          },
+          {
+            "path": "food-storage-url-service.cjs",
+            "bytes": 2452
+          },
+          {
+            "path": "hunyuan-image-service.cjs",
+            "bytes": 8441
+          },
+          {
+            "path": "hunyuan-worker-client.cjs",
+            "bytes": 2860
+          },
+          {
+            "path": "index.js",
+            "bytes": 186093
+          },
+          {
+            "path": "insight-data-service.cjs",
+            "bytes": 20019
+          },
+          {
+            "path": "job-ops-service.cjs",
+            "bytes": 5639
+          },
+          {
+            "path": "meal-data-service.cjs",
+            "bytes": 22372
+          },
+          {
+            "path": "meal-food-link-service.cjs",
+            "bytes": 10648
+          },
+          {
+            "path": "milestone-state-service.cjs",
+            "bytes": 16779
+          },
+          {
+            "path": "model-usage.cjs",
+            "bytes": 3762
+          },
+          {
+            "path": "nickname-moderation.cjs",
+            "bytes": 1765
+          },
+          {
+            "path": "nutrition-backfill-service.cjs",
+            "bytes": 4207
+          },
+          {
+            "path": "nutrition-calculation-service.cjs",
+            "bytes": 15380
+          },
+          {
+            "path": "nutrition-insight-worker-client.cjs",
+            "bytes": 6949
+          },
+          {
+            "path": "nutrition-plan-formula.cjs",
+            "bytes": 3026
+          },
+          {
+            "path": "observability-sanitizer.cjs",
+            "bytes": 2833
+          },
+          {
+            "path": "observability-service.cjs",
+            "bytes": 33074
+          },
+          {
+            "path": "onboarding-draft-data-service.cjs",
+            "bytes": 3603
+          },
+          {
+            "path": "open-food-facts-service.cjs",
+            "bytes": 6108
+          },
+          {
+            "path": "operation-guard.cjs",
+            "bytes": 7912
+          },
+          {
+            "path": "package-lock.json",
+            "bytes": 60829
+          },
+          {
+            "path": "package.json",
+            "bytes": 315
+          },
+          {
+            "path": "proactive-daily-brief-service.cjs",
+            "bytes": 9316
+          },
+          {
+            "path": "product-data-service.cjs",
+            "bytes": 18064
+          },
+          {
+            "path": "product-session-auth.cjs",
+            "bytes": 2106
+          },
+          {
+            "path": "product-session-service.cjs",
+            "bytes": 2922
+          },
+          {
+            "path": "profile-avatar-service.cjs",
+            "bytes": 4504
+          },
+          {
+            "path": "qwen-vision-service.cjs",
+            "bytes": 17278
+          },
+          {
+            "path": "scf_bootstrap",
+            "bytes": 47
+          },
+          {
+            "path": "system-health-service.cjs",
+            "bytes": 5933
+          },
+          {
+            "path": "transport-fixture-integration.cjs",
+            "bytes": 5434
+          },
+          {
+            "path": "transport-fixture-provisioning.cjs",
+            "bytes": 3724
+          },
+          {
+            "path": "usda-service.cjs",
+            "bytes": 7360
+          },
+          {
+            "path": "user-image-ops-service.cjs",
+            "bytes": 20185
+          },
+          {
+            "path": "user-ops-service.cjs",
+            "bytes": 9201
+          },
+          {
+            "path": "vision-analysis-foundation.cjs",
+            "bytes": 12826
+          },
+          {
+            "path": "vision-analysis-hybrid.cjs",
+            "bytes": 4665
+          },
+          {
+            "path": "vision-async-deadline.cjs",
+            "bytes": 1844
+          },
+          {
+            "path": "vision-budget.cjs",
+            "bytes": 1038
+          },
+          {
+            "path": "vision-data-service.cjs",
+            "bytes": 20019
+          },
+          {
+            "path": "vision-image-compress.cjs",
+            "bytes": 1601
+          },
+          {
+            "path": "vision-image-retention-service.cjs",
+            "bytes": 5797
+          },
+          {
+            "path": "vision-image-review-service.cjs",
+            "bytes": 3467
+          },
+          {
+            "path": "vita-vision-service.cjs",
+            "bytes": 5119
+          },
+          {
+            "path": "wechat-image-security.cjs",
+            "bytes": 9485
+          }
+        ],
+        "ignore": [
+          "*.test.mjs",
+          "node_modules/**",
+          ".git/**"
+        ]
+      },
+      "productionReadback": {
+        "status": "NOT_VERIFIED",
+        "normalizedSha256": null,
+        "active": null,
+        "codeResult": null,
+        "updatedTime": null
+      },
+      "trigger": {
+        "kind": "http_or_event",
+        "currentReadback": "NOT_VERIFIED"
+      }
+    },
+    {
+      "name": "nordic-api",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": true,
+      "ignore": [
+        "*.test.mjs",
+        "node_modules/**",
+        ".git/**"
+      ],
+      "root": "cloudbase/functions/nordic-api",
+      "artifactSource": "manifest_function_directory",
+      "deploymentCommand": "tcb fn deploy nordic-api",
+      "localArtifact": {
+        "sha256": "8838a6b4e603ade35a7d8fd171fc45f9b22375e5d4874c0dc7cc1c785885ebf3",
+        "files": [
+          {
+            "path": "index.js",
+            "bytes": 4075
+          },
+          {
+            "path": "package.json",
+            "bytes": 182
+          }
+        ],
+        "ignore": [
+          "*.test.mjs",
+          "node_modules/**",
+          ".git/**"
+        ]
+      },
+      "productionReadback": {
+        "status": "NOT_VERIFIED",
+        "normalizedSha256": null,
+        "active": null,
+        "codeResult": null,
+        "updatedTime": null
+      },
+      "trigger": {
+        "kind": "http_or_event",
+        "currentReadback": "NOT_VERIFIED"
+      }
+    },
+    {
+      "name": "food-image-batch-dispatcher",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": false,
+      "ignore": [
+        "*.test.mjs",
+        "node_modules/**",
+        ".git/**"
+      ],
+      "root": "cloudbase/functions/food-image-batch-dispatcher",
+      "artifactSource": "manifest_function_directory",
+      "deploymentCommand": "tcb fn deploy food-image-batch-dispatcher",
+      "localArtifact": {
+        "sha256": "5eed185c30a953798a391a48fdee2de9687e988f3226b8851e0d3682c34b3a04",
+        "files": [
+          {
+            "path": "index.js",
+            "bytes": 2342
+          },
+          {
+            "path": "package.json",
+            "bytes": 159
+          }
+        ],
+        "ignore": [
+          "*.test.mjs",
+          "node_modules/**",
+          ".git/**"
+        ]
+      },
+      "productionReadback": {
+        "status": "NOT_VERIFIED",
+        "normalizedSha256": null,
+        "active": null,
+        "codeResult": null,
+        "updatedTime": null
+      },
+      "trigger": {
+        "kind": "http_or_event",
+        "currentReadback": "NOT_VERIFIED"
+      }
+    },
+    {
+      "name": "vision-image-purge-dispatcher",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": false,
+      "ignore": [
+        "*.test.mjs",
+        "node_modules/**",
+        ".git/**"
+      ],
+      "root": "cloudbase/functions/vision-image-purge-dispatcher",
+      "artifactSource": "manifest_function_directory",
+      "deploymentCommand": "tcb fn deploy vision-image-purge-dispatcher",
+      "localArtifact": {
+        "sha256": "a8239acacf4dd34b3dd0a23e8f65a9d02995229189f0cd05e7c1165bc0cbe752",
+        "files": [
+          {
+            "path": "index.js",
+            "bytes": 2113
+          },
+          {
+            "path": "package.json",
+            "bytes": 109
+          }
+        ],
+        "ignore": [
+          "*.test.mjs",
+          "node_modules/**",
+          ".git/**"
+        ]
+      },
+      "productionReadback": {
+        "status": "NOT_VERIFIED",
+        "normalizedSha256": null,
+        "active": null,
+        "codeResult": null,
+        "updatedTime": null
+      },
+      "trigger": {
+        "kind": "http_or_event",
+        "currentReadback": "NOT_VERIFIED"
+      }
+    },
+    {
+      "name": "nutrition-insight-worker",
+      "type": "HTTP",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": true,
+      "ignore": [
+        "*.test.mjs",
+        "node_modules/**",
+        ".git/**"
+      ],
+      "root": "cloudbase/functions/nutrition-insight-worker",
+      "artifactSource": "manifest_function_directory",
+      "deploymentCommand": "tcb fn deploy nutrition-insight-worker",
+      "localArtifact": {
+        "sha256": "623d90569bac16c5912170d160d557de8d0297c5a8efe14b1b9d4f700f675b2d",
+        "files": [
+          {
+            "path": "index.js",
+            "bytes": 7741
+          },
+          {
+            "path": "package.json",
+            "bytes": 214
+          },
+          {
+            "path": "scf_bootstrap",
+            "bytes": 47
+          }
+        ],
+        "ignore": [
+          "*.test.mjs",
+          "node_modules/**",
+          ".git/**"
+        ]
+      },
+      "productionReadback": {
+        "status": "NOT_VERIFIED",
+        "normalizedSha256": null,
+        "active": null,
+        "codeResult": null,
+        "updatedTime": null
+      },
+      "trigger": {
+        "kind": "http_or_event",
+        "currentReadback": "NOT_VERIFIED"
+      }
+    },
+    {
+      "name": "hunyuan-image-worker",
+      "type": "HTTP",
+      "timeout": 900,
+      "runtime": "Nodejs18.15",
+      "installDependency": true,
+      "ignore": [
+        "*.test.mjs",
+        ".git/**"
+      ],
+      "root": "cloudbase/functions/hunyuan-image-worker",
+      "artifactSource": "manifest_function_directory",
+      "deploymentCommand": "tcb fn deploy hunyuan-image-worker",
+      "localArtifact": {
+        "sha256": "392ae9c4a491083c83c85b85de1e2c5b74cdcd4525d39053116fb53501ac887d",
+        "files": [
+          {
+            "path": "index.js",
+            "bytes": 16547
+          },
+          {
+            "path": "package.json",
+            "bytes": 210
+          },
+          {
+            "path": "README.md",
+            "bytes": 1136
+          },
+          {
+            "path": "scf_bootstrap",
+            "bytes": 47
+          }
+        ],
+        "ignore": [
+          "*.test.mjs",
+          ".git/**"
+        ]
+      },
+      "productionReadback": {
+        "status": "NOT_VERIFIED",
+        "normalizedSha256": null,
+        "active": null,
+        "codeResult": null,
+        "updatedTime": null
+      },
+      "trigger": {
+        "kind": "http_or_event",
+        "currentReadback": "NOT_VERIFIED"
+      }
+    },
+    {
+      "name": "vision-analysis-dispatcher",
+      "type": "HTTP",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": true,
+      "ignore": [
+        "*.test.mjs",
+        ".git/**"
+      ],
+      "root": "cloudbase/functions/vision-analysis-dispatcher",
+      "artifactSource": "manifest_function_directory",
+      "deploymentCommand": "tcb fn deploy vision-analysis-dispatcher",
+      "localArtifact": {
+        "sha256": "8e2da9592bca0f83584a0a5dc756444e5cbea3ae81a1aa8ec42076f740fef7c8",
+        "files": [
+          {
+            "path": "diagnostic-client.cjs",
+            "bytes": 1468
+          },
+          {
+            "path": "index.js",
+            "bytes": 6925
+          },
+          {
+            "path": "package.json",
+            "bytes": 181
+          }
+        ],
+        "ignore": [
+          "*.test.mjs",
+          ".git/**"
+        ]
+      },
+      "productionReadback": {
+        "status": "NOT_VERIFIED",
+        "normalizedSha256": null,
+        "active": null,
+        "codeResult": null,
+        "updatedTime": null
+      },
+      "trigger": {
+        "kind": "timer",
+        "schedule": "every 1 minute",
+        "invokes": "vision-analysis-worker via callFunction($LATEST)",
+        "currentReadback": "NOT_VERIFIED"
+      }
+    },
+    {
+      "name": "vision-analysis-worker",
+      "type": "HTTP",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": true,
+      "ignore": [
+        "*.test.mjs",
+        ".git/**"
+      ],
+      "root": "cloudbase/functions/vision-analysis-worker",
+      "artifactSource": "staged_function_directory_with_get_login_ticket_runtime",
+      "deploymentCommand": "stage-function-artifact.mjs vision-analysis-worker <output-root>; tcb fn deploy vision-analysis-worker --dir <output-root>",
+      "localArtifact": {
+        "sha256": "1a40d6e6f0cfdf1ae02393029c891e41dec7830e3fa5d8f460fd5cc29fa140b8",
+        "files": [
+          {
+            "path": "diagnostic-client.cjs",
+            "bytes": 1329
+          },
+          {
+            "path": "get-login-ticket/.gitignore",
+            "bytes": 36
+          },
+          {
+            "path": "get-login-ticket/account-deletion-service.cjs",
+            "bytes": 6655
+          },
+          {
+            "path": "get-login-ticket/achievement-state-service.cjs",
+            "bytes": 2775
+          },
+          {
+            "path": "get-login-ticket/admin-audit-service.cjs",
+            "bytes": 3266
+          },
+          {
+            "path": "get-login-ticket/admin-console-auth-service.cjs",
+            "bytes": 6837
+          },
+          {
+            "path": "get-login-ticket/admin-console-service.cjs",
+            "bytes": 5842
+          },
+          {
+            "path": "get-login-ticket/coach-data-service.cjs",
+            "bytes": 41070
+          },
+          {
+            "path": "get-login-ticket/content-moderation-service.cjs",
+            "bytes": 5679
+          },
+          {
+            "path": "get-login-ticket/daily-insight-service.cjs",
+            "bytes": 11588
+          },
+          {
+            "path": "get-login-ticket/daily-tip-service.cjs",
+            "bytes": 12829
+          },
+          {
+            "path": "get-login-ticket/deepseek-budget-service.cjs",
+            "bytes": 3328
+          },
+          {
+            "path": "get-login-ticket/deepseek-coach-service.cjs",
+            "bytes": 13322
+          },
+          {
+            "path": "get-login-ticket/deepseek-evaluation-service.cjs",
+            "bytes": 2213
+          },
+          {
+            "path": "get-login-ticket/deepseek-meal-service.cjs",
+            "bytes": 5045
+          },
+          {
+            "path": "get-login-ticket/deepseek-nutrition-plan-service.cjs",
+            "bytes": 5981
+          },
+          {
+            "path": "get-login-ticket/deepseek-weekly-review-service.cjs",
+            "bytes": 8704
+          },
+          {
+            "path": "get-login-ticket/diet-preference-labels.cjs",
+            "bytes": 1832
+          },
+          {
+            "path": "get-login-ticket/feedback-data-service.cjs",
+            "bytes": 3673
+          },
+          {
+            "path": "get-login-ticket/food-admin-service.cjs",
+            "bytes": 12446
+          },
+          {
+            "path": "get-login-ticket/food-barcode-service.cjs",
+            "bytes": 5861
+          },
+          {
+            "path": "get-login-ticket/food-catalog-service.cjs",
+            "bytes": 23394
+          },
+          {
+            "path": "get-login-ticket/food-display-name.cjs",
+            "bytes": 2243
+          },
+          {
+            "path": "get-login-ticket/food-image-audit-service.cjs",
+            "bytes": 12179
+          },
+          {
+            "path": "get-login-ticket/food-image-audit-vision.cjs",
+            "bytes": 6827
+          },
+          {
+            "path": "get-login-ticket/food-image-batch-service.cjs",
+            "bytes": 30926
+          },
+          {
+            "path": "get-login-ticket/food-image-job-service.cjs",
+            "bytes": 28302
+          },
+          {
+            "path": "get-login-ticket/food-image-patrol-service.cjs",
+            "bytes": 12533
+          },
+          {
+            "path": "get-login-ticket/food-image-prompts.cjs",
+            "bytes": 21110
+          },
+          {
+            "path": "get-login-ticket/food-image-service.cjs",
+            "bytes": 14886
+          },
+          {
+            "path": "get-login-ticket/food-image-visual-profile.cjs",
+            "bytes": 4361
+          },
+          {
+            "path": "get-login-ticket/food-image-visual-type.cjs",
+            "bytes": 26404
+          },
+          {
+            "path": "get-login-ticket/food-insight-service.cjs",
+            "bytes": 10487
+          },
+          {
+            "path": "get-login-ticket/food-normalization-service.cjs",
+            "bytes": 3988
+          },
+          {
+            "path": "get-login-ticket/food-query-translator.cjs",
+            "bytes": 3652
+          },
+          {
+            "path": "get-login-ticket/food-repository.cjs",
+            "bytes": 50053
+          },
+          {
+            "path": "get-login-ticket/food-storage-url-service.cjs",
+            "bytes": 2452
+          },
+          {
+            "path": "get-login-ticket/hunyuan-image-service.cjs",
+            "bytes": 8441
+          },
+          {
+            "path": "get-login-ticket/hunyuan-worker-client.cjs",
+            "bytes": 2860
+          },
+          {
+            "path": "get-login-ticket/index.js",
+            "bytes": 186093
+          },
+          {
+            "path": "get-login-ticket/insight-data-service.cjs",
+            "bytes": 20019
+          },
+          {
+            "path": "get-login-ticket/job-ops-service.cjs",
+            "bytes": 5639
+          },
+          {
+            "path": "get-login-ticket/meal-data-service.cjs",
+            "bytes": 22372
+          },
+          {
+            "path": "get-login-ticket/meal-food-link-service.cjs",
+            "bytes": 10648
+          },
+          {
+            "path": "get-login-ticket/milestone-state-service.cjs",
+            "bytes": 16779
+          },
+          {
+            "path": "get-login-ticket/model-usage.cjs",
+            "bytes": 3762
+          },
+          {
+            "path": "get-login-ticket/nickname-moderation.cjs",
+            "bytes": 1765
+          },
+          {
+            "path": "get-login-ticket/nutrition-backfill-service.cjs",
+            "bytes": 4207
+          },
+          {
+            "path": "get-login-ticket/nutrition-calculation-service.cjs",
+            "bytes": 15380
+          },
+          {
+            "path": "get-login-ticket/nutrition-insight-worker-client.cjs",
+            "bytes": 6949
+          },
+          {
+            "path": "get-login-ticket/nutrition-plan-formula.cjs",
+            "bytes": 3026
+          },
+          {
+            "path": "get-login-ticket/observability-sanitizer.cjs",
+            "bytes": 2833
+          },
+          {
+            "path": "get-login-ticket/observability-service.cjs",
+            "bytes": 33074
+          },
+          {
+            "path": "get-login-ticket/onboarding-draft-data-service.cjs",
+            "bytes": 3603
+          },
+          {
+            "path": "get-login-ticket/open-food-facts-service.cjs",
+            "bytes": 6108
+          },
+          {
+            "path": "get-login-ticket/operation-guard.cjs",
+            "bytes": 7912
+          },
+          {
+            "path": "get-login-ticket/package-lock.json",
+            "bytes": 60829
+          },
+          {
+            "path": "get-login-ticket/package.json",
+            "bytes": 315
+          },
+          {
+            "path": "get-login-ticket/proactive-daily-brief-service.cjs",
+            "bytes": 9316
+          },
+          {
+            "path": "get-login-ticket/product-data-service.cjs",
+            "bytes": 18064
+          },
+          {
+            "path": "get-login-ticket/product-session-auth.cjs",
+            "bytes": 2106
+          },
+          {
+            "path": "get-login-ticket/product-session-service.cjs",
+            "bytes": 2922
+          },
+          {
+            "path": "get-login-ticket/profile-avatar-service.cjs",
+            "bytes": 4504
+          },
+          {
+            "path": "get-login-ticket/qwen-vision-service.cjs",
+            "bytes": 17278
+          },
+          {
+            "path": "get-login-ticket/scf_bootstrap",
+            "bytes": 47
+          },
+          {
+            "path": "get-login-ticket/system-health-service.cjs",
+            "bytes": 5933
+          },
+          {
+            "path": "get-login-ticket/transport-fixture-integration.cjs",
+            "bytes": 5434
+          },
+          {
+            "path": "get-login-ticket/transport-fixture-provisioning.cjs",
+            "bytes": 3724
+          },
+          {
+            "path": "get-login-ticket/usda-service.cjs",
+            "bytes": 7360
+          },
+          {
+            "path": "get-login-ticket/user-image-ops-service.cjs",
+            "bytes": 20185
+          },
+          {
+            "path": "get-login-ticket/user-ops-service.cjs",
+            "bytes": 9201
+          },
+          {
+            "path": "get-login-ticket/vision-analysis-foundation.cjs",
+            "bytes": 12826
+          },
+          {
+            "path": "get-login-ticket/vision-analysis-hybrid.cjs",
+            "bytes": 4665
+          },
+          {
+            "path": "get-login-ticket/vision-async-deadline.cjs",
+            "bytes": 1844
+          },
+          {
+            "path": "get-login-ticket/vision-budget.cjs",
+            "bytes": 1038
+          },
+          {
+            "path": "get-login-ticket/vision-data-service.cjs",
+            "bytes": 20019
+          },
+          {
+            "path": "get-login-ticket/vision-image-compress.cjs",
+            "bytes": 1601
+          },
+          {
+            "path": "get-login-ticket/vision-image-retention-service.cjs",
+            "bytes": 5797
+          },
+          {
+            "path": "get-login-ticket/vision-image-review-service.cjs",
+            "bytes": 3467
+          },
+          {
+            "path": "get-login-ticket/vita-vision-service.cjs",
+            "bytes": 5119
+          },
+          {
+            "path": "get-login-ticket/wechat-image-security.cjs",
+            "bytes": 9485
+          },
+          {
+            "path": "index.js",
+            "bytes": 16391
+          },
+          {
+            "path": "package.json",
+            "bytes": 315
+          }
+        ],
+        "ignore": [
+          "*.test.mjs",
+          ".git/**"
+        ]
+      },
+      "productionReadback": {
+        "status": "NOT_VERIFIED",
+        "normalizedSha256": null,
+        "active": null,
+        "codeResult": null,
+        "updatedTime": null
+      },
+      "trigger": {
+        "kind": "internal_invocation",
+        "source": "vision-analysis-dispatcher",
+        "qualifier": "$LATEST",
+        "currentReadback": "NOT_VERIFIED"
+      }
+    },
+    {
+      "name": "vision-analysis-reaper",
+      "type": "HTTP",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": false,
+      "ignore": [
+        "*.test.mjs",
+        ".git/**"
+      ],
+      "root": "cloudbase/functions/vision-analysis-reaper",
+      "artifactSource": "manifest_function_directory",
+      "deploymentCommand": "tcb fn deploy vision-analysis-reaper",
+      "localArtifact": {
+        "sha256": "c85ea6776e55769b41f9a090f616c53449b126517a53c469c076ba2d6b6a0120",
+        "files": [
+          {
+            "path": "index.js",
+            "bytes": 1514
+          }
+        ],
+        "ignore": [
+          "*.test.mjs",
+          ".git/**"
+        ]
+      },
+      "productionReadback": {
+        "status": "NOT_VERIFIED",
+        "normalizedSha256": null,
+        "active": null,
+        "codeResult": null,
+        "updatedTime": null
+      },
+      "trigger": {
+        "kind": "timer",
+        "schedule": "every 1 minute",
+        "invokes": "get-login-ticket internal reap route",
+        "currentReadback": "NOT_VERIFIED"
+      }
+    }
+  ],
+  "testEvidence": "NOT_VERIFIED",
+  "rollbackEvidence": "NOT_VERIFIED"
+}

@@ -9,7 +9,7 @@
     "@cloudbase/ai": "^2.30.0",
     "@cloudbase/js-sdk": "3.6.3",
     "@cloudbase/node-sdk": "^3.18.3",
-    "sharp": "^0.33.0",
+    "sharp": "0.32.6",
     "ws": "8.18.3"
   }
 }

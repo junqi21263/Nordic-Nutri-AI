@@ -1,0 +1,46 @@
+{
+  "capturedAt": "2026-08-19T16:06:48+08:00",
+  "envId": "lewis-healthy-d4glgqqzv73a5bc10",
+  "sample": {
+    "imageSha256": "cc55c7e7dbe6919eb88d269a583e025dce1859fcc361c1154ffcd4ec4766182d",
+    "clientRequestId": "1ce1e45c-1a36-4555-aa19-a9ba24d805d0",
+    "analysisId": "139be3df-6522-43e0-80c6-ca1170e4ea3a",
+    "jobId": "1e609dfa-9646-41fa-be6c-15c098c191d0"
+  },
+  "result": {
+    "initialHandoff": "HTTP 202 / resume_stage=analyzing",
+    "finalHttpStatus": 200,
+    "status": "completed",
+    "currentStage": "completed",
+    "executionOwner": "none",
+    "dispatchState": "completed",
+    "leaseUntil": null,
+    "providerAttempt": 2,
+    "providerCompletedAt": "2026-08-19 16:06:48.011201 +0800 CST",
+    "completedAt": "2026-08-19 16:06:48.011201 +0800 CST",
+    "quotaState": "committed",
+    "resumeStage": "analyzing",
+    "asyncTriggerReason": "fast_timeout"
+  },
+  "databaseReadback": {
+    "sameClientRequestIdRows": 1,
+    "providerCheckpoint": null,
+    "version": 4,
+    "opsMetricEventCounts": {
+      "vision_async_execution_stage": 11,
+      "vision_recognition_trace": 1
+    }
+  },
+  "stageEvidence": [
+    "dispatcher.claim succeeded",
+    "dispatcher.worker_invoke_start started",
+    "dispatcher.worker_invoke_result succeeded",
+    "worker.claim succeeded",
+    "worker.asset_load succeeded",
+    "worker.temp_url succeeded",
+    "worker.deadline_check succeeded with remainingMs=69655",
+    "worker.provider_start succeeded with providerAttempt=2"
+  ],
+  "scope": "single authenticated request; no retry; no second POST",
+  "sensitiveValues": "redacted"
+}

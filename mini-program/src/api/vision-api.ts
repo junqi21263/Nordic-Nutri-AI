@@ -11,10 +11,47 @@ import type { ScannerMealFixture } from "../features/scanner/domain";
 import { createClientRequestId } from "../repositories/client-request-id";
 import { getLocalFileInfo } from "../utils/file-system-info";
 import { productApiEndpoint } from "./product-api-config";
+import {
+  isVisionTerminalStatus,
+  nextVisionPollDelay,
+  normalizeVisionStatus,
+  type VisionAsyncResponse,
+} from "../features/scanner/vision-async-client";
 const maxImageBytes = MAX_UPLOAD_HARD_BYTES;
 const CLIENT_TOTAL_BUDGET_MS = 15_000;
+const VISION_PENDING_ANALYSIS_KEY = "nordic-nutri:vision-pending-analysis:v1";
 /** Network upload target — keep base64 payload small enough for mobile + cloud timeout. */
 const targetUploadBytes = MAX_UPLOAD_IMAGE_BYTES;
+type VisionSource = "camera" | "album";
+
+interface VisionImageMetadata {
+  width: number | null;
+  height: number | null;
+  orientation: string | null;
+  contentType: string | null;
+}
+
+interface VisionImageDiagnostics {
+  source: VisionSource | null;
+  originalContentType: string | null;
+  finalContentType: string | null;
+  originalBytes: number | null;
+  finalBytes: number | null;
+  originalWidth: number | null;
+  originalHeight: number | null;
+  finalWidth: number | null;
+  finalHeight: number | null;
+  orientation: string | null;
+  imagePrepareDurationMs: number;
+  imageReadDurationMs: number;
+}
+
+interface PreparedVisionImage {
+  path: string;
+  originalSize: number;
+  original: VisionImageMetadata;
+  imagePrepareDurationMs: number;
+}
 
 interface ProductVisionResult {
   analysisId: string;
@@ -37,6 +74,8 @@ interface ProductVisionResult {
   }>;
 }
 
+type VisionStatusPayload = VisionAsyncResponse & { message?: string };
+
 function readBase64(filePath: string) {
   const fileSystem = Taro.getFileSystemManager();
   return new Promise<string>((resolve, reject) => {
@@ -50,6 +89,120 @@ function readBase64(filePath: string) {
   });
 }
 
+interface PendingVisionAnalysis {
+  analysisId: string;
+  deadlineAt: number | null;
+  savedAt: number;
+}
+
+function savePendingAnalysis(analysisId: string, deadlineAt?: number | null) {
+  const value: PendingVisionAnalysis = {
+    analysisId,
+    deadlineAt: typeof deadlineAt === "number" && Number.isFinite(deadlineAt) ? deadlineAt : null,
+    savedAt: Date.now(),
+  };
+  try {
+    Taro.setStorageSync(VISION_PENDING_ANALYSIS_KEY, value);
+  } catch {
+    /* best effort */
+  }
+}
+
+function clearPendingAnalysis(analysisId?: string) {
+  try {
+    const pending = readPendingVisionAnalysis();
+    if (!analysisId || pending?.analysisId === analysisId) {
+      Taro.removeStorageSync(VISION_PENDING_ANALYSIS_KEY);
+    }
+  } catch {
+    /* best effort */
+  }
+}
+
+export function readPendingVisionAnalysisId(): string | null {
+  const pending = readPendingVisionAnalysis();
+  return pending?.analysisId ?? null;
+}
+
+function readPendingVisionAnalysis(): PendingVisionAnalysis | null {
+  try {
+    const value = Taro.getStorageSync(VISION_PENDING_ANALYSIS_KEY);
+    // Keep compatibility with the v1 string written by older builds.
+    if (typeof value === "string" && value) {
+      return { analysisId: value, deadlineAt: null, savedAt: 0 };
+    }
+    if (!value || typeof value !== "object") return null;
+    const analysisId = (value as { analysisId?: unknown }).analysisId;
+    if (typeof analysisId !== "string" || !analysisId) return null;
+    const deadlineAt = (value as { deadlineAt?: unknown }).deadlineAt;
+    const savedAt = (value as { savedAt?: unknown }).savedAt;
+    return {
+      analysisId,
+      deadlineAt: typeof deadlineAt === "number" && Number.isFinite(deadlineAt) ? deadlineAt : null,
+      savedAt: typeof savedAt === "number" && Number.isFinite(savedAt) ? savedAt : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function getVisionAnalysisStatus(analysisId: string): Promise<VisionStatusPayload> {
+  const token = useAuthStore.getState().session?.accessToken;
+  if (!token) throw new Error("登录状态已失效，请重新登录");
+  const response = await Taro.request<unknown>({
+    url: `${productApiEndpoint}/vision-analysis/${analysisId}`,
+    method: "GET",
+    header: { authorization: `Bearer ${token}` },
+    timeout: 10_000,
+  });
+  if (response.statusCode !== 200) {
+    const data = response.data as { code?: unknown; message?: unknown };
+    const error = new Error(
+      typeof data.message === "string" ? data.message : "识别状态暂时无法获取",
+    );
+    error.name = typeof data.code === "string" ? data.code : "VISION_STATUS_FAILED";
+    throw error;
+  }
+  return normalizeVisionStatus(response.data);
+}
+
+function statusResultToMeal(status: VisionStatusPayload): ScannerMealFixture {
+  if (status.status !== "completed" || !status.result) throw new Error("VISION_RESULT_INVALID");
+  return mapVisionResult({
+    ...(status.result as ProductVisionResult),
+    analysisId: status.analysisId,
+  });
+}
+
+export async function resumeVisionAnalysis(
+  options: { deadlineAt?: number; onStatus?: (status: VisionStatusPayload) => void } = {},
+) {
+  const pending = readPendingVisionAnalysis();
+  const analysisId = pending?.analysisId ?? null;
+  if (!analysisId) return null;
+  const deadlineAt = options.deadlineAt ?? pending?.deadlineAt ?? Date.now() + 30_000;
+  let attempt = 0;
+  let firstRead = true;
+  while (firstRead || Date.now() < deadlineAt) {
+    firstRead = false;
+    const status = await getVisionAnalysisStatus(analysisId);
+    options.onStatus?.(status);
+    if (isVisionTerminalStatus(status.status)) {
+      clearPendingAnalysis(analysisId);
+      if (status.status === "completed") return statusResultToMeal(status);
+      const error = new Error(status.message || status.errorCode || "图片识别失败，请重试");
+      error.name = status.errorCode || `VISION_${status.status.toUpperCase()}`;
+      throw error;
+    }
+    if (Date.now() >= deadlineAt) break;
+    await new Promise((resolve) => setTimeout(resolve, nextVisionPollDelay(attempt)));
+    attempt += 1;
+  }
+  const error = new Error("识别任务仍在处理中，请稍后返回查看");
+  error.name = "VISION_ASYNC_PROCESSING";
+  throw error;
+}
+
 function detectImageContentType(imageBase64: string, filePath?: string): string {
   // Magic-byte detection for mainstream formats (Android + Apple)
   if (imageBase64.startsWith("/9j/")) return "image/jpeg";
@@ -57,18 +210,67 @@ function detectImageContentType(imageBase64: string, filePath?: string): string 
   if (imageBase64.startsWith("UklGR")) return "image/webp";
   if (imageBase64.startsWith("Qk")) return "image/bmp";
   // HEIC/HEIF (Apple default since iOS 11) — ftyp box at byte 4
-  if (imageBase64.startsWith("AAAA") && /AAAA[A-Za-z0-9+/]{0,4}GZ0eXB/i.test(imageBase64.slice(0, 24))) return "image/heic";
+  if (
+    imageBase64.startsWith("AAAA") &&
+    /AAAA[A-Za-z0-9+/]{0,4}GZ0eXB/i.test(imageBase64.slice(0, 24))
+  )
+    return "image/heic";
   // Fallback: infer from file extension
   if (filePath) {
     const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
     const extMap: Record<string, string> = {
-      jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
-      bmp: "image/bmp", heic: "image/heic", heif: "image/heic",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      webp: "image/webp",
+      bmp: "image/bmp",
+      heic: "image/heic",
+      heif: "image/heic",
     };
     if (extMap[ext]) return extMap[ext];
   }
   // Default to JPEG (WeChat usually converts HEIC to JPEG automatically)
   return "image/jpeg";
+}
+
+function contentTypeFromPath(filePath: string): string | null {
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+  const extMap: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    bmp: "image/bmp",
+    heic: "image/heic",
+    heif: "image/heic",
+  };
+  return extMap[ext] ?? null;
+}
+
+function contentTypeFromImageType(type: unknown, filePath: string): string | null {
+  if (typeof type !== "string" || !type.trim()) return contentTypeFromPath(filePath);
+  const normalized = type.trim().toLowerCase();
+  if (normalized.startsWith("image/")) return normalized;
+  return contentTypeFromPath(`image.${normalized}`) ?? contentTypeFromPath(filePath);
+}
+
+async function imageMetadataOf(filePath: string): Promise<VisionImageMetadata> {
+  try {
+    const info = await Taro.getImageInfo({ src: filePath });
+    return {
+      width: Number.isFinite(info.width) ? info.width : null,
+      height: Number.isFinite(info.height) ? info.height : null,
+      orientation: typeof info.orientation === "string" ? info.orientation : null,
+      contentType: contentTypeFromImageType(info.type, filePath),
+    };
+  } catch {
+    return {
+      width: null,
+      height: null,
+      orientation: null,
+      contentType: contentTypeFromPath(filePath),
+    };
+  }
 }
 
 function createVisionError(message: string, cause: unknown, name?: string) {
@@ -84,7 +286,11 @@ function remainingClientMs(deadlineAt: number) {
 
 function throwIfClientDeadlineExceeded(deadlineAt: number) {
   if (remainingClientMs(deadlineAt) <= 0) {
-    throw createVisionError("识别时间有点久，请重新试一次", { code: "VISION_TIMEOUT" }, "VISION_TIMEOUT");
+    throw createVisionError(
+      "识别时间有点久，请重新试一次",
+      { code: "VISION_TIMEOUT" },
+      "VISION_TIMEOUT",
+    );
   }
 }
 
@@ -151,15 +357,21 @@ async function compressOnce(
   }
 }
 
-async function prepareImagePath(sourcePath: string, deadlineAt: number, onTiming?: (event: { stage: string; ms: number }) => void) {
+async function prepareImagePath(
+  sourcePath: string,
+  deadlineAt: number,
+  onTiming?: (event: { stage: string; ms: number }) => void,
+): Promise<PreparedVisionImage> {
   const startedAt = Date.now();
   let path = sourcePath;
+  const originalSize = await fileSizeOf(sourcePath);
+  const original = await imageMetadataOf(sourcePath);
   try {
     throwIfClientDeadlineExceeded(deadlineAt);
-    const originalSize = await fileSizeOf(sourcePath);
     // Keep the browser-side payload below WeChat image-security's 900KB fallback
     // limit. Quality-only often stalls on phone JPEGs, so shrink the long edge too.
-    const firstQuality = originalSize > 8 * 1024 * 1024 ? 48 : originalSize > 3 * 1024 * 1024 ? 58 : 68;
+    const firstQuality =
+      originalSize > 8 * 1024 * 1024 ? 48 : originalSize > 3 * 1024 * 1024 ? 58 : 68;
     const passes: Array<{ quality: number; width: number }> = [
       { quality: firstQuality, width: 1280 },
       { quality: 54, width: 960 },
@@ -174,15 +386,26 @@ async function prepareImagePath(sourcePath: string, deadlineAt: number, onTiming
   } catch {
     if (remainingClientMs(deadlineAt) <= 0) throwIfClientDeadlineExceeded(deadlineAt);
     onTiming?.({ stage: "image_prepare", ms: Date.now() - startedAt });
-    return sourcePath;
+    return {
+      path: sourcePath,
+      originalSize,
+      original,
+      imagePrepareDurationMs: Date.now() - startedAt,
+    };
   }
-  onTiming?.({ stage: "image_prepare", ms: Date.now() - startedAt });
-  return path;
+  const imagePrepareDurationMs = Date.now() - startedAt;
+  onTiming?.({ stage: "image_prepare", ms: imagePrepareDurationMs });
+  return { path, originalSize, original, imagePrepareDurationMs };
 }
 
 export async function analyzeProductImage(
   sourcePath: string,
-  options: { recognitionStartedAt?: number; deadlineAt?: number; onTiming?: (event: { stage: string; ms: number }) => void } = {},
+  options: {
+    source?: VisionSource;
+    recognitionStartedAt?: number;
+    deadlineAt?: number;
+    onTiming?: (event: { stage: string; ms: number }) => void;
+  } = {},
 ): Promise<ScannerMealFixture> {
   const recognitionStartedAt = options.recognitionStartedAt ?? Date.now();
   const deadlineAt = options.deadlineAt ?? recognitionStartedAt + CLIENT_TOTAL_BUDGET_MS;
@@ -192,7 +415,8 @@ export async function analyzeProductImage(
     console.error("[vision] No auth token in session:", useAuthStore.getState().session);
     throw new Error("登录状态已失效，请重新登录");
   }
-  const filePath = await prepareImagePath(sourcePath, deadlineAt, onTiming);
+  const prepared = await prepareImagePath(sourcePath, deadlineAt, onTiming);
+  const filePath = prepared.path;
   throwIfClientDeadlineExceeded(deadlineAt);
   let info;
   try {
@@ -221,6 +445,21 @@ export async function analyzeProductImage(
     console.error("[vision] detectImageContentType failed:", err);
     throw err;
   }
+  const finalMetadata = await imageMetadataOf(filePath);
+  const diagnostics: VisionImageDiagnostics = {
+    source: options.source ?? null,
+    originalContentType: prepared.original.contentType,
+    finalContentType: contentType,
+    originalBytes: prepared.originalSize > 0 ? prepared.originalSize : null,
+    finalBytes: typeof info.size === "number" ? info.size : null,
+    originalWidth: prepared.original.width,
+    originalHeight: prepared.original.height,
+    finalWidth: finalMetadata.width,
+    finalHeight: finalMetadata.height,
+    orientation: finalMetadata.orientation || prepared.original.orientation,
+    imagePrepareDurationMs: prepared.imagePrepareDurationMs,
+    imageReadDurationMs: Date.now() - readStartedAt,
+  };
   console.info(
     "[vision] Sending request to",
     `${productApiEndpoint}/vision-analysis`,
@@ -234,6 +473,7 @@ export async function analyzeProductImage(
   throwIfClientDeadlineExceeded(deadlineAt);
   const requestStartedAt = Date.now();
   const requestTimeout = remainingClientMs(deadlineAt);
+  const clientRequestId = createClientRequestId();
   let response;
   try {
     response = await Taro.request<unknown>({
@@ -241,7 +481,13 @@ export async function analyzeProductImage(
       method: "POST",
       header: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       data: {
-        clientRequestId: createClientRequestId(),
+        clientRequestId,
+        source: options.source,
+        clientCapabilities: {
+          supportsAsyncVision: true,
+          clientVersion: "phase2-local",
+        },
+        diagnostics,
         contentType,
         imageBase64,
       },
@@ -250,8 +496,11 @@ export async function analyzeProductImage(
     onTiming?.({ stage: "request", ms: Date.now() - requestStartedAt });
   } catch (err) {
     console.error("[vision] network request failed:", err);
-    const detail = String((err as { errMsg?: unknown })?.errMsg || (err as Error)?.message || "").toLowerCase();
-    const isTimeout = detail.includes("timeout") || detail.includes("aborted") || detail.includes("超时");
+    const detail = String(
+      (err as { errMsg?: unknown })?.errMsg || (err as Error)?.message || "",
+    ).toLowerCase();
+    const isTimeout =
+      detail.includes("timeout") || detail.includes("aborted") || detail.includes("超时");
     throw createVisionError(
       isTimeout ? "识别时间有点久，请重新试一次" : "网络似乎不太稳定，请检查后重试",
       err,
@@ -259,7 +508,23 @@ export async function analyzeProductImage(
     );
   }
   const parseStartedAt = Date.now();
-  const data = response.data as ProductVisionResult & { code?: unknown; message?: unknown };
+  const data = response.data as ProductVisionResult &
+    VisionStatusPayload & { code?: unknown; message?: unknown };
+  if (response.statusCode === 202) {
+    const processing = normalizeVisionStatus(data);
+    const serverDeadlineAt = processing.deadlineAt
+      ? new Date(processing.deadlineAt).getTime()
+      : null;
+    savePendingAnalysis(processing.analysisId, serverDeadlineAt);
+    onTiming?.({ stage: "async_handoff", ms: Date.now() - requestStartedAt });
+    const resumed = await resumeVisionAnalysis({
+      deadlineAt: serverDeadlineAt ?? Date.now() + 30_000,
+      onStatus: (status) =>
+        onTiming?.({ stage: `async_${status.currentStage || status.status}`, ms: 0 }),
+    });
+    if (!resumed) throw new Error("VISION_RESULT_INVALID");
+    return resumed;
+  }
   if (response.statusCode !== 200) {
     const backendMessage = typeof data.message === "string" ? data.message : "";
     const errorCode = typeof data.code === "string" ? data.code : "VisionRequestError";
@@ -284,12 +549,14 @@ export async function analyzeProductImage(
       messageByCode[errorCode] ||
         (timedOut
           ? "识别时间有点久，请重新试一次"
-          : backendMessage || (response.statusCode === 503 ? "图片识别服务暂不可用" : "图片识别失败，请重新拍摄")),
+          : backendMessage ||
+            (response.statusCode === 503 ? "图片识别服务暂不可用" : "图片识别失败，请重新拍摄")),
     );
     error.name = errorCode;
     console.error("[vision] request failed:", response.statusCode, data);
     throw error;
   }
+  clearPendingAnalysis(typeof data.analysisId === "string" ? data.analysisId : undefined);
   const meal = mapVisionResult(data);
   onTiming?.({ stage: "parse", ms: Date.now() - parseStartedAt });
   onTiming?.({ stage: "client_total", ms: Date.now() - recognitionStartedAt });
