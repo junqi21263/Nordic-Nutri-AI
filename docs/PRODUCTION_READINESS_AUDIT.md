@@ -17,7 +17,7 @@
 - 当前 worktree 已 clean；四个 `$LATEST` 生产包已按同一 ignore 规则完成 normalized SHA `4/4 MATCH`。平台 `codeSha256` 仍作为独立 digest domain 记录。
 - 隐私审核材料仍为 `DRAFT — OWNER INPUT REQUIRED`。
 - 2026-08-19 只读平台回读：目标环境 `lewis-healthy-d4glgqqzv73a5bc10` 状态 NORMAL，PG RUNNING，套餐 `baas_personal`，自动续费开启，到期时间 2026-09-03 23:59:59；dispatcher `$LATEST` timer 为 `*/15 * * * * * *`，reaper `$LATEST` timer 为 `0 * * * * * *`，两个触发器均 BindStatus=on / Enable=1。
-- 2026-08-19 migration runner 只读回读：`20260815224412 repair_core_schema_drift`、`20260818000000 vision_hybrid_runtime_reconcile`、`20260819000000 transport_fixture_rpc`，LatestVersion=`20260819000000`。
+- 2026-08-19 migration runner 回读：`20260815224412 repair_core_schema_drift`、`20260818000000 vision_hybrid_runtime_reconcile`、`20260819000000 transport_fixture_rpc`、`20260819000001 vision_quota_expiry_reconcile`，LatestVersion=`20260819000001`。
 
 ## Executive Summary
 
@@ -73,7 +73,7 @@ PG migrations: cloudbase/pg/migrations/
 | `get-login-ticket` | 统一 HTTPS/auth/API/AI 边界；代码约 3,000+ 行 | 已运行但耦合度高，需拆分/固化发布边界 |
 | Vision foundation/hybrid | 本地实现、CAS、checkpoint、deadline tests；生产 S2/S3 受控 fixture | 后端核心链路通过；客户端和发布审计仍未闭环 |
 | Dispatcher/worker/reaper | 独立函数目录和 30 个定向测试 | 仓库存在；manifest/生产可复现性不足 |
-| PostgreSQL | 0047-0050 SQL/readback/rollback tests | 生产 registry 已回读至 `20260819000000 transport_fixture_rpc`；CAS/配额 fixture 已通过 |
+| PostgreSQL | 0047-0051 SQL/readback/rollback tests；0051 真实 PG 验证 | 生产 registry 已回读至 `20260819000001 vision_quota_expiry_reconcile`；CAS/配额 fixture 与 quota 一致性回读已通过 |
 | Observability/Admin | Trace Explorer、sanitizer、system health | 有基础能力；告警和持续 SLO 证据不足 |
 
 ## Release Scorecard
@@ -158,9 +158,9 @@ PG migrations: cloudbase/pg/migrations/
 
 ## Database Audit
 
-本地 migration tests 47/47 通过，覆盖 0047 foundation、0048 hybrid runtime、0049 reconciliation、0050 transport fixture RPC 的静态/幂等/非破坏性断言；worker/dispatcher/reaper tests 30/30 通过。
+本地 migration tests 0051 相关链路与既有迁移回归通过，覆盖 0047 foundation、0048 hybrid runtime、0049 reconciliation、0050 transport fixture RPC、0051 quota expiry reconciliation 的静态/幂等/非破坏性断言；一次性 PostgreSQL 16 真实 up/readback 亦通过。
 
-当前生产 registry 已回读包含 `20260819000000 transport_fixture_rpc`；dispatcher→worker transport、S2/S3 受控 fixture、CAS/配额 terminal 状态已有证据。仍未验证的是持续队列 backlog、并发租约行为、容量上限和长期 provider 成本。
+当前生产 registry 已回读包含 `20260819000001 vision_quota_expiry_reconcile`；dispatcher→worker transport、S2/S3 受控 fixture、CAS/配额 terminal 状态和过期 reservation 一致性已有证据。仍未验证的是持续队列 backlog、并发租约行为、容量上限和长期 provider 成本。
 
 ## AI / Provider Audit
 
@@ -308,10 +308,10 @@ Complex Timeout Fix     NOT CLOSED
 
 ## 2026-08-19 Quota Consistency Addendum
 
-- Production read-only evidence found one terminal `timed_out` analysis with `quota_state=reserved`; its linked reservation was `state=expired` while `reservation_state` remained `reserved`.
+- Production read-only evidence initially found one terminal `timed_out` analysis with `quota_state=reserved`; its linked reservation was `state=expired` while `reservation_state` remained `reserved`.
 - Root cause is the existing automatic expiry function updating reservation `state` only, without synchronizing `reservation_state` and `ai_analysis.quota_state`.
 - Local forward-only migration `0051_vision_quota_expiry_reconcile` and 3/3 static contract tests are present. A disposable PostgreSQL 16 validation passed for existing stale-row reconciliation, live expiry synchronization, readback, and idempotency; production migration is **NOT EXECUTED**.
-- This is a new P0 release blocker for quota consistency. Do not manually mutate the production row or restore an expired reservation to `reserved`.
+- 0051 production push succeeded through the official runner; registry/readback now show the migration present, stale expired reservations `0`, and terminal-reserved quota rows `0`. No business row was manually mutated and no expired reservation was restored to `reserved`.
 
 ## Future Architecture (6–12 Months)
 

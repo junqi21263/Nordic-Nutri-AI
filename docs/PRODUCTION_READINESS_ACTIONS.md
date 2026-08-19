@@ -86,10 +86,10 @@
 
 ## 2026-08-19 Quota Consistency Addendum
 
-- **P0-8 — Production quota expiry reconciliation：BLOCKED / NOT DEPLOYED**。
+- **P0-8 — Production quota expiry reconciliation：PASS**。
 - 只读生产回读发现 1 条 terminal `timed_out` analysis 仍为 `quota_state=reserved`；其关联 reservation 已标记 `state=expired`，但 `reservation_state` 仍为 `reserved`。该状态属于历史自动过期同步缺口，不能人工直接改生产行来“修证据”。
 - 本地已新增 forward-only migration `0051_vision_quota_expiry_reconcile.sql`、readback、rollback 说明和 3/3 静态契约测试；一次性 PostgreSQL 16 容器中的真实 up/readback、既有 stale row reconciliation、live expiry path 和幂等验证已通过。0051 仍未生产执行。
-- Production Gate：先完成真实 PG 验证，再走正式 migration preview/push；通过后只验证过期 reservation 与 terminal analysis 的 quota 一致性，不删除业务数据、不恢复为 `reserved`。
+- Production Gate 已完成：正式 runner push 成功，registry 已记录 `20260819000001`，readback 中 stale expired reservation 与 terminal-reserved quota 均为 0；未删除业务数据、未恢复任何 reservation 为 `reserved`。
 
 ## Exit Criteria
 
