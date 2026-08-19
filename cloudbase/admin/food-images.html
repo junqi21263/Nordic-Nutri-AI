@@ -286,6 +286,10 @@
     .ops-stage-list { display: grid; gap: 7px; margin-top: 10px; }
     .ops-stage { display: flex; justify-content: space-between; gap: 10px; padding: 9px 10px; border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; background: var(--linen); font-size: 12px; }
     .ops-stage.failed, .ops-stage.timed_out { border-left-color: var(--danger); background: var(--danger-mist); }
+    .ops-diagnostic { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .ops-diagnostic__block { margin-top: 12px; }
+    .ops-diagnostic__block h5 { margin: 0 0 5px; color: var(--ink); font-size: 12px; }
+    .ops-diagnostic__block pre { max-height: 220px; margin-top: 0; }
     .ops-inline-link { border: 0; padding: 0; background: transparent; color: var(--green); font: inherit; cursor: pointer; text-decoration: underline; }
     .ops-empty { display: grid; min-height: 160px; place-items: center; border: 1px dashed #c4cec2; border-radius: 14px; color: var(--muted); text-align: center; }
     .ops-user-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-bottom: 14px; }
@@ -758,7 +762,7 @@
 
         <section id="moduleTraces" class="admin-module" hidden>
           <div class="module-toolbar"><h2>Trace Explorer</h2><span class="muted">按请求状态定位阶段耗时与 Provider</span><button id="refreshTraces" class="button secondary" type="button">刷新</button></div>
-          <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / Error Code" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="admin">admin</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
+    <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / Error Code" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="processing">processing</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="admin">admin</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
           <div class="ops-page-grid"><section class="ops-panel"><div id="traceList" class="data-table"><p class="ops-empty">加载中…</p></div></section></div>
           <section id="traceDrawer" class="nn-drawer" hidden aria-label="Trace Detail" role="dialog" aria-modal="true" aria-labelledby="traceDrawerTitle"><div class="nn-drawer__panel"><div class="nn-drawer__header"><div><span class="eyebrow">TRACE DETAIL</span><h3 id="traceDrawerTitle">Trace Detail</h3></div><button class="nn-drawer__close" type="button" data-trace-drawer-close aria-label="关闭 Trace Detail">关闭</button></div><div id="traceDetail"><p class="muted">选择一条 Trace 查看阶段。</p></div></div></section>
         </section>
@@ -2537,8 +2541,8 @@
     }
     let selectedTraceId = "";
     let selectedUserDetailId = "";
-    const opsStatusLabel = (status) => ({ healthy: "健康", configured: "已配置 · 未知", succeeded: "成功", degraded: "降级", unavailable: "不可用", unknown: "未知", running: "运行中", failed: "失败", cancelled: "已取消", timed_out: "超时", rate_limited: "限流", partial: "部分可用" }[status] || status || "未知");
-    const opsTone = (status) => ({ healthy: "good", succeeded: "good", degraded: "warn", partial: "warn", unavailable: "danger", failed: "danger", timed_out: "danger", rate_limited: "warn", cancelled: "muted", running: "warn" }[status] || "muted");
+    const opsStatusLabel = (status) => ({ healthy: "健康", configured: "已配置 · 未知", succeeded: "成功", degraded: "降级", unavailable: "不可用", unknown: "未知", running: "运行中", processing: "后台处理中", failed: "失败", cancelled: "已取消", timed_out: "超时", rate_limited: "限流", partial: "部分可用" }[status] || status || "未知");
+    const opsTone = (status) => ({ healthy: "good", succeeded: "good", degraded: "warn", partial: "warn", unavailable: "danger", failed: "danger", timed_out: "danger", rate_limited: "warn", cancelled: "muted", running: "warn", processing: "warn" }[status] || "muted");
     function setOpsMessage(host, message, tone = "muted") {
       if (!host) return;
       host.innerHTML = `<p class="ops-empty ${tone === "danger" ? "danger" : ""}">${escapeHtml(message)}</p>`;
@@ -2621,7 +2625,21 @@
       setOpsMessage(host, "加载 Trace 详情…");
       try {
         const item = await api(`/traces/${encodeURIComponent(traceId)}`);
-        host.innerHTML = `<div class="ops-detail"><div class="ops-detail__heading"><div><span class="eyebrow">TRACE DETAIL</span><h3>${escapeHtml(item.traceId)}</h3></div><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span></div><div class="ops-window-grid"><span>功能<b>${escapeHtml(item.feature || "—")}</b></span><span>最后阶段<b>${escapeHtml(item.lastStage || "—")}</b></span><span>总耗时<b>${escapeHtml(item.durationMs ?? "—")} ms</b></span><span>HTTP<b>${escapeHtml(item.httpStatus ?? "—")}</b></span><span>错误码<b>${escapeHtml(item.errorCode || "—")}</b></span><span>Provider / fallback<b>${escapeHtml(item.provider || "—")} / ${item.fallbackUsed ? "是" : "否"}</b></span></div><h4>Stages</h4><div id="traceDrawerStages" class="ops-stage-list">${(item.stages || []).map((stage) => `<div class="ops-stage"><span>${escapeHtml(stage.name)}</span><strong class="${opsTone(stage.status)}">${escapeHtml(opsStatusLabel(stage.status))}</strong><small>${escapeHtml(stage.durationMs ?? "—")} ms${stage.provider ? ` · ${escapeHtml(stage.provider)}` : ""}</small></div>`).join("") || "<p class=\"ops-empty\">暂无阶段记录</p>"}</div><h4>安全元数据</h4><pre id="traceDrawerMeta">${escapeHtml(JSON.stringify(item.meta || {}, null, 2))}</pre></div>`;
+        host.innerHTML = `<div class="ops-detail"><div class="ops-detail__heading"><div><span class="eyebrow">TRACE DETAIL</span><h3>${escapeHtml(item.traceId)}</h3></div><div class="action-row"><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span><button class="button secondary" type="button" data-trace-diagnostic="${escapeHtml(item.traceId)}">查看诊断包</button></div></div><div class="ops-window-grid"><span>功能<b>${escapeHtml(item.feature || "—")}</b></span><span>最后阶段<b>${escapeHtml(item.lastStage || "—")}</b></span><span>总耗时<b>${escapeHtml(item.durationMs ?? "—")} ms</b></span><span>HTTP<b>${escapeHtml(item.httpStatus ?? "—")}</b></span><span>错误码<b>${escapeHtml(item.errorCode || "—")}</b></span><span>Provider / fallback<b>${escapeHtml(item.provider || "—")} / ${item.fallbackUsed ? "是" : "否"}</b></span></div><h4>Stages</h4><div id="traceDrawerStages" class="ops-stage-list">${(item.stages || []).map((stage) => `<div class="ops-stage"><span>${escapeHtml(stage.name)}</span><strong class="${opsTone(stage.status)}">${escapeHtml(opsStatusLabel(stage.status))}</strong><small>${escapeHtml(stage.durationMs ?? "—")} ms${stage.provider ? ` · ${escapeHtml(stage.provider)}` : ""}</small></div>`).join("") || "<p class=\"ops-empty\">暂无阶段记录</p>"}</div><h4>安全元数据</h4><pre id="traceDrawerMeta">${escapeHtml(JSON.stringify(item.meta || {}, null, 2))}</pre><div id="traceDiagnostic" class="ops-diagnostic" hidden></div></div>`;
+        host.querySelector("[data-trace-diagnostic]")?.addEventListener("click", () => loadTraceDiagnostic(item.traceId));
+      } catch (error) { setOpsMessage(host, traceDetailErrorMessage(error), "danger"); }
+    }
+    function diagnosticBlock(label, value) {
+      return `<section class="ops-diagnostic__block"><h5>${escapeHtml(label)}</h5><pre>${escapeHtml(JSON.stringify(value ?? {}, null, 2))}</pre></section>`;
+    }
+    async function loadTraceDiagnostic(traceId) {
+      const host = $("traceDiagnostic");
+      if (!host || !traceId) return;
+      host.hidden = false;
+      setOpsMessage(host, "加载诊断包…");
+      try {
+        const diagnostic = await api(`/diagnostics/${encodeURIComponent(traceId)}`);
+        host.innerHTML = `<h4>Diagnostic Package</h4><p class="muted">仅显示脱敏后的排障字段。</p>${diagnosticBlock("Request", diagnostic.request)}${diagnosticBlock("Runtime", diagnostic.runtime)}${diagnosticBlock("Vision", diagnostic.vision)}${diagnosticBlock("Quota", diagnostic.quota)}${diagnosticBlock("Database", diagnostic.database)}${diagnosticBlock("Result", diagnostic.result)}${diagnosticBlock("Replay Hints", diagnostic.replayHints)}`;
       } catch (error) { setOpsMessage(host, traceDetailErrorMessage(error), "danger"); }
     }
     async function loadTraces() {

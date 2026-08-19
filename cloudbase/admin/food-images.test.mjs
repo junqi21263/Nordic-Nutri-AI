@@ -451,6 +451,19 @@ test("users and feedback modules call admin list endpoints", async () => {
   assert.match(source, /method:\s*"PATCH"/);
 });
 
+test("trace detail exposes the sanitized diagnostic package action", async () => {
+  const source = await pageSource();
+  assert.match(source, /data-trace-diagnostic/);
+  assert.match(source, /\/diagnostics\//);
+  assert.match(source, /Diagnostic Package|诊断包/);
+});
+
+test("trace explorer distinguishes async processing from failure", async () => {
+  const source = await pageSource();
+  assert.match(source, /value="processing">processing/);
+  assert.match(source, /processing: "后台处理中"/);
+});
+
 test("shows a login gate before revealing the admin console", async () => {
   const source = await pageSource();
   assert.match(source, /id="loginGate"/);
