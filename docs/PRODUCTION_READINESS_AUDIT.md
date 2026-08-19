@@ -306,6 +306,13 @@ Complex Timeout Fix     NOT CLOSED
 | 安全性 | 7/10 | auth/HMAC/RLS/sanitizer 有较好本地证据；生产权限、轮换和外部测试未完成 |
 | Observability | 6/10 | trace/stage/processing 修复存在；告警演练、SLO、值班和历史数据治理不足 |
 
+## 2026-08-19 Quota Consistency Addendum
+
+- Production read-only evidence found one terminal `timed_out` analysis with `quota_state=reserved`; its linked reservation was `state=expired` while `reservation_state` remained `reserved`.
+- Root cause is the existing automatic expiry function updating reservation `state` only, without synchronizing `reservation_state` and `ai_analysis.quota_state`.
+- Local forward-only migration `0051_vision_quota_expiry_reconcile` and 3/3 static contract tests are present. Real PostgreSQL validation is **NOT VERIFIED** because neither local PostgreSQL nor Docker is available; production migration is **NOT EXECUTED**.
+- This is a new P0 release blocker for quota consistency. Do not manually mutate the production row or restore an expired reservation to `reserved`.
+
 ## Future Architecture (6–12 Months)
 
 | 规模 | 建议 |

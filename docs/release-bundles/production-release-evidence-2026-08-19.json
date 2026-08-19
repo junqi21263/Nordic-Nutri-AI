@@ -56,6 +56,7 @@
   "productionS2": "PASS — see s2-e2e-2026-08-19.json",
   "productionS3": "PASS — dedicated real-Storage fixture resumed from enriching; worker.checkpoint_resume succeeded, no worker.provider_start event was emitted, provider_attempt remained 1, and final status completed/quota committed",
   "transportHelper": "DEPLOYED/REACHABLE — invalid-HMAC probe returned 401 with zero-write path; production transport fixture invoke smoke PASS (dispatcher claim/invoke and worker handler reached; worker temp_url correctly rejected the synthetic non-storage path). Fixture was terminalized via CAS as timed_out with quota_state=none; terminal fixture row retained by the migration's non-destructive cleanup rule.",
+  "quotaConsistency": "BLOCKED — read-only production aggregate found one terminal timed_out analysis with quota_state=reserved while its linked reservation had state=expired and reservation_state=reserved. Local forward-only 0051 reconciliation plus 3/3 static contract tests are present; real PostgreSQL validation and production migration are pending.",
   "rollback": "Prepared locally; production rollback drill NOT_VERIFIED",
   "privacy": "DRAFT — OWNER INPUT REQUIRED",
   "secretRotation": "REQUIRED — sensitive values were not persisted in this bundle; dependency and two-phase rotation runbook prepared at docs/PRODUCTION_SECRET_ROTATION_RUNBOOK.md; rotate before public release and repeat presence-only readback",

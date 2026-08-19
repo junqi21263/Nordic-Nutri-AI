@@ -1,0 +1,3 @@
+-- 0051 is a forward-only consistency repair.
+-- A rollback must not restore expired reservations or terminal analyses to
+-- quota_state='reserved'. If needed, roll back the application release only.
