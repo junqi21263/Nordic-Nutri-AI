@@ -1,10 +1,10 @@
 {
   "capturedAt": "2026-08-19",
   "envId": "lewis-healthy-d4glgqqzv73a5bc10",
-  "releaseStatus": "NO_GO_PUBLIC_RELEASE_DIRTY_WORKTREE",
+  "releaseStatus": "NO_GO_PUBLIC_RELEASE_PENDING_CLIENT_PRIVACY_SRE",
   "baseline": {
-    "commit": "7b06316946d95c1956ed6fa16b0024db013909c0",
-    "worktree": "dirty",
+    "commit": "2a3b90afe99c3723473e18f8634d7ca412cdf611",
+    "worktree": "clean",
     "nodeTooling": "Node 24.18.x required by release policy",
     "runtime": "Nodejs18.15"
   },

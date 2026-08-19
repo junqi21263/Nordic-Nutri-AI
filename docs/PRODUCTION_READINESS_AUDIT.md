@@ -12,7 +12,7 @@
 - 生产数据库回读确认同一 `client_request_id` 只有 1 条 analysis，`lease_until=null`、`execution_owner=none`、`dispatch_state=completed`。
 - S3 独立真实 Storage fixture 已完成 async-worker enriching resume：`worker.checkpoint_resume` 成功、`provider_attempt=1`、无 `worker.provider_start`，最终 `completed` 且 quota committed。
 - 当前四个 Hybrid flag 均为 `true`；这证明受控链路已开启，不等于公开 rollout 已批准。
-- 当前 worktree 仍 dirty，生产 normalized artifact SHA 尚未通过远程包规范化回读确认；平台 `codeSha256` 已记录但不得与 normalized SHA 直接比较。
+- 当前 worktree 已 clean；四个 `$LATEST` 生产包已按同一 ignore 规则完成 normalized SHA `4/4 MATCH`。平台 `codeSha256` 仍作为独立 digest domain 记录。
 - 隐私审核材料仍为 `DRAFT — OWNER INPUT REQUIRED`。
 
 ## Executive Summary
@@ -21,7 +21,7 @@
 
 当前产品已经具备可用的基础视觉能力：真实设备上曾完成餐食图片上传、菜品识别、营养结果展示、保存本餐和记录页回读；本地自动化质量也较好。复杂餐食超过 Flash 6 秒后的 S2 异步兜底，以及 provider 成功后的 S3 checkpoint resume/no-second-provider，均已有受控生产证据；但仍未形成可公开发布的完整基线与客户端、运维、合规闭环。
 
-同时，当前工作树是 dirty/uncommitted，`cloudbaserc.json` 的函数清单没有声明 vision dispatcher/worker/reaper，Mini Program 异步客户端的生产发布证据缺失，生产 Hybrid flag 的当前值也未能通过本轮 CLI 独立回读。上述问题使“当前运行的代码、批准 artifact、客户端版本和配置”无法形成可审计的单一发布基线。
+同时，Mini Program 异步客户端的正式生产发布证据缺失，生产 Hybrid flag 虽已独立回读为 `true`，但客户端版本与灰度范围尚未形成可审计的单一发布基线。
 
 建议：
 
@@ -99,7 +99,7 @@ PG migrations: cloudbase/pg/migrations/
 ### P0 — 必须在公开生产前关闭
 
 1. **复杂图片异步兜底已完成后端生产 E2E，但完整发布仍未闭环**：S2 已有 `Flash timeout → 202 → worker provider attempt #2 → completed → quota committed`；S3 已有 `checkpoint → worker.checkpoint_resume → no provider_start → completed → quota committed`。剩余是客户端真机、并发、SRE 和发布审计。
-2. **发布一致性不可审计**：当前工作树有大量未提交/未跟踪 Phase 2 代码；生产 normalized SHA 尚未完成远程包回读，无法证明生产包可从当前批准提交重建。
+2. **客户端与生产发布一致性仍未闭环**：后端 clean commit 和四个 normalized SHA 已闭环，但 Mini Program 正式版本、灰度范围和回滚绑定仍未形成可审计证据。
 3. **客户端与后端合约不同步风险**：本地已实现 200/202/polling，但 Mini Program 正式发布/体验版版本和生产后端 artifact 的同一 SHA/版本关联未验证。Hybrid flag 若确实保持 ON，会把未完成的异步链路暴露给新客户端。
 4. **公开发布的隐私、审核和运营证据未完成**：`docs/WECHAT_RELEASE_CHECKLIST.md` 中关键项目仍未勾选；这不是代码测试可以替代的合规门。
 

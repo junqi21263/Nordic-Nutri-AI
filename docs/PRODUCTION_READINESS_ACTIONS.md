@@ -24,7 +24,7 @@
 
 | 顺序 | 动作 | 验收证据 | 负责人/状态 |
 |---|---|---|---|
-| P0-1 | 固化单一发布提交和 artifact manifest | clean commit、函数清单含 vision dispatcher/worker/reaper、每个包 normalized SHA | 部分完成；当前 worktree dirty，生产 normalized SHA 未验证 |
+| P0-1 | 固化单一发布提交和 artifact manifest | clean commit、函数清单含 vision dispatcher/worker/reaper、每个包 normalized SHA | PASS（HEAD `2a3b90a`、worktree clean、4/4 normalized SHA MATCH）；平台/审计记录仍需持续冻结 |
 | P0-2 | 关闭或明确隔离生产 Hybrid flag，直到客户端/后端同版本 | flag readback、client build SHA、rollback proof | 生产 flag 已回读为 true；client build/rollback 仍未闭环 |
 | P0-3 | 完成单样本 Final S2 E2E | `202 → claim → invoke → worker.entry → provider_attempt=2 → completed → quota=committed` | PASS（见 `docs/release-bundles/s2-e2e-2026-08-19.json`） |
 | P0-4 | 完成 S3 checkpoint resume | `resume_stage=enriching`、Qwen second call=0、最终 completed | PASS；真实 Storage fixture 经独立 worker resume，`worker.checkpoint_resume`、`provider_attempt=1`、无 `worker.provider_start`、最终 completed/quota committed |
