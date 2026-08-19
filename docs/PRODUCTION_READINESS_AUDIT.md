@@ -15,7 +15,7 @@
 - 当前可重建 release candidate 已更新为 `docs/release-bundles/production-release-candidate.json`，其 source commit 为 `6fbde98620034bdb29c48d7b47a8900491c6d8bd`，worktree 在生成时 clean；candidate 包含 9 个函数、Vision dispatcher/worker/reaper trigger contract、生产 ignore 规则和当前 normalized SHA。
 - 隐私审核材料自动门禁已通过 `11/11`；微信公众平台截图已证明用户隐私保护指引已更新且 UGC 场景已声明，但自动门禁和截图仍不替代真实主体、联系方式、删除回读和审核责任人确认。
 - 当前 worktree 已 clean；四个 `$LATEST` 生产包已按同一 ignore 规则完成 normalized SHA `4/4 MATCH`。平台 `codeSha256` 仍作为独立 digest domain 记录。
-- 隐私审核材料仍为 `DRAFT — OWNER INPUT REQUIRED`；新增平台截图证明个人主体已认证、小程序已备案，但完整法定名称、联系方式、专用审核账号和删除回读仍未证明。
+- 隐私审核材料仍为 `DRAFT — OWNER INPUT REQUIRED`；新增平台截图证明个人主体已认证、小程序已备案，专用审核账号标识 `junqi21263` 已提供，但成员资格、完整法定名称、联系方式和删除回读仍未证明。
 - 2026-08-19 只读平台回读：目标环境 `lewis-healthy-d4glgqqzv73a5bc10` 状态 NORMAL，PG RUNNING，套餐 `baas_personal`，自动续费开启，到期时间 2026-09-03 23:59:59；dispatcher `$LATEST` timer 为 `*/15 * * * * * *`，reaper `$LATEST` timer 为 `0 * * * * * *`，两个触发器均 BindStatus=on / Enable=1。
 - 2026-08-19 migration runner 回读：`20260815224412 repair_core_schema_drift`、`20260818000000 vision_hybrid_runtime_reconcile`、`20260819000000 transport_fixture_rpc`、`20260819000001 vision_quota_expiry_reconcile`，LatestVersion=`20260819000001`。
 
