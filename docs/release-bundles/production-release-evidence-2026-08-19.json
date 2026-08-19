@@ -8,6 +8,12 @@
     "nodeTooling": "Node 24.18.x required by release policy",
     "runtime": "Nodejs18.15"
   },
+  "clientBaseline": {
+    "commit": "59f4db577f0c3b8820d47c35647a6543acfb5c05",
+    "miniProgramUnit": "532 tests PASS",
+    "asyncStatusRetry": "bounded transient-read retry implemented and locally verified",
+    "productionDeployment": "NOT_VERIFIED"
+  },
   "productionFunctions": {
     "get-login-ticket": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"7623a3c723bc65b4f7d8a9bf1c3ba24f5a736bb8769eb282446f7df09637296a","platformCodeSha256":"2c905bcea5e4de9b6b4231c3aa34b4b691d42cbdefe01f3a63f9fe3b263d3092","normalizedProductionSha":"7623a3c723bc65b4f7d8a9bf1c3ba24f5a736bb8769eb282446f7df09637296a","normalizedShaMatch":true},
     "vision-analysis-dispatcher": {"status":"Active","available":"Available","codeResult":"success","qualifier":"$LATEST","localNormalizedSha":"8e2da9592bca0f83584a0a5dc756444e5cbea3ae81a1aa8ec42076f740fef7c8","platformCodeSha256":"d1fce0324c758721569a7f831554df5a7e641f00c5f26b054f9f4b95fa66ec69","timer":"*/15 * * * * * *","normalizedProductionSha":"8e2da9592bca0f83584a0a5dc756444e5cbea3ae81a1aa8ec42076f740fef7c8","normalizedShaMatch":true},
@@ -31,7 +37,7 @@
   },
   "tests": {
     "localTargeted": "PASS",
-    "miniProgramUnit": "531 tests PASS",
+    "miniProgramUnit": "532 tests PASS",
     "miniProgramWeappBuild": {"status":"PASS","files":110,"normalizedSha256":"22467032a7c42be26cb2994cc4c87986a310dfe9f57cba61d94ecf5ecb8a5adc"},
     "miniProgramWxss": "PASS",
     "miniProgramSize": "PASS — 1.129 MiB / 1.717 MiB",
