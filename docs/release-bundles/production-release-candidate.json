@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "status": "clean_candidate",
-  "generatedAt": "2026-08-19T09:03:10.148Z",
+  "generatedAt": "2026-08-19T09:08:28.182Z",
   "envId": "lewis-healthy-d4glgqqzv73a5bc10",
-  "commit": "ede6d57cb6d6bfdc96aae73ef7a0155bf8446a70",
+  "commit": "2836a334a06cd63f0a7bda5722e54bbd11b419d8",
   "dirtyFiles": [],
   "runtimePolicy": "Nodejs18.15 functions; Node 24.18.x tooling required for local release checks",
   "featureFlags": {
@@ -605,6 +605,13 @@
       "runtime": "Nodejs18.15",
       "handler": "index.main",
       "installDependency": true,
+      "triggers": [
+        {
+          "name": "vision-analysis-dispatcher-every-15-seconds",
+          "type": "timer",
+          "config": "*/15 * * * * * *"
+        }
+      ],
       "ignore": [
         "*.test.mjs",
         ".git/**"
@@ -642,7 +649,7 @@
       },
       "trigger": {
         "kind": "timer",
-        "schedule": "every 1 minute",
+        "schedule": "*/15 * * * * * *",
         "invokes": "vision-analysis-worker via callFunction($LATEST)",
         "currentReadback": "NOT_VERIFIED"
       }
@@ -1023,6 +1030,13 @@
       "runtime": "Nodejs18.15",
       "handler": "index.main",
       "installDependency": false,
+      "triggers": [
+        {
+          "name": "vision-analysis-reaper-every-minute",
+          "type": "timer",
+          "config": "0 * * * * * *"
+        }
+      ],
       "ignore": [
         "*.test.mjs",
         ".git/**"
@@ -1052,7 +1066,7 @@
       },
       "trigger": {
         "kind": "timer",
-        "schedule": "every 1 minute",
+        "schedule": "0 * * * * * *",
         "invokes": "get-login-ticket internal reap route",
         "currentReadback": "NOT_VERIFIED"
       }
