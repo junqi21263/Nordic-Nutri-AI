@@ -69,7 +69,7 @@ PG migrations: cloudbase/pg/migrations/
 | `get-login-ticket` | 统一 HTTPS/auth/API/AI 边界；代码约 3,000+ 行 | 已运行但耦合度高，需拆分/固化发布边界 |
 | Vision foundation/hybrid | 本地实现、CAS、checkpoint、deadline tests；生产 S2/S3 受控 fixture | 后端核心链路通过；客户端和发布审计仍未闭环 |
 | Dispatcher/worker/reaper | 独立函数目录和 30 个定向测试 | 仓库存在；manifest/生产可复现性不足 |
-| PostgreSQL | 0047-0050 SQL/readback/rollback tests | 结构设计完整；当前生产 registry/schema 需独立回读 |
+| PostgreSQL | 0047-0050 SQL/readback/rollback tests | 生产 registry 已回读至 `20260819000000 transport_fixture_rpc`；CAS/配额 fixture 已通过 |
 | Observability/Admin | Trace Explorer、sanitizer、system health | 有基础能力；告警和持续 SLO 证据不足 |
 
 ## Release Scorecard
@@ -81,13 +81,13 @@ PG migrations: cloudbase/pg/migrations/
 | 3. Frontend | PARTIAL | 531 tests、typecheck、lint、build、WXSS/size 通过；异步 polling/后台恢复生产真机和正式上传未验证 |
 | 4. API Contract | PARTIAL | auth/legacy/ownership/read-only 有证据；曾出现 `VISION_STATUS_INVALID`，202 客户端合约未完成生产闭环 |
 | 5. Backend | PASS（核心链路） | 目标后端测试与生产 S2/S3 受控 fixture 通过；并发/容量证据仍缺失 |
-| 6. Database | PARTIAL | migration static tests 47/47通过；0050/helper 与当前生产 registry/readback 的完整证据不足 |
+| 6. Database | PASS（当前迁移链） | 0047-0050 本地测试通过；生产 registry 已回读，CAS/配额 fixture 已通过 |
 | 7. AI/Provider | PARTIAL | Qwen 成功样本存在；延迟波动和复杂图超时持续出现，provider retry/成本上限未生产证明 |
 | 8. Performance/Capacity | NO-GO | 生产 trace 多为 7.2–9.2s flash 失败/超时；没有并发、队列、p95/p99、压测或容量模型 |
 | 9. Security | PARTIAL | HMAC、auth、sanitizer 有本地测试；生产互调权限、密钥轮换和完整外部安全审计未验证 |
 | 10. Privacy/Compliance | NO-GO | 隐私页面存在，但 release checklist 的主体/联系方式/微信平台声明/审核材料仍是未勾选项 |
 | 11. Observability/SRE | PARTIAL | Trace/metric/processing 状态修复已实现并有测试；告警接收人、阈值、演练和可检索性未闭环 |
-| 12. Deployment/Release/Rollback | NO-GO | 当前 worktree dirty；生产 normalized SHA、客户端/后端/flag 同步基线和 rollback drill 不完整 |
+| 12. Deployment/Release/Rollback | PARTIAL | 四个 `$LATEST` 生产包 normalized SHA `4/4 MATCH`，并回读 Active/Available、CodeResult=success；客户端绑定和 rollback drill 仍未完成 |
 | 13. Testing | PARTIAL | 本地测试和构建强；生产 authenticated concurrent/async/old-client/device matrix 未完成 |
 | 14. Maintainability/Evolvability | PARTIAL | 测试覆盖较好；`get-login-ticket` 过大、runtime coupling、未提交变更和多套历史设计增加风险 |
 | 15. Cost Control | NO-GO | provider 双 attempt、存储、日志和日预算告警尚无生产实测与演练证据 |
@@ -149,13 +149,13 @@ PG migrations: cloudbase/pg/migrations/
 
 ## Backend Audit
 
-本地 backend focused tests、HTTP route tests 和 worker/dispatcher tests 通过；但生产 invocation、provider attempt #2、并发和真实故障恢复仍未形成当前可复核证据。
+本地 backend focused tests、HTTP route tests 和 worker/dispatcher tests 通过；生产 dispatcher→worker invocation、S2 provider attempt #2、S3 checkpoint resume 和 quota terminal readback 已有当前可复核证据。并发容量、真实故障恢复演练和长期 SLO 仍未关闭。
 
 ## Database Audit
 
 本地 migration tests 47/47 通过，覆盖 0047 foundation、0048 hybrid runtime、0049 reconciliation、0050 transport fixture RPC 的静态/幂等/非破坏性断言；worker/dispatcher/reaper tests 30/30 通过。
 
-但以下必须视为未验证：当前生产数据库 registry 的最新状态、0050 是否已正式 runner 执行、dispatcher/worker/reaper 生产 trigger/timeout/qualifier、真实 worker invocation 成功率、队列 backlog 和并发租约行为。不能用 SQL 文件存在替代这些证据。
+当前生产 registry 已回读包含 `20260819000000 transport_fixture_rpc`；dispatcher→worker transport、S2/S3 受控 fixture、CAS/配额 terminal 状态已有证据。仍未验证的是持续队列 backlog、并发租约行为、容量上限和长期 provider 成本。
 
 ## AI / Provider Audit
 
@@ -179,7 +179,7 @@ Trace Explorer、processing 状态、stage timing、provider timing 和 sanitize
 
 ## Deployment Audit
 
-仓库要求 Node 24.18.x，但本轮运行环境为 Node 25.9.0，虽然本地命令通过，仍不能把结果当作目标 runtime 的最终证据。当前 worktree dirty；最新 commit 是 `7b06316 feat(ops): add trace diagnostic package`，Phase 2 相关大量文件未提交。`cloudbaserc.json` 只列出既有函数，未列出 vision dispatcher/worker/reaper。生产 artifact SHA、Function Active/Available 和 `$LATEST` 的部分历史记录存在，但本轮 CLI 由于身份授权失败，未能独立刷新完整生产 readback。
+仓库要求 Node 24.18.x，本轮本地命令仍需在目标工具链上复核。当前 release baseline worktree clean；`cloudbaserc.json` 已列出 vision dispatcher/worker/reaper。四个 `$LATEST` 生产包按相同生产 ignore 规则完成 normalized SHA `4/4 MATCH`，并回读为 Active/Available、CodeResult=success。客户端正式版本绑定、rollback drill 和公开 rollout 仍未关闭。
 
 ## Testing Audit
 

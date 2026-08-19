@@ -8,7 +8,7 @@
 
 | ID | Priority | Area | Problem | Evidence | Risk | Recommended Fix | Verification | Estimated Scope | Release Blocking |
 |---|---|---|---|---|---|---|---|---|---|
-| P0-1 | P0 | Release | 发布提交、函数 manifest 与实际 vision 函数集合不一致 | dirty worktree；`cloudbaserc.json` 未列 vision functions | 无法重建/回滚批准 artifact | 固化 clean commit、完整 manifest、统一 ignore/SHA 规则 | CI manifest + normalized SHA + deployment readback | M | Yes |
+| P0-1 | P0 | Release | 发布提交、函数 manifest 与实际 vision 函数集合不一致 | 历史记录曾存在 dirty worktree/manifest drift；当前已固化 clean baseline、完整 manifest 和 4/4 normalized SHA MATCH | 无法重建/回滚批准 artifact | 持续由 CI 固化 clean commit、完整 manifest、统一 ignore/SHA 规则 | CI manifest + normalized SHA + deployment readback | M | Yes |
 | P0-2 | P0 | Vision Async | 复杂图片 S2/S3 生产 E2E | S2 `202 → provider attempt #2 → completed → quota committed`；S3 checkpoint resume/no-second-provider 已有证据 | 仍需完整 rollout 验收 | 保留 recovery 与监控；转入客户端、并发和发布审计 | trace/job/quota/analysis 全链路 PASS | M | Yes |
 | P0-3 | P0 | Client Contract | Mini Program 异步版本与后端/flag 没有同一发布基线 | 本地 async client 有代码；正式生产前端版本未独立证明 | 202/polling/reopen 行为不一致 | 绑定 client build、backend artifact、flag 和回滚版本 | 真机 200/202/GET/background/reopen | M | Yes |
 | P0-4 | P0 | Privacy/Compliance | 微信审核、主体、政策、删除核验未形成证据包 | `WECHAT_RELEASE_CHECKLIST.md` 关键项未勾选 | 无法合规公开发布 | 完成平台声明、审核账号、删除/保留证明 | 审核材料和管理员只读回读 | M | Yes |
@@ -24,7 +24,7 @@
 
 | 顺序 | 动作 | 验收证据 | 负责人/状态 |
 |---|---|---|---|
-| P0-1 | 固化单一发布提交和 artifact manifest | clean commit、函数清单含 vision dispatcher/worker/reaper、每个包 normalized SHA | PASS（HEAD `2a3b90a`、worktree clean、4/4 normalized SHA MATCH）；平台/审计记录仍需持续冻结 |
+| P0-1 | 固化单一发布提交和 artifact manifest | clean commit、函数清单含 vision dispatcher/worker/reaper、每个包 normalized SHA | PASS（release baseline `2a3b90a`、worktree clean、4/4 normalized SHA MATCH）；后续仅需由 CI 持续冻结 |
 | P0-2 | 关闭或明确隔离生产 Hybrid flag，直到客户端/后端同版本 | flag readback、client build SHA、rollback proof | 生产 flag 已回读为 true；client build/rollback 仍未闭环 |
 | P0-3 | 完成单样本 Final S2 E2E | `202 → claim → invoke → worker.entry → provider_attempt=2 → completed → quota=committed` | PASS（见 `docs/release-bundles/s2-e2e-2026-08-19.json`） |
 | P0-4 | 完成 S3 checkpoint resume | `resume_stage=enriching`、Qwen second call=0、最终 completed | PASS；真实 Storage fixture 经独立 worker resume，`worker.checkpoint_resume`、`provider_attempt=1`、无 `worker.provider_start`、最终 completed/quota committed |
