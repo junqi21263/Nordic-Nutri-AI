@@ -36,16 +36,29 @@ function rpcRow(result) {
 function mapAnalysisRow(row) {
   if (!row) return null;
   const status = mapAnalysisStatus(row.status);
-  const result = row.result
-    ?? (status === "completed" && row.raw_recognition
-      ? {
-        ...row.raw_recognition,
-        analysisId: row.id ?? row.analysis_id,
-        items: row.normalized_items ?? row.raw_recognition.items ?? [],
-        advice: row.advice ?? row.raw_recognition.advice ?? "",
-        imagePath: row.image_path ?? null,
-      }
-      : row.provider_checkpoint ?? row.normalized_items ?? null);
+  const persistedResult = row.result && typeof row.result === "object" && !Array.isArray(row.result)
+    ? row.result
+    : {};
+  const rawRecognition = row.raw_recognition && typeof row.raw_recognition === "object" && !Array.isArray(row.raw_recognition)
+    ? row.raw_recognition
+    : {};
+  const normalizedItems = Array.isArray(row.normalized_items)
+    ? row.normalized_items
+    : Array.isArray(persistedResult.items)
+      ? persistedResult.items
+      : Array.isArray(rawRecognition.items)
+        ? rawRecognition.items
+        : [];
+  const result = status === "completed"
+    ? {
+      ...rawRecognition,
+      ...persistedResult,
+      analysisId: row.id ?? row.analysis_id,
+      items: normalizedItems,
+      advice: row.advice ?? persistedResult.advice ?? rawRecognition.advice ?? "",
+      imagePath: row.image_path ?? persistedResult.imagePath ?? null,
+    }
+    : row.provider_checkpoint ?? row.normalized_items ?? null;
   return {
     analysisId: row.id ?? row.analysis_id,
     status,

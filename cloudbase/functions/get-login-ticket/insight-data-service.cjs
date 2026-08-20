@@ -8,6 +8,7 @@ const {
   calculateDailyNutrition,
   calculateWeeklyNutrition,
   dateKey,
+  naturalWeekStartDate,
 } = require("./nutrition-calculation-service.cjs");
 const {
   createFallbackWeeklyReview,
@@ -260,7 +261,7 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
   async function getWeeklyReview(userId, endDate, options = {}) {
     assertDate(endDate);
     const preferFast = Boolean(options?.preferFast);
-    const startDate = shiftDate(endDate, -6);
+    const startDate = naturalWeekStartDate(endDate);
     let meals = [];
     let plan = null;
     try {

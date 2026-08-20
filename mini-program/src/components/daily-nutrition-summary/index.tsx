@@ -93,7 +93,11 @@ function DailySummaryDashboard({
   const ringAmount = calorieProgress.exceeded
     ? calorieProgress.excess
     : Math.max(0, calorieProgress.remaining);
-  const ringProgress = useAnimatedProgress(calorieProgress.percent);
+  const ringProgress = useAnimatedProgress(
+    calorieProgress.exceeded
+      ? calorieProgress.percent
+      : Math.max(0, 100 - calorieProgress.percent),
+  );
   return (
     <AppCard
       tone="beige"
@@ -107,7 +111,7 @@ function DailySummaryDashboard({
             calorieProgress.exceeded ? "daily-summary__dashboard-ring--exceeded" : ""
           }`}
           style={{
-            background: `conic-gradient(from -90deg, ${calorieProgress.exceeded ? "#ba1a1a" : "#153f2b"} 0 ${ringProgress}%, ${calorieProgress.exceeded ? "rgba(186, 26, 26, 0.14)" : "rgba(21, 63, 43, 0.14)"} ${ringProgress}% 100%)`,
+            background: `conic-gradient(from 0deg, ${calorieProgress.exceeded ? "#ba1a1a" : "#153f2b"} 0 ${ringProgress}%, ${calorieProgress.exceeded ? "rgba(186, 26, 26, 0.14)" : "rgba(21, 63, 43, 0.14)"} ${ringProgress}% 100%)`,
           }}
         >
           <View className="daily-summary__dashboard-ring-copy">

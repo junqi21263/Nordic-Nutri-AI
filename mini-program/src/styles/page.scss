@@ -58,80 +58,43 @@
   width: 160rpx;
 }
 .meal-saved-celebration__success-ring {
+  animation: meal-saved-ring-pop 520ms ease-out 800ms both;
   border-radius: 50%;
   box-sizing: border-box;
   height: 160rpx;
+  overflow: visible;
   position: relative;
   width: 160rpx;
 }
 .meal-saved-celebration__ring-track {
-  border: 6rpx solid rgba(45, 71, 57, 0.18);
-  border-radius: 50%;
-  box-sizing: border-box;
-  height: 160rpx;
-  left: 0;
-  position: absolute;
-  top: 0;
-  width: 160rpx;
-}
-.meal-saved-celebration__ring-mask {
-  height: 160rpx;
-  overflow: hidden;
-  position: absolute;
-  top: 0;
-  width: 80rpx;
-}
-.meal-saved-celebration__ring-mask--right {
-  left: 80rpx;
-}
-.meal-saved-celebration__ring-mask--left {
-  left: 0;
-}
-.meal-saved-celebration__ring-fill {
   border: 6rpx solid #2d4739;
   border-radius: 50%;
   box-sizing: border-box;
   height: 160rpx;
+  left: 0;
   position: absolute;
   top: 0;
   width: 160rpx;
 }
-.meal-saved-celebration__ring-fill--right {
-  animation: meal-saved-ring-sweep-right 520ms ease-out 800ms both;
-  left: -80rpx;
-  transform-origin: 80rpx 80rpx;
-}
-.meal-saved-celebration__ring-fill--left {
-  animation: meal-saved-ring-sweep-left 520ms ease-out 800ms both;
-  left: 0;
-  transform-origin: 80rpx 80rpx;
-}
 .meal-saved-celebration__check {
-  height: 66rpx;
-  left: 38rpx;
+  height: 72rpx;
+  left: 42rpx;
   position: relative;
-  top: 47rpx;
-  width: 84rpx;
+  top: 34rpx;
+  width: 80rpx;
 }
-.meal-saved-celebration__check-short,
-.meal-saved-celebration__check-long {
-  background: #2d4739;
-  border-radius: 999rpx;
-  height: 10rpx;
+.meal-saved-celebration__check-mark {
+  animation: meal-saved-check-pop 260ms ease-out 1030ms both;
+  border-bottom: 10rpx solid #2d4739;
+  border-left: 10rpx solid #2d4739;
+  box-sizing: border-box;
+  height: 32rpx;
+  left: 8rpx;
   position: absolute;
-  transform-origin: left center;
-}
-.meal-saved-celebration__check-short {
-  animation: meal-saved-check-short 200ms ease-out 1030ms both;
-  left: 4rpx;
-  top: 40rpx;
-  width: 34rpx;
-}
-.meal-saved-celebration__check-long {
-  animation: meal-saved-check-long 260ms ease-out 1085ms both;
-  left: 27rpx;
-  top: 60rpx;
-  width: 66rpx;
+  top: 24rpx;
+  transform: rotate(-45deg) scale(0.7);
+  transform-origin: center;
+  width: 58rpx;
 }
 .meal-saved-celebration__particle {
   animation: meal-saved-particle 800ms ease-out both;
@@ -278,8 +241,8 @@
 @keyframes meal-saved-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes meal-saved-ring-sweep-right { from { opacity: 0; transform: rotate(-180deg); } 1% { opacity: 1; } to { opacity: 1; transform: rotate(0deg); } }
 @keyframes meal-saved-ring-sweep-left { from { opacity: 0; transform: rotate(-180deg); } 1% { opacity: 1; } to { opacity: 1; transform: rotate(0deg); } }
-@keyframes meal-saved-check-short { from { transform: rotate(45deg) scaleX(0); } to { transform: rotate(45deg) scaleX(1); } }
-@keyframes meal-saved-check-long { from { transform: rotate(-48deg) scaleX(0); } to { transform: rotate(-48deg) scaleX(1); } }
+@keyframes meal-saved-check-pop { from { opacity: 0; transform: rotate(-45deg) scale(0.7); } to { opacity: 1; transform: rotate(-45deg) scale(1); } }
+@keyframes meal-saved-ring-pop { from { opacity: 0; transform: scale(.82); } to { opacity: 1; transform: scale(1); } }
 @keyframes meal-saved-particle { 0% { opacity: 0; transform: scale(0.4); } 35% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.6); } }
 @keyframes meal-saved-cta-fill { from { background: #7d9688; } to { background: #173124; } }
 .page-section-title {
@@ -7440,7 +7403,7 @@
 .home-page .daily-summary__dashboard-ring {
   align-items: center;
   background: conic-gradient(
-    from -90deg,
+    from 0deg,
     $stitch-brand-green 0 0%,
     rgba($stitch-brand-green, 0.14) 0% 100%
   );
@@ -7530,7 +7493,7 @@
 }
 .home-page .daily-summary__dashboard-ring--exceeded {
   background: conic-gradient(
-    from -90deg,
+    from 0deg,
     $color-error 0 0%,
     rgba($color-error, 0.14) 0% 100%
   );

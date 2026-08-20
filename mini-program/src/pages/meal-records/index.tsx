@@ -155,6 +155,7 @@ export default function MealRecordsPage() {
   const setActiveKey = useTabBarStore((state) => state.setActiveKey);
   const [filterOpen, setFilterOpen] = useState(false);
   const [monthExpanded, setMonthExpanded] = useState(false);
+  const [visibleMonthDate, setVisibleMonthDate] = useState(store.selectedDate);
   const [remoteSummary, setRemoteSummary] = useState<ProductDailySummary | null>(null);
   const [recordedDates, setRecordedDates] = useState<Set<string>>(new Set());
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -185,8 +186,8 @@ export default function MealRecordsPage() {
   );
   const meals = store.filterMeals();
   const weekDays = useMemo(() => getWeekDays(store.selectedDate), [store.selectedDate]);
-  const monthCells = useMemo(() => getMonthGrid(store.selectedDate), [store.selectedDate]);
-  const selectedDateParts = getDateParts(store.selectedDate);
+  const monthCells = useMemo(() => getMonthGrid(visibleMonthDate), [visibleMonthDate]);
+  const visibleMonthParts = getDateParts(visibleMonthDate);
   const calorieProgress = clampProgress(summary.consumed.calories, summary.calories);
   const maxDate = getLocalDateString(7);
   const openDetail = (id: string) => Taro.navigateTo({ url: `/pages/meal-detail/index?id=${id}` });
@@ -204,10 +205,12 @@ export default function MealRecordsPage() {
   };
   const hasFilters = Boolean(store.searchKeyword) || store.mealTypeFilter !== "all";
   const changePeriod = (offset: number) => {
-    const nextDate = monthExpanded
-      ? shiftMonth(store.selectedDate, offset)
-      : shiftDate(store.selectedDate, offset * 7);
-    if (nextDate <= maxDate) store.setSelectedDate(nextDate);
+    if (monthExpanded) {
+      setVisibleMonthDate(shiftMonth(visibleMonthDate, offset));
+      return;
+    }
+    const nextDate = shiftDate(store.selectedDate, offset * 7);
+    if (nextDate <= maxDate) { setVisibleMonthDate(nextDate); store.setSelectedDate(nextDate); }
   };
 
   usePullDownRefresh(() => {
@@ -276,7 +279,7 @@ export default function MealRecordsPage() {
     const searching = Boolean(store.searchKeyword.trim());
     const range =
       monthExpanded || searching
-        ? getMonthRange(store.selectedDate)
+        ? getMonthRange(visibleMonthDate)
         : { start: weekDays[0], end: weekDays[6] };
     let cancelled = false;
     void getProductMealsRange(range.start, range.end, { light: !searching })
@@ -293,7 +296,7 @@ export default function MealRecordsPage() {
     return () => {
       cancelled = true;
     };
-  }, [monthExpanded, store.replaceRemoteMeals, store.searchKeyword, store.selectedDate, weekDays]);
+  }, [monthExpanded, store.replaceRemoteMeals, store.searchKeyword, store.selectedDate, visibleMonthDate, weekDays]);
 
   return (
     <PageLayout
@@ -351,7 +354,7 @@ export default function MealRecordsPage() {
             </View>
             <View className="meal-records-page__calendar-title-row">
               <Text className="meal-records-page__calendar-title">
-                {selectedDateParts.year} 年 {selectedDateParts.month} 月
+                {visibleMonthParts.year} 年 {visibleMonthParts.month} 月
               </Text>
               <View
                 className={`meal-records-page__calendar-expand ${monthExpanded ? "meal-records-page__calendar-expand--open" : ""}`}
@@ -398,7 +401,10 @@ export default function MealRecordsPage() {
                       .join(" ")}
                     ariaLabel={hasRecord ? `${day}日，有饮食记录` : `${day}日`}
                     onClick={() => {
-                      if (cell.date <= maxDate) store.setSelectedDate(cell.date);
+                      if (cell.date <= maxDate) {
+                        setVisibleMonthDate(cell.date);
+                        store.setSelectedDate(cell.date);
+                      }
                     }}
                   >
                     <Text>{day}</Text>
@@ -423,7 +429,7 @@ export default function MealRecordsPage() {
                       .filter(Boolean)
                       .join(" ")}
                     ariaLabel={hasRecord ? `${day}日，有饮食记录` : `${day}日`}
-                    onClick={() => store.setSelectedDate(date)}
+                    onClick={() => { setVisibleMonthDate(date); store.setSelectedDate(date); }}
                   >
                     <Text>{day}</Text>
                   </View>

@@ -102,12 +102,12 @@ test("builds a seven-day review and server-derived achievements", async () => {
   const review = await service.getWeeklyReview("user-1", "2026-07-20");
   const achievements = await service.getAchievements("user-1", "2026-07-20");
 
-  assert.equal(review.startDate, "2026-07-14");
+  assert.equal(review.startDate, "2026-07-20");
   assert.equal(review.endDate, "2026-07-20");
-  assert.equal(review.recordedMeals, 3);
-  assert.equal(review.recordedDays, 2);
+  assert.equal(review.recordedMeals, 2);
+  assert.equal(review.recordedDays, 1);
   assert.equal(review.rhythm.length, 7);
-  assert.equal(review.rhythm.at(-1).date, "2026-07-20");
+  assert.equal(review.rhythm[0].date, "2026-07-20");
   assert.equal(achievements.length, 20);
   assert.equal(achievements[0].unlocked, true);
   assert.equal(achievements[3].unlocked, false);
@@ -286,7 +286,7 @@ test("weekly preferFast skips DeepSeek and does not write a blocking cache miss"
   assert.equal(review.insight.source, "rule_v1");
   assert.equal(generationCount, 0);
   assert.equal(cache, null);
-  assert.ok(review.recordedDays >= 3);
+  assert.ok(review.recordedDays >= 1);
 });
 
 test("daily insight context includes saved diet preferences for generation", async () => {
@@ -407,21 +407,21 @@ test("uses rule weekly insight without DeepSeek when recorded days are sparse", 
   assert.equal(first.insight.cached, false);
   assert.equal(second.insight.cached, true);
   assert.equal(generationCount, 0);
-  assert.match(first.insight.summary, /2\s*天/);
+  assert.match(first.insight.summary, /1\s*天/);
 });
 
 test("regenerates a weekly review cached with a different model", async () => {
   const denseMeals = [
-    { id: "m1", recordedAt: "2026-07-14T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
-    { id: "m2", recordedAt: "2026-07-15T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
-    { id: "m3", recordedAt: "2026-07-16T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+    { id: "m1", recordedAt: "2026-07-20T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+    { id: "m2", recordedAt: "2026-07-21T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+    { id: "m3", recordedAt: "2026-07-22T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
   ];
   let generationCount = 0;
   const listMealsRange = async (_userId, from, to) => denseMeals.filter((meal) => meal.recordedAt.slice(0, 10) >= from && meal.recordedAt.slice(0, 10) <= to);
   const getNutritionPlan = async () => ({ calories: 2400, proteinG: 180, carbsG: 300, fatG: 70 });
   const clock = () => new Date("2026-07-20T09:30:00.000Z");
   const snapshot = await createInsightDataService({ listMealsRange, getNutritionPlan, clock })
-    .getWeeklyReview("user-1", "2026-07-20", { preferFast: true });
+    .getWeeklyReview("user-1", "2026-07-22", { preferFast: true });
   let cache = {
     context_hash: createWeeklyReviewHash(weeklyReviewContext(snapshot)),
     payload: { headline: "旧周回顾", summary: "不应继续复用 V4 Pro 缓存。", strengths: [], nextSteps: [] },
@@ -459,7 +459,7 @@ test("regenerates a weekly review cached with a different model", async () => {
     clock,
   });
 
-  const result = await service.getWeeklyReview("user-1", "2026-07-20");
+  const result = await service.getWeeklyReview("user-1", "2026-07-22");
 
   assert.equal(generationCount, 1);
   assert.equal(result.insight.cached, false);
@@ -469,11 +469,11 @@ test("regenerates a weekly review cached with a different model", async () => {
 
 test("generates and reuses a server-time weekly DeepSeek review cache when enough days exist", async () => {
   const denseMeals = [
-    { id: "m1", recordedAt: "2026-07-14T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
-    { id: "m2", recordedAt: "2026-07-15T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
-    { id: "m3", recordedAt: "2026-07-16T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
-    { id: "m4", recordedAt: "2026-07-18T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
-    { id: "m5", recordedAt: "2026-07-20T12:00:00.000Z", caloriesKcal: 700, proteinG: 60, carbsG: 80, fatG: 20 },
+    { id: "m1", recordedAt: "2026-07-20T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+    { id: "m2", recordedAt: "2026-07-21T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+    { id: "m3", recordedAt: "2026-07-22T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+    { id: "m4", recordedAt: "2026-07-24T12:00:00.000Z", caloriesKcal: 600, proteinG: 50, carbsG: 70, fatG: 18 },
+    { id: "m5", recordedAt: "2026-07-26T12:00:00.000Z", caloriesKcal: 700, proteinG: 60, carbsG: 80, fatG: 20 },
   ];
   let generationCount = 0;
   let cache = null;
@@ -512,8 +512,8 @@ test("generates and reuses a server-time weekly DeepSeek review cache when enoug
     clock: () => new Date("2026-07-20T09:30:00.000Z"),
   });
 
-  const first = await service.getWeeklyReview("user-1", "2026-07-20");
-  const second = await service.getWeeklyReview("user-1", "2026-07-20");
+  const first = await service.getWeeklyReview("user-1", "2026-07-26");
+  const second = await service.getWeeklyReview("user-1", "2026-07-26");
 
   assert.equal(first.serverTime, "2026-07-20T09:30:00.000Z");
   assert.equal(first.serverDate, "2026-07-20");

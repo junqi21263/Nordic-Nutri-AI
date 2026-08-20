@@ -703,6 +703,7 @@
             <button id="refreshUserImages" class="button secondary" type="button">刷新</button>
             <button id="userImagesPrevPage" class="button secondary" type="button">上一页</button>
             <button id="userImagesNextPage" class="button secondary" type="button">下一页</button>
+            <button id="deleteSelectedUserImages" class="button danger" type="button" disabled>删除所选图片</button>
             <button id="purgeVisionImages" class="button secondary" type="button">清理过期识图</button>
           </div>
           <p id="userImagesPagerMeta" class="muted" style="margin:0 0 12px">连接后显示分页信息</p>
@@ -762,7 +763,8 @@
 
         <section id="moduleTraces" class="admin-module" hidden>
           <div class="module-toolbar"><h2>Trace Explorer</h2><span class="muted">按请求状态定位阶段耗时与 Provider</span><button id="refreshTraces" class="button secondary" type="button">刷新</button></div>
-    <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / Error Code" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="processing">processing</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="admin">admin</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
+    <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / Error Code" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="processing">processing</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="admin">admin</option></select><select id="traceStageFilter"><option value="">全部阶段</option><option value="init">init</option><option value="upload">upload</option><option value="uploaded">uploaded</option><option value="safety_check">safety_check</option><option value="evaluation">evaluation</option><option value="flash">flash</option><option value="nutrition">nutrition</option><option value="persistence">persistence</option><option value="storage_upload">storage_upload</option><option value="temp_url_generation">temp_url_generation</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
+          <div class="trace-quick-filters nn-status-filter" aria-label="Trace 快捷筛选"><span class="muted">快捷筛选</span><button class="filter" type="button" data-trace-quick-filter="all">全部</button><button class="filter" type="button" data-trace-quick-filter="failed">失败</button><button class="filter" type="button" data-trace-quick-filter="timed_out">超时</button><button class="filter" type="button" data-trace-quick-filter="last24h">最近 24 小时</button><button class="filter" type="button" data-trace-quick-filter="vision">Vision</button><button class="filter" type="button" data-trace-quick-filter="coach">Coach</button><button id="traceClearFilters" class="button link" type="button">清除筛选</button></div><p id="traceActiveFilters" class="muted" aria-live="polite">当前未应用筛选</p>
           <div class="ops-page-grid"><section class="ops-panel"><div id="traceList" class="data-table"><p class="ops-empty">加载中…</p></div></section></div>
           <section id="traceDrawer" class="nn-drawer" hidden aria-label="Trace Detail" role="dialog" aria-modal="true" aria-labelledby="traceDrawerTitle"><div class="nn-drawer__panel"><div class="nn-drawer__header"><div><span class="eyebrow">TRACE DETAIL</span><h3 id="traceDrawerTitle">Trace Detail</h3></div><button class="nn-drawer__close" type="button" data-trace-drawer-close aria-label="关闭 Trace Detail">关闭</button></div><div id="traceDetail"><p class="muted">选择一条 Trace 查看阶段。</p></div></div></section>
         </section>
@@ -2298,7 +2300,7 @@
         featureHost.innerHTML = `<span class="status-metric danger">加载失败<b>${message}</b></span>`;
       }
     }
-    const userImagesState = { page: 1, pageSize: 40, total: 0 };
+    const userImagesState = { page: 1, pageSize: 40, total: 0, selectedKeys: new Set() };
 
     function userImageKindLabel(kind) {
       return ({ all: "全部", vision: "识图", blocked: "违规", avatar: "头像", asset: "资产" }[kind] || kind || "—");
@@ -2311,6 +2313,25 @@
       if (item.kind === "blocked") return userImageReviewLabel(item.status || "open");
       if (item.kind === "asset") return item.status || "—";
       return item.status || "—";
+    }
+    function userImageKey(item) { return `${item.kind}:${item.id}`; }
+    function syncUserImageSelection(items = []) {
+      const selectable = items.filter((item) => !item.protected);
+      const selected = selectable.filter((item) => userImagesState.selectedKeys.has(userImageKey(item))).length;
+      const selectAll = $("userImageSelectAll");
+      if (selectAll) { selectAll.checked = selectable.length > 0 && selected === selectable.length; selectAll.indeterminate = selected > 0 && selected < selectable.length; }
+      const button = $("deleteSelectedUserImages");
+      if (button) { button.disabled = selected === 0; button.textContent = selected ? `删除所选图片（${selected}）` : "删除所选图片"; }
+    }
+    async function deleteSelectedUserImages() {
+      const targets = [...userImagesState.selectedKeys];
+      if (!targets.length || !window.confirm(`确认删除所选 ${targets.length} 张图片？此操作不可恢复。`)) return;
+      try {
+        for (const key of targets) { const separator = key.indexOf(":"); await api(`/ops/user-images/${key.slice(0, separator)}/${key.slice(separator + 1)}`, { method: "DELETE" }); }
+        userImagesState.selectedKeys.clear();
+        toast(`已删除 ${targets.length} 张图片`);
+        await loadUserImagesModule();
+      } catch (error) { toast(apiErrorMessage(error), true); }
     }
     function shortId(value) {
       const text = String(value || "");
@@ -2374,6 +2395,7 @@
         grid.innerHTML = `<table>
           <thead>
             <tr>
+              <th><input id="userImageSelectAll" type="checkbox" aria-label="全选当前页图片" /></th>
               <th>用户 UUID</th>
               <th>记录 ID</th>
               <th>识别名 / 标题</th>
@@ -2402,10 +2424,12 @@
               reviewControl = escapeHtml(userImageStatusLabel(item));
             }
             const deleteDisabled = item.protected ? "disabled" : "";
+            const selected = userImagesState.selectedKeys.has(userImageKey(item));
             const protectNote = item.protected
               ? `<div class="user-image-protect">${escapeHtml(item.protectReason || "受保护")}</div>`
               : `<span class="muted">未关联</span>`;
             return `<tr>
+              <td><input type="checkbox" data-user-image-select="${escapeHtml(userImageKey(item))}" ${selected ? "checked" : ""} ${deleteDisabled} aria-label="选择 ${escapeHtml(title)}" /></td>
               <td><code title="${escapeHtml(item.userId || "")}">${escapeHtml(shortId(item.userId))}</code></td>
               <td><code title="${escapeHtml(item.id || "")}">${escapeHtml(shortId(item.id))}</code></td>
               <td>${escapeHtml(title)}</td>
@@ -2420,6 +2444,16 @@
             </tr>`;
           }).join("")}</tbody>
         </table>`;
+        grid.querySelector("#userImageSelectAll")?.addEventListener("change", (event) => {
+          const checked = event.currentTarget.checked;
+          items.filter((item) => !item.protected).forEach((item) => { const key = userImageKey(item); if (checked) userImagesState.selectedKeys.add(key); else userImagesState.selectedKeys.delete(key); });
+          grid.querySelectorAll("input[data-user-image-select]").forEach((input) => { input.checked = checked; });
+          syncUserImageSelection(items);
+        });
+        grid.querySelectorAll("input[data-user-image-select]").forEach((input) => {
+          input.addEventListener("change", () => { if (input.checked) userImagesState.selectedKeys.add(input.dataset.userImageSelect); else userImagesState.selectedKeys.delete(input.dataset.userImageSelect); syncUserImageSelection(items); });
+        });
+        syncUserImageSelection(items);
         bindModerationSelects(grid, () => loadUserImagesModule());
         grid.querySelectorAll("select[data-vision-analysis-id]").forEach((select) => {
           select.onchange = async () => {
@@ -2625,7 +2659,9 @@
       setOpsMessage(host, "加载 Trace 详情…");
       try {
         const item = await api(`/traces/${encodeURIComponent(traceId)}`);
-        host.innerHTML = `<div class="ops-detail"><div class="ops-detail__heading"><div><span class="eyebrow">TRACE DETAIL</span><h3>${escapeHtml(item.traceId)}</h3></div><div class="action-row"><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span><button class="button secondary" type="button" data-trace-diagnostic="${escapeHtml(item.traceId)}">查看诊断包</button></div></div><div class="ops-window-grid"><span>功能<b>${escapeHtml(item.feature || "—")}</b></span><span>最后阶段<b>${escapeHtml(item.lastStage || "—")}</b></span><span>总耗时<b>${escapeHtml(item.durationMs ?? "—")} ms</b></span><span>HTTP<b>${escapeHtml(item.httpStatus ?? "—")}</b></span><span>错误码<b>${escapeHtml(item.errorCode || "—")}</b></span><span>Provider / fallback<b>${escapeHtml(item.provider || "—")} / ${item.fallbackUsed ? "是" : "否"}</b></span></div><h4>Stages</h4><div id="traceDrawerStages" class="ops-stage-list">${(item.stages || []).map((stage) => `<div class="ops-stage"><span>${escapeHtml(stage.name)}</span><strong class="${opsTone(stage.status)}">${escapeHtml(opsStatusLabel(stage.status))}</strong><small>${escapeHtml(stage.durationMs ?? "—")} ms${stage.provider ? ` · ${escapeHtml(stage.provider)}` : ""}</small></div>`).join("") || "<p class=\"ops-empty\">暂无阶段记录</p>"}</div><h4>安全元数据</h4><pre id="traceDrawerMeta">${escapeHtml(JSON.stringify(item.meta || {}, null, 2))}</pre><div id="traceDiagnostic" class="ops-diagnostic" hidden></div></div>`;
+        const requestPayload = item.meta?.request || {};
+        const responsePayload = item.meta?.response || {};
+        host.innerHTML = `<div class="ops-detail"><div class="ops-detail__heading"><div><span class="eyebrow">TRACE DETAIL</span><h3>${escapeHtml(item.traceId)}</h3></div><div class="action-row"><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span><button class="button secondary" type="button" data-trace-diagnostic="${escapeHtml(item.traceId)}">查看诊断包</button></div></div><div class="ops-window-grid"><span>功能<b>${escapeHtml(item.feature || "—")}</b></span><span>最后阶段<b>${escapeHtml(item.lastStage || "—")}</b></span><span>总耗时<b>${escapeHtml(item.durationMs ?? "—")} ms</b></span><span>HTTP<b>${escapeHtml(item.httpStatus ?? "—")}</b></span><span>错误码<b>${escapeHtml(item.errorCode || "—")}</b></span><span>Provider / fallback<b>${escapeHtml(item.provider || "—")} / ${item.fallbackUsed ? "是" : "否"}</b></span></div><h4>请求报文（脱敏摘要）</h4><pre id="traceDrawerRequest">${escapeHtml(JSON.stringify(requestPayload, null, 2))}</pre><h4>响应报文（脱敏摘要）</h4><pre id="traceDrawerResponse">${escapeHtml(JSON.stringify(responsePayload, null, 2))}</pre><h4>Stages</h4><div id="traceDrawerStages" class="ops-stage-list">${(item.stages || []).map((stage) => `<div class="ops-stage"><span>${escapeHtml(stage.name)}</span><strong class="${opsTone(stage.status)}">${escapeHtml(opsStatusLabel(stage.status))}</strong><small>${escapeHtml(stage.durationMs ?? "—")} ms${stage.provider ? ` · ${escapeHtml(stage.provider)}` : ""}</small></div>`).join("") || "<p class=\"ops-empty\">暂无阶段记录</p>"}</div><h4>安全元数据</h4><pre id="traceDrawerMeta">${escapeHtml(JSON.stringify(item.meta || {}, null, 2))}</pre><div id="traceDiagnostic" class="ops-diagnostic" hidden></div></div>`;
         host.querySelector("[data-trace-diagnostic]")?.addEventListener("click", () => loadTraceDiagnostic(item.traceId));
       } catch (error) { setOpsMessage(host, traceDetailErrorMessage(error), "danger"); }
     }
@@ -2647,10 +2683,27 @@
       try {
         const params = new URLSearchParams({ page: "1", limit: "50" }); const query = ($("traceSearch").value || "").trim();
         if (query) params.set(query.startsWith("trace_") ? "traceId" : "errorCode", query);
+        if ($("traceSearch").dataset.from) params.set("from", $("traceSearch").dataset.from);
         if ($("traceStatusFilter").value) params.set("status", $("traceStatusFilter").value);
         if ($("traceFeatureFilter").value) params.set("feature", $("traceFeatureFilter").value);
+        if ($("traceStageFilter").value) params.set("stage", $("traceStageFilter").value);
+        const active = [];
+        if ($("traceStatusFilter").value) active.push(`状态：${opsStatusLabel($("traceStatusFilter").value)}`);
+        if ($("traceFeatureFilter").value) active.push(`功能：${$("traceFeatureFilter").value}`);
+        if ($("traceStageFilter").value) active.push(`阶段：${$("traceStageFilter").value}`);
+        if ($( "traceSearch").dataset.from) active.push("时间：最近 24 小时");
+        if (query) active.push(`搜索：${query}`);
+        $("traceActiveFilters").textContent = active.length ? `已应用：${active.join(" · ")}` : "当前未应用筛选";
         renderTraceList(await api(`/traces?${params.toString()}`));
       } catch (error) { setOpsMessage(host, apiErrorMessage(error), "danger"); }
+    }
+    function applyTraceQuickFilter(filter) {
+      $("traceSearch").value = "";
+      $("traceStatusFilter").value = filter === "failed" || filter === "timed_out" ? filter : "";
+      $("traceFeatureFilter").value = filter === "vision" || filter === "coach" ? filter : "";
+      $("traceStageFilter").value = "";
+      if (filter === "last24h") $("traceSearch").dataset.from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); else delete $("traceSearch").dataset.from;
+      loadTraces().catch((error) => toast(apiErrorMessage(error), true));
     }
     function renderJobs(data) {
       const items = data?.items || []; const select = $("runNowJobKey");
@@ -2764,7 +2817,10 @@
     $("refreshHealth").onclick = () => loadSystemHealth().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshTraces").onclick = () => loadTraces().catch((error) => toast(apiErrorMessage(error), true));
     $("traceApplyFilters").onclick = () => loadTraces().catch((error) => toast(apiErrorMessage(error), true));
+    $("traceClearFilters").onclick = () => { $("traceSearch").value = ""; delete $("traceSearch").dataset.from; $("traceStatusFilter").value = ""; $("traceFeatureFilter").value = ""; $("traceStageFilter").value = ""; loadTraces().catch((error) => toast(apiErrorMessage(error), true)); };
+    document.querySelectorAll("[data-trace-quick-filter]").forEach((button) => { button.onclick = () => applyTraceQuickFilter(button.dataset.traceQuickFilter); });
     $("traceSearch").onkeydown = (event) => { if (event.key === "Enter") loadTraces().catch((error) => toast(apiErrorMessage(error), true)); };
+    $("deleteSelectedUserImages").onclick = () => deleteSelectedUserImages();
     $("refreshJobs").onclick = () => loadJobs().catch((error) => toast(apiErrorMessage(error), true));
     $("runNowJob").onclick = () => runNowJob().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshAuditLogs").onclick = () => loadAuditLogs().catch((error) => toast(apiErrorMessage(error), true));
@@ -2784,18 +2840,21 @@
     if ($("refreshUserImages")) {
       $("refreshUserImages").onclick = () => {
         userImagesState.page = 1;
+        userImagesState.selectedKeys.clear();
         loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
       };
     }
     if ($("userImageKindFilter")) {
       $("userImageKindFilter").onchange = () => {
         userImagesState.page = 1;
+        userImagesState.selectedKeys.clear();
         loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
       };
     }
     if ($("userImageBlockedStatus")) {
       $("userImageBlockedStatus").onchange = () => {
         userImagesState.page = 1;
+        userImagesState.selectedKeys.clear();
         loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
       };
     }
@@ -2803,6 +2862,7 @@
       $("userImageUserId").onkeydown = (event) => {
         if (event.key === "Enter") {
           userImagesState.page = 1;
+          userImagesState.selectedKeys.clear();
           loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
         }
       };
@@ -2811,6 +2871,7 @@
       $("userImagesPrevPage").onclick = () => {
         if (userImagesState.page <= 1) return;
         userImagesState.page -= 1;
+        userImagesState.selectedKeys.clear();
         loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
       };
     }
@@ -2824,6 +2885,7 @@
     if ($("userImagesNextPage")) {
       $("userImagesNextPage").onclick = () => {
         userImagesState.page += 1;
+        userImagesState.selectedKeys.clear();
         loadUserImagesModule().catch((error) => toast(apiErrorMessage(error), true));
       };
     }

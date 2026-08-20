@@ -8,6 +8,7 @@ import {
 } from "../features/media/image-upload-limits";
 import { inferMealTypeFromTime } from "../features/meals/meal-type";
 import type { ScannerMealFixture } from "../features/scanner/domain";
+import { normalizeVisionResult, type ProductVisionResult } from "../features/scanner/vision-result";
 import { createClientRequestId } from "../repositories/client-request-id";
 import { getLocalFileInfo } from "../utils/file-system-info";
 import { productApiEndpoint } from "./product-api-config";
@@ -52,27 +53,6 @@ interface PreparedVisionImage {
   originalSize: number;
   original: VisionImageMetadata;
   imagePrepareDurationMs: number;
-}
-
-interface ProductVisionResult {
-  analysisId: string;
-  evaluation?: string;
-  imageUrl?: string | null;
-  imagePath?: string | null;
-  nutritionSource?: string;
-  mealName: string;
-  mealType: ScannerMealFixture["mealType"];
-  confidence: number;
-  advice: string;
-  items: Array<{
-    name: string;
-    quantityG: number;
-    caloriesPer100g: number;
-    proteinPer100g: number;
-    carbsPer100g: number;
-    fatPer100g: number;
-    nutritionSource?: string;
-  }>;
 }
 
 type VisionStatusPayload = VisionAsyncResponse & { message?: string };
@@ -169,10 +149,7 @@ export async function getVisionAnalysisStatus(analysisId: string): Promise<Visio
 
 function statusResultToMeal(status: VisionStatusPayload): ScannerMealFixture {
   if (status.status !== "completed" || !status.result) throw new Error("VISION_RESULT_INVALID");
-  return mapVisionResult({
-    ...(status.result as ProductVisionResult),
-    analysisId: status.analysisId,
-  });
+  return mapVisionResult(normalizeVisionResult(status.result, status.analysisId));
 }
 
 export async function resumeVisionAnalysis(
@@ -571,7 +548,7 @@ export async function analyzeProductImage(
     throw error;
   }
   clearPendingAnalysis(typeof data.analysisId === "string" ? data.analysisId : undefined);
-  const meal = mapVisionResult(data);
+  const meal = mapVisionResult(normalizeVisionResult(data, data.analysisId));
   onTiming?.({ stage: "parse", ms: Date.now() - parseStartedAt });
   onTiming?.({ stage: "client_total", ms: Date.now() - recognitionStartedAt });
   return meal;

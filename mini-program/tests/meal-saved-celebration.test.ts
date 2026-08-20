@@ -73,9 +73,10 @@ describe("meal saved celebration motion", () => {
     expect(component).toContain("export interface MealSavedCelebrationProps");
     expect(component).toContain("meal-saved-celebration__success-ring");
     expect(component).toContain("meal-saved-celebration__ring-track");
-    expect(component).toContain("meal-saved-celebration__ring-mask--left");
-    expect(component).toContain("meal-saved-celebration__ring-mask--right");
-    expect(component).toContain("meal-saved-celebration__check-short");
+    expect(component).not.toContain("meal-saved-celebration__ring-mask");
+    expect(component).toContain("meal-saved-celebration__check-mark");
+    expect(component).not.toContain("meal-saved-celebration__check-short");
+    expect(component).not.toContain("meal-saved-celebration__check-long");
     expect(component).toContain("meal-saved-celebration__particle--1");
     expect(component).toContain("progressScale");
     expect(component).toContain("progressAnimating");
@@ -95,8 +96,13 @@ describe("meal saved celebration motion", () => {
     expect(styles).toContain("position: absolute");
     expect(styles).toContain(".meal-saved-celebration__success-ring");
     expect(styles).toContain(".meal-saved-celebration__ring-track");
-    expect(styles).toContain("meal-saved-ring-sweep");
+    expect(styles).toContain("meal-saved-ring-pop");
     expect(styles).toContain("height: 160rpx");
+    expect(styles).toContain("left: 42rpx;");
+    expect(styles).toContain("top: 34rpx;");
+    expect(styles).toContain(".meal-saved-celebration__check-mark");
+    expect(styles).toContain("border-bottom: 10rpx solid #2d4739;");
+    expect(styles).toContain("border-left: 10rpx solid #2d4739;");
     expect(styles).toContain("animation: meal-saved-fade-up 420ms ease-out 1150ms both");
   });
 

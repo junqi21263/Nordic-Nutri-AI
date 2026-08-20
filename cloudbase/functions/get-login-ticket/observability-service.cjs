@@ -486,6 +486,7 @@ function createObservabilityService({ db }) {
     traceId,
     userHash,
     feature,
+    stage,
     status,
     errorCode,
     from,
@@ -501,6 +502,7 @@ function createObservabilityService({ db }) {
     if (traceId) query = query.eq("trace_id", boundedText(traceId, 160));
     if (userHash) query = query.eq("user_hash", boundedText(userHash, 200));
     if (feature) query = query.eq("feature", boundedText(feature, 80));
+    if (stage) query = query.eq("last_stage", boundedText(stage, 120));
     if (status && TRACE_STATUSES.has(status)) query = query.eq("status", status);
     if (errorCode) query = query.eq("error_code", boundedText(errorCode, 80));
     if (from) query = query.gte("started_at", from);

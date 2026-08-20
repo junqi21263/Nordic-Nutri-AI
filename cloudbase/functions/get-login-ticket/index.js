@@ -38,7 +38,7 @@ const { createAccountDeletionService, PublicAccountDeletionError } = require("./
 const { createProductUserExists, resolveProductSession } = require("./product-session-auth.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
 const { createObservabilityService } = require("./observability-service.cjs");
-const { sanitizeTraceMeta } = require("./observability-sanitizer.cjs");
+const { sanitizeTraceMeta, sanitizeTracePayload } = require("./observability-sanitizer.cjs");
 const { createAdminAuditService } = require("./admin-audit-service.cjs");
 const { recordModelUsage } = require("./model-usage.cjs");
 const { createContentModerationService, PublicContentModerationError } = require("./content-moderation-service.cjs");
@@ -126,6 +126,10 @@ const CORS_HEADERS = {
 };
 
 function sendJson(res, statusCode, data) {
+  if (res.__traceContext) {
+    res.__traceContext.response = sanitizeTracePayload(data);
+    if (data && typeof data === "object" && typeof data.code === "string") res.__traceContext.errorCode = data.code;
+  }
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
@@ -229,7 +233,12 @@ function readJsonBody(req, maxBytes = MAX_BODY_BYTES) {
         return;
       }
       try {
-        resolve(JSON.parse(raw));
+        const body = JSON.parse(raw);
+        if (req.__traceContext) {
+          req.__traceContext.request.bodyBytes = size;
+          req.__traceContext.request.body = sanitizeTracePayload(body);
+        }
+        resolve(body);
       } catch {
         reject(new PublicLoginError("REQUEST_INVALID", "请求无效"));
       }
@@ -262,7 +271,12 @@ function readRawJsonBody(req, maxBytes = MAX_BODY_BYTES) {
         return;
       }
       try {
-        resolve({ raw, body: JSON.parse(raw) });
+        const body = JSON.parse(raw);
+        if (req.__traceContext) {
+          req.__traceContext.request.bodyBytes = size;
+          req.__traceContext.request.body = sanitizeTracePayload(body);
+        }
+        resolve({ raw, body });
       } catch {
         reject(new PublicLoginError("REQUEST_INVALID", "请求无效"));
       }
@@ -1790,6 +1804,28 @@ function isAvatarRoute(pathname) {
   return pathname.replace(/^\/get-login-ticket/, "") === "/profile/avatar";
 }
 
+function getGenericTraceFeature(routes) {
+  if (routes.adminFoodRoute || routes.internalFoodImageRoute || routes.internalVisionAnalysisRoute) return "admin";
+  if (routes.coachOperation) return "coach";
+  if (routes.visionAnalysisStatusRoute || routes.visionRoute) return "vision";
+  if (routes.mealRoute) return "meals";
+  if (routes.insightOperation || routes.dataOperation) return "nutrition";
+  if (routes.foodRoute) return "foods";
+  if (routes.feedbackRoute) return "feedback";
+  if (routes.achievementCelebrationRoute || routes.milestoneRoute) return "milestones";
+  if (routes.avatarRoute) return "profile";
+  return "system";
+}
+
+function captureTraceError(res, error) {
+  if (!res.__traceContext) return;
+  res.__traceContext.internalError = sanitizeTracePayload({
+    name: error?.name,
+    code: error?.code,
+    message: error?.message,
+  });
+}
+
 function sendMealError(res, error) {
   if (error instanceof PublicMealDataError || error instanceof PublicMealAnalysisError) {
     const statusCode = error.code === "MEAL_DATA_INVALID" ? 400 : 503;
@@ -1823,6 +1859,26 @@ function createHttpServer({ service }) {
     const visionRoute = isVisionRoute(url.pathname);
     const visionAnalysisStatusRoute = getVisionAnalysisStatusRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
+    const traceRoutes = { dataOperation, mealRoute, insightOperation, achievementCelebrationRoute, milestoneRoute, coachOperation, foodRoute, adminFoodRoute, internalFoodImageRoute, internalVisionAnalysisRoute, feedbackRoute, visionRoute, visionAnalysisStatusRoute, avatarRoute };
+    const genericTrace = service?.observability?.startTrace && !visionRoute
+      ? service.observability.startTrace({
+        feature: getGenericTraceFeature(traceRoutes),
+        clientRequestId: /^[0-9a-f-]{36}$/i.test(String(req.headers["x-client-request-id"] || "")) ? req.headers["x-client-request-id"] : null,
+      })
+      : null;
+    if (genericTrace) {
+      res.__traceId = genericTrace.traceId;
+      res.__traceContext = { request: { method: req.method, route: url.pathname, query: Object.fromEntries(url.searchParams.entries()) }, response: null };
+      req.__traceContext = res.__traceContext;
+      res.once("finish", () => {
+        service.observability.finishTrace(genericTrace, {
+          status: res.statusCode >= 400 ? (res.statusCode === 408 ? "timed_out" : "failed") : "succeeded",
+          httpStatus: res.statusCode,
+          errorCode: res.__traceContext.errorCode || null,
+          meta: { route: url.pathname, method: req.method, request: res.__traceContext.request, response: res.__traceContext.response, internalError: res.__traceContext.internalError, sanitizationVersion: "3" },
+        }).catch(() => {});
+      });
+    }
     if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !internalVisionAnalysisRoute && !feedbackRoute && !visionRoute && !visionAnalysisStatusRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
@@ -2158,6 +2214,7 @@ function createHttpServer({ service }) {
           return sendJson(res, 200, await service.observability.listTraces({
             traceId: url.searchParams.get("traceId") || undefined,
             feature: url.searchParams.get("feature") || undefined,
+            stage: url.searchParams.get("stage") || undefined,
             status: url.searchParams.get("status") || undefined,
             errorCode: url.searchParams.get("errorCode") || undefined,
             from: url.searchParams.get("from") || undefined,
@@ -2847,6 +2904,7 @@ function createHttpServer({ service }) {
         await service.insights.acknowledgeAchievementCelebration(session.sub, achievementCelebrationRoute.achievementId);
         return sendJson(res, 200, { acknowledged: true });
       } catch (error) {
+        captureTraceError(res, error);
         console.error("[achievement-celebration] failed:", error?.message || error);
         return sendJson(res, 503, { code: "ACHIEVEMENT_SERVICE_UNAVAILABLE" });
       }

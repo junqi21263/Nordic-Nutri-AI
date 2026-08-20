@@ -5,6 +5,7 @@ import {
   nextVisionPollDelay,
   normalizeVisionStatus,
 } from "../src/features/scanner/vision-async-client";
+import { normalizeVisionResult } from "../src/features/scanner/vision-result";
 
 describe("vision async client contract", () => {
   it("normalizes processing and terminal server states", () => {
@@ -39,5 +40,10 @@ describe("vision async client contract", () => {
     expect(isRetryableVisionStatusError({ name: "VISION_NETWORK_ERROR" })).toBe(true);
     expect(isRetryableVisionStatusError({ name: "VISION_STATUS_INVALID" })).toBe(false);
     expect(isRetryableVisionStatusError({ name: "VISION_NOT_FOUND" })).toBe(false);
+  });
+
+  it("rejects completed results without an items array instead of throwing a raw map error", () => {
+    expect(() => normalizeVisionResult({ mealName: "套餐" }, "analysis-1")).toThrow("VISION_RESULT_INVALID");
+    expect(() => normalizeVisionResult({ mealName: "套餐", items: null }, "analysis-1")).toThrow("VISION_RESULT_INVALID");
   });
 });

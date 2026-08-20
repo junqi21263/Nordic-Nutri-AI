@@ -39,16 +39,39 @@ test("falls back to default targets when nutrition plan is null", () => {
 
 test("scores a week against seven daily targets instead of the number of recorded days", () => {
   const meals = [
-    { recordedAt: "2026-07-14T08:00:00.000Z", caloriesKcal: 2400, proteinG: 180, carbsG: 300, fatG: 70 },
+    { recordedAt: "2026-07-21T08:00:00.000Z", caloriesKcal: 2400, proteinG: 180, carbsG: 300, fatG: 70 },
     { recordedAt: "2026-07-20T08:00:00.000Z", caloriesKcal: 2400, proteinG: 180, carbsG: 300, fatG: 70 },
   ];
-  const result = calculateWeeklyNutrition(meals, { calories: 2400, proteinG: 180, carbsG: 300, fatG: 70 }, "2026-07-20");
+  const result = calculateWeeklyNutrition(meals, { calories: 2400, proteinG: 180, carbsG: 300, fatG: 70 }, "2026-07-26");
 
   assert.equal(result.recordedDays, 2);
   assert.equal(result.proteinCompletion, 29);
   assert.equal(result.calorieCompletion, 29);
   assert.equal(result.consistency, 29);
   assert.equal(result.score, 29);
+});
+
+test("counts the current natural week from Monday through Sunday", () => {
+  const meals = [
+    { recordedAt: "2026-08-14T08:00:00.000Z", caloriesKcal: 500 },
+    { recordedAt: "2026-08-15T08:00:00.000Z", caloriesKcal: 500 },
+    { recordedAt: "2026-08-16T08:00:00.000Z", caloriesKcal: 500 },
+    { recordedAt: "2026-08-20T08:00:00.000Z", caloriesKcal: 500 },
+  ];
+  const result = calculateWeeklyNutrition(meals, { calories: 2400 }, "2026-08-20");
+
+  assert.equal(result.startDate, "2026-08-17");
+  assert.equal(result.endDate, "2026-08-20");
+  assert.equal(result.recordedDays, 1);
+  assert.deepEqual(result.rhythm.map((day) => day.date), [
+    "2026-08-17",
+    "2026-08-18",
+    "2026-08-19",
+    "2026-08-20",
+    "2026-08-21",
+    "2026-08-22",
+    "2026-08-23",
+  ]);
 });
 
 test("does not unlock achievements without matching records", () => {

@@ -84,6 +84,13 @@ function shiftDate(value, days) {
   return parsed.toISOString().slice(0, 10);
 }
 
+function naturalWeekStartDate(value) {
+  const safeDate = assertDate(value);
+  const weekday = new Date(`${safeDate}T00:00:00Z`).getUTCDay();
+  const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+  return shiftDate(safeDate, -daysFromMonday);
+}
+
 function dateKey(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
@@ -165,7 +172,7 @@ function calculateDailyNutrition(meals = [], plan = {}) {
 
 function calculateWeeklyNutrition(meals = [], plan = {}, endDate) {
   const safeEndDate = assertDate(endDate);
-  const startDate = shiftDate(safeEndDate, -6);
+  const startDate = naturalWeekStartDate(safeEndDate);
   const safeMeals = (Array.isArray(meals) ? meals : []).filter((meal) => {
     const date = dateKey(meal.recordedAt);
     return date >= startDate && date <= safeEndDate;
@@ -305,5 +312,6 @@ module.exports = {
   calculateDailyNutrition,
   calculateWeeklyNutrition,
   dateKey,
+  naturalWeekStartDate,
   normalizeTargets,
 };

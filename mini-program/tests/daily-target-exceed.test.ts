@@ -17,6 +17,9 @@ describe("daily target exceed presentation", () => {
     expect(domain).toContain("export function formatTargetStatus");
     expect(domain).toContain("excess: Math.max(0, -remaining)");
     expect(summary).toContain("daily-summary__dashboard-ring--exceeded");
+    expect(summary).toContain("100 - calorieProgress.percent");
+    expect(summary).toContain("conic-gradient(from 0deg");
+    expect(summary).not.toContain("conic-gradient(from -90deg");
     expect(summary).toContain('calorieProgress.exceeded ? "已超" : "剩余"');
     expect(summary).toContain("formatTargetStatus");
     expect(records).toContain("meal-records-page__summary-status--exceeded");
@@ -24,6 +27,7 @@ describe("daily target exceed presentation", () => {
     expect(coach).toContain("coach-chat__progress-track--exceeded");
     expect(coach).toContain("formatTargetStatus");
     expect(pageStyles).toContain(".daily-summary__dashboard-ring--exceeded");
+    expect(pageStyles).toContain("conic-gradient(\n    from 0deg");
     expect(pageStyles).toContain(".meal-records-page__summary-track--exceeded");
     expect(componentStyles).toContain(".macro-progress--exceeded");
   });

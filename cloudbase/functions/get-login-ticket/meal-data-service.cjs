@@ -306,7 +306,7 @@ function createMealDataService({
         user_id: userId,
         provider: "deepseek",
         model,
-        status: "succeeded",
+        status: "completed",
         raw_recognition: result,
         normalized_items: result.items,
         advice: result.advice || null,

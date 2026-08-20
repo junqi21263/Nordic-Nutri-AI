@@ -270,6 +270,7 @@ test("listTraces applies bounded filters and returns a paginated safe projection
     traceId: "trace_1",
     userHash: "user_hash",
     feature: "vision",
+    stage: "nutrition.enrichment",
     status: "timed_out",
     errorCode: "NUTRITION_TIMEOUT",
     from: "2026-08-14T00:00:00.000Z",

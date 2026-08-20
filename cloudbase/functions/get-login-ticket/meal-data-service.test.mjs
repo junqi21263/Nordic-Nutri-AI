@@ -59,6 +59,22 @@ function createDb({ meals = [], items = [] } = {}) {
   return { db, calls };
 }
 
+test("persists meal analysis with the database-supported completed status", async () => {
+  const { db, calls } = createDb();
+  const service = createMealDataService({
+    db,
+    analyze: async () => ({ mealName: "麦辣鸡翅", items: [], advice: "适量食用" }),
+    model: "qwen3-vl-flash",
+  });
+
+  await service.createAnalysis("user-1", {
+    clientRequestId: "11111111-1111-4111-8111-111111111111",
+    items: [{ name: "麦辣鸡翅", quantityG: 100 }],
+  });
+
+  assert.equal(calls.find((call) => call.table === "ai_analysis")?.payload.status, "completed");
+});
+
 const validMeal = {
   clientRequestId: "11111111-1111-4111-8111-111111111111",
   mealType: "lunch",

@@ -85,15 +85,8 @@ export function MealSavedCelebration({
         <View className="meal-saved-celebration__success-icon">
           <View className="meal-saved-celebration__success-ring">
             <View className="meal-saved-celebration__ring-track" />
-            <View className="meal-saved-celebration__ring-mask meal-saved-celebration__ring-mask--right">
-              <View className="meal-saved-celebration__ring-fill meal-saved-celebration__ring-fill--right" />
-            </View>
-            <View className="meal-saved-celebration__ring-mask meal-saved-celebration__ring-mask--left">
-              <View className="meal-saved-celebration__ring-fill meal-saved-celebration__ring-fill--left" />
-            </View>
             <View className="meal-saved-celebration__check">
-              <View className="meal-saved-celebration__check-short" />
-              <View className="meal-saved-celebration__check-long" />
+              <View className="meal-saved-celebration__check-mark" />
             </View>
           </View>
           <View className="meal-saved-celebration__particle meal-saved-celebration__particle--1" />

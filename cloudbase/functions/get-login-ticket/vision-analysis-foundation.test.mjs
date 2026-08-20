@@ -102,6 +102,29 @@ test("owned completed status exposes the persisted result shape", async () => {
   assert.equal(result.result.advice, "适量");
 });
 
+test("completed status repairs an incomplete result from normalized items", async () => {
+  const service = createVisionAnalysisService({
+    db: {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: async () => ({ data: [{
+              id: analysisId,
+              status: "completed",
+              result: { mealName: "套餐" },
+              normalized_items: [{ name: "米饭", quantityG: 150 }],
+            }], error: null }),
+          }),
+        }),
+      }),
+    },
+    featureEnabled: true,
+  });
+
+  const result = await service.getOwnedAnalysis("user-1", analysisId);
+  assert.deepEqual(result.result.items, [{ name: "米饭", quantityG: 150 }]);
+});
+
 test("foundation exports explicit ownership and dispatch vocabularies", () => {
   assert.deepEqual(EXECUTION_OWNERS, ["fast", "async", "none"]);
   assert.deepEqual(DISPATCH_STATES, ["none", "queued", "claimed", "running", "completed", "failed"]);

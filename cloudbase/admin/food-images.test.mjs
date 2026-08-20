@@ -310,9 +310,12 @@ test("user images module wires list delete and purge APIs", async () => {
   assert.match(source, /id="userImageLightbox"/);
   assert.match(source, /data-user-image-preview/);
   assert.match(source, /openUserImageLightbox/);
+  assert.match(source, /userImageSelectAll/);
+  assert.match(source, /data-user-image-select/);
+  assert.match(source, /deleteSelectedUserImages/);
   assert.match(
     source,
-    /<th>用户 UUID<\/th>\s*<th>记录 ID<\/th>\s*<th>识别名 \/ 标题<\/th>\s*<th>类型<\/th>\s*<th>缩略图<\/th>\s*<th>上传时间<\/th>\s*<th>审核状态<\/th>\s*<th>关联餐食<\/th>\s*<th>操作<\/th>/,
+    /<th><input id="userImageSelectAll"[^>]*><\/th>\s*<th>用户 UUID<\/th>\s*<th>记录 ID<\/th>\s*<th>识别名 \/ 标题<\/th>\s*<th>类型<\/th>\s*<th>缩略图<\/th>\s*<th>上传时间<\/th>\s*<th>审核状态<\/th>\s*<th>关联餐食<\/th>\s*<th>操作<\/th>/,
   );
   assert.match(source, /关联餐食/);
   assert.doesNotMatch(source, /id="moderationViewTab"/);
@@ -462,6 +465,15 @@ test("trace explorer distinguishes async processing from failure", async () => {
   const source = await pageSource();
   assert.match(source, /value="processing">processing/);
   assert.match(source, /processing: "后台处理中"/);
+});
+
+test("trace explorer exposes stage and quick filters", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="traceStageFilter"/);
+  assert.match(source, /data-trace-quick-filter="failed"/);
+  assert.match(source, /data-trace-quick-filter="last24h"/);
+  assert.match(source, /traceActiveFilters/);
+  assert.match(source, /params\.set\("stage"/);
 });
 
 test("shows a login gate before revealing the admin console", async () => {

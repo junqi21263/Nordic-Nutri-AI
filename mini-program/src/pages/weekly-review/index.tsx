@@ -38,22 +38,22 @@ export default function WeeklyReviewPage() {
   const proteinLeft = remoteReview?.progress?.protein
     ? remoteReview.progress.protein.remaining
     : Math.max(0, summary.protein - summary.consumed.protein);
-  const recordedByDate = new Map(
-    (remoteReview?.rhythm ?? []).map((item) => [item.date, item.recorded] as const),
-  );
-  const displayedRhythm = getMondayBasedWeekDates(date).map((dateKey) => {
+  const localRhythm = getMondayBasedWeekDates(date).map((dateKey) => ({
+    date: dateKey,
+    recorded: meals.getMealsByDate(dateKey).length > 0,
+  }));
+  const displayedRhythm = (remoteReview?.rhythm?.length ? remoteReview.rhythm : localRhythm).map((item) => {
+    const dateKey = item.date;
     const [itemYear, itemMonth, itemDay] = dateKey.split("-").map(Number);
     const current = new Date(itemYear, itemMonth - 1, itemDay);
     return {
       date: dateKey,
       label: weekdayLabels[current.getDay()]!,
-      recorded: recordedByDate.has(dateKey)
-        ? Boolean(recordedByDate.get(dateKey))
-        : meals.getMealsByDate(dateKey).length > 0,
+      recorded: Boolean(item.recorded),
       today: dateKey === date,
     };
   });
-  const recordedDays = displayedRhythm.filter((item) => item.recorded).length;
+  const recordedDays = remoteReview?.recordedDays ?? displayedRhythm.filter((item) => item.recorded).length;
   const recordedMeals = remoteReview?.recordedMeals ?? todayMeals.length;
   const targetCalories = remoteReview?.calorieTarget ?? profile.profile.targetCalories;
   const weeklyInsight = remoteReview?.insight;
@@ -183,14 +183,6 @@ export default function WeeklyReviewPage() {
               <Text>让每日目标更容易完成</Text>
             </View>
           </View>
-        </View>
-        <View
-          className="weekly-review__milestone-link"
-          onClick={() => Taro.navigateTo({ url: "/pages/milestone-poster/index?milestone=7" })}
-        >
-          <NordicIcon name="milestone" size={20} ariaLabel="生成里程碑分享卡" />
-          <Text>生成 7 天里程碑分享卡</Text>
-          <NordicIcon name="chevron-right" size={18} ariaLabel="前往" />
         </View>
         <Text className="weekly-review__source">基于已同步到云端的饮食记录生成</Text>
       </View>
