@@ -1048,6 +1048,40 @@ test("correlates vision timeout diagnostics across request, image, and provider 
   assert.equal(stages.length, 0);
 });
 
+test("records a generic request stage and the original error for failed API requests", async () => {
+  const finished = [];
+  const stages = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      data: {
+        getAccount: async () => { throw new Error("database connection reset"); },
+      },
+      observability: {
+        startTrace: () => ({ traceId: "trace_generic_failure", startedAt: new Date().toISOString(), stages: [] }),
+        recordStage: (_trace, stage) => stages.push(stage),
+        finishTrace: async (_trace, result) => { finished.push(result); },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/account`, {
+      headers: { authorization: "Bearer valid-session" },
+    });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, "ACCOUNT_READ_FAILED");
+  });
+
+  assert.equal(stages.length, 1);
+  assert.equal(stages[0].name, "request");
+  assert.equal(stages[0].status, "failed");
+  assert.equal(stages[0].providerHttpStatus, 503);
+  assert.equal(stages[0].errorCode, "ACCOUNT_READ_FAILED");
+  assert.equal(finished[0].errorCode, "ACCOUNT_READ_FAILED");
+  assert.equal(finished[0].meta.internalError.message, "database connection reset");
+});
+
 test("validates the vision image before consuming the daily and burst quota", async () => {
   const quotaOperations = [];
   const server = createHttpServer({

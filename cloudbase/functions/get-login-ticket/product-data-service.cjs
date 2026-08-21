@@ -1,6 +1,7 @@
 const { assertNicknameAllowed } = require("./nickname-moderation.cjs");
 const { pickDefaultAvatarSentinel } = require("./profile-avatar-service.cjs");
 const { createOnboardingDraftDataService } = require("./onboarding-draft-data-service.cjs");
+const { withDbReadRetry } = require("./db-read-retry.cjs");
 
 function fail(message) {
   const error = new Error(message);
@@ -296,11 +297,11 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
 
     async getAccount(userId) {
       const [profile, bodyProfile, goal, settings, plan] = await Promise.all([
-        db.from("profiles").select("nickname,avatar_path,onboarding_completed_at").eq("id", userId).maybeSingle(),
-        db.from("body_profiles").select("age,sex,height_cm,weight_kg,activity_level,training_days_per_week").eq("user_id", userId).eq("is_current", true).maybeSingle(),
-        db.from("user_goals").select("goal_type,target_weight_kg,target_calories_kcal").eq("user_id", userId).eq("is_current", true).maybeSingle(),
-        db.from("user_settings").select("dietary_pattern,food_avoidances,meals_per_day,theme,locale,notification_enabled,unit_system").eq("id", userId).maybeSingle(),
-        db.from("nutrition_plans").select("id,daily_calories_kcal,protein_g,carbs_g,fat_g,status").eq("user_id", userId).eq("status", "active").maybeSingle(),
+        withDbReadRetry(() => db.from("profiles").select("nickname,avatar_path,onboarding_completed_at").eq("id", userId).maybeSingle()),
+        withDbReadRetry(() => db.from("body_profiles").select("age,sex,height_cm,weight_kg,activity_level,training_days_per_week").eq("user_id", userId).eq("is_current", true).maybeSingle()),
+        withDbReadRetry(() => db.from("user_goals").select("goal_type,target_weight_kg,target_calories_kcal").eq("user_id", userId).eq("is_current", true).maybeSingle()),
+        withDbReadRetry(() => db.from("user_settings").select("dietary_pattern,food_avoidances,meals_per_day,theme,locale,notification_enabled,unit_system").eq("id", userId).maybeSingle()),
+        withDbReadRetry(() => db.from("nutrition_plans").select("id,daily_calories_kcal,protein_g,carbs_g,fat_g,status").eq("user_id", userId).eq("status", "active").maybeSingle()),
       ]);
       if (profile.error || bodyProfile.error || goal.error || settings.error || plan.error) throw new Error("Account read failed");
       let avatarUrl = null;

@@ -310,8 +310,8 @@ function signVisionAnalysisInternal(secret, { timestamp, method = "POST", path, 
 function verifyVisionAnalysisInternalSignature(secret, req, { path, body, kind, now = Date.now() } = {}) {
   if (!secret || !path || !kind) return false;
   const prefix = kind === "reaper" ? "x-vision-reaper" : "x-vision-dispatch";
-  const timestamp = String(req.headers[`${prefix}-timestamp`] || "");
-  const signature = String(req.headers[`${prefix}-signature`] || "");
+  let timestamp = String(req.headers[`${prefix}-timestamp`] || "");
+  let signature = String(req.headers[`${prefix}-signature`] || "");
   const numericTimestamp = Number(timestamp);
   if (!Number.isInteger(numericTimestamp) || Math.abs(Math.floor(now / 1000) - numericTimestamp) > 300) return false;
   const expected = signVisionAnalysisInternal(secret, { timestamp, method: req.method, path, body });
@@ -336,6 +336,18 @@ function readRuntimeConfig(env) {
     identityPepper: env.IDENTITY_HASH_PEPPER,
     cloudbaseApiKey: env.CLOUDBASE_APIKEY,
     sessionSecret: env.APP_SESSION_SECRET,
+  };
+}
+
+function createBootstrapDiagnosticLogger(env) {
+  if (String(env.AUTH_DIAGNOSTIC_LOGGING || "").toLowerCase() !== "true") return undefined;
+  return (error) => {
+    const safe = error && typeof error === "object" ? error : {};
+    console.error("[auth-bootstrap] product session dependency failed", {
+      name: typeof safe.name === "string" ? safe.name : "Error",
+      code: typeof safe.code === "string" ? safe.code : null,
+      message: typeof safe.message === "string" ? safe.message.slice(0, 240) : String(error).slice(0, 240),
+    });
   };
 }
 
@@ -530,6 +542,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     exchangeCode: (code) => requestWechatSession({ ...config, code }),
     identityPepper: config.identityPepper,
     sessionSecret: config.sessionSecret,
+    onBootstrapError: createBootstrapDiagnosticLogger(env),
     bootstrapUser: async (openidHash) => {
       const existing = await db.from("app_users").select("id").eq("openid_hash", openidHash).maybeSingle();
       if (existing.error) throw new Error("Product user lookup failed");
@@ -1827,6 +1840,7 @@ function captureTraceError(res, error) {
 }
 
 function sendMealError(res, error) {
+  captureTraceError(res, error);
   if (error instanceof PublicMealDataError || error instanceof PublicMealAnalysisError) {
     const statusCode = error.code === "MEAL_DATA_INVALID" ? 400 : 503;
     sendJson(res, statusCode, { code: error.code, message: error.message || error.code });
@@ -1871,11 +1885,23 @@ function createHttpServer({ service }) {
       res.__traceContext = { request: { method: req.method, route: url.pathname, query: Object.fromEntries(url.searchParams.entries()) }, response: null };
       req.__traceContext = res.__traceContext;
       res.once("finish", () => {
+        const status = res.statusCode >= 400 ? (res.statusCode === 408 ? "timed_out" : "failed") : "succeeded";
+        const errorCode = res.__traceContext.errorCode || null;
+        const startedAtMs = new Date(genericTrace.startedAt).getTime();
+        const durationMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : null;
+        service.observability.recordStage?.(genericTrace, {
+          name: "request",
+          startedAt: genericTrace.startedAt,
+          durationMs,
+          status,
+          providerHttpStatus: res.statusCode,
+          errorCode,
+        });
         service.observability.finishTrace(genericTrace, {
-          status: res.statusCode >= 400 ? (res.statusCode === 408 ? "timed_out" : "failed") : "succeeded",
+          status,
           httpStatus: res.statusCode,
-          errorCode: res.__traceContext.errorCode || null,
-          meta: { route: url.pathname, method: req.method, request: res.__traceContext.request, response: res.__traceContext.response, internalError: res.__traceContext.internalError, sanitizationVersion: "3" },
+          errorCode,
+          meta: { route: url.pathname, method: req.method, request: res.__traceContext.request, response: res.__traceContext.response, internalError: res.__traceContext.internalError, sanitizationVersion: "4" },
         }).catch(() => {});
       });
     }
@@ -1937,6 +1963,7 @@ function createHttpServer({ service }) {
         }));
         return sendJson(res, 200, { claimed: jobs.length, jobs });
       } catch (error) {
+        captureTraceError(res, error);
         if (internalVisionAnalysisRoute.operation === "provisionTransportFixture"
           || internalVisionAnalysisRoute.operation === "cleanupTransportFixture") {
           const code = /^[A-Z0-9_:-]{1,80}$/.test(String(error?.code || ""))
@@ -1966,6 +1993,7 @@ function createHttpServer({ service }) {
         if (!analysis) return sendJson(res, 404, { code: "NOT_FOUND" });
         return sendJson(res, 200, analysis);
       } catch (error) {
+        captureTraceError(res, error);
         console.error("[vision-analysis-status] failed:", error?.message || error);
         return sendJson(res, 503, { code: "VISION_ANALYSIS_STATUS_UNAVAILABLE" });
       }
@@ -2013,6 +2041,7 @@ function createHttpServer({ service }) {
         const dispatch = await service.foodImageBatches.dispatchTrusted({ maxItems: payload.body?.maxItems });
         return sendJson(res, 200, patrol === undefined ? dispatch : { ...dispatch, patrol });
       } catch (error) {
+        captureTraceError(res, error);
         console.error("[food-image-dispatch] failed:", error?.code || error?.message || error);
         return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_FAILED" });
       }
@@ -2138,6 +2167,7 @@ function createHttpServer({ service }) {
         if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         return sendJson(res, 200, await service.foodCatalog.getById(session.sub, foodRoute.foodId));
       } catch (error) {
+        captureTraceError(res, error);
         if (error instanceof PublicFoodCatalogError) return sendJson(res, 400, { code: error.code });
         if (error instanceof FoodBarcodeError) return sendJson(res, error.code === "FOOD_BARCODE_NOT_FOUND" ? 404 : 400, { code: error.code });
         if (error instanceof FoodImageError) return sendJson(res, 400, { code: error.code });
@@ -2217,6 +2247,8 @@ function createHttpServer({ service }) {
             stage: url.searchParams.get("stage") || undefined,
             status: url.searchParams.get("status") || undefined,
             errorCode: url.searchParams.get("errorCode") || undefined,
+            route: url.searchParams.get("route") || undefined,
+            httpStatus: url.searchParams.get("httpStatus") || undefined,
             from: url.searchParams.get("from") || undefined,
             to: url.searchParams.get("to") || undefined,
             page: url.searchParams.get("page"),
@@ -2879,6 +2911,7 @@ function createHttpServer({ service }) {
         if (milestoneRoute.operation === "share" && req.method === "POST") return sendJson(res, 200, await service.milestones.recordShare(session.sub, milestoneRoute.eventId));
         return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       } catch (error) {
+        captureTraceError(res, error);
         const message = error?.message || "MILESTONE_SERVICE_UNAVAILABLE";
         const status = /not found|unavailable/i.test(message) ? 404 : /claim/i.test(message) ? 409 : 503;
         return sendJson(res, status, { code: status === 409 ? "MILESTONE_CLAIM_INVALID" : "MILESTONE_SERVICE_UNAVAILABLE", message });
@@ -2934,6 +2967,7 @@ function createHttpServer({ service }) {
         }
         return sendJson(res, 200, await service.insights[insightOperation](session.sub, date));
       } catch (error) {
+        captureTraceError(res, error);
         const code = error?.code || (String(error?.message || "").includes("Invalid date") ? "INSIGHT_DATA_INVALID" : "INSIGHT_SERVICE_UNAVAILABLE");
         const status = code === "INSIGHT_DATA_INVALID" || code === "MEAL_DATA_INVALID" ? 400 : 503;
         console.error("[insights] failed:", code, error?.message || error);
@@ -3545,7 +3579,7 @@ function createHttpServer({ service }) {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.data?.getAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-      try { return sendJson(res, 200, await service.data.getAccount(session.sub)); } catch { return sendJson(res, 503, { code: "ACCOUNT_READ_FAILED" }); }
+      try { return sendJson(res, 200, await service.data.getAccount(session.sub)); } catch (error) { captureTraceError(res, error); return sendJson(res, 503, { code: "ACCOUNT_READ_FAILED" }); }
     }
     if (dataOperation === "accountUsage" && req.method === "GET") {
       const session = await authorizeProductRequest(service, req, res);
@@ -3615,19 +3649,19 @@ function createHttpServer({ service }) {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.data?.getNutritionPlan) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-      try { return sendJson(res, 200, await service.data.getNutritionPlan(session.sub)); } catch { return sendJson(res, 503, { code: "NUTRITION_PLAN_READ_FAILED" }); }
+      try { return sendJson(res, 200, await service.data.getNutritionPlan(session.sub)); } catch (error) { captureTraceError(res, error); return sendJson(res, 503, { code: "NUTRITION_PLAN_READ_FAILED" }); }
     }
     if (dataOperation === "saveSettings" && req.method === "PATCH") {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.data?.saveSettings) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-      try { return sendJson(res, 200, await service.data.saveSettings(session.sub, await readJsonBody(req))); } catch { return sendJson(res, 400, { code: "SETTINGS_SAVE_FAILED" }); }
+      try { return sendJson(res, 200, await service.data.saveSettings(session.sub, await readJsonBody(req))); } catch (error) { captureTraceError(res, error); return sendJson(res, 400, { code: "SETTINGS_SAVE_FAILED" }); }
     }
     if (dataOperation === "nutritionPlan" && req.method === "PATCH") {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.data?.saveNutritionPlan) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-      try { return sendJson(res, 200, await service.data.saveNutritionPlan(session.sub, await readJsonBody(req))); } catch { return sendJson(res, 400, { code: "NUTRITION_PLAN_SAVE_FAILED" }); }
+      try { return sendJson(res, 200, await service.data.saveNutritionPlan(session.sub, await readJsonBody(req))); } catch (error) { captureTraceError(res, error); return sendJson(res, 400, { code: "NUTRITION_PLAN_SAVE_FAILED" }); }
     }
     if (dataOperation === "previewNutritionPlan" && req.method === "POST") {
       const session = await authorizeProductRequest(service, req, res);

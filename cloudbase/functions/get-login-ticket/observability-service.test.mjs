@@ -248,6 +248,7 @@ test("listTraces applies bounded filters and returns a paginated safe projection
     error_code: "NUTRITION_TIMEOUT",
     provider: "qwen",
     fallback_used: true,
+    meta_json: { route: "/vision-analysis" },
     prompt: "must not persist",
   }];
   const db = {
@@ -273,8 +274,10 @@ test("listTraces applies bounded filters and returns a paginated safe projection
     stage: "nutrition.enrichment",
     status: "timed_out",
     errorCode: "NUTRITION_TIMEOUT",
+    route: "/vision-analysis",
     from: "2026-08-14T00:00:00.000Z",
     to: "2026-08-15T00:00:00.000Z",
+    httpStatus: 504,
     page: 2,
     limit: 9999,
   });
@@ -286,6 +289,7 @@ test("listTraces applies bounded filters and returns a paginated safe projection
     clientRequestId: "client_1",
     userHash: "user_hash",
     feature: "vision",
+    route: "/vision-analysis",
     status: "timed_out",
     lastStage: "nutrition.enrichment",
     startedAt: "2026-08-15T00:00:00.000Z",

@@ -58,12 +58,15 @@ test("preserves only the safe WeChat error code for HTTP diagnostics", async () 
 });
 
 test("reports product-user bootstrap failures separately from WeChat exchange failures", async () => {
+  const diagnostics = [];
   const service = createProductSessionService({
     exchangeCode: async () => ({ openid: "wx-openid-123" }),
     bootstrapUser: async () => { throw new Error("database unavailable"); },
+    onBootstrapError: (error) => diagnostics.push(error.message),
     identityPepper: "identity-pepper",
     sessionSecret: "session-secret",
   });
 
   await assert.rejects(() => service.issue({ code: "fresh-code" }), (error) => error.code === "PRODUCT_SESSION_FAILED");
+  assert.deepEqual(diagnostics, ["database unavailable"]);
 });

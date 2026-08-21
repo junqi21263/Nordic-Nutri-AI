@@ -46,6 +46,8 @@
     .login-card details { margin-top: 14px; color: var(--muted); font-size: 12px; }
     .login-card details summary { cursor: pointer; font-weight: 700; }
     .login-error { min-height: 18px; margin: 0 0 8px; color: #9b2c2c; font-size: 12px; font-weight: 700; }
+    .environment-badge { display: inline-flex; align-items: center; width: fit-content; border: 1px solid #b9791f; border-radius: 999px; padding: 4px 9px; background: #fff4dc; color: #8a5510; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+    .login-card .environment-badge { margin-bottom: 8px; }
     .ops-header { max-width: 1540px; margin: 0 auto 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
     .brand { display: flex; align-items: center; gap: 12px; }
     .brand-mark { width: 38px; height: 38px; border: 1px solid var(--green); border-radius: 50%; display: grid; place-items: center; color: var(--green); font: 700 18px Georgia, serif; }
@@ -311,6 +313,25 @@
     .data-table tr:last-child td { border-bottom: 0; }
     .data-table select { height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: var(--paper); font-size: 12px; }
     .data-table code { font: 11px/1.4 "SFMono-Regular", Consolas, monospace; word-break: break-all; }
+    .data-table--traces { overflow-x: auto; }
+    .data-table--traces table { min-width: 1120px; table-layout: fixed; }
+    .data-table--traces th, .data-table--traces td { overflow: hidden; }
+    .data-table--traces th:nth-child(1), .data-table--traces td:nth-child(1) { width: 205px; }
+    .data-table--traces th:nth-child(2), .data-table--traces td:nth-child(2) { width: 330px; }
+    .data-table--traces th:nth-child(3), .data-table--traces td:nth-child(3) { width: 72px; }
+    .data-table--traces th:nth-child(4), .data-table--traces td:nth-child(4) { width: 78px; }
+    .data-table--traces th:nth-child(5), .data-table--traces td:nth-child(5) { width: 76px; }
+    .data-table--traces th:nth-child(6), .data-table--traces td:nth-child(6) { width: 92px; }
+    .data-table--traces th:nth-child(7), .data-table--traces td:nth-child(7) { width: 96px; }
+    .data-table--traces th:nth-child(8), .data-table--traces td:nth-child(8) { width: 88px; }
+    .data-table--traces th:nth-child(9), .data-table--traces td:nth-child(9) { width: 132px; }
+    .trace-cell--id,
+    .trace-cell--status,
+    .trace-cell--http,
+    .trace-cell--duration,
+    .trace-cell--time { white-space: nowrap; }
+    .trace-cell--id .ops-inline-link { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .trace-cell--route { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .user-image-thumb {
       display: block; width: 56px; height: 56px; padding: 0; border: 1px solid var(--line);
       border-radius: 10px; overflow: hidden; background: var(--linen); cursor: zoom-in;
@@ -439,6 +460,7 @@
 <body>
   <section id="loginGate" class="login-gate" aria-label="后台登录">
     <form id="loginForm" class="login-card" autocomplete="on">
+      <span id="loginEnvironmentBadge" class="environment-badge">DEV 测试环境</span>
       <p class="eyebrow">Nordic Nutri · Admin Console</p>
       <h1>登录管理后台</h1>
       <p class="lead">请先输入帐号密码，通过后再进入食材管理与生图。</p>
@@ -451,7 +473,7 @@
 
   <main id="adminApp" class="ops-shell admin-shell nn-shell" hidden>
     <header class="ops-header nn-topbar">
-      <div class="brand"><div class="brand-mark" aria-hidden="true">N</div><div><p class="eyebrow">Nordic Nutri · Admin Console</p><h1>管理后台</h1></div><span id="currentArea" class="topbar-context">食材生图</span></div>
+      <div class="brand"><div class="brand-mark" aria-hidden="true">N</div><div><p class="eyebrow">Nordic Nutri · Admin Console</p><h1>管理后台</h1></div><span id="adminEnvironmentBadge" class="environment-badge">DEV 测试环境</span><span id="currentArea" class="topbar-context">食材生图</span></div>
       <div class="header-actions"><span id="connectionStatus" class="muted">尚未登录</span><button id="refreshAll" class="button secondary" type="button">刷新批次</button><button id="logoutBtn" class="button secondary" type="button">退出登录</button><button id="openTools" class="button secondary" type="button">系统配置</button></div>
     </header>
 
@@ -763,9 +785,9 @@
 
         <section id="moduleTraces" class="admin-module" hidden>
           <div class="module-toolbar"><h2>Trace Explorer</h2><span class="muted">按请求状态定位阶段耗时与 Provider</span><button id="refreshTraces" class="button secondary" type="button">刷新</button></div>
-    <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / Error Code" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="processing">processing</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="admin">admin</option></select><select id="traceStageFilter"><option value="">全部阶段</option><option value="init">init</option><option value="upload">upload</option><option value="uploaded">uploaded</option><option value="safety_check">safety_check</option><option value="evaluation">evaluation</option><option value="flash">flash</option><option value="nutrition">nutrition</option><option value="persistence">persistence</option><option value="storage_upload">storage_upload</option><option value="temp_url_generation">temp_url_generation</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
+    <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / 接口 / 错误码" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="processing">processing</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceHttpStatusFilter"><option value="">全部状态码</option><option value="200">200</option><option value="202">202</option><option value="400">400</option><option value="401">401</option><option value="404">404</option><option value="408">408</option><option value="409">409</option><option value="429">429</option><option value="500">500</option><option value="503">503</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="foods">foods</option><option value="feedback">feedback</option><option value="milestones">milestones</option><option value="profile">profile</option><option value="admin">admin</option><option value="system">system</option></select><select id="traceStageFilter"><option value="">全部阶段</option><option value="request">request</option><option value="init">init</option><option value="upload">upload</option><option value="uploaded">uploaded</option><option value="safety_check">safety_check</option><option value="evaluation">evaluation</option><option value="flash">flash</option><option value="nutrition">nutrition</option><option value="persistence">persistence</option><option value="storage_upload">storage_upload</option><option value="temp_url_generation">temp_url_generation</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
           <div class="trace-quick-filters nn-status-filter" aria-label="Trace 快捷筛选"><span class="muted">快捷筛选</span><button class="filter" type="button" data-trace-quick-filter="all">全部</button><button class="filter" type="button" data-trace-quick-filter="failed">失败</button><button class="filter" type="button" data-trace-quick-filter="timed_out">超时</button><button class="filter" type="button" data-trace-quick-filter="last24h">最近 24 小时</button><button class="filter" type="button" data-trace-quick-filter="vision">Vision</button><button class="filter" type="button" data-trace-quick-filter="coach">Coach</button><button id="traceClearFilters" class="button link" type="button">清除筛选</button></div><p id="traceActiveFilters" class="muted" aria-live="polite">当前未应用筛选</p>
-          <div class="ops-page-grid"><section class="ops-panel"><div id="traceList" class="data-table"><p class="ops-empty">加载中…</p></div></section></div>
+          <div class="ops-page-grid"><section class="ops-panel"><div id="traceList" class="data-table data-table--traces"><p class="ops-empty">加载中…</p></div><div id="tracePagination" class="food-admin-pagination" hidden><span id="tracePageInfo"></span><div class="food-admin-pagination__jump"><button id="tracePagePrev" class="button secondary" type="button">上一页</button><button id="tracePageNext" class="button secondary" type="button">下一页</button></div></div></section></div>
           <section id="traceDrawer" class="nn-drawer" hidden aria-label="Trace Detail" role="dialog" aria-modal="true" aria-labelledby="traceDrawerTitle"><div class="nn-drawer__panel"><div class="nn-drawer__header"><div><span class="eyebrow">TRACE DETAIL</span><h3 id="traceDrawerTitle">Trace Detail</h3></div><button class="nn-drawer__close" type="button" data-trace-drawer-close aria-label="关闭 Trace Detail">关闭</button></div><div id="traceDetail"><p class="muted">选择一条 Trace 查看阶段。</p></div></div></section>
         </section>
 
@@ -898,7 +920,11 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const DEFAULT_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
+    const PRODUCTION_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
+    const TEST_API_BASE = "https://test-dev-d4gyxnn0b5dfa2c8a-1420560890.ap-shanghai.app.tcloudbase.com/get-login-ticket";
+    const DEFAULT_API_BASE = window.location.hostname.startsWith("test-dev-d4gyxnn0b5dfa2c8a")
+      ? TEST_API_BASE
+      : PRODUCTION_API_BASE;
     const CREDENTIAL_KEYS = {
       token: "nordic-admin-session-token",
       username: "nordic-admin-username",
@@ -956,7 +982,7 @@
       const entry = moduleCache[key];
       return Boolean(entry && Date.now() - entry.at < MODULE_CACHE_TTL_MS);
     }
-    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, auditRun: null, auditItems: [], auditSelectedIds: new Set(), auditActiveFilter: "all", batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, feedbackReplyItem: null, batchRailCollapsed: false };
+    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, auditRun: null, auditItems: [], auditSelectedIds: new Set(), auditActiveFilter: "all", batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, tracePage: 1, tracePageSize: 50, traceTotal: 0, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, feedbackReplyItem: null, batchRailCollapsed: false };
     try { state.batchRailCollapsed = localStorage.getItem(CREDENTIAL_KEYS.batchRailCollapsed) === "1"; } catch { /* ignore */ }
     // Same root taxonomy as mini-program food library chips (STANDARD_FOOD_CATEGORY_ROOT_CODES).
     const FOOD_LIBRARY_ROOT_CODES = ["meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables", "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples", "nordic_staples", "north_american_staples"];
@@ -2628,8 +2654,17 @@
     }
     function renderTraceList(data) {
       const host = $("traceList"); const items = data?.items || [];
+      state.tracePage = Math.max(1, Number(data?.page) || 1);
+      state.tracePageSize = Math.max(1, Number(data?.pageSize) || 50);
+      state.traceTotal = Math.max(0, Number(data?.total) || 0);
+      const pagination = $("tracePagination");
+      const totalPages = Math.max(1, Math.ceil(state.traceTotal / state.tracePageSize));
+      pagination.hidden = state.traceTotal <= state.tracePageSize;
+      $("tracePageInfo").textContent = `第 ${state.tracePage} / ${totalPages} 页 · 共 ${state.traceTotal} 条`;
+      $("tracePagePrev").disabled = state.tracePage <= 1;
+      $("tracePageNext").disabled = state.tracePage >= totalPages;
       if (!items.length) return setOpsMessage(host, "暂无符合条件的 Trace");
-      host.innerHTML = `<table><thead><tr><th>Trace ID</th><th>功能</th><th>状态</th><th>阶段</th><th>耗时</th><th>时间</th></tr></thead><tbody>${items.map((item) => `<tr><td><button class="ops-inline-link" type="button" data-trace-id="${escapeHtml(item.traceId)}" aria-controls="traceDrawer" aria-expanded="false">${escapeHtml(item.traceId)}</button></td><td>${escapeHtml(item.feature || "—")}</td><td><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span></td><td>${escapeHtml(item.lastStage || "—")}</td><td>${escapeHtml(item.durationMs ?? "—")} ms</td><td>${escapeHtml(formatTime(item.startedAt))}</td></tr>`).join("")}</tbody></table>`;
+      host.innerHTML = `<table><thead><tr><th>Trace ID</th><th>接口</th><th>功能</th><th>状态</th><th>状态码</th><th>错误码</th><th>阶段</th><th>耗时</th><th>时间</th></tr></thead><tbody>${items.map((item) => `<tr><td class="trace-cell trace-cell--id"><button class="ops-inline-link" type="button" data-trace-id="${escapeHtml(item.traceId)}" aria-controls="traceDrawer" aria-expanded="false">${escapeHtml(item.traceId)}</button></td><td class="trace-cell trace-cell--route" title="${escapeHtml(item.route || "")}">${escapeHtml(item.route || "—")}</td><td class="trace-cell">${escapeHtml(item.feature || "—")}</td><td class="trace-cell trace-cell--status"><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span></td><td class="trace-cell trace-cell--http">${escapeHtml(item.httpStatus ?? "—")}</td><td class="trace-cell">${escapeHtml(item.errorCode || "—")}</td><td class="trace-cell">${escapeHtml(item.lastStage || "—")}</td><td class="trace-cell trace-cell--duration">${escapeHtml(item.durationMs ?? "—")} ms</td><td class="trace-cell trace-cell--time">${escapeHtml(formatTime(item.startedAt))}</td></tr>`).join("")}</tbody></table>`;
       host.querySelectorAll("[data-trace-id]").forEach((button) => { button.onclick = () => loadTraceDetail(button.dataset.traceId, button); });
     }
     let traceDrawerTrigger = null;
@@ -2678,17 +2713,24 @@
         host.innerHTML = `<h4>Diagnostic Package</h4><p class="muted">仅显示脱敏后的排障字段。</p>${diagnosticBlock("Request", diagnostic.request)}${diagnosticBlock("Runtime", diagnostic.runtime)}${diagnosticBlock("Vision", diagnostic.vision)}${diagnosticBlock("Quota", diagnostic.quota)}${diagnosticBlock("Database", diagnostic.database)}${diagnosticBlock("Result", diagnostic.result)}${diagnosticBlock("Replay Hints", diagnostic.replayHints)}`;
       } catch (error) { setOpsMessage(host, traceDetailErrorMessage(error), "danger"); }
     }
-    async function loadTraces() {
+    async function loadTraces({ resetPage = false } = {}) {
       const host = $("traceList"); setOpsMessage(host, "加载中…");
       try {
-        const params = new URLSearchParams({ page: "1", limit: "50" }); const query = ($("traceSearch").value || "").trim();
-        if (query) params.set(query.startsWith("trace_") ? "traceId" : "errorCode", query);
+        if (resetPage) state.tracePage = 1;
+        const params = new URLSearchParams({ page: String(state.tracePage), limit: String(state.tracePageSize) }); const query = ($("traceSearch").value || "").trim();
+        if (query) {
+          if (query.startsWith("trace_")) params.set("traceId", query);
+          else if (query.startsWith("/")) params.set("route", query);
+          else params.set("errorCode", query);
+        }
         if ($("traceSearch").dataset.from) params.set("from", $("traceSearch").dataset.from);
         if ($("traceStatusFilter").value) params.set("status", $("traceStatusFilter").value);
+        if ($("traceHttpStatusFilter").value) params.set("httpStatus", $("traceHttpStatusFilter").value);
         if ($("traceFeatureFilter").value) params.set("feature", $("traceFeatureFilter").value);
         if ($("traceStageFilter").value) params.set("stage", $("traceStageFilter").value);
         const active = [];
         if ($("traceStatusFilter").value) active.push(`状态：${opsStatusLabel($("traceStatusFilter").value)}`);
+        if ($("traceHttpStatusFilter").value) active.push(`状态码：${$("traceHttpStatusFilter").value}`);
         if ($("traceFeatureFilter").value) active.push(`功能：${$("traceFeatureFilter").value}`);
         if ($("traceStageFilter").value) active.push(`阶段：${$("traceStageFilter").value}`);
         if ($( "traceSearch").dataset.from) active.push("时间：最近 24 小时");
@@ -2700,10 +2742,11 @@
     function applyTraceQuickFilter(filter) {
       $("traceSearch").value = "";
       $("traceStatusFilter").value = filter === "failed" || filter === "timed_out" ? filter : "";
+      $("traceHttpStatusFilter").value = "";
       $("traceFeatureFilter").value = filter === "vision" || filter === "coach" ? filter : "";
       $("traceStageFilter").value = "";
       if (filter === "last24h") $("traceSearch").dataset.from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); else delete $("traceSearch").dataset.from;
-      loadTraces().catch((error) => toast(apiErrorMessage(error), true));
+      loadTraces({ resetPage: true }).catch((error) => toast(apiErrorMessage(error), true));
     }
     function renderJobs(data) {
       const items = data?.items || []; const select = $("runNowJobKey");
@@ -2816,8 +2859,10 @@
     $("traceDrawer").onclick = (event) => { if (event.target === event.currentTarget) closeTraceDrawer(); };
     $("refreshHealth").onclick = () => loadSystemHealth().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshTraces").onclick = () => loadTraces().catch((error) => toast(apiErrorMessage(error), true));
-    $("traceApplyFilters").onclick = () => loadTraces().catch((error) => toast(apiErrorMessage(error), true));
-    $("traceClearFilters").onclick = () => { $("traceSearch").value = ""; delete $("traceSearch").dataset.from; $("traceStatusFilter").value = ""; $("traceFeatureFilter").value = ""; $("traceStageFilter").value = ""; loadTraces().catch((error) => toast(apiErrorMessage(error), true)); };
+    $("traceApplyFilters").onclick = () => loadTraces({ resetPage: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("traceClearFilters").onclick = () => { $("traceSearch").value = ""; delete $("traceSearch").dataset.from; $("traceStatusFilter").value = ""; $("traceHttpStatusFilter").value = ""; $("traceFeatureFilter").value = ""; $("traceStageFilter").value = ""; loadTraces({ resetPage: true }).catch((error) => toast(apiErrorMessage(error), true)); };
+    $("tracePagePrev").onclick = () => { if (state.tracePage > 1) { state.tracePage -= 1; loadTraces().catch((error) => toast(apiErrorMessage(error), true)); } };
+    $("tracePageNext").onclick = () => { if (state.tracePage * state.tracePageSize < state.traceTotal) { state.tracePage += 1; loadTraces().catch((error) => toast(apiErrorMessage(error), true)); } };
     document.querySelectorAll("[data-trace-quick-filter]").forEach((button) => { button.onclick = () => applyTraceQuickFilter(button.dataset.traceQuickFilter); });
     $("traceSearch").onkeydown = (event) => { if (event.key === "Enter") loadTraces().catch((error) => toast(apiErrorMessage(error), true)); };
     $("deleteSelectedUserImages").onclick = () => deleteSelectedUserImages();

@@ -154,7 +154,9 @@ test("API failures are retained in the visible operation feed with request metad
 
 test("admin connection defaults to the primary CloudBase HTTP function without exposing API Base on login", async () => {
   const source = await pageSource();
-  assert.match(source, /const DEFAULT_API_BASE = "https:\/\/lewis-healthy-d4glgqqzv73a5bc10\.service\.tcloudbase\.com\/get-login-ticket"/);
+  assert.match(source, /const PRODUCTION_API_BASE = "https:\/\/lewis-healthy-d4glgqqzv73a5bc10\.service\.tcloudbase\.com\/get-login-ticket"/);
+  assert.match(source, /const TEST_API_BASE = "https:\/\/test-dev-d4gyxnn0b5dfa2c8a-1420560890\.ap-shanghai\.app\.tcloudbase\.com\/get-login-ticket"/);
+  assert.match(source, /window\.location\.hostname\.startsWith\("test-dev-d4gyxnn0b5dfa2c8a"\)/);
   assert.match(source, /function apiBase\(\)/);
   assert.doesNotMatch(source, /高级：API Base/);
   assert.doesNotMatch(source, /id="baseUrl"/);
@@ -476,6 +478,34 @@ test("trace explorer exposes stage and quick filters", async () => {
   assert.match(source, /params\.set\("stage"/);
 });
 
+test("trace explorer exposes route and HTTP status search and filters", async () => {
+  const source = await pageSource();
+  assert.match(source, /Trace ID \/ 接口 \/ 错误码/);
+  assert.match(source, /id="traceHttpStatusFilter"/);
+  assert.match(source, /value="503">503/);
+  assert.match(source, /<th>接口<\/th>/);
+  assert.match(source, /<th>状态码<\/th>/);
+  assert.match(source, /params\.set\("route"/);
+  assert.match(source, /params\.set\("httpStatus"/);
+});
+
+test("trace explorer keeps status, time, and trace id readable in fixed columns", async () => {
+  const source = await pageSource();
+  assert.match(source, /class="data-table data-table--traces"/);
+  assert.match(source, /\.data-table--traces table \{ min-width: 1120px; table-layout: fixed; \}/);
+  assert.match(source, /\.trace-cell--status,\s*\.trace-cell--http,\s*\.trace-cell--duration,\s*\.trace-cell--time \{ white-space: nowrap; \}/);
+  assert.match(source, /\.trace-cell--id \.ops-inline-link \{ display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; \}/);
+});
+
+test("trace explorer exposes pagination for older and non-success traces", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="tracePagination"/);
+  assert.match(source, /tracePagePrev/);
+  assert.match(source, /tracePageNext/);
+  assert.match(source, /new URLSearchParams\(\{ page: String\(state\.tracePage\), limit: String\(state\.tracePageSize\) \}/);
+  assert.match(source, /data\.total/);
+});
+
 test("shows a login gate before revealing the admin console", async () => {
   const source = await pageSource();
   assert.match(source, /id="loginGate"/);
@@ -487,6 +517,13 @@ test("shows a login gate before revealing the admin console", async () => {
   assert.match(source, /showLoginGate\(\)/);
   assert.match(source, /id="logoutBtn"/);
   assert.match(source, /loginForm"\.onsubmit|id="loginForm"/);
+});
+
+test("marks the admin console as the DEV test environment on login and after entry", async () => {
+  const source = await pageSource();
+  assert.match(source, /DEV 测试环境/);
+  assert.match(source, /id="loginEnvironmentBadge"/);
+  assert.match(source, /id="adminEnvironmentBadge"/);
 });
 
 test("persists admin credentials in localStorage and auto-connects on reload", async () => {

@@ -1,3 +1,5 @@
+const { withDbReadRetry } = require("./db-read-retry.cjs");
+
 class PublicMealDataError extends Error {
   constructor(code, message = "餐食数据无效") {
     super(message);
@@ -329,13 +331,13 @@ function createMealDataService({
       assertDateRange(from, to);
       const resolveImages = options.resolveImages !== false;
       const until = nextDate(to);
-      const records = await db.from("meal_records").select("*").eq("user_id", userId).is("deleted_at", null)
-        .gte("recorded_at", `${from}T00:00:00+08:00`).lt("recorded_at", until).order("recorded_at", { ascending: true });
+      const records = await withDbReadRetry(() => db.from("meal_records").select("*").eq("user_id", userId).is("deleted_at", null)
+        .gte("recorded_at", `${from}T00:00:00+08:00`).lt("recorded_at", until).order("recorded_at", { ascending: true }));
       if (records.error) throw new Error("Meal list failed");
       const rows = records.data ?? [];
       if (!rows.length) return [];
       const mealIds = rows.map((row) => row.id);
-      const itemsResult = await db.from("meal_items").select("*").in("meal_record_id", mealIds).order("created_at", { ascending: true });
+      const itemsResult = await withDbReadRetry(() => db.from("meal_items").select("*").in("meal_record_id", mealIds).order("created_at", { ascending: true }));
       if (itemsResult.error) throw new Error("Meal item read failed");
       const itemsByMeal = new Map();
       for (const item of itemsResult.data ?? []) {
