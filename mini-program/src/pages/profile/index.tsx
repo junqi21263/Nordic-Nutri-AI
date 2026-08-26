@@ -171,6 +171,9 @@ export default function ProfilePage() {
   useDidShow(() => {
     refreshFeedbackHistory();
     syncProfileFromAccount();
+    void getProductWeeklyReview(date, { preferFast: true })
+      .then(setWeeklyReview)
+      .catch(() => undefined);
   });
 
   const openPage = (url: string) => void Taro.navigateTo({ url });

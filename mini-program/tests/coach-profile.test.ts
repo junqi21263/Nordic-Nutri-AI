@@ -239,6 +239,19 @@ describe("local coach and profile", () => {
     expect(source).not.toContain('title="Language"');
   });
 
+  it("refreshes the weekly rhythm score when the profile page is shown again", () => {
+    const source = readFileSync(
+      resolve(import.meta.dirname, "../src/pages/profile/index.tsx"),
+      "utf8",
+    );
+    const didShowStart = source.indexOf("useDidShow(() => {");
+    const didShowEnd = source.indexOf("\n  });", didShowStart);
+    const didShow = source.slice(didShowStart, didShowEnd);
+
+    expect(didShow).toContain("getProductWeeklyReview(date, { preferFast: true })");
+    expect(didShow).toContain("setWeeklyReview");
+  });
+
   it("routes the profile hub to complete local profile pages without legacy settings", () => {
     const appConfig = readFileSync(resolve(import.meta.dirname, "../src/app.config.ts"), "utf8");
     const source = readFileSync(
