@@ -609,10 +609,10 @@ test("AI provider editor only asks for provider credentials and catalog model", 
   assert.match(source, /\/ai\/catalog/);
 });
 
-test("AI routing limits food vision to the implemented provider adapter", async () => {
+test("AI routing explains that food vision uses the selected provider adapter", async () => {
   const source = await pageSource();
-  assert.match(source, /仅支持通义千问视觉适配器/);
-  assert.match(source, /featureKey === "vision" \? items\.filter\(\(model\) => model\.providerKey === "qwen"\)/);
+  assert.match(source, /支持已接入的视觉模型，保存后按厂商实际调用/);
+  assert.match(source, /data-ai-feature-route=/);
 });
 
 test("admin toast is centered, dismissible, and accessible", async () => {

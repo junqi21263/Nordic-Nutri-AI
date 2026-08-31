@@ -25,6 +25,7 @@ const { createCoachDataService, PublicCoachDataError } = require("./coach-data-s
 const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-data-service.cjs");
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
 const { createQwenVisionService, PublicQwenVisionError } = require("./qwen-vision-service.cjs");
+const { createDeepseekVisionService } = require("./deepseek-vision-service.cjs");
 const { createVisionDataService, PublicVisionDataError } = require("./vision-data-service.cjs");
 const { createWechatImageSecurity, PublicImageSecurityError } = require("./wechat-image-security.cjs");
 const { createVisionImageRetentionService } = require("./vision-image-retention-service.cjs");
@@ -70,6 +71,7 @@ const { createVisionAnalysisService } = require("./vision-analysis-foundation.cj
 const { createHybridVisionController } = require("./vision-analysis-hybrid.cjs");
 const { createAsyncLifecycleDeadlines } = require("./vision-async-deadline.cjs");
 const { createTransportFixtureProvisioner } = require("./transport-fixture-provisioning.cjs");
+const { createConfiguredVisionAnalyzer } = require("./vision-provider-router.cjs");
 const {
   createTransportFixtureDbAdapter,
   safeProvisionResponse,
@@ -1336,17 +1338,25 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   const qwenApiKey = typeof env.QWEN_API_KEY === "string" && env.QWEN_API_KEY.trim()
     ? env.QWEN_API_KEY
     : env.DASHSCOPE_API_KEY;
-  if (typeof qwenApiKey === "string" && qwenApiKey.trim()) {
+  const qwenVision = typeof qwenApiKey === "string" && qwenApiKey.trim()
+    ? createQwenVisionService({
+      apiKey: qwenApiKey,
+      workspaceId: env.QWEN_WORKSPACE_ID || "llm-ekun6ter25w7d0ms",
+      flashModel: env.QWEN_VL_FLASH_MODEL,
+      plusModel: env.QWEN_VL_PLUS_MODEL,
+    })
+    : null;
+  const deepseekVision = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY.trim()
+    ? createDeepseekVisionService({ apiKey: env.DEEPSEEK_API_KEY, model: "deepseek-v4-flash-vision-exp" })
+    : null;
+  const visionAdapters = { qwen: qwenVision, deepseek: deepseekVision };
+  const fallbackVision = qwenVision ? { provider: "qwen", model: env.QWEN_VL_FLASH_MODEL || "qwen3-vl-flash" } : deepseekVision ? { provider: "deepseek", model: "deepseek-v4-flash-vision-exp" } : null;
+  if (fallbackVision) {
     vision = createVisionDataService({
       db,
-      provider: "qwen",
-      model: env.QWEN_VL_FLASH_MODEL || "qwen3-vl-flash",
-      analyze: createQwenVisionService({
-        apiKey: qwenApiKey,
-        workspaceId: env.QWEN_WORKSPACE_ID || "llm-ekun6ter25w7d0ms",
-        flashModel: env.QWEN_VL_FLASH_MODEL,
-        plusModel: env.QWEN_VL_PLUS_MODEL,
-      }),
+      provider: fallbackVision.provider,
+      model: fallbackVision.model,
+      analyze: createConfiguredVisionAnalyzer({ db, adapters: visionAdapters, fallbackProvider: fallbackVision.provider }),
       evaluateMeal,
       backfillNutrition,
       assertImageSafe,

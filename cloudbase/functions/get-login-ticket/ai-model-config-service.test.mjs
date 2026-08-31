@@ -38,9 +38,8 @@ test("rejects an API key shaped value as a model identifier", () => {
   assert.throws(() => normalizeAiModelConfig({ ...base, modelKey: "sk-not-a-model" }), (error) => error.code === "MODEL_KEY_SECRET_LIKE");
 });
 
-test("only the implemented Qwen adapter can be assigned to food vision", () => {
-  assert.throws(() => normalizeAiModelConfig({ ...base, providerKey: "deepseek", applications: ["vision"] }), (error) => error.code === "MODEL_FEATURE_UNSUPPORTED");
-  assert.doesNotThrow(() => normalizeAiModelConfig({ ...base, providerKey: "qwen", applications: ["vision"] }));
+test("allows a configured provider to be assigned to food vision", () => {
+  assert.doesNotThrow(() => normalizeAiModelConfig({ ...base, providerKey: "deepseek", applications: ["vision"] }));
 });
 
 test("enforces safe parameter bounds", () => {

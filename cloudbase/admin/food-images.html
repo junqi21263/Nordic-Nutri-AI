@@ -2422,10 +2422,10 @@
       if (!host) return;
       if (!items.length) { host.innerHTML = '<p class="muted">暂无模型配置，请先新增模型。</p>'; return; }
       const option = (selected, emptyLabel, availableItems = items) => `<option value="">${emptyLabel}</option>${availableItems.map((model) => `<option value="${escapeHtml(model.id)}" ${selected === model.id ? "selected" : ""}>${escapeHtml(aiModelLabel(model))} · ${escapeHtml(model.providerKey)}</option>`).join("")}`;
-      const compatibleItems = (featureKey) => featureKey === "vision" ? items.filter((model) => model.providerKey === "qwen") : items;
+      const compatibleItems = () => items;
       const roleFor = (model, featureKey) => model.routeRoles?.[featureKey] || "";
       const selectedModel = (featureKey, role) => compatibleItems(featureKey).find((model) => roleFor(model, featureKey) === role)?.id || (role === "primary" ? compatibleItems(featureKey).find((model) => (model.applications || []).includes(featureKey))?.id || "" : "");
-      host.innerHTML = AI_FEATURES.map((feature) => `<div class="ai-feature-route-row" data-ai-feature-route="${feature.key}"><div class="ai-feature-route-row__name">${feature.label}${feature.key === "vision" ? '<small>仅支持通义千问视觉适配器</small>' : ""}</div><label>主模型<select data-ai-route-role="primary" aria-label="${feature.label}主模型">${option(selectedModel(feature.key, "primary"), "未设置", compatibleItems(feature.key))}</select></label><label>备用模型<select data-ai-route-role="fallback" aria-label="${feature.label}备用模型">${option(selectedModel(feature.key, "fallback"), "未设置", compatibleItems(feature.key))}</select></label></div>`).join("");
+      host.innerHTML = AI_FEATURES.map((feature) => `<div class="ai-feature-route-row" data-ai-feature-route="${feature.key}"><div class="ai-feature-route-row__name">${feature.label}${feature.key === "vision" ? '<small>支持已接入的视觉模型，保存后按厂商实际调用</small>' : ""}</div><label>主模型<select data-ai-route-role="primary" aria-label="${feature.label}主模型">${option(selectedModel(feature.key, "primary"), "未设置", compatibleItems())}</select></label><label>备用模型<select data-ai-route-role="fallback" aria-label="${feature.label}备用模型">${option(selectedModel(feature.key, "fallback"), "未设置", compatibleItems())}</select></label></div>`).join("");
     }
     function openAiModelEditor(modelId = null) {
       const model = aiModelState.items.find((item) => item.id === modelId);

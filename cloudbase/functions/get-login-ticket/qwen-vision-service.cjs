@@ -80,7 +80,7 @@ const DOWNSTREAM_MANDATORY_RESERVE_MS = VISION_BUDGETS.nutritionReserveMs
   + VISION_BUDGETS.evaluationReserveMs
   + VISION_BUDGETS.persistenceReserveMs;
 
-function createQwenRequestCompletion({ apiKey, workspaceId, model, timeoutMs = 18_000, fetchImpl = globalThis.fetch }) {
+function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", provider = "qwen", timeoutMs = 18_000, fetchImpl = globalThis.fetch }) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("QWEN_API_KEY configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "qwen3-vl-flash";
@@ -96,7 +96,7 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, timeoutMs = 1
     try {
       const headers = { authorization: `Bearer ${apiKey}`, "content-type": "application/json" };
       if (workspaceId) headers["X-DashScope-WorkSpace"] = workspaceId;
-      const response = await fetchImpl("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
+      const response = await fetchImpl(endpoint, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -123,8 +123,8 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, timeoutMs = 1
           providerRequestIdHash: providerRequestId ? crypto.createHash("sha256").update(String(providerRequestId)).digest("hex") : null,
         };
         emit(responseMeta);
-        console.error("[qwen] API error status:", response.status, "body:", errBody.slice(0, 500));
-        const error = new PublicQwenVisionError("VISION_RETRYABLE", `Qwen API ${response.status}: ${errBody.slice(0, 200)}`);
+        console.error(`[${provider}] API error status:`, response.status, "body:", errBody.slice(0, 500));
+        const error = new PublicQwenVisionError("VISION_RETRYABLE", `${provider} API ${response.status}: ${errBody.slice(0, 200)}`);
         Object.assign(error, responseMeta, { providerErrorType: "http", providerErrorCode: `HTTP_${response.status}` });
         throw error;
       }
@@ -158,7 +158,7 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, timeoutMs = 1
         providerErrorCode,
       });
       if (error instanceof PublicQwenVisionError) throw error;
-      console.error("[qwen] request error:", error?.message || error, error?.stack || "");
+      console.error(`[${provider}] request error:`, error?.message || error, error?.stack || "");
       if (error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("aborted")) {
         throw new PublicQwenVisionError("VISION_TIMEOUT", "识别时间有点久，请重新试一次");
       }
@@ -214,9 +214,9 @@ function unwrapVisionCompletion(raw) {
   return { content: raw, usage: null, ...diagnostics };
 }
 
-function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-flash", plusModel = "qwen3-vl-plus", requestCompletion, fetchImpl } = {}) {
-  const complete = requestCompletion ?? createQwenRequestCompletion({ apiKey, workspaceId, model: flashModel, timeoutMs: 18_000, fetchImpl });
-  const plusComplete = requestCompletion ? requestCompletion : createQwenRequestCompletion({ apiKey, workspaceId, model: plusModel, timeoutMs: 10_000, fetchImpl });
+function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-flash", plusModel = "qwen3-vl-plus", endpoint, provider = "qwen", requestCompletion, fetchImpl } = {}) {
+  const complete = requestCompletion ?? createQwenRequestCompletion({ apiKey, workspaceId, model: flashModel, endpoint, provider, timeoutMs: 18_000, fetchImpl });
+  const plusComplete = requestCompletion ? requestCompletion : createQwenRequestCompletion({ apiKey, workspaceId, model: plusModel, endpoint, provider, timeoutMs: 10_000, fetchImpl });
   return async ({ imageUrl, budget, observe = () => {}, onTrace = () => {} }) => {
     if (typeof imageUrl !== "string" || imageUrl.length > 30_000_000) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
     if (!/^https:\/\//i.test(imageUrl) && !/^data:image\//i.test(imageUrl)) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
@@ -238,7 +238,7 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       const provider = providerEvents[providerEvents.length - 1] || error || {};
       observe({
         stage: "flash",
-        provider: "qwen",
+        provider,
         startedAt: flashStartedIso,
         ms: Date.now() - flashStartedAt,
         status: "failed",
@@ -253,20 +253,20 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       });
       throw error;
     }
-    const provider = providerEvents[providerEvents.length - 1] || firstRaw;
+    const providerEvent = providerEvents[providerEvents.length - 1] || firstRaw;
     observe({
       stage: "flash",
-      provider: "qwen",
+      provider,
       startedAt: flashStartedIso,
       ms: Date.now() - flashStartedAt,
       status: "succeeded",
       flashSuccess: true,
       timeoutBudgetMs: flashTimeoutMs,
-      providerHttpStatus: provider.providerHttpStatus ?? null,
-      providerRequestIdHash: provider.providerRequestIdHash ?? null,
-      providerRequestDurationMs: provider.providerRequestDurationMs ?? null,
-      providerErrorCode: provider.providerErrorCode ?? null,
-      providerErrorType: provider.providerErrorType ?? null,
+      providerHttpStatus: providerEvent.providerHttpStatus ?? null,
+      providerRequestIdHash: providerEvent.providerRequestIdHash ?? null,
+      providerRequestDurationMs: providerEvent.providerRequestDurationMs ?? null,
+      providerErrorCode: providerEvent.providerErrorCode ?? null,
+      providerErrorType: providerEvent.providerErrorType ?? null,
     });
     const first = validateResult(firstRaw.content);
     let usage = firstRaw.usage;
@@ -324,7 +324,7 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       plus: plusTrace,
       selected: summarizeResult(selected),
     });
-    return { ...selected, provider: "qwen", model: selected === first ? flashModel : plusModel, usage, modelHops: selected === first ? 1 : 2 };
+    return { ...selected, provider, model: selected === first ? flashModel : plusModel, usage, modelHops: selected === first ? 1 : 2 };
   };
 }
 
