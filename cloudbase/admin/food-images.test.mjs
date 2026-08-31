@@ -611,6 +611,13 @@ test("admin toast is centered, dismissible, and accessible", async () => {
   assert.match(source, /toastClose.*hideToast|hideToast.*toastClose/s);
 });
 
+test("success toast policy only allows save or activation feedback", async () => {
+  const source = await pageSource();
+  assert.match(source, /shouldShowSuccessToast/);
+  assert.match(source, /保存|生效|切换/);
+  assert.match(source, /if \(!isError && !shouldShowSuccessToast\(message\)\) return/);
+});
+
 test("AI workspaces and provider status keep routing, quota, history, and secrets separated", async () => {
   const source = await pageSource();
   assert.match(source, /data-ai-workspace="routing"/);

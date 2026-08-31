@@ -1056,7 +1056,8 @@
     const out = (data) => { $("out").textContent = JSON.stringify(data, null, 2); };
     let toastTimer = null;
     const hideToast = () => { const el = $("toast"); if (el) el.className = "toast"; if (toastTimer) window.clearTimeout(toastTimer); };
-    const toast = (message, isError = false) => { const el = $("toast"); const copy = $("toastMessage"); if (!el || !copy) return; copy.textContent = message; el.className = `toast visible${isError ? " error" : ""}`; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(hideToast, 3600); };
+    const shouldShowSuccessToast = (message) => /保存|生效|切换/.test(String(message || ""));
+    const toast = (message, isError = false) => { if (!isError && !shouldShowSuccessToast(message)) return; const el = $("toast"); const copy = $("toastMessage"); if (!el || !copy) return; copy.textContent = message; el.className = `toast visible${isError ? " error" : ""}`; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(hideToast, 3600); };
     const selectedBatch = () => state.batches.find((batch) => batch.id === state.activeBatchId) || null;
     const progress = (batch) => { const total = Number(batch?.totalCount || 0); const terminal = Number(batch?.reviewCount || 0) + Number(batch?.completedCount || 0) + Number(batch?.failedCount || 0) + Number(batch?.skippedCount || 0); return { total, terminal, percent: total ? Math.round((terminal / total) * 100) : 0 }; };
     const statusLabel = (status) => ({ draft: "草稿", running: "运行中", paused: "已暂停", completed: "已通过", completed_with_errors: "完成（有失败）", cancelled: "已取消", needs_review: "待审核", failed: "失败", generating: "生成中", pending: "待生成", needs_retry: "待重试", skipped: "已跳过" }[status] || status || "未知");
