@@ -506,6 +506,7 @@ function downloadImageBuffer(url) {
 function createRuntimeService(env = process.env, dependencies = {}) {
   const config = readRuntimeConfig(env);
   const opsRef = { observability: null };
+  let vision = null;
   const cloudbase = dependencies.cloudbaseSdk ?? require("@cloudbase/js-sdk");
   const app = cloudbase.init({
     env: config.cloudbaseEnvId,
@@ -1176,7 +1177,6 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     jobs: foodImageJobs,
     dailyCap: Math.min(Number(env.HY_IMAGE_DAILY_LIMIT) || 500, 500),
   });
-  let vision = null;
   let assertImageSafe = null;
   try {
     require("sharp");
