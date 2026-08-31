@@ -1016,6 +1016,8 @@
     function showAdminApp() {
       $("loginGate").hidden = true;
       $("adminApp").hidden = false;
+      // Every fresh login/reload starts from the operational overview.
+      setModule("dashboard");
       setConnected(true);
     }
     function saveCredentials() {

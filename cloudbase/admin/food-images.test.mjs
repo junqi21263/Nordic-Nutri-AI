@@ -547,6 +547,13 @@ test("persists admin credentials in localStorage and auto-connects on reload", a
   assert.doesNotMatch(source, /管理员 Bearer Token/);
 });
 
+test("fresh login and reload open the overview module", async () => {
+  const source = await pageSource();
+  assert.match(source, /function showAdminApp\([\s\S]*?setModule\("dashboard"\)/);
+  assert.match(source, /id="moduleDashboard" class="admin-module" hidden/);
+  assert.match(source, /id="moduleImages" class="admin-module nn-food-operations"/);
+});
+
 test("food image admin exposes a safe old-image audit workflow", async () => {
   const source = await pageSource();
   assert.match(source, /id="auditPreview"/);
