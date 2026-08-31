@@ -1266,7 +1266,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
             });
           }
           void contentType;
-          return { cloudPath: fileID, imageUrl: imageUrl || toDataUrl() };
+          return { cloudPath: fileID, imageUrl: imageUrl || buildVisionDataUrl({ content, contentType }) };
         } catch (error) {
           lastError = error;
         }
@@ -1611,6 +1611,14 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     }),
     calculateNutritionPlan: calculateNutritionPlanWithAi,
   };
+}
+
+function buildVisionDataUrl({ content, contentType }) {
+  if (!Buffer.isBuffer(content) || !content.length) throw new Error("Vision image content is unavailable");
+  const safeContentType = typeof contentType === "string" && /^image\/(?:jpeg|png|gif|webp)$/i.test(contentType)
+    ? contentType.toLowerCase()
+    : "image/jpeg";
+  return `data:${safeContentType};base64,${content.toString("base64")}`;
 }
 
 function readBearerToken(req) {
@@ -3865,6 +3873,7 @@ if (require.main === module) {
 
 module.exports = {
   buildModelCatalog,
+  buildVisionDataUrl,
   mergeConfiguredModelCatalog,
   createHttpServer,
   createHunyuanGenerationService,

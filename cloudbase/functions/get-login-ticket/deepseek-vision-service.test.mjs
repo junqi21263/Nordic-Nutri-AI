@@ -18,3 +18,32 @@ test("DeepSeek vision uses the OpenAI-compatible endpoint and image content bloc
   assert.equal(result.provider, "deepseek");
   assert.equal(result.items[0].name, "米饭");
 });
+
+test("DeepSeek vision returns successfully when the adapter records provider events", async () => {
+  const events = [];
+  const service = createDeepseekVisionService({
+    apiKey: "deepseek-key",
+    requestCompletion: async ({ onRequestEvent }) => {
+      onRequestEvent({ providerHttpStatus: 200, providerRequestDurationMs: 12 });
+      return {
+        content: JSON.stringify({
+          mealName: "沙拉",
+          mealType: "lunch",
+          confidence: 0.9,
+          portionConfidence: 0.9,
+          needsEscalation: false,
+          items: [{ name: "生菜", quantityG: 100, caloriesPer100g: 20, proteinPer100g: 1, carbsPer100g: 3, fatPer100g: 0 }],
+        }),
+      };
+    },
+  });
+
+  const result = await service({
+    imageUrl: "https://example.com/meal.jpg",
+    budget: { stageTimeout: () => 5000 },
+    observe: (event) => events.push(event),
+  });
+
+  assert.equal(result.provider, "deepseek");
+  assert.equal(events[0].providerHttpStatus, 200);
+});

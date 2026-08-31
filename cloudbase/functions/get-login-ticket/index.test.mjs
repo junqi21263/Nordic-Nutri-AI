@@ -6,6 +6,7 @@ import { PublicVisionDataError } from "./vision-data-service.cjs";
 
 import {
   buildModelCatalog,
+  buildVisionDataUrl,
   mergeConfiguredModelCatalog,
   createHttpServer,
   createHunyuanGenerationService,
@@ -14,6 +15,13 @@ import {
   selectDeepseekModel,
   signFoodImageDispatch,
 } from "./index.js";
+
+test("vision upload fallback builds a valid inline image URL", () => {
+  assert.equal(
+    buildVisionDataUrl({ content: Buffer.from([0xff, 0xd8, 0xff]), contentType: "image/jpeg" }),
+    "data:image/jpeg;base64,/9j/",
+  );
+});
 
 test("configured AI model routes replace runtime models for the same features", () => {
   const result = mergeConfiguredModelCatalog(
