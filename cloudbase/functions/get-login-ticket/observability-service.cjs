@@ -756,6 +756,7 @@ function createObservabilityService({ db }) {
 
     return {
       model: modelName,
+      displayName: catalogEntries[0]?.displayName || modelName,
       provider: catalogEntries[0]?.provider || null,
       days: dayKeys.length,
       today,

@@ -474,6 +474,7 @@ function mergeConfiguredModelCatalog(runtimeCatalog, configuredModels = []) {
         featureLabel: fallback.featureLabel || feature,
         provider: model.providerKey,
         model: model.modelKey,
+        displayName: model.displayName || model.modelKey,
       });
     }
   }
