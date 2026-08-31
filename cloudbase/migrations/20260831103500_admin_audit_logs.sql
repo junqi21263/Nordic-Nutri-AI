@@ -10,6 +10,7 @@ create table if not exists public.admin_audit_logs (
   result text not null check (result in ('succeeded', 'failed', 'rejected')),
   error_code text,
   trace_id text,
+  expires_at timestamptz,
   created_at timestamptz not null default now()
 );
 

@@ -6,6 +6,7 @@ import { PublicVisionDataError } from "./vision-data-service.cjs";
 
 import {
   buildModelCatalog,
+  mergeConfiguredModelCatalog,
   createHttpServer,
   createHunyuanGenerationService,
   createRuntimeService,
@@ -13,6 +14,19 @@ import {
   selectDeepseekModel,
   signFoodImageDispatch,
 } from "./index.js";
+
+test("configured AI model routes replace runtime models for the same features", () => {
+  const result = mergeConfiguredModelCatalog(
+    [
+      { feature: "coach", featureLabel: "营养教练", provider: "deepseek", model: "deepseek-v4-flash" },
+      { feature: "daily_tip", featureLabel: "每日小贴士", provider: "hunyuan", model: "hunyuan-old" },
+    ],
+    [{ providerKey: "openai", modelKey: "gpt-5", applications: ["coach"], routeRoles: { coach: "primary" } }],
+  );
+  assert.equal(result.find((item) => item.feature === "coach").model, "gpt-5");
+  assert.equal(result.find((item) => item.feature === "coach").provider, "openai");
+  assert.equal(result.find((item) => item.feature === "daily_tip").model, "hunyuan-old");
+});
 
 async function withServer(server, run) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

@@ -2453,7 +2453,7 @@
         const saved = await api(`/ai/models/${encodeURIComponent(model.id)}`, { method: "PUT", body: { ...model, applications: assignment?.applications || [], routeRoles: assignment?.routeRoles || {}, apiKeyStatus: undefined } });
         Object.assign(model, saved);
       }
-      renderAiModelConfigBoard(aiModelState.items); renderAiFeatureRouteBoard(aiModelState.items); renderAiProviderStatus(aiModelState.items); await loadAiModelHistory(); toast("应用配置已保存并生效");
+      renderAiModelConfigBoard(aiModelState.items); renderAiFeatureRouteBoard(aiModelState.items); renderAiProviderStatus(aiModelState.items); await loadAiModelHistory(); if (!$('moduleQuota')?.hidden) await loadQuotaManagement(); toast("应用配置已保存并生效");
     }
     async function testAiModel(modelId) {
       const model = aiModelState.items.find((item) => item.id === modelId);

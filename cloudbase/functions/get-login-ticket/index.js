@@ -458,6 +458,31 @@ function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = nu
   ];
 }
 
+function mergeConfiguredModelCatalog(runtimeCatalog, configuredModels = []) {
+  const runtimeByFeature = new Map((runtimeCatalog || []).map((item) => [item.feature, item]));
+  const configuredFeatures = new Set();
+  const configuredCatalog = [];
+  for (const model of configuredModels || []) {
+    const applications = Array.isArray(model.applications) ? model.applications : [];
+    for (const feature of applications) {
+      const fallback = runtimeByFeature.get(feature);
+      if (!fallback || !model.providerKey || !model.modelKey) continue;
+      configuredFeatures.add(feature);
+      configuredCatalog.push({
+        ...fallback,
+        feature,
+        featureLabel: fallback.featureLabel || feature,
+        provider: model.providerKey,
+        model: model.modelKey,
+      });
+    }
+  }
+  return [
+    ...configuredCatalog,
+    ...(runtimeCatalog || []).filter((item) => !configuredFeatures.has(item.feature)),
+  ];
+}
+
 function createHunyuanGenerationService({ env, aiClient, createWorkerClient = createHunyuanWorkerClient } = {}) {
   const enabled = String(env?.FOOD_IMAGE_GENERATION_ENABLED ?? "true").toLowerCase() !== "false";
   if (!enabled) return null;
@@ -2396,7 +2421,14 @@ function createHttpServer({ service }) {
           }
           const foodToday = foodImageQuota?.usage ?? foodImage?.dailyGenerated ?? 0;
           const foodTotal = foodImageSeries.reduce((sum, point) => sum + (Number(point.value) || 0), 0);
-          const catalog = service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision });
+          const runtimeCatalog = service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision });
+          let configuredModels = [];
+          try {
+            configuredModels = (await service.aiModelConfig?.listModels(session.sub))?.items || [];
+          } catch (error) {
+            console.warn("[ops-quota] configured model catalog unavailable:", error?.message || error);
+          }
+          const catalog = mergeConfiguredModelCatalog(runtimeCatalog, configuredModels);
           let modelBoard = { models: [] };
           if (service.observability?.getModelBoard) {
             try {
@@ -2456,7 +2488,10 @@ function createHttpServer({ service }) {
           return sendJson(res, 200, await service.observability.getModelDetail({
             model,
             days,
-            catalog: service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision }),
+            catalog: mergeConfiguredModelCatalog(
+              service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision }),
+              (await service.aiModelConfig?.listModels(session.sub))?.items || [],
+            ),
             foodImageSeries,
           }));
         }
@@ -3819,6 +3854,7 @@ if (require.main === module) {
 
 module.exports = {
   buildModelCatalog,
+  mergeConfiguredModelCatalog,
   createHttpServer,
   createHunyuanGenerationService,
   createRuntimeService,
