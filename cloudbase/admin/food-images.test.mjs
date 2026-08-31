@@ -155,7 +155,7 @@ test("API failures are retained in the visible operation feed with request metad
 test("admin connection defaults to the primary CloudBase HTTP function without exposing API Base on login", async () => {
   const source = await pageSource();
   assert.match(source, /const PRODUCTION_API_BASE = "https:\/\/lewis-healthy-d4glgqqzv73a5bc10\.service\.tcloudbase\.com\/get-login-ticket"/);
-  assert.match(source, /const TEST_API_BASE = "https:\/\/test-dev-d4gyxnn0b5dfa2c8a-1420560890\.ap-shanghai\.app\.tcloudbase\.com\/get-login-ticket"/);
+  assert.match(source, /const TEST_API_BASE = "https:\/\/test-dev-d4gyxnn0b5dfa2c8a\.service\.tcloudbase\.com\/get-login-ticket"/);
   assert.match(source, /window\.location\.hostname\.startsWith\("test-dev-d4gyxnn0b5dfa2c8a"\)/);
   assert.match(source, /function apiBase\(\)/);
   assert.doesNotMatch(source, /高级：API Base/);
