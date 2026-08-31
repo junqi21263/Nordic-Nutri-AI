@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   AiProviderCatalogError,
+  PROVIDER_REGISTRY,
   createAiProviderCatalogService,
   SYSTEM_MODEL_DEFAULTS,
   listRuntimeCatalog,
@@ -60,6 +61,13 @@ test("official vendor model payload hides non-active models", () => {
 test("unknown vendors and malformed official payloads fail closed", () => {
   assert.throws(() => normalizeVendorModels("unknown", { data: [] }), (error) => error instanceof AiProviderCatalogError && error.code === "PROVIDER_UNSUPPORTED");
   assert.throws(() => normalizeVendorModels("deepseek", { data: null }), (error) => error instanceof AiProviderCatalogError && error.code === "MODEL_CATALOG_INVALID");
+});
+
+test("provider registry offers the supported vendor choices", () => {
+  for (const providerKey of ["deepseek", "qwen", "hunyuan", "openai", "moonshot", "zhipu", "minimax", "siliconflow", "openrouter"]) {
+    assert.ok(PROVIDER_REGISTRY[providerKey], `${providerKey} should be registered`);
+    assert.equal(typeof PROVIDER_REGISTRY[providerKey].displayName, "string");
+  }
 });
 
 test("provider catalog is sourced from runtime configuration before any admin model records exist", async () => {

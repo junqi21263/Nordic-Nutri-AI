@@ -8,6 +8,13 @@ async function pageSource() {
   return readFile(pagePath, "utf8");
 }
 
+test("all admin select controls share the Nordic Nutri select treatment", async () => {
+  const source = await pageSource();
+  assert.match(source, /(^|[,{\s])select,?\s*\.nn-select\s*\{/);
+  assert.match(source, /select:focus,?\s*\.nn-select:focus\s*\{/);
+  assert.match(source, /appearance:\s*none/);
+});
+
 test("batch rail contains no unused operation area", async () => {
   const source = await pageSource();
   assert.doesNotMatch(source, /id="batchActions"/);

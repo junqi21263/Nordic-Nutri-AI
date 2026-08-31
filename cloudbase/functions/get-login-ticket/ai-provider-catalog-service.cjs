@@ -11,16 +11,54 @@ const PROVIDER_REGISTRY = Object.freeze({
     displayName: "DeepSeek",
     credentialEnvNames: ["DEEPSEEK_API_KEY"],
     modelDiscovery: "official-api",
+    modelsEndpoint: "https://api.deepseek.com/models",
   }),
   qwen: Object.freeze({
     displayName: "通义千问",
     credentialEnvNames: ["DASHSCOPE_API_KEY", "QWEN_API_KEY"],
-    modelDiscovery: "provider-workspace-required",
+    modelDiscovery: "official-api",
+    modelsEndpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
   }),
   hunyuan: Object.freeze({
     displayName: "腾讯混元",
     credentialEnvNames: ["HUNYUAN_API_KEY"],
     modelDiscovery: "cloudbase-runtime",
+  }),
+  openai: Object.freeze({
+    displayName: "OpenAI",
+    credentialEnvNames: ["OPENAI_API_KEY"],
+    modelDiscovery: "official-api",
+    modelsEndpoint: "https://api.openai.com/v1/models",
+  }),
+  moonshot: Object.freeze({
+    displayName: "月之暗面 Moonshot",
+    credentialEnvNames: ["MOONSHOT_API_KEY", "KIMI_API_KEY"],
+    modelDiscovery: "official-api",
+    modelsEndpoint: "https://api.moonshot.cn/v1/models",
+  }),
+  zhipu: Object.freeze({
+    displayName: "智谱 GLM",
+    credentialEnvNames: ["ZHIPU_API_KEY", "GLM_API_KEY"],
+    modelDiscovery: "official-api",
+    modelsEndpoint: "https://open.bigmodel.cn/api/paas/v4/models",
+  }),
+  minimax: Object.freeze({
+    displayName: "MiniMax",
+    credentialEnvNames: ["MINIMAX_API_KEY"],
+    modelDiscovery: "official-api",
+    modelsEndpoint: "https://api.minimaxi.chat/v1/models",
+  }),
+  siliconflow: Object.freeze({
+    displayName: "SiliconFlow",
+    credentialEnvNames: ["SILICONFLOW_API_KEY"],
+    modelDiscovery: "official-api",
+    modelsEndpoint: "https://api.siliconflow.cn/v1/models",
+  }),
+  openrouter: Object.freeze({
+    displayName: "OpenRouter",
+    credentialEnvNames: ["OPENROUTER_API_KEY"],
+    modelDiscovery: "official-api",
+    modelsEndpoint: "https://openrouter.ai/api/v1/models",
   }),
 });
 
@@ -254,13 +292,13 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
   async function syncModels(actorUserId, providerKey) {
     await requireAdmin(actorUserId);
     const provider = requireProvider(providerKey);
-    if (provider.modelDiscovery !== "official-api") throw new AiProviderCatalogError("MODEL_CATALOG_DISCOVERY_UNAVAILABLE");
+    if (provider.modelDiscovery !== "official-api" || !provider.modelsEndpoint) throw new AiProviderCatalogError("MODEL_CATALOG_DISCOVERY_UNAVAILABLE");
     const apiKey = await effectiveCredential(providerKey);
     if (!apiKey) throw new AiProviderCatalogError("CREDENTIAL_MISSING");
     if (typeof fetchImpl !== "function") throw new AiProviderCatalogError("MODEL_CATALOG_SYNC_FAILED");
     let response;
     try {
-      response = await fetchImpl("https://api.deepseek.com/models", { headers: { Authorization: `Bearer ${apiKey}` } });
+      response = await fetchImpl(provider.modelsEndpoint, { headers: { Authorization: `Bearer ${apiKey}` } });
     } catch (error) {
       asError("MODEL_CATALOG_SYNC_FAILED", error);
     }
@@ -294,12 +332,12 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
   async function testProvider(actorUserId, providerKey) {
     await requireAdmin(actorUserId);
     const provider = requireProvider(providerKey);
-    if (provider.modelDiscovery !== "official-api") throw new AiProviderCatalogError("MODEL_CATALOG_DISCOVERY_UNAVAILABLE");
+    if (provider.modelDiscovery !== "official-api" || !provider.modelsEndpoint) throw new AiProviderCatalogError("MODEL_CATALOG_DISCOVERY_UNAVAILABLE");
     const apiKey = await effectiveCredential(providerKey);
     if (!apiKey) throw new AiProviderCatalogError("CREDENTIAL_MISSING");
     if (typeof fetchImpl !== "function") throw new AiProviderCatalogError("PROVIDER_TEST_FAILED");
     try {
-      const response = await fetchImpl("https://api.deepseek.com/models", { headers: { Authorization: `Bearer ${apiKey}` } });
+      const response = await fetchImpl(provider.modelsEndpoint, { headers: { Authorization: `Bearer ${apiKey}` } });
       if (!response?.ok) throw new Error("provider rejected credential");
       return { providerKey, status: "OK" };
     } catch (error) {
