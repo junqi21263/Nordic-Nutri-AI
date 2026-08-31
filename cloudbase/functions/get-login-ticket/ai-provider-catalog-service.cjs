@@ -171,6 +171,15 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
     return configuredEnvironmentCredential(env, providerKey);
   }
 
+  async function credentialStatus(providerKey) {
+    if (configuredEnvironmentCredential(env, providerKey)) return "PRESENT";
+    try {
+      return (await credentialRecord(providerKey)) ? "PRESENT" : "MISSING";
+    } catch {
+      return "MISSING";
+    }
+  }
+
   async function savedCatalogRows(providerKey = null) {
     try {
       let query = db.from("ai_provider_model_catalog").select("*").order("provider_key").order("model_key");
@@ -195,8 +204,10 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
       const current = merged.get(item.id);
       merged.set(item.id, current ? { ...current, ...item, applications: current.applications } : item);
     }
-    const items = [...merged.values()]
-      .map((item) => ({ ...item, credentialStatus: configuredEnvironmentCredential(env, item.providerKey) ? "PRESENT" : "MISSING" }))
+    const items = (await Promise.all([...merged.values()].map(async (item) => ({
+      ...item,
+      credentialStatus: await credentialStatus(item.providerKey),
+    }))))
       .sort((a, b) => a.providerKey.localeCompare(b.providerKey) || a.modelKey.localeCompare(b.modelKey));
     return { items };
   }
@@ -210,7 +221,7 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
         const latestSync = providerRows.map((row) => row.last_synced_at).filter(Boolean).sort().at(-1) || null;
         return publicProviderStatus({
           providerKey,
-          credentialStatus: configuredEnvironmentCredential(env, providerKey) ? "PRESENT" : "MISSING",
+          credentialStatus: items.find((item) => item.providerKey === providerKey)?.credentialStatus || "MISSING",
           modelCount: items.filter((item) => item.providerKey === providerKey).length,
           lastSyncedAt: latestSync,
           discoveryStatus: latestSync ? "SYNCED" : "NOT_SYNCED",

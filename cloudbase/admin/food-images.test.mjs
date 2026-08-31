@@ -580,18 +580,28 @@ test("AI management uses the complete quota feature catalog and feature-first ro
   assert.doesNotMatch(source, /data-ai-application=/);
 });
 
-test("AI model parameter fields use fixed system defaults", async () => {
+test("AI provider editor only asks for provider credentials and catalog model", async () => {
   const source = await pageSource();
   assert.match(source, /const MODEL_DEFAULT_TIMEOUT_MS = 30000/);
   assert.match(source, /const MODEL_DEFAULT_MAX_TOKENS = 2048/);
   assert.match(source, /const MODEL_DEFAULT_TEMPERATURE = 0\.2/);
-  assert.match(source, /id="aiModelTimeoutMs"[^>]*readonly/);
-  assert.match(source, /id="aiModelMaxTokens"[^>]*readonly/);
-  assert.match(source, /id="aiModelTemperature"[^>]*readonly/);
-  assert.match(source, /调用参数采用系统默认值，暂不支持按模型单独修改/);
-  assert.match(source, /timeoutMs: MODEL_DEFAULT_TIMEOUT_MS/);
-  assert.match(source, /maxTokens: MODEL_DEFAULT_MAX_TOKENS/);
-  assert.match(source, /temperature: MODEL_DEFAULT_TEMPERATURE/);
+  assert.match(source, /id="aiProviderSelect"/);
+  assert.match(source, /id="aiProviderApiKey"[^>]*type="password"/);
+  assert.match(source, /id="aiProviderModelSelect"/);
+  assert.doesNotMatch(source, /id="aiModelProtocol"/);
+  assert.doesNotMatch(source, /id="aiModelBaseUrl"/);
+  assert.doesNotMatch(source, /id="aiModelEndpoint"/);
+  assert.match(source, /\/ai\/providers/);
+  assert.match(source, /\/ai\/catalog/);
+});
+
+test("admin toast is centered, dismissible, and accessible", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="toastMessage"/);
+  assert.match(source, /id="toastClose"/);
+  assert.match(source, /left: 50%/);
+  assert.match(source, /top: 50%/);
+  assert.match(source, /toastClose.*hideToast|hideToast.*toastClose/s);
 });
 
 test("AI workspaces and provider status keep routing, quota, history, and secrets separated", async () => {
