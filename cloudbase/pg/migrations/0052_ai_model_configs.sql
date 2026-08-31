@@ -35,3 +35,37 @@ alter table public.ai_model_configs enable row level security;
 drop policy if exists "ai model configs: server only" on public.ai_model_configs;
 create policy "ai model configs: server only" on public.ai_model_configs
   for all to public using (false) with check (false);
+
+create table if not exists public.ai_provider_credentials (
+  provider_key text primary key,
+  secret_ciphertext text not null,
+  secret_iv text not null,
+  secret_auth_tag text not null,
+  updated_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.ai_provider_model_catalog (
+  provider_key text not null,
+  model_key text not null,
+  display_name text not null,
+  status text not null default 'active' check (status in ('active', 'deprecated', 'retired', 'offline')),
+  source text not null default 'vendor',
+  last_synced_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (provider_key, model_key)
+);
+
+create index if not exists ai_provider_model_catalog_provider_idx
+  on public.ai_provider_model_catalog (provider_key, status, model_key);
+
+alter table public.ai_provider_credentials enable row level security;
+drop policy if exists "ai provider credentials: server only" on public.ai_provider_credentials;
+create policy "ai provider credentials: server only" on public.ai_provider_credentials
+  for all to public using (false) with check (false);
+
+alter table public.ai_provider_model_catalog enable row level security;
+drop policy if exists "ai provider model catalog: server only" on public.ai_provider_model_catalog;
+create policy "ai provider model catalog: server only" on public.ai_provider_model_catalog
+  for all to public using (false) with check (false);
