@@ -250,6 +250,32 @@
     .quota-model-link { color: var(--ink); text-decoration: none; border: 0; background: transparent; padding: 0; cursor: pointer; border-bottom: 1px dashed transparent; font: inherit; }
     .quota-model-link:hover { color: var(--green); border-bottom-color: var(--green); }
     .quota-model-link code { font: inherit; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+    .ai-workspace-tabs { display: flex; gap: 4px; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
+    .ai-workspace-tab { border: 0; border-bottom: 2px solid transparent; padding: 9px 13px; background: transparent; color: var(--muted); font-weight: 800; cursor: pointer; }
+    .ai-workspace-tab:hover, .ai-workspace-tab.active { border-bottom-color: var(--green); color: var(--green); }
+    .ai-workspace-panel[hidden] { display: none !important; }
+    .ai-management-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .85fr); gap: 14px; margin-bottom: 16px; }
+    .ai-model-config-list, .ai-provider-status-list { display: grid; gap: 10px; }
+    .ai-model-config-card, .ai-provider-status-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: rgba(255,255,255,.72); }
+    .ai-model-config-card__head, .ai-provider-status-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .ai-model-config-card__head h4, .ai-provider-status-card__head h4 { margin: 0; color: var(--ink); font: 800 13px/1.4 "SFMono-Regular", Consolas, monospace; }
+    .ai-model-config-card__meta, .ai-provider-status-card__meta { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .ai-model-config-card__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+    .ai-feature-route-config { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .ai-feature-route-list { display: grid; gap: 8px; margin-top: 10px; }
+    .ai-feature-route-row { display: grid; grid-template-columns: minmax(130px, .7fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+    .ai-feature-route-row__name { color: var(--ink); font-size: 12px; font-weight: 800; }
+    .ai-feature-route-row label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; font-weight: 700; }
+    .ai-feature-route-row select, .ai-model-editor-grid input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--paper); color: var(--text); }
+    .ai-model-default-note { margin: 0 0 2px; padding: 8px 10px; border-radius: 8px; background: var(--mist); color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .ai-model-editor-grid input[readonly] { background: var(--mist); color: var(--muted); cursor: not-allowed; }
+    .ai-model-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+    .ai-model-editor-grid label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .ai-model-editor-grid .span-2 { grid-column: span 2; }
+    .ai-status-pill { display: inline-flex; align-items: center; border: 1px solid #a8cdb5; border-radius: 999px; padding: 4px 7px; color: var(--green); font-size: 10px; white-space: nowrap; }
+    .ai-status-pill.missing { border-color: #e0b9a8; color: var(--danger); }
+    .ai-provider-status-card__chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+    @media (max-width: 900px) { .ai-management-grid { grid-template-columns: 1fr; } .ai-feature-route-row { grid-template-columns: 1fr; } }
     @media (max-width: 900px) { .quota-model-cards { grid-template-columns: 1fr; } }
     .admin-layout { max-width: 1540px; margin: 0 auto; display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: start; }
     .admin-nav { position: sticky; top: 16px; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
@@ -696,12 +722,52 @@
             </select>
             <button id="refreshQuota" class="button secondary" type="button">刷新</button>
           </div>
-          <div id="quotaFeatureStats" class="ops-overview-stats status-metrics"><span class="status-metric">加载中<b>…</b></span></div>
-          <div id="quotaModelBoard" class="quota-model-board"><p class="muted">加载中…</p></div>
-          <div class="ops-table-block">
-            <h3>模型限额配置</h3>
-            <div id="quotaModelTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
-            <p class="muted" style="margin-top:10px">识别日限额 10 次、10 分钟突发 3 次；教练日对话 20 次。调整需改云函数环境变量后重新部署。</p>
+          <div class="ai-workspace-tabs" role="tablist" aria-label="AI 管理工作区">
+            <button class="ai-workspace-tab active" type="button" data-ai-workspace="routing" role="tab">模型路由</button>
+            <button class="ai-workspace-tab" type="button" data-ai-workspace="quota" role="tab">模型额度</button>
+            <button class="ai-workspace-tab" type="button" data-ai-workspace="history" role="tab">切换记录</button>
+          </div>
+          <div id="aiWorkspaceRouting" class="ai-workspace-panel">
+            <div class="ai-management-grid">
+              <section class="ops-panel">
+                <div class="ops-panel__head"><div><h3>模型参数</h3><p class="muted">管理已接入的模型参数；应用功能在下方统一配置。</p></div><button id="addAiModel" class="button" type="button">新增模型</button></div>
+                <div id="aiModelConfigBoard" class="ai-model-config-list"><p class="muted">请先连接后台</p></div>
+                <section class="ai-feature-route-config">
+                  <div class="ops-panel__head"><div><h3>应用功能配置</h3><p class="muted">按功能选择主模型和备用模型；保存后立即生效。</p></div></div>
+                  <div id="aiFeatureRouteBoard" class="ai-feature-route-list"><p class="muted">请先连接后台</p></div>
+                  <div class="ai-model-config-card__actions"><button id="saveAiRoutes" class="button" type="button">保存应用配置并生效</button></div>
+                </section>
+              </section>
+              <section class="ops-panel"><div class="ops-panel__head"><div><h3>Provider 与模型状态</h3><p class="muted">仅显示配置状态，不显示 API Key 明文。</p></div></div><div id="aiProviderStatusBoard" class="ai-provider-status-list"><p class="muted">加载中…</p></div></section>
+            </div>
+          </div>
+          <div id="aiWorkspaceQuota" class="ai-workspace-panel" hidden>
+            <div id="quotaFeatureStats" class="ops-overview-stats status-metrics"><span class="status-metric">加载中<b>…</b></span></div>
+            <div id="quotaModelBoard" class="quota-model-board"><p class="muted">加载中…</p></div>
+            <div class="ops-table-block"><h3>模型限额配置</h3><div id="quotaModelTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div><p class="muted" style="margin-top:10px">请求用量来自 Trace/Ops；模型参数由上方模型配置统一管理。</p></div>
+          </div>
+          <div id="aiWorkspaceHistory" class="ai-workspace-panel" hidden>
+            <section class="ops-panel"><div class="ops-panel__head"><div><h3>切换记录</h3><p class="muted">记录模型配置和应用关联的变更。</p></div></div><div id="aiModelSwitchHistory" class="data-table"><p class="muted" style="padding:18px">加载中…</p></div></section>
+          </div>
+          <div id="aiModelEditorModal" class="food-admin-modal" hidden>
+            <button type="button" class="food-admin-modal__backdrop" id="aiModelEditorBackdrop" aria-label="关闭模型编辑"></button>
+            <section class="food-admin-modal__panel" role="dialog" aria-modal="true" aria-labelledby="aiModelEditorTitle">
+              <div class="food-admin-editor__head"><h3 id="aiModelEditorTitle">新增模型</h3><button id="aiModelEditorClose" class="button link" type="button">关闭</button></div>
+              <div class="ai-model-editor-grid">
+                <label>Provider Key *<input id="aiModelProviderKey" type="text" autocomplete="off" placeholder="例如 deepseek" /></label>
+                <label>模型 Key *<input id="aiModelModelKey" type="text" autocomplete="off" placeholder="例如 chat-model-v1" /></label>
+                <label class="span-2">显示名称<input id="aiModelDisplayName" type="text" autocomplete="off" /></label>
+                <label>API Key 环境变量 *<input id="aiModelApiKeyEnv" type="text" autocomplete="off" placeholder="例如 DEEPSEEK_API_KEY" /></label>
+                <label>协议<input id="aiModelProtocol" type="text" autocomplete="off" placeholder="例如 openai-chat-completions" /></label>
+                <label class="span-2">Base URL<input id="aiModelBaseUrl" type="url" autocomplete="off" /></label>
+                <label>Endpoint<input id="aiModelEndpoint" type="text" placeholder="例如 /chat/completions" /></label>
+                <p class="ai-model-default-note span-2">调用参数采用系统默认值，暂不支持按模型单独修改。</p>
+                <label>超时（系统默认）<input id="aiModelTimeoutMs" type="number" value="30000" readonly aria-readonly="true" /></label>
+                <label>最大输出 Token（系统默认）<input id="aiModelMaxTokens" type="number" value="2048" readonly aria-readonly="true" /></label>
+                <label>温度（系统默认）<input id="aiModelTemperature" type="number" value="0.2" readonly aria-readonly="true" /></label>
+              </div>
+              <div class="food-admin-editor__actions"><button id="aiModelEditorCancel" class="button secondary" type="button">取消</button><button id="aiModelEditorSave" class="button" type="button">保存模型</button></div>
+            </section>
           </div>
         </section>
 
@@ -2285,7 +2351,120 @@
         return true;
       };
     }
+    const AI_FEATURES = [
+      { key: "vision", label: "食物识别" },
+      { key: "coach", label: "营养教练" },
+      { key: "daily_insight", label: "每日洞察" },
+      { key: "weekly_review", label: "周回顾" },
+      { key: "nutrition_plan", label: "营养计划" },
+      { key: "daily_tip", label: "每日小贴士" },
+      { key: "proactive_daily_brief", label: "NOVA 每日提醒" },
+      { key: "food_image", label: "食材生图" },
+    ];
+    const MODEL_DEFAULT_TIMEOUT_MS = 30000;
+    const MODEL_DEFAULT_MAX_TOKENS = 2048;
+    const MODEL_DEFAULT_TEMPERATURE = 0.2;
+    const aiModelState = { items: [], editingId: null };
+    function aiModelLabel(model) { return model.displayName || model.modelKey || "未命名模型"; }
+    function renderAiProviderStatus(items) {
+      const host = $("aiProviderStatusBoard");
+      if (!host) return;
+      const providers = new Map();
+      items.forEach((model) => {
+        const current = providers.get(model.providerKey) || { key: model.providerKey, models: [], features: new Set(), statuses: new Set(), protocols: new Set() };
+        current.models.push(model);
+        const applications = Object.keys(model.routeRoles || {}).filter((feature) => model.routeRoles[feature]);
+        (applications.length ? applications : (model.applications || [])).forEach((feature) => current.features.add(AI_FEATURES.find((item) => item.key === feature)?.label || feature));
+        current.statuses.add(model.apiKeyStatus || "MISSING");
+        if (model.protocol) current.protocols.add(model.protocol);
+        providers.set(model.providerKey, current);
+      });
+      if (!providers.size) { host.innerHTML = '<p class="muted">暂无模型配置，请先新增模型。</p>'; return; }
+      host.innerHTML = [...providers.values()].map((provider) => {
+        const status = [...provider.statuses].includes("PRESENT") ? "已配置" : "未配置";
+        return `<article class="ai-provider-status-card"><div class="ai-provider-status-card__head"><div><h4>${escapeHtml(provider.key)}</h4><p class="ai-provider-status-card__meta">${escapeHtml([...provider.protocols].join(" · ") || "协议待配置")}</p></div><span class="ai-status-pill ${status === "未配置" ? "missing" : ""}">Key ${status}</span></div><div class="ai-provider-status-card__chips"><span class="ai-status-pill">${provider.models.length} 个模型</span>${[...provider.features].map((feature) => `<span class="ai-status-pill">应用 ${escapeHtml(feature)}</span>`).join("")}</div></article>`;
+      }).join("");
+    }
+    function renderAiModelConfigBoard(items) {
+      const host = $("aiModelConfigBoard");
+      if (!host) return;
+      if (!items.length) { host.innerHTML = '<p class="muted">暂无模型配置，请点击“新增模型”。</p>'; return; }
+      host.innerHTML = items.map((model) => `<article class="ai-model-config-card" data-ai-model-id="${escapeHtml(model.id)}"><div class="ai-model-config-card__head"><div><h4>${escapeHtml(aiModelLabel(model))}</h4><p class="ai-model-config-card__meta">提供商 ${escapeHtml(model.providerKey)} · ${escapeHtml(model.modelKey)} · Key ${escapeHtml(model.apiKeyStatus || "MISSING")} · ${escapeHtml(model.protocol || "协议待配置")}</p></div><span class="ai-status-pill ${model.enabled ? "" : "missing"}">${model.enabled ? "已启用" : "已停用"}</span></div><p class="ai-model-config-card__meta">${escapeHtml(model.baseUrl || "Base URL 未配置")} · 超时 ${MODEL_DEFAULT_TIMEOUT_MS}ms · Token ${MODEL_DEFAULT_MAX_TOKENS} · 温度 ${MODEL_DEFAULT_TEMPERATURE}</p><div class="ai-model-config-card__actions"><button type="button" class="button secondary" data-ai-test-model="${escapeHtml(model.id)}">测试模型</button><button type="button" class="button secondary" data-ai-edit-model="${escapeHtml(model.id)}">编辑参数</button></div></article>`).join("");
+      host.querySelectorAll("[data-ai-edit-model]").forEach((button) => button.addEventListener("click", () => openAiModelEditor(button.dataset.aiEditModel)));
+      host.querySelectorAll("[data-ai-test-model]").forEach((button) => button.addEventListener("click", () => testAiModel(button.dataset.aiTestModel)));
+    }
+    function renderAiFeatureRouteBoard(items) {
+      const host = $("aiFeatureRouteBoard");
+      if (!host) return;
+      if (!items.length) { host.innerHTML = '<p class="muted">暂无模型配置，请先新增模型。</p>'; return; }
+      const option = (selected, emptyLabel) => `<option value="">${emptyLabel}</option>${items.map((model) => `<option value="${escapeHtml(model.id)}" ${selected === model.id ? "selected" : ""}>${escapeHtml(aiModelLabel(model))} · ${escapeHtml(model.providerKey)}</option>`).join("")}`;
+      const roleFor = (model, featureKey) => model.routeRoles?.[featureKey] || "";
+      const selectedModel = (featureKey, role) => items.find((model) => roleFor(model, featureKey) === role)?.id || (role === "primary" ? items.find((model) => (model.applications || []).includes(featureKey))?.id || "" : "");
+      host.innerHTML = AI_FEATURES.map((feature) => `<div class="ai-feature-route-row" data-ai-feature-route="${feature.key}"><div class="ai-feature-route-row__name">${feature.label}</div><label>主模型<select data-ai-route-role="primary" aria-label="${feature.label}主模型">${option(selectedModel(feature.key, "primary"), "未设置")}</select></label><label>备用模型<select data-ai-route-role="fallback" aria-label="${feature.label}备用模型">${option(selectedModel(feature.key, "fallback"), "未设置")}</select></label></div>`).join("");
+    }
+    function openAiModelEditor(modelId = null) {
+      const model = aiModelState.items.find((item) => item.id === modelId);
+      aiModelState.editingId = modelId;
+      $("aiModelEditorTitle").textContent = model ? "编辑模型参数" : "新增模型";
+      const values = { providerKey: "", modelKey: "", displayName: "", apiKeyEnv: "", protocol: "", baseUrl: "", endpoint: "", timeoutMs: MODEL_DEFAULT_TIMEOUT_MS, maxTokens: MODEL_DEFAULT_MAX_TOKENS, temperature: MODEL_DEFAULT_TEMPERATURE, ...model, timeoutMs: MODEL_DEFAULT_TIMEOUT_MS, maxTokens: MODEL_DEFAULT_MAX_TOKENS, temperature: MODEL_DEFAULT_TEMPERATURE };
+      ["providerKey", "modelKey", "displayName", "apiKeyEnv", "protocol", "baseUrl", "endpoint", "timeoutMs", "maxTokens", "temperature"].forEach((key) => { const field = $("aiModel" + key.charAt(0).toUpperCase() + key.slice(1)); if (field) field.value = values[key] ?? ""; });
+      $("aiModelEditorModal").hidden = false;
+    }
+    function closeAiModelEditor() { $("aiModelEditorModal").hidden = true; aiModelState.editingId = null; }
+    function aiModelEditorPayload() {
+      const value = (key) => $("aiModel" + key.charAt(0).toUpperCase() + key.slice(1))?.value;
+      const existing = aiModelState.items.find((item) => item.id === aiModelState.editingId);
+      return { providerKey: value("providerKey"), modelKey: value("modelKey"), displayName: value("displayName"), apiKeyEnv: value("apiKeyEnv"), protocol: value("protocol"), baseUrl: value("baseUrl"), endpoint: value("endpoint"), timeoutMs: MODEL_DEFAULT_TIMEOUT_MS, maxTokens: MODEL_DEFAULT_MAX_TOKENS, temperature: MODEL_DEFAULT_TEMPERATURE, enabled: existing?.enabled !== false, applications: existing?.applications || [], routeRoles: existing?.routeRoles || {} };
+    }
+    async function saveAiModelEditor() {
+      const payload = aiModelEditorPayload();
+      const path = aiModelState.editingId ? `/ai/models/${encodeURIComponent(aiModelState.editingId)}` : "/ai/models";
+      const saved = await api(path, { method: aiModelState.editingId ? "PUT" : "POST", body: payload });
+      const index = aiModelState.items.findIndex((item) => item.id === saved.id);
+      if (index >= 0) aiModelState.items[index] = saved; else aiModelState.items.push(saved);
+      renderAiModelConfigBoard(aiModelState.items); renderAiFeatureRouteBoard(aiModelState.items); renderAiProviderStatus(aiModelState.items); closeAiModelEditor(); toast("模型配置已保存");
+    }
+    async function saveAiModelApplications() {
+      const assignments = new Map(aiModelState.items.map((model) => [model.id, { applications: [], routeRoles: {} }]));
+      for (const row of [...($("aiFeatureRouteBoard")?.querySelectorAll("[data-ai-feature-route]") || [])]) {
+        const featureKey = row.dataset.aiFeatureRoute;
+        const primary = row.querySelector('[data-ai-route-role="primary"]')?.value || "";
+        const fallback = row.querySelector('[data-ai-route-role="fallback"]')?.value || "";
+        if (primary && fallback && primary === fallback) { throw new Error(`${AI_FEATURES.find((feature) => feature.key === featureKey)?.label || featureKey} 的主模型和备用模型不能相同`); }
+        [[primary, "primary"], [fallback, "fallback"]].forEach(([modelId, role]) => { if (modelId && assignments.has(modelId)) { const target = assignments.get(modelId); target.applications.push(featureKey); target.routeRoles[featureKey] = role; } });
+      }
+      for (const model of aiModelState.items) {
+        const assignment = assignments.get(model.id);
+        const saved = await api(`/ai/models/${encodeURIComponent(model.id)}`, { method: "PUT", body: { ...model, applications: assignment?.applications || [], routeRoles: assignment?.routeRoles || {}, apiKeyStatus: undefined } });
+        Object.assign(model, saved);
+      }
+      renderAiModelConfigBoard(aiModelState.items); renderAiFeatureRouteBoard(aiModelState.items); renderAiProviderStatus(aiModelState.items); await loadAiModelHistory(); toast("应用配置已保存并生效");
+    }
+    async function testAiModel(modelId) {
+      const model = aiModelState.items.find((item) => item.id === modelId);
+      if (!model) return;
+      toast(model.apiKeyStatus === "PRESENT" ? `${aiModelLabel(model)}：配置已就绪，可进行真实调用测试` : `${aiModelLabel(model)}：API Key 环境变量未配置`, model.apiKeyStatus !== "PRESENT");
+    }
+    async function loadAiModelHistory() {
+      const host = $("aiModelSwitchHistory"); if (!host) return;
+      try {
+        const data = await api("/audit-logs?resourceType=ai_model_config&limit=50");
+        const items = data.items || data.logs || [];
+        host.innerHTML = items.length ? `<table><thead><tr><th>时间</th><th>操作</th><th>结果</th><th>资源</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(formatTime(item.createdAt || item.created_at || item.at))}</td><td>${escapeHtml(item.action || "—")}</td><td>${escapeHtml(item.outcome || "—")}</td><td><code>${escapeHtml(item.resourceId || item.resource_id || "—")}</code></td></tr>`).join("")}</tbody></table>` : '<p class="muted" style="padding:18px">暂无切换记录</p>';
+      } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
+    }
+    async function loadAiModelConfigs() {
+      const host = $("aiModelConfigBoard"); if (!host) return;
+      host.innerHTML = '<p class="muted">加载中…</p>';
+      try { const data = await api("/ai/models"); aiModelState.items = data.items || []; renderAiModelConfigBoard(aiModelState.items); renderAiFeatureRouteBoard(aiModelState.items); renderAiProviderStatus(aiModelState.items); } catch (error) { host.innerHTML = `<p class="muted">${escapeHtml(apiErrorMessage(error))}</p>`; $("aiFeatureRouteBoard").innerHTML = `<p class="muted">${escapeHtml(apiErrorMessage(error))}</p>`; $("aiProviderStatusBoard").innerHTML = `<p class="muted">${escapeHtml(apiErrorMessage(error))}</p>`; }
+    }
+    function setAiWorkspace(name) {
+      ["routing", "quota", "history"].forEach((key) => { const panel = $("aiWorkspace" + key.charAt(0).toUpperCase() + key.slice(1)); if (panel) panel.hidden = key !== name; });
+      document.querySelectorAll("[data-ai-workspace]").forEach((tab) => { const active = tab.dataset.aiWorkspace === name; tab.classList.toggle("active", active); tab.setAttribute("aria-selected", String(active)); });
+      if (name === "history") loadAiModelHistory();
+    }
     async function loadQuotaManagement() {
+      await loadAiModelConfigs();
       const boardHost = $("quotaModelBoard");
       const modelHost = $("quotaModelTable");
       const featureHost = $("quotaFeatureStats");
@@ -2878,6 +3057,13 @@
     $("feedbackStatusFilter").onchange = () => loadFeedback({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("refreshOps").onclick = () => loadOpsOverview().catch((error) => toast(apiErrorMessage(error), true));
     $("runOpsPatrol").onclick = () => runOpsPatrolFromOverview().catch((error) => toast(apiErrorMessage(error), true));
+    document.querySelectorAll("[data-ai-workspace]").forEach((tab) => { tab.onclick = () => setAiWorkspace(tab.dataset.aiWorkspace); });
+    $("addAiModel").onclick = () => openAiModelEditor();
+    $("saveAiRoutes").onclick = () => saveAiModelApplications().catch((error) => toast(apiErrorMessage(error), true));
+    $("aiModelEditorSave").onclick = () => saveAiModelEditor().catch((error) => toast(apiErrorMessage(error), true));
+    $("aiModelEditorCancel").onclick = closeAiModelEditor;
+    $("aiModelEditorClose").onclick = closeAiModelEditor;
+    $("aiModelEditorBackdrop").onclick = closeAiModelEditor;
     $("refreshQuota").onclick = () => loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
     $("quotaDaysFilter").onchange = () => loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshModeration").onclick = () => loadModerationModule().catch((error) => toast(apiErrorMessage(error), true));

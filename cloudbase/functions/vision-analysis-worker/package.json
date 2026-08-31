@@ -2,6 +2,9 @@
   "name": "nordic-nutri-vision-analysis-worker",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "postinstall": "npm rebuild sharp --foreground-scripts"
+  },
   "dependencies": {
     "@cloudbase/ai": "^2.30.0",
     "@cloudbase/js-sdk": "3.6.3",

@@ -558,3 +558,53 @@ test("feedback console uses Chinese statuses and exposes a reply action", async 
   assert.match(source, /保存回复并通知用户/);
   assert.match(source, /body: \{ reply \}/);
 });
+
+test("AI management uses the complete quota feature catalog and feature-first routing", async () => {
+  const source = await pageSource();
+  for (const feature of [
+    ["vision", "食物识别"],
+    ["coach", "营养教练"],
+    ["daily_insight", "每日洞察"],
+    ["weekly_review", "周回顾"],
+    ["nutrition_plan", "营养计划"],
+    ["daily_tip", "每日小贴士"],
+    ["proactive_daily_brief", "NOVA 每日提醒"],
+    ["food_image", "食材生图"],
+  ]) {
+    assert.match(source, new RegExp(`key: "${feature[0]}"`));
+    assert.match(source, new RegExp(`label: "${feature[1]}"`));
+  }
+  assert.match(source, /id="aiFeatureRouteBoard"/);
+  assert.match(source, /data-ai-feature-route=/);
+  assert.match(source, /应用功能配置/);
+  assert.doesNotMatch(source, /data-ai-application=/);
+});
+
+test("AI model parameter fields use fixed system defaults", async () => {
+  const source = await pageSource();
+  assert.match(source, /const MODEL_DEFAULT_TIMEOUT_MS = 30000/);
+  assert.match(source, /const MODEL_DEFAULT_MAX_TOKENS = 2048/);
+  assert.match(source, /const MODEL_DEFAULT_TEMPERATURE = 0\.2/);
+  assert.match(source, /id="aiModelTimeoutMs"[^>]*readonly/);
+  assert.match(source, /id="aiModelMaxTokens"[^>]*readonly/);
+  assert.match(source, /id="aiModelTemperature"[^>]*readonly/);
+  assert.match(source, /调用参数采用系统默认值，暂不支持按模型单独修改/);
+  assert.match(source, /timeoutMs: MODEL_DEFAULT_TIMEOUT_MS/);
+  assert.match(source, /maxTokens: MODEL_DEFAULT_MAX_TOKENS/);
+  assert.match(source, /temperature: MODEL_DEFAULT_TEMPERATURE/);
+});
+
+test("AI workspaces and provider status keep routing, quota, history, and secrets separated", async () => {
+  const source = await pageSource();
+  assert.match(source, /data-ai-workspace="routing"/);
+  assert.match(source, /data-ai-workspace="quota"/);
+  assert.match(source, /data-ai-workspace="history"/);
+  assert.match(source, /模型路由/);
+  assert.match(source, /模型额度/);
+  assert.match(source, /切换记录/);
+  assert.match(source, /Provider 与模型状态/);
+  assert.match(source, /Key \$\{status\}/);
+  assert.match(source, /已配置/);
+  assert.match(source, /未配置/);
+  assert.doesNotMatch(source, /Key：[^<\n]+/);
+});

@@ -51,6 +51,7 @@ const { createFoodImageService, FoodImageError } = require("./food-image-service
 const { createFoodBarcodeService, FoodBarcodeError } = require("./food-barcode-service.cjs");
 const { createFoodAdminService, FoodAdminError } = require("./food-admin-service.cjs");
 const { createAdminConsoleService, AdminConsoleError } = require("./admin-console-service.cjs");
+const { createAiModelConfigService, AiModelConfigError } = require("./ai-model-config-service.cjs");
 const { createHunyuanImageService, HunyuanImageError } = require("./hunyuan-image-service.cjs");
 const { createHunyuanWorkerClient } = require("./hunyuan-worker-client.cjs");
 const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
@@ -1098,6 +1099,12 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     isAdmin: allowAdminConsole,
   });
+  const aiModelConfigService = createAiModelConfigService({
+    db,
+    env,
+    isAdmin: allowAdminConsole,
+    audit: adminAudit,
+  });
   const adminConsoleAuth = createAdminConsoleAuthService({
     db,
     sessionSecret: config.sessionSecret,
@@ -1507,6 +1514,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodBarcode: foodBarcodeService,
     foodAdmin: foodAdminService,
     adminConsole: adminConsoleService,
+    aiModelConfig: aiModelConfigService,
     adminConsoleAuth,
     foodImage: foodImageService,
     foodImageJobs,
@@ -1677,6 +1685,9 @@ function getAdminFoodRoute(pathname) {
   const userDetailMatch = path.match(/^\/users\/([^/]+)$/i);
   if (userDetailMatch) return { operation: "userDetail", userId: decodeURIComponent(userDetailMatch[1]) };
   if (path === "/login") return { operation: "adminLogin" };
+  const aiModelItemMatch = path.match(/^\/ai\/models\/([^/]+)$/i);
+  if (aiModelItemMatch) return { operation: "aiModelItem", modelId: decodeURIComponent(aiModelItemMatch[1]) };
+  if (path === "/ai/models") return { operation: "aiModels" };
   if (path === "/jobs") return { operation: "jobList" };
   const jobRunMatch = path.match(/^\/jobs\/([a-z0-9_-]+)\/run-now$/i);
   if (jobRunMatch) return { operation: "jobRunNow", jobKey: jobRunMatch[1] };
@@ -2194,6 +2205,21 @@ function createHttpServer({ service }) {
       const session = requireAdminConsoleSession(service, req);
       if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED", message: "请先使用帐号密码登录后台" });
       try {
+        if (adminFoodRoute.operation === "aiModels") {
+          if (!service.aiModelConfig) return sendJson(res, 503, { code: "AI_MODEL_CONFIG_UNAVAILABLE" });
+          if (req.method === "GET") return sendJson(res, 200, await service.aiModelConfig.listModels(session.sub));
+          if (req.method === "POST") return sendJson(res, 201, await service.aiModelConfig.createModel(session.sub, await readJsonBody(req, 32 * 1024)));
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "aiModelItem") {
+          if (req.method !== "PUT") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.aiModelConfig) return sendJson(res, 503, { code: "AI_MODEL_CONFIG_UNAVAILABLE" });
+          return sendJson(res, 200, await service.aiModelConfig.updateModel(
+            session.sub,
+            adminFoodRoute.modelId,
+            await readJsonBody(req, 32 * 1024),
+          ));
+        }
         if (adminFoodRoute.operation === "jobList") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.jobOps?.listJobs) return sendJson(res, 503, { code: "JOBS_UNAVAILABLE" });
@@ -2820,6 +2846,11 @@ function createHttpServer({ service }) {
           return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         }
       } catch (error) {
+        if (error instanceof AiModelConfigError) {
+          const status = error.code === "FORBIDDEN" ? 403
+            : error.code.endsWith("_READ_FAILED") || error.code.endsWith("_WRITE_FAILED") ? 503 : 400;
+          return sendJson(res, status, { code: error.code, ...(status === 400 ? { message: error.message } : {}) });
+        }
         if (error instanceof JobOpsError) {
           const status = error.code === "JOB_NOT_ALLOWED" ? 400 : 503;
           return sendJson(res, status, { code: error.code });

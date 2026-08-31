@@ -154,15 +154,16 @@ function createWiredVisionWorker({ claimJob, vision, resolveImageUrl, commitQuot
       return { status: "noop", analysisId: job?.id || null };
     }
     const recordStage = createStageRecorder(diagnostics, job);
-    await recordStage("worker.asset_load", async () => {
-      if (!job.image_path) throw Object.assign(new Error("image path missing"), { code: "VISION_ASSET_PATH_MISSING" });
-    });
-    const imageUrl = await recordStage("worker.temp_url", async () => {
-      const resolved = await resolveImageUrl(job.image_path);
-      if (!resolved) throw Object.assign(new Error("image URL unavailable"), { code: "VISION_ANALYSIS_IMAGE_UNAVAILABLE" });
-      return resolved;
-    });
+    let imageUrl;
     try {
+      await recordStage("worker.asset_load", async () => {
+        if (!job.image_path) throw Object.assign(new Error("image path missing"), { code: "VISION_ASSET_PATH_MISSING" });
+      });
+      imageUrl = await recordStage("worker.temp_url", async () => {
+        const resolved = await resolveImageUrl(job.image_path);
+        if (!resolved) throw Object.assign(new Error("image URL unavailable"), { code: "VISION_ANALYSIS_IMAGE_UNAVAILABLE" });
+        return resolved;
+      });
       const deadlineAt = job.deadline_at ? Date.parse(job.deadline_at) : null;
       const remainingMs = Number.isFinite(deadlineAt) ? deadlineAt - Date.now() : null;
       const deadlineStartedAt = new Date().toISOString();
