@@ -34,6 +34,15 @@ test("rejects raw API keys and invalid environment variable names", () => {
   assert.throws(() => normalizeAiModelConfig({ ...base, apiKeyEnv: "not-a-var" }), (error) => error instanceof AiModelConfigError && error.code === "API_KEY_ENV_INVALID");
 });
 
+test("rejects an API key shaped value as a model identifier", () => {
+  assert.throws(() => normalizeAiModelConfig({ ...base, modelKey: "sk-not-a-model" }), (error) => error.code === "MODEL_KEY_SECRET_LIKE");
+});
+
+test("only the implemented Qwen adapter can be assigned to food vision", () => {
+  assert.throws(() => normalizeAiModelConfig({ ...base, providerKey: "deepseek", applications: ["vision"] }), (error) => error.code === "MODEL_FEATURE_UNSUPPORTED");
+  assert.doesNotThrow(() => normalizeAiModelConfig({ ...base, providerKey: "qwen", applications: ["vision"] }));
+});
+
 test("enforces safe parameter bounds", () => {
   assert.throws(() => normalizeAiModelConfig({ ...base, timeoutMs: 0 }), (error) => error.code === "MODEL_PARAMETER_INVALID");
   assert.throws(() => normalizeAiModelConfig({ ...base, maxTokens: 0 }), (error) => error.code === "MODEL_PARAMETER_INVALID");

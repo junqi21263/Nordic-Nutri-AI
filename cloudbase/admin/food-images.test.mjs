@@ -609,6 +609,12 @@ test("AI provider editor only asks for provider credentials and catalog model", 
   assert.match(source, /\/ai\/catalog/);
 });
 
+test("AI routing limits food vision to the implemented provider adapter", async () => {
+  const source = await pageSource();
+  assert.match(source, /仅支持通义千问视觉适配器/);
+  assert.match(source, /featureKey === "vision" \? items\.filter\(\(model\) => model\.providerKey === "qwen"\)/);
+});
+
 test("admin toast is centered, dismissible, and accessible", async () => {
   const source = await pageSource();
   assert.match(source, /id="toastMessage"/);

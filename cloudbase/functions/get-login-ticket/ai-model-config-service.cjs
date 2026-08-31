@@ -37,6 +37,7 @@ function normalizeAiModelConfig(input = {}, { env = process.env, id } = {}) {
   const apiKeyEnv = String(valueOf(input, "apiKeyEnv", "api_key_env") ?? "").trim();
   if (!KEY.test(providerKey)) throw new AiModelConfigError("PROVIDER_KEY_INVALID");
   if (!KEY.test(modelKey)) throw new AiModelConfigError("MODEL_KEY_INVALID");
+  if (/^(sk-|key-|api[-_]?key)/i.test(modelKey)) throw new AiModelConfigError("MODEL_KEY_SECRET_LIKE", "模型标识不能是 API Key");
   if (!ENV_NAME.test(apiKeyEnv)) throw new AiModelConfigError("API_KEY_ENV_INVALID");
 
   const timeoutMs = numberOrUndefined(valueOf(input, "timeoutMs", "timeout_ms"));
@@ -54,6 +55,9 @@ function normalizeAiModelConfig(input = {}, { env = process.env, id } = {}) {
   const rawApplications = input.applications ?? input.featureKeys ?? input.feature_keys ?? [];
   const applications = Array.from(new Set((Array.isArray(rawApplications) ? rawApplications : [])
     .map((item) => String(item).trim()).filter(Boolean))).slice(0, 50);
+  if (applications.includes("vision") && providerKey !== "qwen") {
+    throw new AiModelConfigError("MODEL_FEATURE_UNSUPPORTED", "当前食物识别仅支持通义千问视觉模型");
+  }
   const routeRoles = normalizeRouteRoles(input);
   return {
     ...(id || valueOf(input, "id", "id") ? { id: id || valueOf(input, "id", "id") } : {}),
