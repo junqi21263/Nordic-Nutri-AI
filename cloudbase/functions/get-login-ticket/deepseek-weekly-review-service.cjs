@@ -149,7 +149,7 @@ function createWeeklyReviewHash(context) {
   return crypto.createHash("sha256").update(JSON.stringify(context)).digest("hex");
 }
 
-function createDeepseekWeeklyReviewService({ apiKey, model, requestCompletion, fetchImpl } = {}) {
+function createDeepseekWeeklyReviewService({ apiKey, model, requestCompletion, fetchImpl, source = "deepseek" } = {}) {
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
   const complete = requestCompletion ?? (apiKey ? createWeeklyCompletion({ apiKey, model: selectedModel, fetchImpl }) : null);
   return async ({ date, context } = {}) => {
@@ -160,7 +160,7 @@ function createDeepseekWeeklyReviewService({ apiKey, model, requestCompletion, f
       const content = typeof raw === "string" ? raw : raw?.content;
       const usage = typeof raw === "object" && raw ? raw.usage : null;
       const result = validateWeeklyReview(content);
-      return result ? { ...result, source: "deepseek", model: selectedModel, usage } : fallback;
+      return result ? { ...result, source, model: selectedModel, usage } : fallback;
     } catch {
       return fallback;
     }

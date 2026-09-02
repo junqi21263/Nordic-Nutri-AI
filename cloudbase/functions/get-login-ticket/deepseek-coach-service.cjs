@@ -116,10 +116,39 @@ function buildMessages({ prompt, context, history, outputRules }) {
 
 const { extractContentAndUsage, extractOpenAiUsage } = require("./model-usage.cjs");
 
-function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis.fetch }) {
+const DEFAULT_STREAM_FIRST_EVENT_TIMEOUT_MS = 10_000;
+const DEFAULT_STREAM_TOTAL_TIMEOUT_MS = 30_000;
+const DEFAULT_COACH_MAX_TOKENS = 256;
+const DEFAULT_COACH_TEMPERATURE = 0.2;
+
+function positiveInteger(value, fallback = null) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : fallback;
+}
+
+function resolveCoachStreamTimeouts({ route = null } = {}) {
+  // The configured timeout is the complete attempt budget. Keeping it bounded
+  // prevents one stalled provider from delaying a configured fallback.
+  const configuredTimeoutMs = positiveInteger(route?.timeoutMs);
+  const totalTimeoutMs = configuredTimeoutMs || DEFAULT_STREAM_TOTAL_TIMEOUT_MS;
+  return {
+    firstEventTimeoutMs: Math.min(DEFAULT_STREAM_FIRST_EVENT_TIMEOUT_MS, totalTimeoutMs),
+    totalTimeoutMs,
+  };
+}
+
+function resolveCoachGenerationOptions({ route = null } = {}) {
+  return {
+    maxTokens: positiveInteger(route?.maxTokens, DEFAULT_COACH_MAX_TOKENS),
+    temperature: Number.isFinite(Number(route?.temperature)) ? Number(route.temperature) : DEFAULT_COACH_TEMPERATURE,
+  };
+}
+
+function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis.fetch, route = null }) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("DeepSeek configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
+  const generation = resolveCoachGenerationOptions({ route });
   return async ({ prompt, context, history }) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12_000);
@@ -131,8 +160,8 @@ function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis
           model: selectedModel,
           thinking: { type: "disabled" },
           response_format: { type: "json_object" },
-          temperature: 0.2,
-          max_tokens: 500,
+          temperature: generation.temperature,
+          max_tokens: generation.maxTokens,
           messages: buildMessages({ prompt, context, history, outputRules: COACH_STRUCTURED_OUTPUT_RULES }),
         }),
         signal: controller.signal,
@@ -140,7 +169,7 @@ function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis
       if (!response.ok) throw new PublicCoachError("COACH_RETRYABLE");
       const data = await response.json();
       const parsed = extractContentAndUsage(data);
-      return { content: parsed.content, usage: parsed.usage, model: selectedModel };
+      return { content: parsed.content || extractCoachText(data), usage: parsed.usage || extractCoachUsage(data), model: selectedModel };
     } catch (error) {
       if (error instanceof PublicCoachError) throw error;
       throw new PublicCoachError("COACH_RETRYABLE");
@@ -150,35 +179,56 @@ function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis
   };
 }
 
-async function* readSseJson(body) {
+async function* readSseJson(body, { onPayload = null } = {}) {
   const decoder = new TextDecoder();
   let buffer = "";
   for await (const chunk of body) {
     buffer += decoder.decode(chunk, { stream: true });
-    let separator = buffer.indexOf("\n\n");
-    while (separator >= 0) {
+    let separatorMatch = buffer.match(/\r?\n\r?\n/);
+    while (separatorMatch) {
+      const separator = separatorMatch.index;
+      const separatorLength = separatorMatch[0].length;
       const frame = buffer.slice(0, separator);
-      buffer = buffer.slice(separator + 2);
-      separator = buffer.indexOf("\n\n");
-      const data = frame.split("\n").find((line) => line.startsWith("data: "))?.slice(6);
-      if (!data || data === "[DONE]") continue;
-      try {
-        yield JSON.parse(data);
-      } catch {
-        throw new PublicCoachError("COACH_RETRYABLE");
+      buffer = buffer.slice(separator + separatorLength);
+      const dataLine = frame.split("\n").find((line) => line.trimStart().startsWith("data:"));
+      const data = dataLine?.trimStart().slice(5).trim();
+      if (data && data !== "[DONE]") {
+        try {
+          const payload = JSON.parse(data);
+          if (typeof onPayload === "function") onPayload(payload);
+          yield payload;
+        } catch {
+          throw new PublicCoachError("COACH_RETRYABLE");
+        }
       }
+      separatorMatch = buffer.match(/\r?\n\r?\n/);
     }
   }
 }
 
-function createDeepseekCoachStreamService({ apiKey, model, fetchImpl = globalThis.fetch } = {}) {
+function createDeepseekCoachStreamService({ apiKey, model, fetchImpl = globalThis.fetch, route = null } = {}) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("DeepSeek configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
   return async function* (input) {
     const { prompt, context, history } = validateInput(input);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 28_000);
+    const { firstEventTimeoutMs, totalTimeoutMs } = resolveCoachStreamTimeouts({ route });
+    const generation = resolveCoachGenerationOptions({ route });
+    let timeoutCode = null;
+    let firstEventTimer = setTimeout(() => {
+      timeoutCode = "COACH_STREAM_FIRST_EVENT_TIMEOUT";
+      controller.abort();
+    }, firstEventTimeoutMs);
+    const totalTimer = setTimeout(() => {
+      timeoutCode = "COACH_STREAM_TOTAL_TIMEOUT";
+      controller.abort();
+    }, totalTimeoutMs);
+    const markFirstEvent = () => {
+      if (!firstEventTimer) return;
+      clearTimeout(firstEventTimer);
+      firstEventTimer = null;
+    };
     try {
       const response = await fetchImpl("https://api.deepseek.com/chat/completions", {
         method: "POST",
@@ -186,8 +236,8 @@ function createDeepseekCoachStreamService({ apiKey, model, fetchImpl = globalThi
         body: JSON.stringify({
           model: selectedModel,
           thinking: { type: "disabled" },
-          temperature: 0.2,
-          max_tokens: 600,
+          temperature: generation.temperature,
+          max_tokens: generation.maxTokens,
           stream: true,
           stream_options: { include_usage: true },
           messages: buildMessages({ prompt, context, history, outputRules: COACH_STREAM_OUTPUT_RULES }),
@@ -196,25 +246,27 @@ function createDeepseekCoachStreamService({ apiKey, model, fetchImpl = globalThi
       });
       if (!response.ok || !response.body) throw new PublicCoachError("COACH_RETRYABLE");
       let usage = null;
-      for await (const payload of readSseJson(response.body)) {
-        const nextUsage = extractOpenAiUsage(payload);
+      for await (const payload of readSseJson(response.body, { onPayload: markFirstEvent })) {
+        const nextUsage = extractCoachUsage(payload);
         if (nextUsage) usage = nextUsage;
-        const text = payload?.choices?.[0]?.delta?.content;
+        const text = payload?.choices?.[0]?.delta?.content || extractCoachText(payload);
         if (typeof text === "string" && text) yield text;
       }
       if (usage) yield { type: "usage", usage, model: selectedModel };
     } catch (error) {
       if (error instanceof PublicCoachError) throw error;
+      if (timeoutCode) throw new PublicCoachError(timeoutCode);
       throw new PublicCoachError("COACH_RETRYABLE");
     } finally {
-      clearTimeout(timer);
+      if (firstEventTimer) clearTimeout(firstEventTimer);
+      clearTimeout(totalTimer);
     }
   };
 }
 
-function createDeepseekCoachService({ apiKey, model, requestCompletion, fetchImpl } = {}) {
+function createDeepseekCoachService({ apiKey, model, requestCompletion, fetchImpl, route = null } = {}) {
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
-  const complete = requestCompletion ?? createDeepseekRequestCompletion({ apiKey, model: selectedModel, fetchImpl });
+  const complete = requestCompletion ?? createDeepseekRequestCompletion({ apiKey, model: selectedModel, fetchImpl, route });
   return async (input) => {
     const raw = await complete(validateInput(input));
     let content = raw;
@@ -229,4 +281,19 @@ function createDeepseekCoachService({ apiKey, model, requestCompletion, fetchImp
   };
 }
 
-module.exports = { COACH_SYSTEM_PROMPT, COACH_STREAM_SYSTEM_PROMPT, PublicCoachError, buildCoachLlmContext, createDeepseekCoachService, createDeepseekCoachStreamService, validateReply };
+function extractCoachText(payload) {
+  const direct = payload?.choices?.[0]?.message?.content ?? payload?.choices?.[0]?.message;
+  if (typeof direct === "string") return direct;
+  const nested = payload?.data;
+  if (nested && typeof nested === "object") {
+    const value = nested.choices?.[0]?.message?.content ?? nested.choices?.[0]?.message ?? nested.reply;
+    if (typeof value === "string") return value;
+  }
+  return null;
+}
+
+function extractCoachUsage(payload) {
+  return extractOpenAiUsage(payload) || extractOpenAiUsage(payload?.data);
+}
+
+module.exports = { COACH_SYSTEM_PROMPT, COACH_STREAM_SYSTEM_PROMPT, PublicCoachError, buildCoachLlmContext, createDeepseekCoachService, createDeepseekCoachStreamService, resolveCoachGenerationOptions, resolveCoachStreamTimeouts, validateReply };

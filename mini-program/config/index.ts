@@ -60,9 +60,6 @@ export default defineConfig({
     "process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY": JSON.stringify(
       process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY ?? "",
     ),
-    "process.env.TARO_APP_API_BASE_URL": JSON.stringify(
-      process.env.TARO_APP_API_BASE_URL ?? "",
-    ),
     "process.env.TARO_APP_MILESTONE_ASSET_CDN": JSON.stringify(
       milestoneAssetCdn,
     ),

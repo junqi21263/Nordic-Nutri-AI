@@ -87,8 +87,8 @@ function createVisionDataService({
   db,
   uploadImage,
   analyze,
-  provider = "vita",
-  model = "vita-video-3.0",
+  provider = null,
+  model = null,
   evaluateMeal,
   backfillNutrition,
   assertImageSafe,
@@ -103,8 +103,8 @@ function createVisionDataService({
       .catch((error) => console.warn("[vision] trace recording failed:", error?.message || error));
   };
   return {
-    provider,
-    model: model || "vita-video-3.0",
+    provider: typeof provider === "string" && provider.trim() ? provider.trim() : null,
+    model: typeof model === "string" && model.trim() ? model.trim() : null,
     validateImage(input) {
       return readImage(input);
     },
@@ -174,10 +174,14 @@ function createVisionDataService({
         assetPersisted = assetReady?.assetId != null || assetReady === true;
       }
       let modelTrace = null;
+      const imageDataUrl = !image.stored && image.content
+        ? `data:${image.contentType};base64,${image.content.toString("base64")}`
+        : null;
       const result = input.providerCheckpoint && typeof input.providerCheckpoint === "object"
         ? input.providerCheckpoint
         : await analyze({
           imageUrl: uploaded.imageUrl,
+          imageDataUrl,
           budget,
           observe,
           onTrace: (trace) => { modelTrace = trace; },
@@ -338,7 +342,6 @@ function createVisionDataService({
             normalized_items: backfilledItems,
             advice: result.advice || null,
             client_request_id: image.clientRequestId,
-            completed_at: new Date().toISOString(),
           };
           const saved = input.analysisId
             ? await db.from("ai_analysis").update({ ...analysisPayload, status: "completed", current_stage: "persisting", completed_at: new Date().toISOString() }).eq("id", input.analysisId).eq("user_id", userId).select("id").single()

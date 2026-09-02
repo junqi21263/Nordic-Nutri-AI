@@ -289,6 +289,63 @@ test("batch-owned jobs defer the legacy fire-and-forget worker", () => {
   assert.equal(shouldTriggerWorker({}), true);
 });
 
+test("food-image worker checks the resolved model quota before calling its provider", async () => {
+  const job = {
+    id: "job-quota", food_id: "food-1", status: "pending", candidate_count: 1,
+    generated_count: 0, attempt_count: 0, max_attempts: 3, model_name: "HY-Image-test",
+  };
+  let providerCalls = 0;
+  let observedRoute = null;
+  const db = {
+    from(table) {
+      if (table === "food_image_jobs") {
+        return {
+          select() {
+            const query = { eq() { return query; }, maybeSingle: async () => ({ data: job, error: null }) };
+            return query;
+          },
+          update(patch) {
+            Object.assign(job, patch);
+            const query = { eq() { return query; } };
+            return query;
+          },
+        };
+      }
+      if (table === "food_image_visual_profiles" || table === "foods") {
+        return { update: () => ({ eq() { return this; } }) };
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+  const service = createFoodImageJobService({
+    db,
+    repository: {
+      isAdmin: async () => true,
+      getFoodById: async () => ({ id: "food-1", nameZh: "鸡胸肉", category: { code: "meat" } }),
+    },
+    hunyuan: {
+      modelName: "HY-Image-test",
+      resolveRoute: async () => ({ providerKey: "hunyuan", modelKey: "HY-Image-configured", featureKey: "food_image_generation" }),
+      generateOne: async () => { providerCalls += 1; throw new Error("provider must not be called"); },
+    },
+    imageService: {},
+    config: { generationEnabled: true },
+    beforeGenerate: async ({ feature, route }) => {
+      assert.equal(feature, "food_image_generation");
+      observedRoute = route;
+      const error = new Error("quota exceeded");
+      error.code = "MODEL_QUOTA_EXCEEDED";
+      throw error;
+    },
+  });
+
+  const result = await service.processQueue(null, { jobId: job.id });
+  assert.equal(providerCalls, 0);
+  assert.deepEqual(observedRoute, { providerKey: "hunyuan", modelKey: "HY-Image-configured", featureKey: "food_image_generation" });
+  assert.equal(result.results[0].errorCode, "MODEL_QUOTA_EXCEEDED");
+  assert.equal(job.status, "failed");
+});
+
 test("approving a batch candidate completes its matching batch item", async () => {
   const writes = [];
   const image = {

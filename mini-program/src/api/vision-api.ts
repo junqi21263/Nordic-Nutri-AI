@@ -20,7 +20,7 @@ import {
   type VisionAsyncResponse,
 } from "../features/scanner/vision-async-client";
 const maxImageBytes = MAX_UPLOAD_HARD_BYTES;
-const CLIENT_TOTAL_BUDGET_MS = 15_000;
+export const VISION_CLIENT_TOTAL_BUDGET_MS = 35_000;
 const VISION_PENDING_ANALYSIS_KEY = "nordic-nutri:vision-pending-analysis:v1";
 /** Network upload target — keep base64 payload small enough for mobile + cloud timeout. */
 const targetUploadBytes = MAX_UPLOAD_IMAGE_BYTES;
@@ -399,7 +399,7 @@ export async function analyzeProductImage(
   } = {},
 ): Promise<ScannerMealFixture> {
   const recognitionStartedAt = options.recognitionStartedAt ?? Date.now();
-  const deadlineAt = options.deadlineAt ?? recognitionStartedAt + CLIENT_TOTAL_BUDGET_MS;
+  const deadlineAt = options.deadlineAt ?? recognitionStartedAt + VISION_CLIENT_TOTAL_BUDGET_MS;
   const onTiming = options.onTiming;
   const token = useAuthStore.getState().session?.accessToken;
   if (!token) {

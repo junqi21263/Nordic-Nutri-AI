@@ -48,6 +48,15 @@ describe("coach meal context", () => {
     });
   });
 
+  it("does not treat a snack-only day as having no meal records", () => {
+    expect(createCoachMealContext({ meals: [meal("snack")], summary: summary({ protein: 29, calories: 283 }), hour: 17 })).toMatchObject({
+      summary: "今日已记录 1 餐",
+      suggestion: "今日行动：继续记录下一餐，让今天的营养进度更完整。",
+      ctaLabel: "记录下一餐",
+      ctaAction: "record",
+    });
+  });
+
   it("shows nutrition completion after all three meals are recorded", () => {
     expect(
       createCoachMealContext({

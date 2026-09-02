@@ -74,7 +74,7 @@ function extractJson(content) {
   }
 }
 
-function createDeepseekNutritionPlanService({ apiKey, model, fetchImpl = globalThis.fetch } = {}) {
+function createDeepseekNutritionPlanService({ apiKey, model, fetchImpl = globalThis.fetch, routeManaged = false } = {}) {
   if (typeof apiKey !== "string" || !apiKey.trim()) return null;
   if (typeof fetchImpl !== "function") return null;
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
@@ -126,15 +126,25 @@ function createDeepseekNutritionPlanService({ apiKey, model, fetchImpl = globalT
         }),
         signal: controller.signal,
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        if (routeManaged) throw new Error("MODEL_UPSTREAM_REJECTED");
+        return null;
+      }
       const data = await response.json();
       const parsed = extractContentAndUsage(data);
       const rawPlan = extractJson(parsed.content);
-      if (!rawPlan) return null;
+      if (!rawPlan) {
+        if (routeManaged) throw new Error("MODEL_RESPONSE_INVALID");
+        return null;
+      }
       const plan = normalizePlan(rawPlan);
-      if (!plan) return null;
+      if (!plan) {
+        if (routeManaged) throw new Error("MODEL_RESPONSE_INVALID");
+        return null;
+      }
       return { ...plan, usage: parsed.usage, model: selectedModel };
-    } catch {
+    } catch (error) {
+      if (routeManaged) throw error;
       return null;
     } finally {
       clearTimeout(timer);

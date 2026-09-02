@@ -80,6 +80,17 @@ export function createCoachMealContext({ meals, summary, hour }: CreateCoachMeal
     };
   }
 
+  if (meals.length > 0) {
+    const nextMealType: MealType = hour >= 17 ? "dinner" : hour >= 11 ? "lunch" : "breakfast";
+    return {
+      summary: `今日已记录 ${meals.length} 餐`,
+      suggestion: "今日行动：继续记录下一餐，让今天的营养进度更完整。",
+      ctaLabel: "记录下一餐",
+      ctaAction: "record",
+      mealType: nextMealType,
+    };
+  }
+
   const nextMealType: MealType = hour >= 17 ? "dinner" : hour >= 11 ? "lunch" : "breakfast";
   return {
     summary: "今天还没有餐次记录",

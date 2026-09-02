@@ -84,7 +84,7 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "h
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("QWEN_API_KEY configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "qwen3-vl-flash";
-  return async ({ imageUrl, timeoutMs: requestTimeoutMs, onRequestEvent = () => {} }) => {
+  return async ({ imageUrl, model: requestModel, timeoutMs: requestTimeoutMs, onRequestEvent = () => {} }) => {
     const controller = new AbortController();
     const startedAt = new Date().toISOString();
     const startedMs = Date.now();
@@ -100,11 +100,11 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "h
         method: "POST",
         headers,
         body: JSON.stringify({
-          model: selectedModel,
+          model: typeof requestModel === "string" && requestModel.trim() ? requestModel.trim() : selectedModel,
           temperature: 0,
           messages: [{ role: "user", content: [
-            { type: "image_url", image_url: { url: imageUrl } },
             { type: "text", text: "你是专业营养分析视觉模型。仅返回 JSON，不要 Markdown。第一步判断图片是否为食物或饮品；若是风景、文字、物品、人物或截图，返回 {\"isFood\": false}。对食物图从左到右、前到后按餐盘区域逐区观察，枚举所有清晰可见的独立菜品；主动区分主食、蛋白质、蔬菜、配菜、酱汁和饮品，不能因为一个区域遮挡就遗漏其他区域。只报告图中可见或有充分视觉依据的食物，不猜测完全不可见的食材；对遮挡、混合、火锅、便当和多拼盘场景，在 uncertaintyReasons 中写明不确定项，并给出合理份量估算，不要为了追求绝对确定而持续重试。字段必须为 mealName、mealType(breakfast/lunch/dinner/snack)、confidence(0到1)、portionConfidence(0到1)、needsEscalation(boolean)、uncertaintyReasons(string数组)、advice、items。advice 必须用中文撰写，简明扼要，不超过100字。items 每项含 name、quantityG、caloriesPer100g、proteinPer100g、carbsPer100g、fatPer100g；营养值是估算，不作医疗诊断。" },
+            { type: "image_url", image_url: { url: imageUrl, ...(provider === "deepseek" ? { detail: "low" } : {}) } },
           ] }],
         }),
         signal: controller.signal,
@@ -143,7 +143,7 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "h
       };
       emit(responseMeta);
       const parsed = extractContentAndUsage(data);
-      return { content: parsed.content, usage: parsed.usage, model: selectedModel, ...responseMeta };
+      return { content: parsed.content, usage: parsed.usage, model: typeof requestModel === "string" && requestModel.trim() ? requestModel.trim() : selectedModel, ...responseMeta };
     } catch (error) {
       const providerErrorType = error?.providerErrorType
         || (error?.name === "AbortError" ? "abort" : "network");
@@ -217,7 +217,7 @@ function unwrapVisionCompletion(raw) {
 function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-flash", plusModel = "qwen3-vl-plus", endpoint, provider = "qwen", requestCompletion, fetchImpl } = {}) {
   const complete = requestCompletion ?? createQwenRequestCompletion({ apiKey, workspaceId, model: flashModel, endpoint, provider, timeoutMs: 18_000, fetchImpl });
   const plusComplete = requestCompletion ? requestCompletion : createQwenRequestCompletion({ apiKey, workspaceId, model: plusModel, endpoint, provider, timeoutMs: 10_000, fetchImpl });
-  return async ({ imageUrl, budget, observe = () => {}, onTrace = () => {} }) => {
+  return async ({ imageUrl, imageDataUrl, model: routeModel, budget, observe = () => {}, onTrace = () => {} }) => {
     if (typeof imageUrl !== "string" || imageUrl.length > 30_000_000) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
     if (!/^https:\/\//i.test(imageUrl) && !/^data:image\//i.test(imageUrl)) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
     const explicitProviderTimeoutMs = Number(budget?.providerTimeoutMs);
@@ -227,13 +227,16 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
         ? budget.stageTimeout(FLASH_MAX_TIMEOUT_MS, 0)
         : FLASH_MAX_TIMEOUT_MS;
     if (flashTimeoutMs <= 0) throw new PublicQwenVisionError("VISION_TIMEOUT", "图片识别超时，请重试");
+    const providerImageUrl = provider === "deepseek" && /^data:image\//i.test(String(imageDataUrl || ""))
+      ? imageDataUrl
+      : imageUrl;
     const flashStartedAt = Date.now();
     const flashStartedIso = new Date().toISOString();
     const providerEvents = [];
     const onRequestEvent = (event) => { providerEvents.push(event); };
     let firstRaw;
     try {
-      firstRaw = unwrapVisionCompletion(await complete({ imageUrl, model: flashModel, timeoutMs: flashTimeoutMs, onRequestEvent }));
+      firstRaw = unwrapVisionCompletion(await complete({ imageUrl: providerImageUrl, model: routeModel || flashModel, timeoutMs: flashTimeoutMs, onRequestEvent }));
     } catch (error) {
       const provider = providerEvents[providerEvents.length - 1] || error || {};
       observe({
@@ -272,7 +275,7 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
     let usage = firstRaw.usage;
     const flashTrace = { valid: true, ...summarizeResult(first) };
     // Data-URL payloads are already large; a second plus pass often exceeds the cloud timeout.
-    let canEscalate = !/^data:image\//i.test(imageUrl) && shouldEscalate(first);
+    let canEscalate = !/^data:image\//i.test(providerImageUrl) && shouldEscalate(first);
     let plusTimeoutMs = PLUS_MAX_TIMEOUT_MS;
     let plusSkipReason = null;
     const plusTrace = {
@@ -291,8 +294,8 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       }
     }
     if (!canEscalate) {
-      plusTrace.skipReason = plusSkipReason || (/^data:image\//i.test(imageUrl) ? "data_url" : "not_needed");
-      observe({ stage: "plus", plusAttempted: false, plusSkipReason: plusSkipReason || (/^data:image\//i.test(imageUrl) ? "data_url" : "not_needed") });
+      plusTrace.skipReason = plusSkipReason || (/^data:image\//i.test(providerImageUrl) ? "data_url" : "not_needed");
+      observe({ stage: "plus", plusAttempted: false, plusSkipReason: plusSkipReason || (/^data:image\//i.test(providerImageUrl) ? "data_url" : "not_needed") });
     }
     let selected = first;
     if (canEscalate) {
@@ -300,7 +303,7 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       observe({ stage: "plus", plusAttempted: true });
       const plusStartedAt = Date.now();
       try {
-        const plusRaw = unwrapVisionCompletion(await plusComplete({ imageUrl, model: plusModel, timeoutMs: plusTimeoutMs }));
+        const plusRaw = unwrapVisionCompletion(await plusComplete({ imageUrl, model: routeModel || plusModel, timeoutMs: plusTimeoutMs }));
         const validatedPlus = validateResult(plusRaw.content);
         selected = validatedPlus;
         Object.assign(plusTrace, { success: true, valid: true, ...summarizeResult(validatedPlus) });
@@ -324,7 +327,7 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       plus: plusTrace,
       selected: summarizeResult(selected),
     });
-    return { ...selected, provider, model: selected === first ? flashModel : plusModel, usage, modelHops: selected === first ? 1 : 2 };
+    return { ...selected, provider, model: selected === first ? (routeModel || flashModel) : (routeModel || plusModel), usage, modelHops: selected === first ? 1 : 2 };
   };
 }
 

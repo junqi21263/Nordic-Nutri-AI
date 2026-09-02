@@ -4,6 +4,7 @@ import {
   AiModelConfigError,
   normalizeAiModelConfig,
   redactAiModelConfig,
+  createAiModelConfigService,
 } from "./ai-model-config-service.cjs";
 
 const base = {
@@ -57,10 +58,82 @@ test("redaction never returns the secret value", () => {
   assert.equal("apiKey" in result, false);
 });
 
+test("redaction accepts a server-side provider credential status without exposing the credential", () => {
+  const result = redactAiModelConfig(base, {
+    env: {},
+    credentialStatus: "PRESENT",
+  });
+  assert.equal(result.apiKeyStatus, "PRESENT");
+  assert.equal(JSON.stringify(result).includes("secret"), false);
+});
+
 test("keeps generic primary and fallback application roles without fixed providers", () => {
   const result = normalizeAiModelConfig({ ...base, applications: ["coach", "nutrition-insight"], routeRoles: { coach: "primary", "nutrition-insight": "fallback", ignored: "unknown" } }, { env: { CUSTOM_API_KEY: "secret" } });
   assert.deepEqual(result.applications, ["coach", "nutrition-insight"]);
   assert.deepEqual(result.routeRoles, { coach: "primary", "nutrition-insight": "fallback" });
   const redacted = redactAiModelConfig({ ...result, metadata: { routeRoles: result.routeRoles } }, { env: { CUSTOM_API_KEY: "secret" } });
   assert.deepEqual(redacted.routeRoles, result.routeRoles);
+});
+
+test("declares required capabilities from configured feature routes without depending on provider or model names", () => {
+  const result = normalizeAiModelConfig({
+    ...base,
+    providerKey: "future-provider",
+    modelKey: "future-model-v9",
+    applications: ["coach"],
+    routeRoles: { food_recognition: "fallback" },
+    metadata: { capabilities: [] },
+  }, { env: { CUSTOM_API_KEY: "secret" } });
+  assert.deepEqual(result.applications, ["coach", "food_recognition"]);
+  assert.deepEqual(result.metadata.capabilities, ["text", "vision"]);
+});
+
+test("persists inferred feature capabilities when an existing model route is saved", async () => {
+  let written = null;
+  const db = {
+    from() {
+      return {
+        update(row) { written = row; return this; },
+        eq() { return this; },
+        select() { return this; },
+        async single() { return { data: { id: "model-1", ...written }, error: null }; },
+      };
+    },
+  };
+  const service = createAiModelConfigService({ db, isAdmin: async () => true });
+  await service.updateModel("operator", "model-1", {
+    ...base,
+    applications: ["coach"],
+    routeRoles: { coach: "fallback" },
+    metadata: { capabilities: [] },
+  });
+  assert.deepEqual(written.feature_keys, ["coach"]);
+  assert.deepEqual(written.metadata.capabilities, ["text"]);
+});
+
+test("keeps only supported model capabilities in safe model metadata", () => {
+  const result = normalizeAiModelConfig({
+    ...base,
+    metadata: { capabilities: ["text", "vision", "text", "unsupported"] },
+  }, { env: { CUSTOM_API_KEY: "secret" } });
+  assert.deepEqual(result.metadata.capabilities, ["text", "vision"]);
+  const redacted = redactAiModelConfig(result, { env: { CUSTOM_API_KEY: "secret" } });
+  assert.deepEqual(redacted.metadata.capabilities, ["text", "vision"]);
+});
+
+test("deletes a model only for an operator and returns an auditable result", async () => {
+  let deletedId = null;
+  const db = {
+    from() {
+      return {
+        delete() { return this; },
+        eq(_field, value) { deletedId = value; return this; },
+        select() { return this; },
+        async single() { return { data: { id: deletedId }, error: null }; },
+      };
+    },
+  };
+  const service = createAiModelConfigService({ db, isAdmin: async (actor) => actor === "operator" });
+  await assert.rejects(() => service.deleteModel("visitor", "model-1"), (error) => error.code === "FORBIDDEN");
+  assert.deepEqual(await service.deleteModel("operator", "model-1"), { id: "model-1", deleted: true });
 });

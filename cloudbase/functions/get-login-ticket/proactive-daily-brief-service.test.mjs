@@ -98,6 +98,29 @@ test("does not keep yesterday's theme even when the model repeats it", async () 
   assert.notEqual(result.theme, "consistency");
 });
 
+test("rejects a model reminder that contradicts an existing meal record", async () => {
+  const service = createProactiveDailyBriefService({
+    requestCompletion: async () => ({
+      greeting: "下午好，Lewis 👋",
+      summary: "今天还没有餐次记录。",
+      suggestion: "今日行动：记录第一餐，开始今天的饮食记录。",
+      theme: "starter",
+    }),
+  });
+
+  const result = await service({
+    date: "2026-09-01",
+    context: {
+      ...proteinGapContext,
+      today: { period: "snack", hasMealRecord: true, recordedMeals: 1 },
+      userJourneyStage: "habit_building",
+    },
+  });
+
+  assert.equal(result.source, "rule_v2");
+  assert.doesNotMatch(`${result.summary}\n${result.suggestion}`, /没有餐次|第一餐|首餐/);
+});
+
 test("preferFast returns the action card before the model completes", async () => {
   let resolveCompletion;
   const service = createProactiveDailyBriefService({

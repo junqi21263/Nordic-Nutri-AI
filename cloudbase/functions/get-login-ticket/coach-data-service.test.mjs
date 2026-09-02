@@ -149,6 +149,24 @@ test("stores a rule_v2 structured fallback when DeepSeek fails", async () => {
   assert.match(result.messages[1].content, /40g 蛋白质/);
 });
 
+test("persists the effective configured provider and model for a routed coach response", async () => {
+  const { db, inserts } = createDb();
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    answer: async () => ({ ...validReply, provider: "sensenova", model: "sensenova-6.8-flash-lite" }),
+  });
+
+  const result = await service.sendMessage("user-1", validRequest);
+
+  assert.equal(result.provider, "sensenova");
+  assert.equal(result.model, "sensenova-6.8-flash-lite");
+  assert.equal(result.reply.source, "sensenova");
+  assert.equal(result.reply.model, "sensenova-6.8-flash-lite");
+  assert.equal(inserts.at(-1).payload.provider, "sensenova");
+  assert.equal(inserts.at(-1).payload.model, "sensenova-6.8-flash-lite");
+});
+
 test("does not call the model again for the same client request id", async () => {
   const { db } = createDb();
   let calls = 0;
@@ -318,6 +336,48 @@ test("streams a bounded nutrition reply and persists only after completion", asy
   assert.equal(events[1].reply.source, "deepseek");
   assert.equal(inserts.filter((entry) => entry.payload.role === "assistant").length, 1);
   assert.match(inserts.at(-1).payload.content, /鸡胸肉和蔬菜/);
+});
+
+test("persists the provider and model carried by a routed stream usage event", async () => {
+  const { db, inserts } = createDb();
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    streamAnswer: async function* () {
+      yield "晚餐优先安排鸡胸肉和蔬菜。";
+      yield { type: "usage", provider: "sensenova", model: "sensenova-6.8-flash-lite", usage: { totalTokens: 12 } };
+    },
+  });
+
+  const events = [];
+  for await (const event of service.streamMessage("user-1", { ...validRequest, clientRequestId: "44444444-4444-4444-8444-444444444445" })) events.push(event);
+
+  assert.equal(events.at(-1).provider, "sensenova");
+  assert.equal(events.at(-1).model, "sensenova-6.8-flash-lite");
+  assert.equal(events.at(-1).reply.source, "sensenova");
+  assert.equal(inserts.at(-1).payload.provider, "sensenova");
+  assert.equal(inserts.at(-1).payload.model, "sensenova-6.8-flash-lite");
+});
+
+test("persists the effective routed provider even when a stream has no usage event", async () => {
+  const { db, inserts } = createDb();
+  const service = createCoachDataService({
+    db,
+    ...dependencies(),
+    streamAnswer: async function* () {
+      yield "早餐搭配鸡蛋和全麦主食。";
+      yield { type: "route", provider: "qwen", model: "qwen3-vl-flash", fallbackUsed: false };
+    },
+  });
+
+  const events = [];
+  for await (const event of service.streamMessage("user-1", { ...validRequest, clientRequestId: "44444444-4444-4444-8444-444444444446" })) events.push(event);
+
+  assert.equal(events.at(-1).provider, "qwen");
+  assert.equal(events.at(-1).model, "qwen3-vl-flash");
+  assert.equal(events.at(-1).reply.source, "qwen");
+  assert.equal(inserts.at(-1).payload.provider, "qwen");
+  assert.equal(inserts.at(-1).payload.model, "qwen3-vl-flash");
 });
 
 test("strips Markdown emphasis and answer prefixes from streamed coach text", async () => {

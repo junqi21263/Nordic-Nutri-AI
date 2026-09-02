@@ -167,7 +167,7 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
       content: String(generated?.content ?? "根据今天的真实记录，下一餐继续保持蛋白质、蔬菜和主食的搭配。").trim().slice(0, 140),
     };
     if (!payload.headline || !payload.content) throw new Error("Daily insight generation failed");
-    const provider = ["cloudbase", "deepseek", "hunyuan-exp"].includes(generated?.source) ? generated.source : "rule_v3";
+    const provider = typeof generated?.source === "string" && generated.source.trim() ? generated.source.trim() : "rule_v3";
     return { payload, provider, model: generated?.model ?? null };
   }
 
@@ -320,7 +320,7 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
     if (shouldGenerateWeeklyAi(context) && typeof generateWeeklyReview === "function") {
       try { insight = await generateWeeklyReview({ date: endDate, context, userId }); } catch {}
     }
-    const provider = insight?.source === "deepseek" ? "deepseek" : "rule_v1";
+    const provider = typeof insight?.source === "string" && insight.source.trim() ? insight.source.trim() : "rule_v1";
     const payload = {
       headline: String(insight?.headline || "本周节奏可继续稳定").trim().slice(0, 24),
       summary: String(insight?.summary || "继续根据真实记录调整下一周的饮食安排。").trim().slice(0, 180),

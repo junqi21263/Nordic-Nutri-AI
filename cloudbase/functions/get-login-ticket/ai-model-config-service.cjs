@@ -6,6 +6,8 @@ class AiModelConfigError extends Error {
   }
 }
 
+const { normalizeCapabilities, modelCapabilities, featureCapability } = require("./model-routing-contract.cjs");
+
 const ENV_NAME = /^[A-Z][A-Z0-9_]{0,127}$/;
 const KEY = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/;
 
@@ -52,10 +54,20 @@ function normalizeAiModelConfig(input = {}, { env = process.env, id } = {}) {
   if (temperature !== undefined && (temperature < 0 || temperature > 2)) {
     throw new AiModelConfigError("MODEL_PARAMETER_INVALID", "temperature must be between 0 and 2");
   }
-  const rawApplications = input.applications ?? input.featureKeys ?? input.feature_keys ?? [];
-  const applications = Array.from(new Set((Array.isArray(rawApplications) ? rawApplications : [])
-    .map((item) => String(item).trim()).filter(Boolean))).slice(0, 50);
   const routeRoles = normalizeRouteRoles(input);
+  const rawApplications = input.applications ?? input.featureKeys ?? input.feature_keys ?? [];
+  const applications = Array.from(new Set([
+    ...(Array.isArray(rawApplications) ? rawApplications : []),
+    ...Object.keys(routeRoles),
+  ].map((item) => String(item).trim()).filter(Boolean))).slice(0, 50);
+  const metadata = input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata)
+    ? { ...input.metadata }
+    : {};
+  const featureCapabilities = applications.map(featureCapability).filter(Boolean);
+  metadata.capabilities = modelCapabilities({
+    modelKey,
+    capabilities: [...normalizeCapabilities(metadata.capabilities), ...featureCapabilities],
+  });
   return {
     ...(id || valueOf(input, "id", "id") ? { id: id || valueOf(input, "id", "id") } : {}),
     providerKey,
@@ -69,14 +81,14 @@ function normalizeAiModelConfig(input = {}, { env = process.env, id } = {}) {
     maxTokens: maxTokens ?? null,
     temperature: temperature ?? null,
     enabled: input.enabled !== false,
-    metadata: input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata) ? input.metadata : {},
+    metadata,
     applications,
     routeRoles,
     apiKeyStatus: env[apiKeyEnv] ? "PRESENT" : "MISSING",
   };
 }
 
-function redactAiModelConfig(row = {}, { env = process.env, applications } = {}) {
+function redactAiModelConfig(row = {}, { env = process.env, applications, credentialStatus = null } = {}) {
   const { apiKey: _apiKey, api_key: _apiKeySnake, ...safeRow } = row;
   const normalized = normalizeAiModelConfig(safeRow, { env, id: row.id });
   const storedApplications = row.feature_keys ?? row.featureKeys ?? normalized.applications;
@@ -90,7 +102,7 @@ function redactAiModelConfig(row = {}, { env = process.env, applications } = {})
     endpoint: normalized.endpoint,
     protocol: normalized.protocol,
     apiKeyEnv: normalized.apiKeyEnv,
-    apiKeyStatus: normalized.apiKeyStatus,
+    apiKeyStatus: credentialStatus === "PRESENT" ? "PRESENT" : normalized.apiKeyStatus,
     timeoutMs: normalized.timeoutMs,
     maxTokens: normalized.maxTokens,
     temperature: normalized.temperature,
@@ -123,7 +135,7 @@ function toRow(config, actorUserId) {
   };
 }
 
-function createAiModelConfigService({ db, env = process.env, isAdmin = async () => false, audit = null } = {}) {
+function createAiModelConfigService({ db, env = process.env, isAdmin = async () => false, audit = null, getCredentialStatus = async () => null } = {}) {
   async function requireAdmin(actorUserId) {
     if (!(await isAdmin(actorUserId))) throw new AiModelConfigError("FORBIDDEN");
   }
@@ -131,7 +143,12 @@ function createAiModelConfigService({ db, env = process.env, isAdmin = async () 
     await requireAdmin(actorUserId);
     const { data, error } = await db.from("ai_model_configs").select("*").order("provider_key").order("model_key");
     if (error) throw new AiModelConfigError("MODEL_CONFIG_READ_FAILED", error.message);
-    return { items: (data || []).map((row) => redactAiModelConfig(row, { env })) };
+    return {
+      items: await Promise.all((data || []).map(async (row) => redactAiModelConfig(row, {
+        env,
+        credentialStatus: await getCredentialStatus(String(row.provider_key || row.providerKey || "").trim()),
+      }))),
+    };
   }
   async function saveModel(actorUserId, input, modelId = null) {
     await requireAdmin(actorUserId);
@@ -142,11 +159,27 @@ function createAiModelConfigService({ db, env = process.env, isAdmin = async () 
     if (modelId) result = await query.update(row).eq("id", modelId).select("*").single();
     else result = await query.insert(row).select("*").single();
     if (result.error) throw new AiModelConfigError("MODEL_CONFIG_WRITE_FAILED", result.error.message);
-    const saved = redactAiModelConfig(result.data, { env, applications: config.applications });
+    const saved = redactAiModelConfig(result.data, {
+      env,
+      applications: config.applications,
+      credentialStatus: await getCredentialStatus(config.providerKey),
+    });
     if (audit?.record) await audit.record({ actorUserId, action: modelId ? "ai_model.update" : "ai_model.create", resourceType: "ai_model_config", resourceId: saved.id, outcome: "succeeded" });
     return saved;
   }
-  return { listModels, createModel: (actor, input) => saveModel(actor, input), updateModel: (actor, id, input) => saveModel(actor, input, id) };
+  async function deleteModel(actorUserId, modelId) {
+    await requireAdmin(actorUserId);
+    const id = String(modelId || "").trim();
+    if (!id) throw new AiModelConfigError("MODEL_ID_INVALID");
+    const result = await db.from("ai_model_configs").delete().eq("id", id).select("id").single();
+    if (result.error) {
+      const code = /not found|no rows|0 rows/i.test(String(result.error.message || "")) ? "MODEL_NOT_FOUND" : "MODEL_CONFIG_WRITE_FAILED";
+      throw new AiModelConfigError(code, result.error.message);
+    }
+    if (audit?.record) await audit.record({ actorUserId, action: "ai_model.delete", resourceType: "ai_model_config", resourceId: id, outcome: "succeeded" });
+    return { id, deleted: true };
+  }
+  return { listModels, createModel: (actor, input) => saveModel(actor, input), updateModel: (actor, id, input) => saveModel(actor, input, id), deleteModel };
 }
 
 module.exports = {

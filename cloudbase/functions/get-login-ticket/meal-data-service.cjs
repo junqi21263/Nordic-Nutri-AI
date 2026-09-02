@@ -306,8 +306,8 @@ function createMealDataService({
       const result = await analyze({ items: input?.items, userId });
       const saved = await db.from("ai_analysis").insert({
         user_id: userId,
-        provider: "deepseek",
-        model,
+        provider: result.provider || result.source || "deepseek",
+        model: result.model || model,
         status: "completed",
         raw_recognition: result,
         normalized_items: result.items,

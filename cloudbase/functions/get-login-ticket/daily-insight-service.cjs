@@ -203,13 +203,13 @@ function createCloudbaseDailyInsightCompletion({ ai, model, groupName = "cloudba
   };
 }
 
-function createDailyInsightService({ ai, apiKey, model, requestCompletion, source } = {}) {
+function createDailyInsightService({ ai, apiKey, model, requestCompletion, source, fetchImpl, routeManaged = false } = {}) {
   const cloudbaseEnabled = ai && typeof ai.createModel === "function";
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : (cloudbaseEnabled ? "hy3" : "deepseek-v4-flash");
   const resolvedSource = source ?? (cloudbaseEnabled ? "cloudbase" : "deepseek");
   const complete = requestCompletion ?? (cloudbaseEnabled
     ? createCloudbaseDailyInsightCompletion({ ai, model: selectedModel })
-    : (apiKey ? createDeepseekDailyInsightCompletion({ apiKey, model: selectedModel }) : null));
+    : (apiKey ? createDeepseekDailyInsightCompletion({ apiKey, model: selectedModel, fetchImpl }) : null));
   return async ({ date, context } = {}) => {
     assertDate(date);
     if (!complete) return { ...createRuleInsight(context), source: "rule_v3", model: null, usage: null };
@@ -219,7 +219,8 @@ function createDailyInsightService({ ai, apiKey, model, requestCompletion, sourc
       const usage = typeof raw === "object" && raw ? raw.usage : null;
       const insight = validateDailyInsight(content);
       return { ...insight, source: resolvedSource, model: selectedModel, usage };
-    } catch {
+    } catch (error) {
+      if (routeManaged) throw error;
       return { ...createRuleInsight(context), source: "rule_v3", model: null, usage: null };
     }
   };

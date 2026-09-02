@@ -29,6 +29,8 @@ describe("real visual analysis boundary", () => {
     expect(api).toContain("readPendingVisionAnalysisId");
     expect(scanner).toContain("mediaAcquisitionMs");
     expect(scanner).toContain("clientDeadlineAt");
+    expect(scanner).toContain("VISION_CLIENT_TOTAL_BUDGET_MS");
+    expect(scanner).not.toContain("const visionClientBudgetMs = 15_000");
     expect(scanner).toContain("analyzeProductImage");
     expect(scanner).toContain('source: "camera" | "album"');
     expect(scanner).toContain("mediaAcquisitionMs, source");

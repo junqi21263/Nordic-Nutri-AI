@@ -60,6 +60,16 @@ const PROVIDER_REGISTRY = Object.freeze({
     modelDiscovery: "official-api",
     modelsEndpoint: "https://openrouter.ai/api/v1/models",
   }),
+  sensenova: Object.freeze({
+    displayName: "商汤 SenseNova",
+    credentialEnvNames: ["SENSENOVA_API_TOKEN", "SENSENOVA_API_KEY"],
+    modelDiscovery: "official-api",
+    modelsEndpoint: "https://token.sensenova.cn/v1/models",
+    modelsEndpoints: [
+      "https://token.sensenova.cn/v1/models",
+      "https://api.sensenova.cn/v1/llm/models",
+    ],
+  }),
 });
 
 class AiProviderCatalogError extends Error {
@@ -93,12 +103,19 @@ function publicProviderStatus({ providerKey, credentialStatus = "MISSING", model
 
 function normalizeVendorModels(providerKey, payload) {
   requireProvider(providerKey);
-  if (!payload || !Array.isArray(payload.data)) throw new AiProviderCatalogError("MODEL_CATALOG_INVALID");
-  return payload.data
+  const items = Array.isArray(payload?.data)
+    ? payload.data
+    : Array.isArray(payload?.data?.models)
+      ? payload.data.models
+      : Array.isArray(payload?.models)
+        ? payload.models
+        : null;
+  if (!items) throw new AiProviderCatalogError("MODEL_CATALOG_INVALID");
+  return items
     .filter((item) => item && typeof item.id === "string" && item.id.trim() && !["deprecated", "retired", "offline"].includes(String(item.status || "").toLowerCase()))
     .map((item) => {
       const modelKey = item.id.trim();
-      return { providerKey, modelKey, displayName: modelKey, status: "active", source: "vendor" };
+      return { providerKey, modelKey, displayName: String(item.name || item.display_name || modelKey).trim(), status: "active", source: "vendor" };
     })
     .filter((item, index, all) => all.findIndex((candidate) => candidate.modelKey === item.modelKey) === index);
 }
@@ -204,9 +221,14 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
   }
 
   async function effectiveCredential(providerKey) {
+    // Environment credentials are the active application configuration. Keep
+    // this order aligned with credentialStatus(), otherwise the UI can report
+    // PRESENT while requests use a stale database credential.
+    const configured = configuredEnvironmentCredential(env, providerKey);
+    if (configured) return configured;
     const saved = await credentialRecord(providerKey);
     if (saved) return decryptCredential(saved, encryptionKeyFromEnvironment(env));
-    return configuredEnvironmentCredential(env, providerKey);
+    return null;
   }
 
   async function credentialStatus(providerKey) {
@@ -251,20 +273,31 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
   }
 
   async function listProviders(actorUserId) {
-    const { items } = await listCatalog(actorUserId);
-    const rows = await savedCatalogRows();
+    await requireAdmin(actorUserId);
+    let rows = [];
+    try {
+      rows = await savedCatalogRows();
+    } catch (error) {
+      console.warn("[ai-provider-catalog] provider status fallback:", error?.message || error);
+    }
     return {
-      providers: Object.keys(PROVIDER_REGISTRY).map((providerKey) => {
+      providers: await Promise.all(Object.keys(PROVIDER_REGISTRY).map(async (providerKey) => {
         const providerRows = rows.filter((row) => row.provider_key === providerKey);
         const latestSync = providerRows.map((row) => row.last_synced_at).filter(Boolean).sort().at(-1) || null;
+        let status = "MISSING";
+        try {
+          status = await credentialStatus(providerKey);
+        } catch (error) {
+          console.warn(`[ai-provider-catalog] credential status fallback for ${providerKey}:`, error?.message || error);
+        }
         return publicProviderStatus({
           providerKey,
-          credentialStatus: items.find((item) => item.providerKey === providerKey)?.credentialStatus || "MISSING",
-          modelCount: items.filter((item) => item.providerKey === providerKey).length,
+          credentialStatus: status,
+          modelCount: providerRows.length,
           lastSyncedAt: latestSync,
           discoveryStatus: latestSync ? "SYNCED" : "NOT_SYNCED",
         });
-      }),
+      })),
     };
   }
 
@@ -296,19 +329,25 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
     const apiKey = await effectiveCredential(providerKey);
     if (!apiKey) throw new AiProviderCatalogError("CREDENTIAL_MISSING");
     if (typeof fetchImpl !== "function") throw new AiProviderCatalogError("MODEL_CATALOG_SYNC_FAILED");
+    const endpoints = Array.isArray(provider.modelsEndpoints) && provider.modelsEndpoints.length ? provider.modelsEndpoints : [provider.modelsEndpoint];
     let response;
-    try {
-      response = await fetchImpl(provider.modelsEndpoint, { headers: { Authorization: `Bearer ${apiKey}` } });
-    } catch (error) {
-      asError("MODEL_CATALOG_SYNC_FAILED", error);
-    }
-    if (!response?.ok) throw new AiProviderCatalogError("MODEL_CATALOG_SYNC_FAILED");
     let payload;
-    try {
-      payload = await response.json();
-    } catch (error) {
-      asError("MODEL_CATALOG_SYNC_FAILED", error);
+    let lastFailure = null;
+    for (const endpoint of endpoints) {
+      try {
+        const candidate = await fetchImpl(endpoint, { headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" } });
+        const candidatePayload = await candidate.json().catch(() => null);
+        if (candidate?.ok) {
+          response = candidate;
+          payload = candidatePayload;
+          break;
+        }
+        lastFailure = `HTTP ${candidate?.status || "unknown"}${candidatePayload?.error?.message ? `: ${candidatePayload.error.message}` : ""}`;
+      } catch (error) {
+        lastFailure = error?.message || String(error);
+      }
     }
+    if (!response?.ok) throw new AiProviderCatalogError("MODEL_CATALOG_SYNC_FAILED", lastFailure ? `模型目录同步失败（${lastFailure}）` : "MODEL_CATALOG_SYNC_FAILED");
     const models = normalizeVendorModels(providerKey, payload);
     const syncedAt = new Date().toISOString();
     try {
@@ -336,16 +375,30 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
     const apiKey = await effectiveCredential(providerKey);
     if (!apiKey) throw new AiProviderCatalogError("CREDENTIAL_MISSING");
     if (typeof fetchImpl !== "function") throw new AiProviderCatalogError("PROVIDER_TEST_FAILED");
-    try {
-      const response = await fetchImpl(provider.modelsEndpoint, { headers: { Authorization: `Bearer ${apiKey}` } });
-      if (!response?.ok) throw new Error("provider rejected credential");
-      return { providerKey, status: "OK" };
-    } catch (error) {
-      asError("PROVIDER_TEST_FAILED", error);
+    const startedAt = Date.now();
+    const endpoints = Array.isArray(provider.modelsEndpoints) && provider.modelsEndpoints.length ? provider.modelsEndpoints : [provider.modelsEndpoint];
+    let lastFailure = "";
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetchImpl(endpoint, { headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" } });
+        const payload = await response?.json?.().catch(() => null);
+        if (response?.ok) return { providerKey, status: "OK", durationMs: Date.now() - startedAt };
+        lastFailure = `HTTP ${response?.status || "unknown"}${payload?.error?.message ? `: ${String(payload.error.message).slice(0, 240)}` : ""}`;
+      } catch (error) {
+        lastFailure = String(error?.message || error).slice(0, 240);
+      }
     }
+    throw new AiProviderCatalogError("PROVIDER_TEST_FAILED", lastFailure ? `厂商连接测试失败（${lastFailure}，耗时 ${Date.now() - startedAt}ms）` : `厂商连接测试失败（耗时 ${Date.now() - startedAt}ms）`);
   }
 
-  return { listCatalog, listProviders, saveCredential, syncModels, testProvider };
+  return {
+    listCatalog,
+    listProviders,
+    saveCredential,
+    syncModels,
+    testProvider,
+    getRuntimeCredential: effectiveCredential,
+  };
 }
 
 module.exports = {

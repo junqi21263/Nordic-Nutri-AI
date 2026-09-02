@@ -113,6 +113,11 @@ function rowModel(row) {
   return typeof meta.model === "string" ? meta.model.trim() : "";
 }
 
+function rowProvider(row) {
+  const meta = readMeta(row);
+  return typeof meta.provider === "string" ? meta.provider.trim() : "";
+}
+
 function rowFeature(row) {
   const meta = readMeta(row);
   return typeof meta.feature === "string" ? meta.feature.trim() : "";
@@ -664,9 +669,10 @@ function createObservabilityService({ db }) {
     };
   }
 
-  async function getModelDetail({ model, days = 30, catalog = [], foodImageSeries = [] } = {}) {
+  async function getModelDetail({ provider = null, model, days = 30, catalog = [], foodImageSeries = [] } = {}) {
     const modelName = String(model || "").trim();
     if (!modelName) throw new Error("Model name is required");
+    const providerKey = String(provider || "").trim() || null;
     const dayKeys = enumerateDays(days);
     const sinceIso = new Date(`${dayKeys[0]}T00:00:00+08:00`).toISOString();
     const [windowRows, allRows] = await Promise.all([
@@ -674,9 +680,10 @@ function createObservabilityService({ db }) {
       loadMetricRows({ limit: 10000 }),
     ]);
 
-    const catalogEntries = (catalog || []).filter((entry) => entry?.model === modelName);
+    const catalogEntries = (catalog || []).filter((entry) => entry?.model === modelName
+      && (!providerKey || String(entry.provider || "").trim() === providerKey));
     const catalogFeatures = new Set(catalogEntries.map((entry) => entry.feature));
-    const isFoodImageModel = catalogFeatures.has("food_image");
+    const isFoodImageModel = catalogFeatures.has("food_image") || catalogFeatures.has("food_image_generation");
     const featureMetricMap = {
       vision: ["vision_success", "vision_failure"],
       coach: ["coach_message", "coach_limited"],
@@ -685,11 +692,17 @@ function createObservabilityService({ db }) {
       nutrition_plan: ["nutrition_plan"],
       daily_tip: ["daily_tip"],
       food_image: [],
+      food_image_generation: [],
     };
 
     function rowBelongsToModel(row) {
       const explicit = rowModel(row);
-      if (explicit) return explicit === modelName;
+      if (explicit) {
+        if (explicit !== modelName) return false;
+        const metricProvider = rowProvider(row);
+        if (providerKey) return metricProvider ? metricProvider === providerKey : catalogEntries.length === 1;
+        return true;
+      }
       const feature = rowFeature(row);
       if (feature && catalogFeatures.has(feature)) return true;
       // Attribute legacy rows that only have metric names, no meta.model.
@@ -726,7 +739,8 @@ function createObservabilityService({ db }) {
     }
     if (isFoodImageModel) {
       const foodTotal = foodImageSeries.reduce((sum, point) => sum + (Number(point.value) || 0), 0);
-      featureCounts.food_image = (featureCounts.food_image || 0) + foodTotal;
+      const foodFeature = catalogFeatures.has("food_image_generation") ? "food_image_generation" : "food_image";
+      featureCounts[foodFeature] = (featureCounts[foodFeature] || 0) + foodTotal;
     }
 
     const today = todayShanghaiKey();
@@ -756,8 +770,9 @@ function createObservabilityService({ db }) {
 
     return {
       model: modelName,
+      modelRef: providerKey ? `${providerKey}:${modelName}` : modelName,
       displayName: catalogEntries[0]?.displayName || modelName,
-      provider: catalogEntries[0]?.provider || null,
+      provider: providerKey || catalogEntries[0]?.provider || null,
       days: dayKeys.length,
       today,
       timezone: "Asia/Shanghai",
@@ -796,14 +811,17 @@ function createObservabilityService({ db }) {
     const seen = new Set();
     for (const entry of catalog || []) {
       const name = String(entry?.model || "").trim();
-      if (!name || seen.has(name)) continue;
-      seen.add(name);
-      uniqueModels.push(name);
+      const provider = String(entry?.provider || "").trim();
+      const identity = `${provider}:${name}`;
+      if (!name || seen.has(identity)) continue;
+      seen.add(identity);
+      uniqueModels.push({ provider: provider || null, model: name });
     }
     const boards = [];
-    for (const modelName of uniqueModels) {
+    for (const candidate of uniqueModels) {
       boards.push(await getModelDetail({
-        model: modelName,
+        provider: candidate.provider,
+        model: candidate.model,
         days,
         catalog,
         foodImageSeries,

@@ -26,7 +26,7 @@ test("uploads, recognizes, and persists an authenticated user's food image", asy
   assert.deepEqual(writes.map((write) => write.table), ["uploaded_assets", "ai_analysis", "uploaded_assets"]);
   assert.equal(writes[0].payload.user_id, "user-1");
   assert.equal(writes[1].payload.status, "completed");
-  assert.ok(writes[1].payload.completed_at);
+  assert.equal(writes[1].payload.completed_at, undefined);
   assert.equal(traces.length, 1);
   assert.equal(traces[0][0], "vision_recognition_trace");
   assert.equal(traces[0][2].clientRequestId, "11111111-1111-4111-8111-111111111111");

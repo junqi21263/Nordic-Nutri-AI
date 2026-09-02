@@ -351,7 +351,6 @@ test("quota and moderation admin modules wire dedicated APIs", async () => {
   const source = await pageSource();
   assert.match(source, /id="moduleQuota"/);
   assert.match(source, /id="quotaModelBoard"/);
-  assert.match(source, /id="quotaModelTable"/);
   assert.match(source, /id="quotaFeatureStats"/);
   assert.match(source, /id="quotaDaysFilter"/);
   assert.match(source, /function loadQuotaManagement\(/);

@@ -5,6 +5,7 @@ import {
   buildCoachLlmContext,
   createDeepseekCoachService,
   createDeepseekCoachStreamService,
+  resolveCoachStreamTimeouts,
 } from "./deepseek-coach-service.cjs";
 
 const validReply = {
@@ -216,4 +217,85 @@ test("requests DeepSeek SSE and emits parsed nutrition text deltas", async () =>
   assert.equal(body.response_format, undefined);
   assert.match(body.messages[0].content, /一般营养知识/);
   assert.match(body.messages[0].content, /不说教/);
+});
+
+test("uses a bounded default stream timeout and honours the configured route timeout", () => {
+  assert.deepEqual(resolveCoachStreamTimeouts(), {
+    firstEventTimeoutMs: 10_000,
+    totalTimeoutMs: 30_000,
+  });
+  assert.deepEqual(resolveCoachStreamTimeouts({ route: { timeoutMs: 120_000 } }), {
+    firstEventTimeoutMs: 10_000,
+    totalTimeoutMs: 120_000,
+  });
+  assert.deepEqual(resolveCoachStreamTimeouts({ route: { timeoutMs: 10_000 } }), {
+    firstEventTimeoutMs: 10_000,
+    totalTimeoutMs: 10_000,
+  });
+  assert.deepEqual(resolveCoachStreamTimeouts({ route: { timeoutMs: 8_000 } }), {
+    firstEventTimeoutMs: 8_000,
+    totalTimeoutMs: 8_000,
+  });
+});
+
+test("uses the configured route generation controls for a streamed coach reply", async () => {
+  let body;
+  const answer = createDeepseekCoachStreamService({
+    apiKey: "test-key",
+    model: "future-model",
+    route: { maxTokens: 192, temperature: 0.6 },
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return {
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("data: [DONE]\\n\\n"));
+            controller.close();
+          },
+        }),
+      };
+    },
+  });
+
+  for await (const _part of answer({ prompt: "早餐吃什么？", context: {}, history: [] })) {}
+  assert.equal(body.model, "future-model");
+  assert.equal(body.max_tokens, 192);
+  assert.equal(body.temperature, 0.6);
+});
+
+test("accepts SenseNova data-only SSE frames without a space after data:", async () => {
+  const chunks = [
+    'data:{"data":{"choices":[{"message":"早餐"}]},"status":{"code":0}}\n\n',
+    'data:{"data":{"choices":[{"message":"吃鸡蛋"}]},"status":{"code":0}}\n\n',
+    "data:[DONE]\n\n",
+  ];
+  const answer = createDeepseekCoachStreamService({
+    apiKey: "server-only-key",
+    model: "sensenova-6.8-flash-lite",
+    fetchImpl: async () => ({
+      ok: true,
+      body: (async function* () { for (const chunk of chunks) yield new TextEncoder().encode(chunk); })(),
+    }),
+  });
+  const events = [];
+  for await (const event of answer({ prompt: "早餐吃什么", context: {}, history: [] })) events.push(event);
+  assert.deepEqual(events.filter((event) => typeof event === "string"), ["早餐", "吃鸡蛋"]);
+});
+
+test("accepts CRLF-delimited SenseNova SSE frames", async () => {
+  const answer = createDeepseekCoachStreamService({
+    apiKey: "server-only-key",
+    model: "sensenova-6.8-flash-lite",
+    fetchImpl: async () => ({
+      ok: true,
+      body: (async function* () {
+        yield new TextEncoder().encode('data: {"choices":[{"delta":{"content":"可以"}}]}\r\n\r\n');
+        yield new TextEncoder().encode("data: [DONE]\r\n\r\n");
+      })(),
+    }),
+  });
+  const events = [];
+  for await (const event of answer({ prompt: "早餐吃什么", context: {}, history: [] })) events.push(event);
+  assert.deepEqual(events.filter((event) => typeof event === "string"), ["可以"]);
 });

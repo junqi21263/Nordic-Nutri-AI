@@ -14,7 +14,9 @@ test("DeepSeek vision uses the OpenAI-compatible endpoint and image content bloc
   const result = await service({ imageUrl: "data:image/jpeg;base64,abc", budget: { stageTimeout: () => 5000 } });
   assert.equal(request.url, "https://api.deepseek.com/chat/completions");
   assert.equal(request.body.model, "deepseek-v4-flash-vision-exp");
-  assert.equal(request.body.messages[0].content[0].type, "image_url");
+  assert.equal(request.body.messages[0].content[0].type, "text");
+  assert.equal(request.body.messages[0].content[1].type, "image_url");
+  assert.equal(request.body.messages[0].content[1].image_url.detail, "low");
   assert.equal(result.provider, "deepseek");
   assert.equal(result.items[0].name, "米饭");
 });
@@ -46,4 +48,46 @@ test("DeepSeek vision returns successfully when the adapter records provider eve
 
   assert.equal(result.provider, "deepseek");
   assert.equal(events[0].providerHttpStatus, 200);
+});
+
+test("DeepSeek vision prefers the inline image when a temporary URL is also available", async () => {
+  let body;
+  const service = createDeepseekVisionService({
+    apiKey: "deepseek-key",
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+        mealName: "午餐", mealType: "lunch", confidence: 0.9, portionConfidence: 0.9,
+        needsEscalation: false, items: [{ name: "米饭", quantityG: 150, caloriesPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3 }],
+      }) } }] }), { status: 200 });
+    },
+  });
+  await service({
+    imageUrl: "https://storage.example/temporary.jpg",
+    imageDataUrl: "data:image/jpeg;base64,inline-image",
+    budget: { stageTimeout: () => 5000 },
+  });
+  assert.equal(body.messages[0].content[1].image_url.url, "data:image/jpeg;base64,inline-image");
+  assert.equal(body.messages[0].content[1].image_url.detail, "low");
+});
+
+test("DeepSeek adapter honors the model selected by the dynamic vision route", async () => {
+  let body;
+  const service = createDeepseekVisionService({
+    apiKey: "deepseek-key",
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+        mealName: "午餐", mealType: "lunch", confidence: 0.9, portionConfidence: 0.9,
+        needsEscalation: false, items: [{ name: "米饭", quantityG: 150, caloriesPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3 }],
+      }) } }] }), { status: 200 });
+    },
+  });
+  const result = await service({
+    model: "deepseek-custom-vision",
+    imageUrl: "data:image/jpeg;base64,inline-image",
+    budget: { stageTimeout: () => 5000 },
+  });
+  assert.equal(body.model, "deepseek-custom-vision");
+  assert.equal(result.model, "deepseek-custom-vision");
 });

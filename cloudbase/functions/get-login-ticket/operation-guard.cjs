@@ -141,11 +141,51 @@ function createOperationGuard({ db }) {
       };
     },
     async commitVisionQuota(userId, clientRequestId, response) {
-      const record = await call("commit_vision_quota", {
+      let safeResponse = null;
+      try {
+        safeResponse = response == null ? null : JSON.parse(JSON.stringify(response));
+      } catch {
+        throw new PublicOperationError("VISION_QUOTA_COMMIT_FAILED", "识别结果提交失败，请重试");
+      }
+      const input = {
         p_user_id: userId,
         p_client_request_id: clientRequestId,
-        p_response: response,
-      });
+        p_response: safeResponse,
+      };
+      let record;
+      let lastError;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          record = await call("commit_vision_quota", input);
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (record?.state !== "committed" && record?.committed !== true) {
+        // Some CloudBase PG proxy versions can return an empty RPC payload
+        // even though the server-side write is available. Confirm the same
+        // reservation through the server-role table path before releasing it.
+        try {
+          const fallback = await db
+            .from("vision_quota_reservations")
+            .update({ state: "committed", reservation_state: "committed", response: safeResponse })
+            .eq("user_id", userId)
+            .eq("client_request_id", clientRequestId)
+            .in("state", ["reserved", "committed"])
+            .select("state, response")
+            .maybeSingle();
+          if (!fallback?.error && fallback?.data?.state === "committed") {
+            record = fallback.data;
+          }
+        } catch {
+          // Convert the fallback failure to the same public contract below.
+        }
+      }
+      if (record?.state !== "committed" && record?.committed !== true) {
+        throw new PublicOperationError("VISION_QUOTA_COMMIT_FAILED", "识别结果提交失败，请重试");
+      }
       return {
         committed: record?.state === "committed" || record?.committed === true,
         state: record?.state || null,

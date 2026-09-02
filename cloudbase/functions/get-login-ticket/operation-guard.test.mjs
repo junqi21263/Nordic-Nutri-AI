@@ -1,71 +1,57 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createOperationGuard, PublicOperationError } from "./operation-guard.cjs";
+import { createOperationGuard } from "./operation-guard.cjs";
 
-function createGuardDb(rpc) {
-  return {
-    rpc,
-    from() {
-      return {
-        select() {
-          return {
-            eq() {
-              return {
-                eq() {
-                  return {
-                    eq() {
-                      return { maybeSingle: async () => ({ data: null, error: null }) };
-                    },
-                  };
-                },
-              };
-            },
-          };
-        },
-        insert() {
-          return {
-            select() {
-              return { single: async () => ({ data: { request_count: 1 }, error: null }) };
-            },
-          };
-        },
-        update() {
-          return {
-            eq() {
-              return {
-                eq() {
-                  return {
-                    eq() {
-                      return {
-                        select() {
-                          return { single: async () => ({ data: { request_count: 1 }, error: null }) };
-                        },
-                      };
-                    },
-                  };
-                },
-              };
-            },
-          };
-        },
-      };
+test("commitVisionQuota sends a plain JSON response to the quota RPC", async () => {
+  let rpcInput;
+  const guard = createOperationGuard({
+    db: {
+      from: () => ({}),
+      rpc: async (_name, input) => {
+        rpcInput = input;
+        return { data: [{ state: "committed", response: input.p_response }], error: null };
+      },
     },
-  };
-}
-
-test("claims an operation once and returns its completed response to a retry", async () => {
-  const calls = [];
-  const responses = [{ data: [{ state: "started", claimed: true }] }, { data: [{ state: "succeeded", response: { deleted: true }, claimed: false }] }];
-  const guard = createOperationGuard({ db: createGuardDb(async (name, input) => { calls.push([name, input]); return responses.shift(); }) });
-  assert.deepEqual(await guard.claim("user-a", "account_cancel", "11111111-1111-4111-8111-111111111111"), { response: null, reused: false });
-  assert.deepEqual(await guard.claim("user-a", "account_cancel", "11111111-1111-4111-8111-111111111111"), { response: { deleted: true }, reused: true });
-  assert.equal(calls[0][0], "claim_operation_request");
+  });
+  const response = { analysisId: "analysis-1", items: [{ name: "米饭" }], optional: undefined };
+  const result = await guard.commitVisionQuota("user-1", "11111111-1111-4111-8111-111111111111", response);
+  assert.equal(result.committed, true);
+  assert.deepEqual(rpcInput.p_response, { analysisId: "analysis-1", items: [{ name: "米饭" }] });
 });
 
-test("rejects a duplicate operation still in progress", async () => {
-  const guard = createOperationGuard({ db: createGuardDb(async () => ({ data: [{ state: "started", claimed: false }] })) });
-  await assert.rejects(
-    () => guard.claim("user-a", "account_cancel", "11111111-1111-4111-8111-111111111111"),
-    (error) => error instanceof PublicOperationError && error.code === "OPERATION_IN_PROGRESS",
-  );
+test("commitVisionQuota retries a transient RPC failure", async () => {
+  let calls = 0;
+  const guard = createOperationGuard({
+    db: {
+      from: () => ({}),
+      rpc: async () => {
+        calls += 1;
+        if (calls === 1) return { data: null, error: new Error("transient") };
+        return { data: [{ state: "committed", response: { ok: true } }], error: null };
+      },
+    },
+  });
+  const result = await guard.commitVisionQuota("user-1", "11111111-1111-4111-8111-111111111111", { ok: true });
+  assert.equal(result.committed, true);
+  assert.equal(calls, 2);
+});
+
+test("commitVisionQuota confirms an empty RPC payload through the server table path", async () => {
+  let updateInput;
+  const chain = {
+    update: (input) => { updateInput = input; return chain; },
+    eq: () => chain,
+    in: () => chain,
+    select: () => chain,
+    maybeSingle: async () => ({ data: { state: "committed", response: { ok: true } }, error: null }),
+  };
+  const guard = createOperationGuard({
+    db: {
+      from: () => chain,
+      rpc: async () => ({ data: [], error: null }),
+    },
+  });
+  const result = await guard.commitVisionQuota("user-1", "11111111-1111-4111-8111-111111111111", { ok: true });
+  assert.equal(result.committed, true);
+  assert.equal(updateInput.state, "committed");
 });

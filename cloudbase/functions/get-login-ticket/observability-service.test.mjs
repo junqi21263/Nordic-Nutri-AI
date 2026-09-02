@@ -524,6 +524,18 @@ test("getModelDetail marks food image tokens as not applicable", async () => {
   assert.equal(detail.tokens.applicable, false);
 });
 
+test("getModelDetail treats the configured food image feature as non-token usage", async () => {
+  const { db } = createDb({ metrics: [] });
+  const service = createObservabilityService({ db });
+  const detail = await service.getModelDetail({
+    provider: "hunyuan",
+    model: "HY-Image-3.0-Plus-4090-Tob-v1.0",
+    days: 7,
+    catalog: [{ feature: "food_image_generation", featureLabel: "食材生图", model: "HY-Image-3.0-Plus-4090-Tob-v1.0", provider: "hunyuan" }],
+  });
+  assert.equal(detail.tokens.applicable, false);
+});
+
 test("getModelDetail includes model_request and token metrics for hunyuan text", async () => {
   const today = shanghaiDayKey(new Date().toISOString());
   const createdAt = `${today}T04:00:00.000Z`;
@@ -561,6 +573,40 @@ test("getModelBoard returns one board per unique model", async () => {
   assert.equal(board.models.length, 2);
   assert.equal(board.models[0].model, "deepseek-v4-flash");
   assert.equal(board.models[1].model, "deepseek-v4-pro");
+});
+
+test("getModelBoard keeps same-named models from different providers separate", async () => {
+  const { db } = createDb({ metrics: [] });
+  const service = createObservabilityService({ db });
+  const board = await service.getModelBoard({
+    days: 7,
+    catalog: [
+      { feature: "coach", model: "shared-model", provider: "deepseek" },
+      { feature: "daily_tip", model: "shared-model", provider: "sensenova" },
+    ],
+  });
+  assert.equal(board.models.length, 2);
+  assert.deepEqual(board.models.map((item) => item.provider).sort(), ["deepseek", "sensenova"]);
+});
+
+test("getModelDetail attributes explicit model metrics to the matching provider", async () => {
+  const today = shanghaiDayKey(new Date().toISOString());
+  const createdAt = `${today}T04:00:00.000Z`;
+  const { db } = createDb({ metrics: [
+    { metric: "model_request", value: 2, meta: { provider: "deepseek", model: "shared-model", feature: "coach" }, created_at: createdAt },
+    { metric: "model_request", value: 3, meta: { provider: "sensenova", model: "shared-model", feature: "daily_tip" }, created_at: createdAt },
+  ] });
+  const service = createObservabilityService({ db });
+  const detail = await service.getModelDetail({
+    provider: "sensenova",
+    model: "shared-model",
+    days: 7,
+    catalog: [
+      { feature: "coach", model: "shared-model", provider: "deepseek" },
+      { feature: "daily_tip", model: "shared-model", provider: "sensenova" },
+    ],
+  });
+  assert.equal(detail.requests.total, 3);
 });
 
 test("recordDeletion and listDeletionLog persist durable audit rows", async () => {
