@@ -111,7 +111,20 @@ describe("local coach and profile", () => {
     const source = coachPageSource();
 
     expect(source).toContain("setCompletedReplyVersion");
-    expect(source).toContain("Taro.pageScrollTo({ scrollTop: 999999, duration: 300 })");
+    expect(source).toContain("scrollToCoachBottom();");
+  });
+
+  it("jumps to the latest message when sending and while a reply streams", () => {
+    const source = coachPageSource();
+    const sendMessageStart = source.indexOf("const sendMessage = async");
+    const sendMessageEnd = source.indexOf("const scrollToCoachTop", sendMessageStart);
+    const sendMessageSource = source.slice(sendMessageStart, sendMessageEnd);
+
+    expect(source).toContain("const scrollToCoachBottom");
+    expect(source).toContain("bottomScrollTimerRef");
+    expect(source).toContain("Taro.pageScrollTo({ scrollTop: 999999, duration: 0 })");
+    expect(sendMessageSource).toContain("scrollToCoachBottom();");
+    expect(sendMessageSource).toContain("event.type === \"delta\"");
   });
 
   it("keeps a right-aligned fixed control without a full-screen gesture layer", () => {

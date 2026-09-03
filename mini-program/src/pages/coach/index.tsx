@@ -110,8 +110,17 @@ export default function CoachPage() {
       content:
         advice[0]?.message ||
         `你好，Lewis。今天还差 ${proteinLeft}g 蛋白质，晚餐加一份优质蛋白就能更接近目标。`,
-    },
+      },
   ]);
+  const bottomScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scrollToCoachBottom = () => {
+    if (bottomScrollTimerRef.current) clearTimeout(bottomScrollTimerRef.current);
+    bottomScrollTimerRef.current = setTimeout(() => {
+      bottomScrollTimerRef.current = null;
+      void Taro.pageScrollTo({ scrollTop: 999999, duration: 0 });
+    }, 16);
+  };
 
   const mergeServerMessages = (
     result: { messages: ProductCoachMessage[]; dailyUsage: ProductCoachDailyUsage },
@@ -144,7 +153,7 @@ export default function CoachPage() {
   useEffect(() => {
     if (!completedReplyVersion) return undefined;
     const timer = setTimeout(() => {
-      void Taro.pageScrollTo({ scrollTop: 999999, duration: 300 });
+      scrollToCoachBottom();
     }, 0);
     return () => clearTimeout(timer);
   }, [completedReplyVersion]);
@@ -154,6 +163,7 @@ export default function CoachPage() {
       pageActiveRef.current = false;
       activeStreamRef.current?.abort();
       activeStreamRef.current = null;
+      if (bottomScrollTimerRef.current) clearTimeout(bottomScrollTimerRef.current);
     };
   }, []);
 
@@ -294,6 +304,7 @@ export default function CoachPage() {
         ...attachment,
       },
     ]);
+    scrollToCoachBottom();
     setDraft("");
     setSelectedImagePath(null);
     setSending(true);
@@ -309,6 +320,7 @@ export default function CoachPage() {
           analysis,
         },
       ]);
+      scrollToCoachBottom();
       let completed = false;
       let receivedDelta = false;
       activeStreamRef.current = { id: requestId, abort: () => undefined };
@@ -333,9 +345,10 @@ export default function CoachPage() {
                       generationStatus: "answering",
                       analysis,
                     }
-                  : message,
+                : message,
               ),
             );
+            scrollToCoachBottom();
             return;
           }
           if (event.type === "complete") {
