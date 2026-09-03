@@ -37,8 +37,6 @@ import { PlanSaveTransitionOverlay } from "../../components/plan-save-transition
 import { hasSeenWelcome } from "../../features/welcome/welcome-seen";
 import { useAppShare } from "../../hooks/use-app-share";
 import { isOnboardingCompleted } from "../../utils/local-experience";
-import { getMilestonePreviewUrl, isMilestonePreviewDevelopmentBuild } from "../../features/milestones/development-preview";
-import { MILESTONES, type Milestone } from "../../features/milestones/stats";
 import { tryPresentPendingMilestone } from "../../features/milestones/presentation-flow";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
@@ -175,14 +173,6 @@ export default function HomePage() {
     void Taro.switchTab({ url: "/pages/meal-records/index" });
   };
   const openManualMeal = () => Taro.navigateTo({ url: "/pages/manual-meal/index" });
-  const openMilestonePreview = async () => {
-    const result = await Taro.showActionSheet({
-      itemList: MILESTONES.map((milestone) => `${milestone} 天里程碑`),
-    });
-    const milestone = MILESTONES[result.tapIndex] as Milestone | undefined;
-    if (milestone) void Taro.navigateTo({ url: getMilestonePreviewUrl(milestone) });
-  };
-
   if (store.loadingState === "loading" && !meals.length && !remoteSummary && !planSaveHandoffActive)
     return (
       <PageLayout
@@ -262,12 +252,6 @@ export default function HomePage() {
         <Text className="nutrition-disclaimer">
           营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
         </Text>
-        {isMilestonePreviewDevelopmentBuild ? (
-          <View className="home-page__dev-preview" onClick={() => void openMilestonePreview()}>
-            <NordicIcon name="milestone" size={18} ariaLabel="里程碑预览" />
-            <Text>开发：预览里程碑海报</Text>
-          </View>
-        ) : null}
         <View
           className={`home-page__actions ${guideFirstMeal && meals.length === 0 ? "home-page__actions--guided" : ""}`}
         >
