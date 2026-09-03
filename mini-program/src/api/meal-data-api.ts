@@ -24,6 +24,12 @@ export interface ProductMealInput {
 
 export { mapProductMeal } from "../features/meals/product-meal-mapper";
 
+const remoteMealIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isRemoteMealId(id: string | undefined): id is string {
+  return typeof id === "string" && remoteMealIdPattern.test(id);
+}
+
 export async function getProductMeals(date: string): Promise<Meal[]> {
   const data = await requestProductApi<ProductMeal[]>(`/meals?date=${encodeURIComponent(date)}`, {
     method: "GET",

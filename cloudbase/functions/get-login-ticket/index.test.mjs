@@ -6,6 +6,9 @@ import { PublicVisionDataError } from "./vision-data-service.cjs";
 
 import {
   buildModelCatalog,
+  buildVisionDataUrl,
+  mergeConfiguredModelCatalog,
+  mergeModelQuotaPolicies,
   createHttpServer,
   createHunyuanGenerationService,
   createRuntimeService,
@@ -13,6 +16,35 @@ import {
   selectDeepseekModel,
   signFoodImageDispatch,
 } from "./index.js";
+
+test("vision upload fallback builds a valid inline image URL", () => {
+  assert.equal(
+    buildVisionDataUrl({ content: Buffer.from([0xff, 0xd8, 0xff]), contentType: "image/jpeg" }),
+    "data:image/jpeg;base64,/9j/",
+  );
+});
+
+test("configured AI model routes replace runtime models for the same features", () => {
+  const result = mergeConfiguredModelCatalog(
+    [
+      { feature: "coach", featureLabel: "营养教练", provider: "deepseek", model: "deepseek-v4-flash" },
+      { feature: "daily_tip", featureLabel: "每日小贴士", provider: "hunyuan", model: "hunyuan-old" },
+    ],
+    [{ providerKey: "openai", modelKey: "gpt-5", applications: ["coach"], routeRoles: { coach: "primary" } }],
+  );
+  assert.equal(result.find((item) => item.feature === "coach").model, "gpt-5");
+  assert.equal(result.find((item) => item.feature === "coach").provider, "openai");
+  assert.equal(result.find((item) => item.feature === "daily_tip").model, "hunyuan-old");
+});
+
+test("model quota policies annotate only their exact provider-model-feature route", () => {
+  const result = mergeModelQuotaPolicies(
+    [{ feature: "coach", provider: "deepseek", model: "deepseek-v4-flash", dailyLimit: 20 }],
+    [{ providerKey: "deepseek", modelKey: "deepseek-v4-flash", featureKey: "coach", dailyRequestLimit: 100, enabled: true, providerBalanceMode: "manual" }],
+  );
+  assert.equal(result[0].dailyLimit, 100);
+  assert.equal(result[0].quotaPolicy.providerBalanceMode, "manual");
+});
 
 async function withServer(server, run) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -71,9 +103,23 @@ test("assembles every runtime service after the RDB client is available", () => 
 
   for (const capability of ["issue", "verifySession"]) assert.equal(typeof service[capability], "function");
   for (const capability of ["data", "meals", "insights", "coach", "feedback"]) assert.ok(service[capability]);
-  assert.equal(service.vision, null);
+  assert.equal(typeof service.vision?.analyzeImage, "function");
+  assert.equal(service.vision?.provider, null);
+  assert.equal(service.vision?.model, null);
   assert.equal(service.visionAnalysisFoundationEnabled, false);
   assert.equal(service.foodImageDispatchSecret, "");
+});
+
+test("keeps an injected runtime model resolver private to function services", () => {
+  const resolver = { resolveCandidates: async () => [] };
+  const service = createRuntimeService({
+    WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
+    CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret",
+  }, {
+    cloudbaseSdk: { init: () => ({ rdb: () => createRuntimeDb() }) },
+    modelRouteResolver: resolver,
+  });
+  assert.equal(service.modelRouteResolver, resolver);
 });
 
 test("keeps the login runtime available when optional Node SDK initialization fails", () => {
@@ -162,7 +208,7 @@ test("delegates food insight to dev through the existing signed worker configura
   assert.equal(insight.source, "hunyuan-exp");
 });
 
-test("routes homepage daily insight to DeepSeek while auxiliary content stays on the dev worker", () => {
+test("does not instantiate a fixed daily-insight provider during runtime setup", () => {
   const dailyInsightOptions = [];
   const workerOptions = [];
   const service = createRuntimeService({
@@ -186,11 +232,7 @@ test("routes homepage daily insight to DeepSeek while auxiliary content stays on
     },
   });
 
-  assert.equal(dailyInsightOptions.length, 1);
-  assert.equal(dailyInsightOptions[0].apiKey, "deepseek-key");
-  assert.equal(dailyInsightOptions[0].model, "deepseek-v4-pro");
-  assert.equal(dailyInsightOptions[0].source, "deepseek");
-  assert.equal(dailyInsightOptions[0].requestCompletion, undefined);
+  assert.equal(dailyInsightOptions.length, 0);
   assert.equal(workerOptions.length, 1);
 });
 
@@ -1048,6 +1090,40 @@ test("correlates vision timeout diagnostics across request, image, and provider 
   assert.equal(stages.length, 0);
 });
 
+test("records a generic request stage and the original error for failed API requests", async () => {
+  const finished = [];
+  const stages = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      data: {
+        getAccount: async () => { throw new Error("database connection reset"); },
+      },
+      observability: {
+        startTrace: () => ({ traceId: "trace_generic_failure", startedAt: new Date().toISOString(), stages: [] }),
+        recordStage: (_trace, stage) => stages.push(stage),
+        finishTrace: async (_trace, result) => { finished.push(result); },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/account`, {
+      headers: { authorization: "Bearer valid-session" },
+    });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, "ACCOUNT_READ_FAILED");
+  });
+
+  assert.equal(stages.length, 1);
+  assert.equal(stages[0].name, "request");
+  assert.equal(stages[0].status, "failed");
+  assert.equal(stages[0].providerHttpStatus, 503);
+  assert.equal(stages[0].errorCode, "ACCOUNT_READ_FAILED");
+  assert.equal(finished[0].errorCode, "ACCOUNT_READ_FAILED");
+  assert.equal(finished[0].meta.internalError.message, "database connection reset");
+});
+
 test("validates the vision image before consuming the daily and burst quota", async () => {
   const quotaOperations = [];
   const server = createHttpServer({
@@ -1173,6 +1249,39 @@ test("admin food routes reject product sessions without admin_console role", asy
     const r3 = await fetch(`${baseUrl}/get-login-ticket/api/admin/foods`, { headers: { authorization: "Bearer valid-session" } });
     assert.equal(r3.status, 401);
   });
+});
+
+test("model quota policies are readable and editable only through an admin session", async () => {
+  const saves = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "admin-session" ? { sub: "admin-1", role: "admin_console" } : null,
+      modelQuotaPolicy: {
+        listPolicies: async () => [{ providerKey: "deepseek", modelKey: "deepseek-v4-flash", featureKey: "coach", dailyRequestLimit: 100, enabled: true }],
+        savePolicy: async (actorUserId, body) => {
+          saves.push({ actorUserId, body });
+          return { ...body, dailyRequestLimit: 50, enabled: false };
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/get-login-ticket/api/admin/ops/model-quota-policies`);
+    assert.equal(denied.status, 401);
+
+    const listed = await fetch(`${baseUrl}/get-login-ticket/api/admin/ops/model-quota-policies`, { headers: { authorization: "Bearer admin-session" } });
+    assert.equal(listed.status, 200);
+    assert.equal((await listed.json()).items[0].providerKey, "deepseek");
+
+    const saved = await fetch(`${baseUrl}/get-login-ticket/api/admin/ops/model-quota-policies`, {
+      method: "PUT",
+      headers: { authorization: "Bearer admin-session", "content-type": "application/json" },
+      body: JSON.stringify({ providerKey: "deepseek", modelKey: "deepseek-v4-flash", featureKey: "coach", dailyRequestLimit: 50, enabled: false }),
+    });
+    assert.equal(saved.status, 200);
+    assert.equal((await saved.json()).enabled, false);
+  });
+  assert.deepEqual(saves, [{ actorUserId: "admin-1", body: { providerKey: "deepseek", modelKey: "deepseek-v4-flash", featureKey: "coach", dailyRequestLimit: 50, enabled: false } }]);
 });
 
 test("admin login issues an admin_console session token", async () => {

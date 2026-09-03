@@ -25,6 +25,7 @@ const { createCoachDataService, PublicCoachDataError } = require("./coach-data-s
 const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-data-service.cjs");
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
 const { createQwenVisionService, PublicQwenVisionError } = require("./qwen-vision-service.cjs");
+const { createDeepseekVisionService } = require("./deepseek-vision-service.cjs");
 const { createVisionDataService, PublicVisionDataError } = require("./vision-data-service.cjs");
 const { createWechatImageSecurity, PublicImageSecurityError } = require("./wechat-image-security.cjs");
 const { createVisionImageRetentionService } = require("./vision-image-retention-service.cjs");
@@ -37,6 +38,7 @@ const { createProfileAvatarService, PublicProfileAvatarError, pickDefaultAvatarS
 const { createAccountDeletionService, PublicAccountDeletionError } = require("./account-deletion-service.cjs");
 const { createProductUserExists, resolveProductSession } = require("./product-session-auth.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
+const { getVisionQuotaPolicy } = require("./vision-quota-policy.cjs");
 const { createObservabilityService } = require("./observability-service.cjs");
 const { sanitizeTraceMeta, sanitizeTracePayload } = require("./observability-sanitizer.cjs");
 const { createAdminAuditService } = require("./admin-audit-service.cjs");
@@ -51,6 +53,13 @@ const { createFoodImageService, FoodImageError } = require("./food-image-service
 const { createFoodBarcodeService, FoodBarcodeError } = require("./food-barcode-service.cjs");
 const { createFoodAdminService, FoodAdminError } = require("./food-admin-service.cjs");
 const { createAdminConsoleService, AdminConsoleError } = require("./admin-console-service.cjs");
+const { createAiModelConfigService, AiModelConfigError } = require("./ai-model-config-service.cjs");
+const { createAiProviderCatalogService, AiProviderCatalogError } = require("./ai-provider-catalog-service.cjs");
+const { createModelQuotaPolicyService, ModelQuotaPolicyError } = require("./model-quota-policy-service.cjs");
+const { createFeatureUserQuotaPolicyService, FeatureUserQuotaPolicyError } = require("./feature-user-quota-policy-service.cjs");
+const { createModelRouteResolver, ModelRouteError } = require("./model-route-resolver.cjs");
+const { createRoutedModelInvoker, createRoutedModelStreamInvoker } = require("./routed-model-invoker.cjs");
+const { createTextModelAdapter, createRoutedOpenAiFetch } = require("./text-model-adapter-registry.cjs");
 const { createHunyuanImageService, HunyuanImageError } = require("./hunyuan-image-service.cjs");
 const { createHunyuanWorkerClient } = require("./hunyuan-worker-client.cjs");
 const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
@@ -68,6 +77,7 @@ const { createVisionAnalysisService } = require("./vision-analysis-foundation.cj
 const { createHybridVisionController } = require("./vision-analysis-hybrid.cjs");
 const { createAsyncLifecycleDeadlines } = require("./vision-async-deadline.cjs");
 const { createTransportFixtureProvisioner } = require("./transport-fixture-provisioning.cjs");
+const { createRoutedVisionAnalyzer } = require("./vision-provider-router.cjs");
 const {
   createTransportFixtureDbAdapter,
   safeProvisionResponse,
@@ -107,10 +117,11 @@ const VISION_DOWNSTREAM_RESERVE_MS = VISION_BUDGETS.flashMaxMs
   + VISION_BUDGETS.evaluationReserveMs
   + VISION_BUDGETS.persistenceReserveMs;
 const VISION_DAILY_LIMIT = 10;
+const VISION_QUOTA_POLICY = getVisionQuotaPolicy(process.env);
 // Keep the model catalog and account-usage fallback aligned with the active
 // quota. This alias also protects the public login bootstrap from a missing
 // catalog constant when the temporary unlimited-QA switch is removed.
-const VISION_EFFECTIVE_DAILY_LIMIT = VISION_DAILY_LIMIT;
+const VISION_EFFECTIVE_DAILY_LIMIT = VISION_QUOTA_POLICY.dailyLimit;
 const VISION_BURST_LIMIT = 3;
 const VISION_DAILY_WINDOW_SECONDS = 86400;
 const VISION_BURST_WINDOW_SECONDS = 600;
@@ -310,8 +321,8 @@ function signVisionAnalysisInternal(secret, { timestamp, method = "POST", path, 
 function verifyVisionAnalysisInternalSignature(secret, req, { path, body, kind, now = Date.now() } = {}) {
   if (!secret || !path || !kind) return false;
   const prefix = kind === "reaper" ? "x-vision-reaper" : "x-vision-dispatch";
-  const timestamp = String(req.headers[`${prefix}-timestamp`] || "");
-  const signature = String(req.headers[`${prefix}-signature`] || "");
+  let timestamp = String(req.headers[`${prefix}-timestamp`] || "");
+  let signature = String(req.headers[`${prefix}-signature`] || "");
   const numericTimestamp = Number(timestamp);
   if (!Number.isInteger(numericTimestamp) || Math.abs(Math.floor(now / 1000) - numericTimestamp) > 300) return false;
   const expected = signVisionAnalysisInternal(secret, { timestamp, method: req.method, path, body });
@@ -336,6 +347,18 @@ function readRuntimeConfig(env) {
     identityPepper: env.IDENTITY_HASH_PEPPER,
     cloudbaseApiKey: env.CLOUDBASE_APIKEY,
     sessionSecret: env.APP_SESSION_SECRET,
+  };
+}
+
+function createBootstrapDiagnosticLogger(env) {
+  if (String(env.AUTH_DIAGNOSTIC_LOGGING || "").toLowerCase() !== "true") return undefined;
+  return (error) => {
+    const safe = error && typeof error === "object" ? error : {};
+    console.error("[auth-bootstrap] product session dependency failed", {
+      name: typeof safe.name === "string" ? safe.name : "Error",
+      code: typeof safe.code === "string" ? safe.code : null,
+      message: typeof safe.message === "string" ? safe.message.slice(0, 240) : String(error).slice(0, 240),
+    });
   };
 }
 
@@ -423,6 +446,30 @@ function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = nu
       model: resolvedDeepseek,
     },
     {
+      feature: "meal_analysis",
+      featureLabel: "餐食分析",
+      provider: "deepseek",
+      model: resolvedDeepseek,
+    },
+    {
+      feature: "meal_evaluation",
+      featureLabel: "餐食评价",
+      provider: "deepseek",
+      model: resolvedDeepseek,
+    },
+    {
+      feature: "meal_insight",
+      featureLabel: "餐食洞察",
+      provider: "deepseek",
+      model: resolvedDeepseek,
+    },
+    {
+      feature: "food_query_translation",
+      featureLabel: "食材检索翻译",
+      provider: "deepseek",
+      model: resolvedDeepseek,
+    },
+    {
       feature: "daily_tip",
       featureLabel: "每日小贴士",
       provider: "hunyuan",
@@ -435,7 +482,7 @@ function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = nu
       model: resolvedDeepseek,
     },
     {
-      feature: "food_image",
+      feature: "food_image_generation",
       featureLabel: "食材生图",
       provider: "hunyuan",
       model: hunyuanModel || env.HY_IMAGE_MODEL || "HY-Image-3.0-Plus-4090-Tob-v1.0",
@@ -444,10 +491,52 @@ function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = nu
   ];
 }
 
-function createHunyuanGenerationService({ env, aiClient, createWorkerClient = createHunyuanWorkerClient } = {}) {
+function mergeConfiguredModelCatalog(runtimeCatalog, configuredModels = []) {
+  const runtimeByFeature = new Map((runtimeCatalog || []).map((item) => [item.feature, item]));
+  const configuredFeatures = new Set();
+  const configuredCatalog = [];
+  for (const model of configuredModels || []) {
+    const applications = Array.isArray(model.applications) ? model.applications : [];
+    for (const feature of applications) {
+      const fallback = runtimeByFeature.get(feature);
+      if (!fallback || !model.providerKey || !model.modelKey) continue;
+      configuredFeatures.add(feature);
+      configuredCatalog.push({
+        ...fallback,
+        feature,
+        featureLabel: fallback.featureLabel || feature,
+        provider: model.providerKey,
+        model: model.modelKey,
+        displayName: model.displayName || model.modelKey,
+      });
+    }
+  }
+  return [
+    ...configuredCatalog,
+    ...(runtimeCatalog || []).filter((item) => !configuredFeatures.has(item.feature)),
+  ];
+}
+
+function mergeModelQuotaPolicies(catalog = [], policies = []) {
+  const policyByRoute = new Map((policies || []).map((policy) => [
+    `${policy.providerKey}:${policy.modelKey}:${policy.featureKey}`,
+    policy,
+  ]));
+  return (catalog || []).map((entry) => {
+    const policy = policyByRoute.get(`${entry.provider}:${entry.model}:${entry.feature}`) || null;
+    return {
+      ...entry,
+      dailyLimit: policy?.dailyRequestLimit ?? entry.dailyLimit ?? null,
+      quotaPolicy: policy,
+      quotaLimitSource: policy ? "policy" : (entry.dailyLimit != null ? "legacy" : "unlimited"),
+    };
+  });
+}
+
+function createHunyuanGenerationService({ env, aiClient, modelName: configuredModelName, createWorkerClient = createHunyuanWorkerClient } = {}) {
   const enabled = String(env?.FOOD_IMAGE_GENERATION_ENABLED ?? "true").toLowerCase() !== "false";
   if (!enabled) return null;
-  const modelName = env?.HY_IMAGE_MODEL;
+  const modelName = configuredModelName || env?.HY_IMAGE_MODEL;
   const size = env?.HY_IMAGE_SIZE || `${env?.HY_IMAGE_WIDTH || 1280}x${env?.HY_IMAGE_HEIGHT || 720}`;
   const maxRetries = Number(env?.HY_IMAGE_MAX_RETRIES) || 3;
   const workerEndpoint = typeof env?.HY_IMAGE_WORKER_ENDPOINT === "string" ? env.HY_IMAGE_WORKER_ENDPOINT.trim() : "";
@@ -492,6 +581,7 @@ function downloadImageBuffer(url) {
 function createRuntimeService(env = process.env, dependencies = {}) {
   const config = readRuntimeConfig(env);
   const opsRef = { observability: null };
+  let vision = null;
   const cloudbase = dependencies.cloudbaseSdk ?? require("@cloudbase/js-sdk");
   const app = cloudbase.init({
     env: config.cloudbaseEnvId,
@@ -503,33 +593,61 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   const observability = createObservabilityService({ db });
   opsRef.observability = observability;
   const adminAudit = typeof db.rpc === "function" ? createAdminAuditService({ db, observability }) : null;
+  const modelQuotaPolicy = createModelQuotaPolicyService({ db, adminAudit });
+  const featureUserQuotaPolicy = createFeatureUserQuotaPolicyService({ db, adminAudit });
   const deepseekModel = selectDeepseekModel(env.DEEPSEEK_MODEL);
-  const evaluateMealRaw = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
-    ? createDeepseekEvaluationService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
-    : null;
-  const evaluateMeal = evaluateMealRaw
-    ? async (input) => {
-      const result = await evaluateMealRaw(input);
+  const runtimeModelCatalog = buildModelCatalog({ env, vision, deepseekModel });
+  // Runtime routing is intentionally private: credentials are resolved server-side
+  // from the encrypted provider store (or legacy server env) and never cross an HTTP boundary.
+  const runtimeProviderCatalog = createAiProviderCatalogService({ db, env });
+  const modelRouteResolver = dependencies.modelRouteResolver ?? createModelRouteResolver({
+    db,
+    runtimeCatalog: runtimeModelCatalog,
+    getCredential: runtimeProviderCatalog.getRuntimeCredential,
+  });
+  const assertModelQuota = ({ feature, route }) => modelQuotaPolicy.assertAllowed({
+    providerKey: route.providerKey,
+    modelKey: route.modelKey,
+    featureKey: feature,
+  });
+  const reportModelRouteAttempt = (event) => {
+    const level = event.phase === "failed" ? "warn" : "info";
+    console[level]("[model-route]", event);
+  };
+  const createFeatureInvoker = ({ feature, createService }) => {
+    const routed = createRoutedModelInvoker({ feature, resolver: modelRouteResolver, createService, beforeInvoke: assertModelQuota, onAttempt: reportModelRouteAttempt });
+    return async (...args) => routed(...args);
+  };
+  const createFeatureStreamInvoker = ({ feature, createService }) => {
+    const routed = createRoutedModelStreamInvoker({ feature, resolver: modelRouteResolver, createService, beforeInvoke: assertModelQuota, onAttempt: reportModelRouteAttempt });
+    return async function* invoke(...args) { yield* routed(...args); };
+  };
+  const evaluateMeal = async (input) => {
+      const result = await createFeatureInvoker({
+        feature: "meal_evaluation",
+        createService: createDeepseekEvaluationService,
+      })(input);
       if (result?.usage) {
         recordModelUsage(opsRef.observability, {
           model: result.model || deepseekModel,
           feature: "meal_evaluation",
-          provider: "deepseek",
+          provider: result.provider || result.source || null,
           usage: result.usage,
           requests: 0,
         }).catch(() => {});
       }
       return result;
-    }
-    : null;
-  const calculateNutritionPlanWithAi = typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
-    ? createDeepseekNutritionPlanService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
-    : null;
+    };
+  const calculateNutritionPlanWithAi = createFeatureInvoker({
+    feature: "nutrition_plan",
+    createService: createDeepseekNutritionPlanService,
+  });
 
   const session = createProductSessionService({
     exchangeCode: (code) => requestWechatSession({ ...config, code }),
     identityPepper: config.identityPepper,
     sessionSecret: config.sessionSecret,
+    onBootstrapError: createBootstrapDiagnosticLogger(env),
     bootstrapUser: async (openidHash) => {
       const existing = await db.from("app_users").select("id").eq("openid_hash", openidHash).maybeSingle();
       if (existing.error) throw new Error("Product user lookup failed");
@@ -831,43 +949,40 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       console.error("[nutrition-content] dev worker configuration failed:", error?.code || error?.message || error);
     }
   }
-  const deepseekEnabled = typeof env.DEEPSEEK_API_KEY === "string" && Boolean(env.DEEPSEEK_API_KEY);
-  const generateMealInsightRaw = deepseekEnabled
-    ? createDeepseekMealInsightService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
-    : null;
-  const generateMealInsight = generateMealInsightRaw
-    ? async (input) => {
-      const result = await generateMealInsightRaw(input);
+  const generateMealInsightRouted = createFeatureInvoker({
+    feature: "meal_insight",
+    createService: createDeepseekMealInsightService,
+  });
+  const generateMealInsight = async (input) => {
+      const result = await generateMealInsightRouted(input);
       if (result && typeof result === "object" && result.usage) {
         recordModelUsage(opsRef.observability, {
           model: result.model || deepseekModel,
           feature: "meal_insight",
-          provider: "deepseek",
+          provider: result.provider || result.source || null,
           usage: result.usage,
           requests: 0,
         }).catch(() => {});
       }
       return result;
-    }
-    : null;
-  const analyzeMealRaw = deepseekEnabled
-    ? createDeepseekMealService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
-    : null;
-  const analyzeMeal = analyzeMealRaw
-    ? async (input) => {
-      const result = await analyzeMealRaw(input);
+    };
+  const analyzeMealRouted = createFeatureInvoker({
+    feature: "meal_analysis",
+    createService: createDeepseekMealService,
+  });
+  const analyzeMeal = async (input) => {
+      const result = await analyzeMealRouted(input);
       if (result?.usage) {
         recordModelUsage(opsRef.observability, {
           model: result.model || deepseekModel,
           feature: "meal_analysis",
-          provider: "deepseek",
+          provider: result.provider || result.source || null,
           usage: result.usage,
           requests: 0,
         }).catch(() => {});
       }
       return result;
-    }
-    : null;
+    };
   const milestones = createMilestoneStateService({ db });
   const meals = createMealDataService({
     db,
@@ -881,14 +996,13 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     }),
   });
   const dailyInsightFactory = dependencies.dailyInsightFactory ?? createDailyInsightService;
-  const dailyInsight = dailyInsightFactory({
-    apiKey: env.DEEPSEEK_API_KEY,
-    model: deepseekModel,
-    source: "deepseek",
+  const generateDailyInsight = createFeatureInvoker({
+    feature: "daily_insight",
+    createService: (options) => dailyInsightFactory({ ...options, source: options.source }),
   });
-  const weeklyReview = createDeepseekWeeklyReviewService({
-    apiKey: env.DEEPSEEK_API_KEY,
-    model: deepseekModel,
+  const weeklyReview = createFeatureInvoker({
+    feature: "weekly_review",
+    createService: (options) => createDeepseekWeeklyReviewService({ ...options, source: options.source }),
   });
   const insights = createInsightDataService({
     db,
@@ -910,11 +1024,11 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     getNutritionPlan: data.getNutritionPlan,
     weeklyReviewModel: deepseekModel,
     generateDailyInsight: async (input) => {
-      const result = await dailyInsight(input);
+      const result = await generateDailyInsight(input);
       recordModelUsage(opsRef.observability, {
         model: result?.model,
         feature: "daily_insight",
-        provider: result?.source === "deepseek" ? "deepseek" : result?.source || null,
+        provider: result?.provider || result?.source || null,
         usage: result?.usage || null,
         requests: 0,
       }).catch(() => {});
@@ -925,21 +1039,38 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       recordModelUsage(opsRef.observability, {
         model: result?.model,
         feature: "weekly_review",
-        provider: result?.source === "deepseek" ? "deepseek" : null,
+        provider: result?.provider || result?.source || null,
         usage: result?.usage || null,
         requests: 0,
       }).catch(() => {});
       return result;
     },
   });
-  const translateQueryRaw = createFoodQueryTranslator({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel });
+  const translateQueryRouted = createFeatureInvoker({
+    feature: "food_query_translation",
+    createService: ({ apiKey, model, route, fetchImpl }) => createFoodQueryTranslator({
+      apiKey,
+      model,
+      translate: async ({ query }) => {
+        const completion = await createTextModelAdapter({ ...route, credential: apiKey }, { fetchImpl }).complete({
+          temperature: 0,
+          maxTokens: 20,
+          messages: [
+            { role: "system", content: "Translate a food name into a short English keyword for USDA FoodData Central. Reply with only the keyword, no punctuation or explanation." },
+            { role: "user", content: query },
+          ],
+        });
+        return { translation: completion.content, usage: completion.usage, model };
+      },
+    }),
+  });
   const translateQuery = async (query) => {
-    const result = await translateQueryRaw(query);
+    const result = await translateQueryRouted(query);
     if (result?.usage && result?.model) {
       recordModelUsage(opsRef.observability, {
         model: result.model,
-        feature: "food_translate",
-        provider: "deepseek",
+        feature: "food_query_translation",
+        provider: result.provider || "deepseek",
         usage: result.usage,
         requests: 0,
       }).catch(() => {});
@@ -1085,6 +1216,27 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     isAdmin: allowAdminConsole,
   });
+  const aiModelConfigService = createAiModelConfigService({
+    db,
+    env,
+    runtimeCatalog: runtimeModelCatalog,
+    isAdmin: allowAdminConsole,
+    audit: adminAudit,
+    getCredentialStatus: async (providerKey) => {
+      try {
+        return (await runtimeProviderCatalog.getRuntimeCredential(providerKey)) ? "PRESENT" : "MISSING";
+      } catch {
+        return null;
+      }
+    },
+  });
+  const aiProviderCatalogService = createAiProviderCatalogService({
+    db,
+    env,
+    isAdmin: allowAdminConsole,
+    audit: adminAudit,
+    modelCatalog: buildModelCatalog({ env, vision }),
+  });
   const adminConsoleAuth = createAdminConsoleAuthService({
     db,
     sessionSecret: config.sessionSecret,
@@ -1110,10 +1262,35 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       console.error("[hunyuan] init failed:", error?.message || error);
     }
   }
+  const imageGenerationAdapters = new Map();
+  if (hunyuanImageService) {
+    imageGenerationAdapters.set("hunyuan", async (route) => createHunyuanGenerationService({
+      env,
+      aiClient,
+      modelName: route.modelKey,
+      createWorkerClient: dependencies.createHunyuanWorkerClient ?? createHunyuanWorkerClient,
+    }));
+  }
+  const resolveFoodImageRoute = () => modelRouteResolver.resolve({ feature: "food_image_generation" });
+  const routedHunyuanImageService = hunyuanImageService ? {
+    ...hunyuanImageService,
+    resolveRoute: resolveFoodImageRoute,
+    async generateOne({ modelRoute, ...input }) {
+      const route = modelRoute || await resolveFoodImageRoute();
+      const createAdapter = imageGenerationAdapters.get(route.providerKey);
+      if (!createAdapter) {
+        const error = new HunyuanImageError("IMAGE_ADAPTER_UNSUPPORTED", "Configured image provider has no registered image adapter");
+        error.provider = route.providerKey;
+        throw error;
+      }
+      const configured = await createAdapter(route);
+      return configured.generateOne(input);
+    },
+  } : null;
   foodImageJobs = createFoodImageJobService({
     db,
     repository: foodRepository,
-    hunyuan: hunyuanImageService,
+    hunyuan: routedHunyuanImageService,
     imageService: foodImageService,
     config: {
       candidateCount: Number(env.HY_IMAGE_CANDIDATE_COUNT) || 1,
@@ -1122,9 +1299,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       maxAttempts: Number(env.HY_IMAGE_MAX_RETRIES) || 3,
       storagePrefix: env.FOOD_IMAGE_STORAGE_PREFIX || "food-library",
       imageCdnBaseUrl: env.FOOD_IMAGE_CDN_BASE_URL,
-      generationEnabled: hunyuanEnabled && Boolean(hunyuanImageService),
+      generationEnabled: hunyuanEnabled && Boolean(routedHunyuanImageService),
     },
     resolveTempFileUrl: getTemporaryUrl,
+    beforeGenerate: ({ feature, route }) => assertModelQuota({ feature, route }),
     triggerWorker: async ({ jobId }) => {
       // Fire-and-forget same-process worker (SCF may freeze after response —
       // also expose POST /api/admin/food-image-jobs/worker for timer triggers).
@@ -1148,7 +1326,6 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     jobs: foodImageJobs,
     dailyCap: Math.min(Number(env.HY_IMAGE_DAILY_LIMIT) || 500, 500),
   });
-  let vision = null;
   let assertImageSafe = null;
   try {
     require("sharp");
@@ -1210,7 +1387,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
             });
           }
           void contentType;
-          return { cloudPath: fileID, imageUrl: imageUrl || toDataUrl() };
+          return { cloudPath: fileID, imageUrl: imageUrl || buildVisionDataUrl({ content, contentType }) };
         } catch (error) {
           lastError = error;
         }
@@ -1279,55 +1456,35 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     }
     throw lastError || new Error("Blocked vision upload failed");
   };
-  const qwenApiKey = typeof env.QWEN_API_KEY === "string" && env.QWEN_API_KEY.trim()
-    ? env.QWEN_API_KEY
-    : env.DASHSCOPE_API_KEY;
-  if (typeof qwenApiKey === "string" && qwenApiKey.trim()) {
-    vision = createVisionDataService({
-      db,
-      provider: "qwen",
-      model: env.QWEN_VL_FLASH_MODEL || "qwen3-vl-flash",
-      analyze: createQwenVisionService({
-        apiKey: qwenApiKey,
-        workspaceId: env.QWEN_WORKSPACE_ID || "llm-ekun6ter25w7d0ms",
-        flashModel: env.QWEN_VL_FLASH_MODEL,
-        plusModel: env.QWEN_VL_PLUS_MODEL,
+  vision = createVisionDataService({
+    db,
+    provider: null,
+    model: null,
+    analyze: createRoutedVisionAnalyzer({
+      resolver: modelRouteResolver,
+      createService: ({ route }) => createQwenVisionService({
+        apiKey: route.credential,
+        flashModel: route.modelKey,
+        plusModel: route.modelKey,
+        provider: "openai-compatible",
+        fetchImpl: createRoutedOpenAiFetch(route),
       }),
-      evaluateMeal,
-      backfillNutrition,
-      assertImageSafe,
-      uploadBlockedImage,
-      uploadImage: uploadVisionImage,
-      recordTrace: (...args) => opsRef.observability?.recordMetric?.(...args),
-    });
-  } else if (typeof env.VITA_API_KEY === "string" && env.VITA_API_KEY) {
-    vision = createVisionDataService({
-      db,
-      model: env.VITA_MODEL,
-      analyze: createVitaVisionService({ apiKey: env.VITA_API_KEY, model: env.VITA_MODEL }),
-      evaluateMeal,
-      backfillNutrition,
-      assertImageSafe,
-      uploadBlockedImage,
-      uploadImage: uploadVisionImage,
-      recordTrace: (...args) => opsRef.observability?.recordMetric?.(...args),
-    });
-  }
-  // Old-image auditing is deliberately Qwen-only: it needs strict visual JSON
-  // output and its credentials stay entirely in this server runtime.
-  const foodImageAudit = typeof qwenApiKey === "string" && qwenApiKey.trim()
-    ? createFoodImageAuditService({
-      db,
-      repository: foodRepository,
-      auditVision: createFoodImageAuditVision({
-        apiKey: qwenApiKey,
-        workspaceId: env.QWEN_WORKSPACE_ID || "llm-ekun6ter25w7d0ms",
-        model: env.QWEN_VL_FLASH_MODEL || "qwen3-vl-flash",
+      beforeInvoke: ({ route, feature }) => modelQuotaPolicy.assertAllowed({
+        providerKey: route.providerKey,
+        modelKey: route.modelKey,
+        featureKey: feature,
       }),
-      jobs: foodImageJobs,
-      requireAdmin: allowAdminConsole,
-    })
-    : null;
+    }),
+    evaluateMeal,
+    backfillNutrition,
+    assertImageSafe,
+    uploadBlockedImage,
+    uploadImage: uploadVisionImage,
+    recordTrace: (...args) => opsRef.observability?.recordMetric?.(...args),
+  });
+  // Image audit has no configurable feature route yet, so keep it unavailable
+  // instead of silently calling a provider/model outside the routing contract.
+  const foodImageAudit = null;
   const operationGuard = typeof db?.from === "function" ? createOperationGuard({ db }) : null;
   const contentModeration = createContentModerationService({ db });
   const visionImageReview = createVisionImageReviewService({
@@ -1455,6 +1612,24 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     })
     : null;
 
+  const coachAnswer = createFeatureInvoker({ feature: "coach", createService: createDeepseekCoachService });
+  const coachStreamAnswer = createFeatureStreamInvoker({ feature: "coach", createService: createDeepseekCoachStreamService });
+  const dailyTip = createFeatureInvoker({
+    feature: "daily_tip",
+    createService: (options) => createDailyTipService({ ...options, source: options.source }),
+  });
+  dailyTip.getQuickPrompt = createFeatureInvoker({
+    feature: "daily_tip",
+    createService: (options) => {
+      const service = createDailyTipService({ ...options, source: options.source });
+      return (input) => service.getQuickPrompt(input);
+    },
+  });
+  const proactiveDailyBrief = createFeatureInvoker({
+    feature: "proactive_daily_brief",
+    createService: (options) => createProactiveDailyBriefService({ ...options, source: options.source }),
+  });
+
   return {
     issue: session.issue,
     verifySession: (token) => verifyAccessToken(token, config.sessionSecret),
@@ -1469,23 +1644,10 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       getWeeklyReview: insights.getWeeklyReview,
       getAccount: data.getAccount,
       model: deepseekModel,
-      answer: typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
-        ? createDeepseekCoachService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
-        : null,
-      streamAnswer: typeof env.DEEPSEEK_API_KEY === "string" && env.DEEPSEEK_API_KEY
-        ? createDeepseekCoachStreamService({ apiKey: env.DEEPSEEK_API_KEY, model: deepseekModel })
-        : null,
-      dailyTip: createDailyTipService({
-        requestCompletion: nutritionContentWorker ? (input) => input.purpose === "coach_quick_prompt"
-          ? nutritionContentWorker.generateCoachQuickPrompt({ context: input.context })
-          : nutritionContentWorker.generateDailyTip({ type: input.type, context: input.context }) : null,
-        model: devTextModel,
-        source: "hunyuan-exp",
-      }),
-      proactiveDailyBrief: createProactiveDailyBriefService({
-        apiKey: env.DEEPSEEK_API_KEY,
-        model: deepseekModel,
-      }),
+      answer: coachAnswer,
+      streamAnswer: coachStreamAnswer,
+      dailyTip,
+      proactiveDailyBrief,
     }),
     feedback: createFeedbackDataService({ db }),
     foodCatalog,
@@ -1494,6 +1656,11 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodBarcode: foodBarcodeService,
     foodAdmin: foodAdminService,
     adminConsole: adminConsoleService,
+    aiModelConfig: aiModelConfigService,
+    aiProviderCatalog: aiProviderCatalogService,
+    modelQuotaPolicy,
+    featureUserQuotaPolicy,
+    modelRouteResolver,
     adminConsoleAuth,
     foodImage: foodImageService,
     foodImageJobs,
@@ -1545,6 +1712,14 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     }),
     calculateNutritionPlan: calculateNutritionPlanWithAi,
   };
+}
+
+function buildVisionDataUrl({ content, contentType }) {
+  if (!Buffer.isBuffer(content) || !content.length) throw new Error("Vision image content is unavailable");
+  const safeContentType = typeof contentType === "string" && /^image\/(?:jpeg|png|gif|webp)$/i.test(contentType)
+    ? contentType.toLowerCase()
+    : "image/jpeg";
+  return `data:${safeContentType};base64,${content.toString("base64")}`;
 }
 
 function readBearerToken(req) {
@@ -1664,6 +1839,17 @@ function getAdminFoodRoute(pathname) {
   const userDetailMatch = path.match(/^\/users\/([^/]+)$/i);
   if (userDetailMatch) return { operation: "userDetail", userId: decodeURIComponent(userDetailMatch[1]) };
   if (path === "/login") return { operation: "adminLogin" };
+  const aiProviderCredentialMatch = path.match(/^\/ai\/providers\/([^/]+)\/credential$/i);
+  if (aiProviderCredentialMatch) return { operation: "aiProviderCredential", providerKey: decodeURIComponent(aiProviderCredentialMatch[1]) };
+  const aiProviderSyncMatch = path.match(/^\/ai\/providers\/([^/]+)\/sync$/i);
+  if (aiProviderSyncMatch) return { operation: "aiProviderSync", providerKey: decodeURIComponent(aiProviderSyncMatch[1]) };
+  const aiProviderTestMatch = path.match(/^\/ai\/providers\/([^/]+)\/test$/i);
+  if (aiProviderTestMatch) return { operation: "aiProviderTest", providerKey: decodeURIComponent(aiProviderTestMatch[1]) };
+  if (path === "/ai/providers") return { operation: "aiProviders" };
+  if (path === "/ai/catalog") return { operation: "aiCatalog" };
+  const aiModelItemMatch = path.match(/^\/ai\/models\/([^/]+)$/i);
+  if (aiModelItemMatch) return { operation: "aiModelItem", modelId: decodeURIComponent(aiModelItemMatch[1]) };
+  if (path === "/ai/models") return { operation: "aiModels" };
   if (path === "/jobs") return { operation: "jobList" };
   const jobRunMatch = path.match(/^\/jobs\/([a-z0-9_-]+)\/run-now$/i);
   if (jobRunMatch) return { operation: "jobRunNow", jobKey: jobRunMatch[1] };
@@ -1676,6 +1862,8 @@ function getAdminFoodRoute(pathname) {
   if (traceDetailMatch) return { operation: "traceDetail", traceId: decodeURIComponent(traceDetailMatch[1]) };
   if (path === "/ops/overview") return { operation: "opsOverview" };
   if (path === "/ops/quota") return { operation: "opsQuota" };
+  if (path === "/ops/model-quota-policies") return { operation: "modelQuotaPolicies" };
+  if (path === "/ops/feature-user-quota-policies") return { operation: "featureUserQuotaPolicies" };
   if (path === "/ops/quota/model") return { operation: "opsQuotaModel" };
   if (path === "/ops/deletion-log") return { operation: "opsDeletionLog" };
   if (path === "/ops/moderation-flags") return { operation: "opsModerationFlags" };
@@ -1827,6 +2015,7 @@ function captureTraceError(res, error) {
 }
 
 function sendMealError(res, error) {
+  captureTraceError(res, error);
   if (error instanceof PublicMealDataError || error instanceof PublicMealAnalysisError) {
     const statusCode = error.code === "MEAL_DATA_INVALID" ? 400 : 503;
     sendJson(res, statusCode, { code: error.code, message: error.message || error.code });
@@ -1871,11 +2060,23 @@ function createHttpServer({ service }) {
       res.__traceContext = { request: { method: req.method, route: url.pathname, query: Object.fromEntries(url.searchParams.entries()) }, response: null };
       req.__traceContext = res.__traceContext;
       res.once("finish", () => {
+        const status = res.statusCode >= 400 ? (res.statusCode === 408 ? "timed_out" : "failed") : "succeeded";
+        const errorCode = res.__traceContext.errorCode || null;
+        const startedAtMs = new Date(genericTrace.startedAt).getTime();
+        const durationMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : null;
+        service.observability.recordStage?.(genericTrace, {
+          name: "request",
+          startedAt: genericTrace.startedAt,
+          durationMs,
+          status,
+          providerHttpStatus: res.statusCode,
+          errorCode,
+        });
         service.observability.finishTrace(genericTrace, {
-          status: res.statusCode >= 400 ? (res.statusCode === 408 ? "timed_out" : "failed") : "succeeded",
+          status,
           httpStatus: res.statusCode,
-          errorCode: res.__traceContext.errorCode || null,
-          meta: { route: url.pathname, method: req.method, request: res.__traceContext.request, response: res.__traceContext.response, internalError: res.__traceContext.internalError, sanitizationVersion: "3" },
+          errorCode,
+          meta: { route: url.pathname, method: req.method, request: res.__traceContext.request, response: res.__traceContext.response, internalError: res.__traceContext.internalError, sanitizationVersion: "4" },
         }).catch(() => {});
       });
     }
@@ -1937,6 +2138,7 @@ function createHttpServer({ service }) {
         }));
         return sendJson(res, 200, { claimed: jobs.length, jobs });
       } catch (error) {
+        captureTraceError(res, error);
         if (internalVisionAnalysisRoute.operation === "provisionTransportFixture"
           || internalVisionAnalysisRoute.operation === "cleanupTransportFixture") {
           const code = /^[A-Z0-9_:-]{1,80}$/.test(String(error?.code || ""))
@@ -1966,6 +2168,7 @@ function createHttpServer({ service }) {
         if (!analysis) return sendJson(res, 404, { code: "NOT_FOUND" });
         return sendJson(res, 200, analysis);
       } catch (error) {
+        captureTraceError(res, error);
         console.error("[vision-analysis-status] failed:", error?.message || error);
         return sendJson(res, 503, { code: "VISION_ANALYSIS_STATUS_UNAVAILABLE" });
       }
@@ -2013,6 +2216,7 @@ function createHttpServer({ service }) {
         const dispatch = await service.foodImageBatches.dispatchTrusted({ maxItems: payload.body?.maxItems });
         return sendJson(res, 200, patrol === undefined ? dispatch : { ...dispatch, patrol });
       } catch (error) {
+        captureTraceError(res, error);
         console.error("[food-image-dispatch] failed:", error?.code || error?.message || error);
         return sendJson(res, 503, { code: "FOOD_IMAGE_DISPATCH_FAILED" });
       }
@@ -2138,6 +2342,7 @@ function createHttpServer({ service }) {
         if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         return sendJson(res, 200, await service.foodCatalog.getById(session.sub, foodRoute.foodId));
       } catch (error) {
+        captureTraceError(res, error);
         if (error instanceof PublicFoodCatalogError) return sendJson(res, 400, { code: error.code });
         if (error instanceof FoodBarcodeError) return sendJson(res, error.code === "FOOD_BARCODE_NOT_FOUND" ? 404 : 400, { code: error.code });
         if (error instanceof FoodImageError) return sendJson(res, 400, { code: error.code });
@@ -2164,6 +2369,44 @@ function createHttpServer({ service }) {
       const session = requireAdminConsoleSession(service, req);
       if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED", message: "请先使用帐号密码登录后台" });
       try {
+        if (adminFoodRoute.operation === "aiModels") {
+          if (!service.aiModelConfig) return sendJson(res, 503, { code: "AI_MODEL_CONFIG_UNAVAILABLE" });
+          if (req.method === "GET") return sendJson(res, 200, await service.aiModelConfig.listModels(session.sub));
+          if (req.method === "POST") return sendJson(res, 201, await service.aiModelConfig.createModel(session.sub, await readJsonBody(req, 32 * 1024)));
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "aiProviders" || adminFoodRoute.operation === "aiCatalog") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.aiProviderCatalog) return sendJson(res, 503, { code: "AI_PROVIDER_CATALOG_UNAVAILABLE" });
+          return sendJson(res, 200, adminFoodRoute.operation === "aiProviders"
+            ? await service.aiProviderCatalog.listProviders(session.sub)
+            : await service.aiProviderCatalog.listCatalog(session.sub));
+        }
+        if (adminFoodRoute.operation === "aiProviderCredential" || adminFoodRoute.operation === "aiProviderSync" || adminFoodRoute.operation === "aiProviderTest") {
+          if (!service.aiProviderCatalog) return sendJson(res, 503, { code: "AI_PROVIDER_CATALOG_UNAVAILABLE" });
+          const { providerKey } = adminFoodRoute;
+          if (adminFoodRoute.operation === "aiProviderCredential") {
+            if (req.method !== "PUT") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+            return sendJson(res, 200, await service.aiProviderCatalog.saveCredential(session.sub, providerKey, await readJsonBody(req, 16 * 1024)));
+          }
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, adminFoodRoute.operation === "aiProviderSync"
+            ? await service.aiProviderCatalog.syncModels(session.sub, providerKey)
+            : await service.aiProviderCatalog.testProvider(session.sub, providerKey));
+        }
+        if (adminFoodRoute.operation === "aiModelItem") {
+          if (req.method === "DELETE") {
+            if (!service.aiModelConfig?.deleteModel) return sendJson(res, 503, { code: "AI_MODEL_CONFIG_UNAVAILABLE" });
+            return sendJson(res, 200, await service.aiModelConfig.deleteModel(session.sub, adminFoodRoute.modelId));
+          }
+          if (req.method !== "PUT") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.aiModelConfig) return sendJson(res, 503, { code: "AI_MODEL_CONFIG_UNAVAILABLE" });
+          return sendJson(res, 200, await service.aiModelConfig.updateModel(
+            session.sub,
+            adminFoodRoute.modelId,
+            await readJsonBody(req, 32 * 1024),
+          ));
+        }
         if (adminFoodRoute.operation === "jobList") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.jobOps?.listJobs) return sendJson(res, 503, { code: "JOBS_UNAVAILABLE" });
@@ -2217,6 +2460,8 @@ function createHttpServer({ service }) {
             stage: url.searchParams.get("stage") || undefined,
             status: url.searchParams.get("status") || undefined,
             errorCode: url.searchParams.get("errorCode") || undefined,
+            route: url.searchParams.get("route") || undefined,
+            httpStatus: url.searchParams.get("httpStatus") || undefined,
             from: url.searchParams.get("from") || undefined,
             to: url.searchParams.get("to") || undefined,
             page: url.searchParams.get("page"),
@@ -2267,6 +2512,24 @@ function createHttpServer({ service }) {
           }
           return sendJson(res, 200, overview);
         }
+        if (adminFoodRoute.operation === "modelQuotaPolicies") {
+          if (!service.modelQuotaPolicy) return sendJson(res, 503, { code: "MODEL_QUOTA_POLICY_UNAVAILABLE" });
+          if (req.method === "GET") return sendJson(res, 200, { items: await service.modelQuotaPolicy.listPolicies() });
+          if (req.method === "PUT") return sendJson(res, 200, await service.modelQuotaPolicy.savePolicy(
+            session.sub,
+            await readJsonBody(req, 16 * 1024),
+          ));
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "featureUserQuotaPolicies") {
+          if (!service.featureUserQuotaPolicy) return sendJson(res, 503, { code: "FEATURE_USER_QUOTA_UNAVAILABLE" });
+          if (req.method === "GET") return sendJson(res, 200, { items: await service.featureUserQuotaPolicy.listPolicies() });
+          if (req.method === "PUT") return sendJson(res, 200, await service.featureUserQuotaPolicy.savePolicy(
+            session.sub,
+            await readJsonBody(req, 16 * 1024),
+          ));
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
         if (adminFoodRoute.operation === "opsQuota") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.observability?.getUsageReport) return sendJson(res, 503, { code: "OPS_QUOTA_UNAVAILABLE" });
@@ -2302,7 +2565,23 @@ function createHttpServer({ service }) {
           }
           const foodToday = foodImageQuota?.usage ?? foodImage?.dailyGenerated ?? 0;
           const foodTotal = foodImageSeries.reduce((sum, point) => sum + (Number(point.value) || 0), 0);
-          const catalog = service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision });
+          const runtimeCatalog = service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision });
+          let configuredModels = [];
+          try {
+            configuredModels = (await service.aiModelConfig?.listModels(session.sub))?.items || [];
+          } catch (error) {
+            console.warn("[ops-quota] configured model catalog unavailable:", error?.message || error);
+          }
+          let modelQuotaPolicies = [];
+          try {
+            modelQuotaPolicies = await service.modelQuotaPolicy?.listPolicyUsage?.() || [];
+          } catch (error) {
+            console.warn("[ops-quota] model quota policies unavailable:", error?.message || error);
+          }
+          const catalog = mergeModelQuotaPolicies(
+            mergeConfiguredModelCatalog(runtimeCatalog, configuredModels),
+            modelQuotaPolicies,
+          );
           let modelBoard = { models: [] };
           if (service.observability?.getModelBoard) {
             try {
@@ -2333,6 +2612,7 @@ function createHttpServer({ service }) {
               coachMessages: overview.coach?.messages ?? 0,
               coachLimited: overview.coach?.limited ?? 0,
             },
+            modelQuotaPolicies,
             usage,
             foodImage,
             foodImageQuota,
@@ -2349,6 +2629,7 @@ function createHttpServer({ service }) {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.observability?.getModelDetail) return sendJson(res, 503, { code: "OPS_QUOTA_UNAVAILABLE" });
           const model = url.searchParams.get("model");
+          const provider = url.searchParams.get("provider");
           if (!model) return sendJson(res, 400, { code: "MODEL_REQUIRED", message: "缺少 model 参数" });
           const days = Number(url.searchParams.get("days") ?? "30");
           let foodImageSeries = [];
@@ -2361,8 +2642,12 @@ function createHttpServer({ service }) {
           }
           return sendJson(res, 200, await service.observability.getModelDetail({
             model,
+            provider,
             days,
-            catalog: service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision }),
+            catalog: mergeConfiguredModelCatalog(
+              service.modelCatalog || buildModelCatalog({ env: process.env, vision: service.vision }),
+              (await service.aiModelConfig?.listModels(session.sub))?.items || [],
+            ),
             foodImageSeries,
           }));
         }
@@ -2788,6 +3073,21 @@ function createHttpServer({ service }) {
           return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         }
       } catch (error) {
+        if (error instanceof ModelQuotaPolicyError) {
+          const status = error.code.endsWith("_READ_FAILED") || error.code.endsWith("_SAVE_FAILED") || error.code.endsWith("_UNAVAILABLE") ? 503 : 400;
+          return sendJson(res, status, { code: error.code, ...(status === 400 ? { message: error.message } : {}) });
+        }
+        if (error instanceof AiModelConfigError) {
+          const status = error.code === "FORBIDDEN" ? 403
+            : error.code.endsWith("_READ_FAILED") || error.code.endsWith("_WRITE_FAILED") ? 503 : 400;
+          return sendJson(res, status, { code: error.code, ...(status === 400 ? { message: error.message } : {}) });
+        }
+        if (error instanceof AiProviderCatalogError) {
+          const status = error.code === "FORBIDDEN" ? 403
+            : error.code === "CREDENTIAL_MISSING" ? 400
+            : error.code.endsWith("_READ_FAILED") || error.code.endsWith("_WRITE_FAILED") ? 503 : 400;
+          return sendJson(res, status, { code: error.code, message: error.message });
+        }
         if (error instanceof JobOpsError) {
           const status = error.code === "JOB_NOT_ALLOWED" ? 400 : 503;
           return sendJson(res, status, { code: error.code });
@@ -2879,6 +3179,7 @@ function createHttpServer({ service }) {
         if (milestoneRoute.operation === "share" && req.method === "POST") return sendJson(res, 200, await service.milestones.recordShare(session.sub, milestoneRoute.eventId));
         return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       } catch (error) {
+        captureTraceError(res, error);
         const message = error?.message || "MILESTONE_SERVICE_UNAVAILABLE";
         const status = /not found|unavailable/i.test(message) ? 404 : /claim/i.test(message) ? 409 : 503;
         return sendJson(res, status, { code: status === 409 ? "MILESTONE_CLAIM_INVALID" : "MILESTONE_SERVICE_UNAVAILABLE", message });
@@ -2934,6 +3235,7 @@ function createHttpServer({ service }) {
         }
         return sendJson(res, 200, await service.insights[insightOperation](session.sub, date));
       } catch (error) {
+        captureTraceError(res, error);
         const code = error?.code || (String(error?.message || "").includes("Invalid date") ? "INSIGHT_DATA_INVALID" : "INSIGHT_SERVICE_UNAVAILABLE");
         const status = code === "INSIGHT_DATA_INVALID" || code === "MEAL_DATA_INVALID" ? 400 : 503;
         console.error("[insights] failed:", code, error?.message || error);
@@ -2962,7 +3264,7 @@ function createHttpServer({ service }) {
             recordModelUsage(service.observability, {
               model: tip.model,
               feature: "daily_tip",
-              provider: tip.source === "deepseek" ? "deepseek" : tip.source === "hunyuan-exp" ? "hunyuan" : tip.source || null,
+              provider: tip.provider || (tip.source === "hunyuan-exp" ? "hunyuan" : tip.source || null),
               usage: tip.usage || null,
               requests: 1,
             }).catch(() => {});
@@ -2973,11 +3275,11 @@ function createHttpServer({ service }) {
           const date = url.searchParams.get("date");
           if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
           const brief = await service.coach.getDailyBrief(session.sub, date);
-          if (!brief?.cached && brief?.model && brief?.source === "deepseek") {
+          if (!brief?.cached && brief?.model && brief?.source !== "rule_v2") {
             recordModelUsage(service.observability, {
               model: brief.model,
               feature: "proactive_daily_brief",
-              provider: "deepseek",
+              provider: brief.provider || brief.source || null,
               usage: brief.usage || null,
               requests: 1,
             }).catch(() => {});
@@ -3008,19 +3310,22 @@ function createHttpServer({ service }) {
             }
             throw error;
           }
+          await service.featureUserQuotaPolicy?.assertAllowed?.({ userId: session.sub, featureKey: "coach" });
           const result = await service.coach.sendMessage(session.sub, body);
-          const coachModel = result?.model
-            || service.modelCatalog?.find((item) => item.feature === "coach")?.model
-            || null;
+          const coachProvider = result?.provider || (result?.source && result.source !== "rule_v2" ? result.source : null);
+          const coachModel = coachProvider
+            ? (result?.model || service.modelCatalog?.find((item) => item.feature === "coach")?.model || null)
+            : null;
           service.observability?.recordMetric?.("coach_message", 1, {
             userId: session.sub,
             feature: "coach",
             model: coachModel,
+            provider: coachProvider,
           }).catch(() => {});
           recordModelUsage(service.observability, {
             model: coachModel,
             feature: "coach",
-            provider: "deepseek",
+            provider: coachProvider,
             usage: result?.usage || null,
             requests: 0,
           }).catch(() => {});
@@ -3047,6 +3352,7 @@ function createHttpServer({ service }) {
             }
             throw error;
           }
+          await service.featureUserQuotaPolicy?.assertAllowed?.({ userId: session.sub, featureKey: "coach" });
           res.writeHead(200, {
             "Content-Type": "application/x-ndjson; charset=utf-8",
             "Cache-Control": "no-cache",
@@ -3055,18 +3361,20 @@ function createHttpServer({ service }) {
           try {
             for await (const event of service.coach.streamMessage(session.sub, body)) {
               if (event?.type === "complete") {
-                const coachModel = event?.model
-                  || service.modelCatalog?.find((item) => item.feature === "coach")?.model
-                  || null;
+                const coachProvider = event?.provider || (event?.source && event.source !== "rule_v2" ? event.source : null);
+                const coachModel = coachProvider
+                  ? (event?.model || service.modelCatalog?.find((item) => item.feature === "coach")?.model || null)
+                  : null;
                 service.observability?.recordMetric?.("coach_message", 1, {
                   userId: session.sub,
                   feature: "coach",
                   model: coachModel,
+                  provider: coachProvider,
                 }).catch(() => {});
                 recordModelUsage(service.observability, {
                   model: coachModel,
                   feature: "coach",
-                  provider: "deepseek",
+                  provider: coachProvider,
                   usage: event?.usage || null,
                   requests: 0,
                 }).catch(() => {});
@@ -3091,7 +3399,8 @@ function createHttpServer({ service }) {
               model: service.modelCatalog?.find((item) => item.feature === "coach")?.model || null,
             }).catch(() => {});
           }
-          const status = error.code === "SESSION_USER_MISSING" ? 401 : error.code === "COACH_DAILY_LIMIT_REACHED" ? 429 : 400;
+          const status = error.code === "SESSION_USER_MISSING" ? 401
+            : (error.code === "COACH_DAILY_LIMIT_REACHED" || error.code === "FEATURE_USER_QUOTA_EXCEEDED") ? 429 : 400;
           return sendJson(res, status, { code: error.code, message: error.message });
         }
         console.error("[coach] failed:", error?.message || error);
@@ -3191,6 +3500,7 @@ function createHttpServer({ service }) {
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
       let quotaReservation = null;
       let quotaReservationOwned = false;
+      let completedVisionResult = null;
       let hybridAnalysisId = null;
       let hybridHandoffAccepted = false;
       let clientRequestId = null;
@@ -3233,6 +3543,7 @@ function createHttpServer({ service }) {
         });
         // Invalid or oversized local camera files must not consume a daily scan.
         service.vision?.validateImage?.(body);
+        await service.featureUserQuotaPolicy?.assertAllowed?.({ userId: session.sub, featureKey: "food_recognition" });
         const supportsAsyncVision = body?.clientCapabilities?.supportsAsyncVision === true;
         if (service.visionAnalysisFoundationEnabled && supportsAsyncVision) {
           // Keep the synchronous request budget unchanged; the durable async
@@ -3249,8 +3560,8 @@ function createHttpServer({ service }) {
               const created = await service.visionAnalysisFoundation.createVisionAnalysis({
                 userId: session.sub,
                 clientRequestId,
-                provider: service.vision?.provider || "qwen",
-                model: service.vision?.model || "qwen3-vl-flash",
+                provider: service.vision?.provider || null,
+                model: service.vision?.model || null,
                 deadlineAt,
                 reservationExpiresAt,
               });
@@ -3314,7 +3625,7 @@ function createHttpServer({ service }) {
           }).catch(() => {});
           return sendJson(res, hybridResponse.httpStatus, hybridResponse.body);
         }
-        if (service.operationGuard) {
+        if (service.operationGuard && VISION_QUOTA_POLICY.enforce) {
           if (
             typeof service.operationGuard.reserveVisionQuota !== "function"
             || typeof service.operationGuard.commitVisionQuota !== "function"
@@ -3323,9 +3634,9 @@ function createHttpServer({ service }) {
             throw new PublicOperationError("VISION_QUOTA_UNAVAILABLE", "识别额度服务暂时不可用，请稍后重试");
           }
           quotaReservation = await service.operationGuard.reserveVisionQuota(session.sub, clientRequestId, {
-            dailyLimit: VISION_DAILY_LIMIT,
+            dailyLimit: VISION_QUOTA_POLICY.dailyLimit,
             dailyWindowSeconds: VISION_DAILY_WINDOW_SECONDS,
-            burstLimit: VISION_BURST_LIMIT,
+            burstLimit: VISION_QUOTA_POLICY.burstLimit,
             burstWindowSeconds: VISION_BURST_WINDOW_SECONDS,
             ttlSeconds: VISION_QUOTA_RESERVATION_TTL_SECONDS,
           });
@@ -3347,6 +3658,7 @@ function createHttpServer({ service }) {
           provider: service.vision?.provider || null,
         };
         const result = await service.vision.analyzeImage(session.sub, body, { budget, observe: observeVisionStage });
+        completedVisionResult = result;
         if (quotaReservationOwned) {
           const committed = await service.operationGuard.commitVisionQuota(session.sub, clientRequestId, result);
           if (!committed.committed) {
@@ -3445,14 +3757,38 @@ function createHttpServer({ service }) {
           || error.code === "VISION_NON_FOOD"
           || error.code === "VISION_CONTENT_BLOCKED"
         ) ? 400 : 503;
+        const knownModelQuotaError = error instanceof ModelQuotaPolicyError;
+        const knownFeatureUserQuotaError = error instanceof FeatureUserQuotaPolicyError;
+        const modelQuotaStatus = error?.code === "MODEL_QUOTA_EXCEEDED" ? 429 : 503;
         const traceStage = stageEvents[stageEvents.length - 1] || {};
         const requestTotalDurationMs = Date.now() - startedAt;
         const traceStatus = error?.code === "VISION_TIMEOUT" ? "timed_out" : "failed";
+        if (completedVisionResult && VISION_QUOTA_POLICY.isDev && traceStage.persistenceSuccess === true) {
+          service.observability?.finishTrace?.(visionTrace, {
+            status: "succeeded",
+            httpStatus: 200,
+            provider: completedVisionResult.provider || service.vision?.provider || null,
+            meta: {
+              ...traceMetaBase,
+              stage: "completed",
+              lastSuccessfulStage: "persistence",
+              requestTotalDurationMs,
+              remainingBudgetMs: budget.remainingMs(),
+              quotaState: "disabled_dev",
+              quotaDelta: 0,
+              businessCode: null,
+            },
+          }).catch(() => {});
+          console.warn("[vision] DEV post-completion cleanup error ignored:", error?.code || error?.message || error);
+          return sendJson(res, 200, completedVisionResult);
+        }
         const storageUploadEvent = [...stageEvents].reverse().find((event) => event.stage === "storage_upload") || {};
         const tempUrlEvent = [...stageEvents].reverse().find((event) => event.stage === "temp_url_generation") || {};
         service.observability?.finishTrace?.(visionTrace, {
           status: traceStatus,
-          httpStatus: error instanceof PublicOperationError && error.code === "RATE_LIMITED" ? 429
+          httpStatus: knownFeatureUserQuotaError ? (error.code === "FEATURE_USER_QUOTA_EXCEEDED" ? 429 : 503)
+            : knownModelQuotaError ? modelQuotaStatus
+            : error instanceof PublicOperationError && error.code === "RATE_LIMITED" ? 429
             : error instanceof PublicOperationError && error.code === "OPERATION_IN_PROGRESS" ? 409
               : knownVisionStatus,
           errorCode: error?.code || "VISION_SERVICE_UNAVAILABLE",
@@ -3498,6 +3834,12 @@ function createHttpServer({ service }) {
             feature: "vision",
           }).catch(() => {});
           return sendJson(res, 429, { code: error.code, message: error.message });
+        }
+        if (knownModelQuotaError) {
+          return sendJson(res, modelQuotaStatus, { code: error.code, message: error.message });
+        }
+        if (knownFeatureUserQuotaError) {
+          return sendJson(res, error.code === "FEATURE_USER_QUOTA_EXCEEDED" ? 429 : 503, { code: error.code, message: error.message });
         }
         if (error instanceof PublicOperationError) {
           return sendJson(res, error.code === "OPERATION_IN_PROGRESS" ? 409 : 503, { code: error.code, message: error.message });
@@ -3545,7 +3887,7 @@ function createHttpServer({ service }) {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.data?.getAccount) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-      try { return sendJson(res, 200, await service.data.getAccount(session.sub)); } catch { return sendJson(res, 503, { code: "ACCOUNT_READ_FAILED" }); }
+      try { return sendJson(res, 200, await service.data.getAccount(session.sub)); } catch (error) { captureTraceError(res, error); return sendJson(res, 503, { code: "ACCOUNT_READ_FAILED" }); }
     }
     if (dataOperation === "accountUsage" && req.method === "GET") {
       const session = await authorizeProductRequest(service, req, res);
@@ -3562,10 +3904,10 @@ function createHttpServer({ service }) {
         }
         const vision = service.operationGuard?.getQuotaUsage
           ? await service.operationGuard.getQuotaUsage(session.sub, "vision_analysis_daily", {
-              limit: VISION_DAILY_LIMIT,
+              limit: VISION_QUOTA_POLICY.dailyLimit,
               windowSeconds: VISION_DAILY_WINDOW_SECONDS,
             })
-          : { used: 0, limit: VISION_DAILY_LIMIT, remaining: VISION_DAILY_LIMIT };
+          : { used: 0, limit: VISION_QUOTA_POLICY.dailyLimit, remaining: VISION_QUOTA_POLICY.dailyLimit };
         return sendJson(res, 200, { vision, coach });
       } catch (error) {
         console.error("[account-usage] failed:", error?.message || error);
@@ -3615,19 +3957,19 @@ function createHttpServer({ service }) {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.data?.getNutritionPlan) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-      try { return sendJson(res, 200, await service.data.getNutritionPlan(session.sub)); } catch { return sendJson(res, 503, { code: "NUTRITION_PLAN_READ_FAILED" }); }
+      try { return sendJson(res, 200, await service.data.getNutritionPlan(session.sub)); } catch (error) { captureTraceError(res, error); return sendJson(res, 503, { code: "NUTRITION_PLAN_READ_FAILED" }); }
     }
     if (dataOperation === "saveSettings" && req.method === "PATCH") {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.data?.saveSettings) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-      try { return sendJson(res, 200, await service.data.saveSettings(session.sub, await readJsonBody(req))); } catch { return sendJson(res, 400, { code: "SETTINGS_SAVE_FAILED" }); }
+      try { return sendJson(res, 200, await service.data.saveSettings(session.sub, await readJsonBody(req))); } catch (error) { captureTraceError(res, error); return sendJson(res, 400, { code: "SETTINGS_SAVE_FAILED" }); }
     }
     if (dataOperation === "nutritionPlan" && req.method === "PATCH") {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.data?.saveNutritionPlan) return sendJson(res, 401, { code: "UNAUTHORIZED" });
-      try { return sendJson(res, 200, await service.data.saveNutritionPlan(session.sub, await readJsonBody(req))); } catch { return sendJson(res, 400, { code: "NUTRITION_PLAN_SAVE_FAILED" }); }
+      try { return sendJson(res, 200, await service.data.saveNutritionPlan(session.sub, await readJsonBody(req))); } catch (error) { captureTraceError(res, error); return sendJson(res, 400, { code: "NUTRITION_PLAN_SAVE_FAILED" }); }
     }
     if (dataOperation === "previewNutritionPlan" && req.method === "POST") {
       const session = await authorizeProductRequest(service, req, res);
@@ -3643,7 +3985,7 @@ function createHttpServer({ service }) {
           recordModelUsage(service.observability, {
             model: aiPlan.model,
             feature: "nutrition_plan",
-            provider: "deepseek",
+            provider: aiPlan.provider || aiPlan.source || null,
             usage: aiPlan.usage,
             requests: 0,
           }).catch(() => {});
@@ -3712,6 +4054,9 @@ if (require.main === module) {
 
 module.exports = {
   buildModelCatalog,
+  buildVisionDataUrl,
+  mergeConfiguredModelCatalog,
+  mergeModelQuotaPolicies,
   createHttpServer,
   createHunyuanGenerationService,
   createRuntimeService,

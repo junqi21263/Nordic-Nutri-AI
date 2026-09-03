@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createVisionBudget } from "./vision-budget.cjs";
 
+test("production vision defaults leave enough time for a slow visual provider", async () => {
+  const { VISION_BUDGETS } = await import("./vision-budget.cjs");
+
+  assert.equal(VISION_BUDGETS.serverTotalMs, 30_000);
+  assert.equal(VISION_BUDGETS.flashMaxMs, 18_000);
+});
+
 test("vision budget exposes one absolute deadline and remaining time", () => {
   const budget = createVisionBudget({ now: () => 1_000, totalMs: 12_500 });
 

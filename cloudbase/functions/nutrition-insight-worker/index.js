@@ -106,6 +106,7 @@ function readWorkerConfig(env = process.env) {
   return {
     envId,
     sharedSecret,
+    cloudbaseApiKey: boundedText(env.CLOUDBASE_APIKEY, 4096),
     modelName: boundedText(env.HY_TEXT_MODEL, 100) || DEFAULT_MODEL,
   };
 }
@@ -113,7 +114,10 @@ function readWorkerConfig(env = process.env) {
 function createWorkerService(env = process.env, dependencies = {}) {
   const config = readWorkerConfig(env);
   const cloudbase = dependencies.cloudbaseNodeSdk ?? require("@cloudbase/node-sdk");
-  const app = cloudbase.init({ env: config.envId });
+  const app = cloudbase.init({
+    env: config.envId,
+    ...(config.cloudbaseApiKey ? { accessKey: config.cloudbaseApiKey } : {}),
+  });
   const ai = typeof app.ai === "function" ? app.ai() : app.ai;
   if (!ai || typeof ai.createModel !== "function") throw new Error("CloudBase AI client is unavailable");
   const model = ai.createModel(MODEL_GROUP);

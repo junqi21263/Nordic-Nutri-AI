@@ -192,6 +192,32 @@ test("worker runtime wires foundation claim, quota, and CAS terminal transitions
   assert.deepEqual(calls, [["complete", "analysis-6", 4], ["commit", "analysis-6"]]);
 });
 
+test("missing image path fails the async job and releases its quota reservation", async () => {
+  const calls = [];
+  const worker = createWiredVisionWorker({
+    claimJob: async () => [{
+      id: "analysis-missing-image",
+      user_id: "user-1",
+      client_request_id: "11111111-1111-4111-8111-111111111111",
+      status: "analyzing",
+      execution_owner: "async",
+      version: 9,
+      image_path: null,
+    }],
+    resolveImageUrl: async () => { throw new Error("must not resolve a missing path"); },
+    vision: { analyzeImage: async () => { throw new Error("must not call provider"); } },
+    completeJob: async () => { throw new Error("must not complete"); },
+    failJob: async (job, error) => calls.push(["fail", job.id, error.code]),
+    releaseQuota: async (id) => calls.push(["release", id]),
+  });
+
+  await assert.rejects(worker.processOnce(), (error) => error.code === "VISION_ASSET_PATH_MISSING");
+  assert.deepEqual(calls, [
+    ["fail", "analysis-missing-image", "VISION_ASSET_PATH_MISSING"],
+    ["release", "analysis-missing-image"],
+  ]);
+});
+
 test("expired async deadline stops before the second provider attempt", async () => {
   let providerCalls = 0;
   const calls = [];

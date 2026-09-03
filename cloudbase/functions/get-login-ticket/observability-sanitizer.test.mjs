@@ -58,3 +58,19 @@ test("trace diagnostics keep image, request, and provider timing fields", () => 
     },
   );
 });
+
+test("keeps bounded nested request and response payloads while redacting secrets", () => {
+  const result = sanitizeTraceMeta({
+    request: {
+      body: {
+        items: Array.from({ length: 3 }, (_, index) => ({ name: `food-${index}`, note: "x".repeat(400) })),
+        authorization: "Bearer must-not-persist",
+      },
+    },
+    response: { code: "MEAL_SERVICE_UNAVAILABLE", message: "database connection reset" },
+  });
+
+  assert.equal(result.request.body.items[1].note.length, 400);
+  assert.equal(result.request.body.authorization, "[REDACTED]");
+  assert.equal(result.response.code, "MEAL_SERVICE_UNAVAILABLE");
+});

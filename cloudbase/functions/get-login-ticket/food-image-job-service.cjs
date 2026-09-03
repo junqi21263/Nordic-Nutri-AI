@@ -58,6 +58,7 @@ function createFoodImageJobService({
   config = {},
   triggerWorker,
   resolveTempFileUrl,
+  beforeGenerate,
 } = {}) {
   if (!db || !repository) throw new Error("Food image job service requires db + repository");
 
@@ -371,10 +372,27 @@ function createFoodImageJobService({
     let generated = Number(row.generated_count) || 0;
     let failures = 0;
     let lastCandidateError = "";
+    let terminalErrorCode = null;
 
     while (generated < target) {
       const imageId = crypto.randomUUID();
       try {
+        const modelRoute = typeof hunyuan.resolveRoute === "function"
+          ? await hunyuan.resolveRoute()
+          : {
+              providerKey: "hunyuan",
+              modelKey: hunyuan.modelName,
+              featureKey: "food_image_generation",
+            };
+        if (typeof beforeGenerate === "function") {
+          await beforeGenerate({
+            feature: "food_image_generation",
+            route: modelRoute,
+            job: mapJobRow(row),
+            food,
+            candidateIndex: generated,
+          });
+        }
         const generatedImage = await hunyuan.generateOne({
           foodNameZh: food.nameZh,
           foodNameEn: food.nameEn,
@@ -387,6 +405,7 @@ function createFoodImageJobService({
           servingDescription: row.serving_description,
           extraPrompt: row.extra_prompt,
           visualProfileKey: row.visual_profile_key,
+          modelRoute,
         });
         const downloaded = await hunyuan.downloadGeneratedImage(generatedImage.temporaryUrl);
         const persisted = await imageService.persistGeneratedImage({
@@ -443,6 +462,10 @@ function createFoodImageJobService({
           error?.message || String(error),
         ].filter(Boolean).join(": ").slice(0, 800);
         console.error("[food-image-jobs] candidate failed:", lastCandidateError);
+        if (String(error?.code || "").startsWith("MODEL_QUOTA_")) {
+          terminalErrorCode = error.code;
+          break;
+        }
         if (failures >= 3 && generated === 0) break;
       }
     }
@@ -462,6 +485,17 @@ function createFoodImageJobService({
 
     const attempts = Number(row.attempt_count || 0);
     const maxAttempts = Number(row.max_attempts || 3);
+    if (terminalErrorCode) {
+      await db.from("food_image_jobs").update({
+        status: "failed",
+        error_code: terminalErrorCode,
+        error_message: lastCandidateError || terminalErrorCode,
+        finished_at: new Date().toISOString(),
+      }).eq("id", row.id);
+      if (row.visual_profile_id) await db.from("food_image_visual_profiles").update({ status: "failed" }).eq("id", row.visual_profile_id);
+      await db.from("foods").update({ image_status: "failed" }).eq("id", food.id);
+      return { jobId: row.id, generated: 0, failed: true, errorCode: terminalErrorCode, errorMessage: lastCandidateError || terminalErrorCode };
+    }
     if (attempts < maxAttempts) {
       await db.from("food_image_jobs").update({
         status: "pending",

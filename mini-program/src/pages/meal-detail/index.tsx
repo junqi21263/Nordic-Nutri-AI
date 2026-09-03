@@ -14,6 +14,7 @@ import {
   deleteProductMeal,
   getProductMeal,
   getProductMeals,
+  isRemoteMealId,
   updateProductMeal,
 } from "../../api/meal-data-api";
 import { PageLayout } from "../../layouts/page-layout";
@@ -49,7 +50,7 @@ export default function MealDetailPage() {
   const storedMeal = store.getMealById(router.params.id);
   const meal = remoteMeal ?? storedMeal;
   useEffect(() => {
-    if (!router.params.id) return;
+    if (!isRemoteMealId(router.params.id)) return;
     let cancelled = false;
     const refresh = () =>
       getProductMeal(router.params.id!)
@@ -115,6 +116,12 @@ export default function MealDetailPage() {
     void Taro.navigateBack();
   };
   const remove = async () => {
+    if (!isRemoteMealId(meal.id)) {
+      store.deleteMeal(meal.id);
+      feedback.show({ message: "餐次已删除", tone: "success" });
+      void Taro.switchTab({ url: "/pages/meal-records/index" });
+      return;
+    }
     try {
       const result = await deleteProductMeal(meal.id);
       if (!result.deleted) throw new Error("Meal not found");
@@ -127,6 +134,14 @@ export default function MealDetailPage() {
   };
   const toggleFavorite = async () => {
     const nextFavorite = !meal.favorite;
+    if (!isRemoteMealId(meal.id)) {
+      store.toggleFavorite(meal.id);
+      feedback.show({
+        message: nextFavorite ? "已加入收藏" : "已取消收藏",
+        tone: "success",
+      });
+      return;
+    }
     try {
       const saved = await updateProductMeal(meal.id, { isFavorite: nextFavorite });
       if (!saved) throw new Error("Meal not found");

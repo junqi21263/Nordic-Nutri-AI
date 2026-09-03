@@ -43,6 +43,22 @@ test("accepts a bounded structured DeepSeek weekly review", async () => {
   assert.equal(result.nextSteps[0], "早餐加入一份高蛋白食物");
 });
 
+test("keeps the effective routed provider as the review source", async () => {
+  const service = createDeepseekWeeklyReviewService({
+    model: "qwen-plus",
+    source: "qwen",
+    requestCompletion: async () => JSON.stringify({
+      headline: "记录节奏稳定",
+      summary: "本周记录较完整，继续保持。",
+      strengths: [],
+      nextSteps: ["下周保持每日记录"],
+    }),
+  });
+  const result = await service({ date: "2026-07-20", context: weeklyReviewContext(review) });
+  assert.equal(result.source, "qwen");
+  assert.equal(result.model, "qwen-plus");
+});
+
 test("uses V4 Flash when no weekly-review model is supplied", async () => {
   const service = createDeepseekWeeklyReviewService({
     requestCompletion: async () => JSON.stringify({

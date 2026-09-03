@@ -1,0 +1,2 @@
+-- 0052 rollback is intentionally forward-only. The catalog may contain
+-- environment configuration and must not be dropped by an accidental rollback.

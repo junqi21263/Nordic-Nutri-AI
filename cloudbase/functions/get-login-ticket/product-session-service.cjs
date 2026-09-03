@@ -25,7 +25,7 @@ function validateCode(input) {
   return input.code.trim();
 }
 
-function createProductSessionService({ exchangeCode, bootstrapUser, identityPepper, sessionSecret, now = Date.now }) {
+function createProductSessionService({ exchangeCode, bootstrapUser, identityPepper, sessionSecret, onBootstrapError, now = Date.now }) {
   return {
     async issue(input) {
       const code = validateCode(input);
@@ -48,7 +48,10 @@ function createProductSessionService({ exchangeCode, bootstrapUser, identityPepp
           session: { accessToken: createAccessToken(productUser.userId, sessionSecret, now) },
           onboardingRequired: Boolean(productUser.onboardingRequired),
         };
-      } catch {
+      } catch (error) {
+        if (typeof onBootstrapError === "function") {
+          try { onBootstrapError(error); } catch { /* diagnostics must never affect login */ }
+        }
         throw new PublicLoginError("PRODUCT_SESSION_FAILED", "用户资料服务暂时不可用");
       }
     },

@@ -100,13 +100,14 @@ test("dev worker uses the Growth Plan hunyuan-exp model group", async () => {
   const service = createWorkerService({
     TCB_ENV: "dev-d8g3hqv2b0de38046",
     AI_TEXT_WORKER_SHARED_SECRET: "worker-secret",
+    CLOUDBASE_APIKEY: "server-api-key",
   }, {
     cloudbaseNodeSdk: {
-      init: ({ env }) => ({
+      init: ({ env, accessKey }) => ({
         ai: () => ({
           createModel: (groupName) => ({
             generateText: async (input) => {
-              calls.push({ env, groupName, input });
+              calls.push({ env, accessKey, groupName, input });
               return { text: JSON.stringify({ headline: "鸡胸肉的营养参考", content: "每100g含31g蛋白质，可搭配蔬菜与主食。" }) };
             },
           }),
@@ -118,6 +119,7 @@ test("dev worker uses the Growth Plan hunyuan-exp model group", async () => {
   const insight = await service.generate({ name: "鸡胸肉", category: "肉禽", nutritionPer100g: { proteinG: 31, carbsG: 0, fatG: 3.6, caloriesKcal: 165 } });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].env, "dev-d8g3hqv2b0de38046");
+  assert.equal(calls[0].accessKey, "server-api-key");
   assert.equal(calls[0].groupName, "hunyuan-exp");
   assert.equal(calls[0].input.model, "hunyuan-2.0-instruct-20251111");
   assert.equal(insight.source, "hunyuan-exp");

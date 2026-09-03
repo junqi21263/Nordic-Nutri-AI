@@ -46,6 +46,8 @@
     .login-card details { margin-top: 14px; color: var(--muted); font-size: 12px; }
     .login-card details summary { cursor: pointer; font-weight: 700; }
     .login-error { min-height: 18px; margin: 0 0 8px; color: #9b2c2c; font-size: 12px; font-weight: 700; }
+    .environment-badge { display: inline-flex; align-items: center; width: fit-content; border: 1px solid #b9791f; border-radius: 999px; padding: 4px 9px; background: #fff4dc; color: #8a5510; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+    .login-card .environment-badge { margin-bottom: 8px; }
     .ops-header { max-width: 1540px; margin: 0 auto 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
     .brand { display: flex; align-items: center; gap: 12px; }
     .brand-mark { width: 38px; height: 38px; border: 1px solid var(--green); border-radius: 50%; display: grid; place-items: center; color: var(--green); font: 700 18px Georgia, serif; }
@@ -202,9 +204,13 @@
     .operation-item strong { color: var(--ink); font-size: 11px; }
     .operation-item.error strong { color: var(--danger); }
     .operation-item span { margin-top: 2px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
-    .toast { position: fixed; z-index: 10; right: 24px; bottom: 24px; max-width: min(400px, calc(100vw - 48px)); border-radius: 11px; padding: 12px 15px; background: var(--ink); box-shadow: 0 10px 25px rgba(0,0,0,.16); color: #fff; font-size: 13px; opacity: 0; pointer-events: none; transform: translateY(10px); transition: .18s ease; }
+    .toast { position: fixed; z-index: 120; left: 50%; top: 50%; display: flex; align-items: flex-start; gap: 14px; width: min(440px, calc(100vw - 36px)); border-radius: 14px; padding: 16px 18px; background: var(--ink); box-shadow: 0 18px 48px rgba(23,61,42,.24); color: #fff; font-size: 13px; line-height: 1.5; opacity: 0; pointer-events: none; transform: translate(-50%, calc(-50% + 10px)) scale(.98); transition: .18s ease; }
     .toast.visible { opacity: 1; transform: translateY(0); }
     .toast.error { background: var(--danger); }
+    .toast.visible { pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+    .toast__close { flex: 0 0 auto; border: 0; padding: 0 2px; background: transparent; color: inherit; font-size: 20px; line-height: 1; cursor: pointer; opacity: .8; }
+    select, .nn-select { appearance: none; width: 100%; min-height: 40px; border: 1px solid var(--line); border-radius: 10px; padding: 0 36px 0 12px; background: var(--paper) linear-gradient(45deg, transparent 50%, var(--green) 50%) calc(100% - 17px) 17px/6px 6px no-repeat, linear-gradient(135deg, var(--green) 50%, transparent 50%) calc(100% - 12px) 17px/6px 6px no-repeat; color: var(--text); font: inherit; cursor: pointer; }
+    select:focus, .nn-select:focus { outline: 3px solid rgba(44,123,81,.18); border-color: var(--green); }
     .utility-drawer { max-width: 1540px; margin: 14px auto 0; overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: rgba(255,255,255,.68); }
     .workflow-guide { max-width: 1540px; margin: 0 auto 18px; overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: rgba(255,255,255,.68); }
     .workflow-guide > summary { padding: 13px 18px; color: var(--ink); font-weight: 700; cursor: pointer; }
@@ -245,9 +251,48 @@
     .quota-model-card__label { margin: 0; font-size: 12px; color: var(--muted); font-weight: 700; }
     .quota-model-card__total { margin: 4px 0 8px; font-size: 28px; font-weight: 800; color: var(--ink); letter-spacing: -.02em; }
     .quota-model-card .ops-chart { min-height: 170px; }
+    .quota-model-section__summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .quota-model-section__summary span { border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; background: var(--paper); color: var(--muted); font-size: 11px; font-weight: 700; }
+    .quota-data-note { margin: 10px 0 14px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.64); color: var(--muted); font-size: 12px; }
+    .quota-data-note strong { color: var(--ink); }
     .quota-model-link { color: var(--ink); text-decoration: none; border: 0; background: transparent; padding: 0; cursor: pointer; border-bottom: 1px dashed transparent; font: inherit; }
     .quota-model-link:hover { color: var(--green); border-bottom-color: var(--green); }
     .quota-model-link code { font: inherit; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+    .quota-route { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; align-items: center; padding: 3px 0; }
+    .quota-route > span { font-size: 12px; font-weight: 700; color: var(--ink); }
+    .quota-route .quota-model-link { min-width: 0; justify-self: start; text-align: left; }
+    .quota-route small { grid-column: 1 / -1; }
+    .quota-route code { overflow-wrap: anywhere; }
+    .ai-workspace-tabs { display: flex; gap: 4px; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
+    .ai-workspace-tab { border: 0; border-bottom: 2px solid transparent; padding: 9px 13px; background: transparent; color: var(--muted); font-weight: 800; cursor: pointer; }
+    .ai-workspace-tab:hover, .ai-workspace-tab.active { border-bottom-color: var(--green); color: var(--green); }
+    .ai-workspace-panel[hidden] { display: none !important; }
+    .ai-management-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .85fr); gap: 14px; margin-bottom: 16px; }
+    .ai-model-config-list, .ai-provider-status-list { display: grid; gap: 10px; }
+    .ai-model-picker-row { display: flex; gap: 8px; align-items: center; }
+    .ai-model-picker-row .nn-select { flex: 1 1 auto; min-width: 0; }
+    .ai-model-picker-row .button { flex: 0 0 auto; white-space: nowrap; }
+    .ai-model-config-card, .ai-provider-status-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: rgba(255,255,255,.72); }
+    .ai-model-config-card__head, .ai-provider-status-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .ai-model-config-card__head h4, .ai-provider-status-card__head h4 { margin: 0; color: var(--ink); font: 800 13px/1.4 "SFMono-Regular", Consolas, monospace; }
+    .ai-model-config-card__meta, .ai-provider-status-card__meta { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .ai-model-config-card__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+    .ai-feature-route-config { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .ai-feature-route-list { display: grid; gap: 8px; margin-top: 10px; }
+    .ai-feature-route-row { display: grid; grid-template-columns: minmax(130px, .7fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+    .ai-feature-route-row__name { color: var(--ink); font-size: 12px; font-weight: 800; }
+    .ai-feature-route-row label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; font-weight: 700; }
+    .ai-feature-route-row select, .ai-model-editor-grid input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--paper); color: var(--text); }
+    .ai-model-default-note { margin: 0 0 2px; padding: 8px 10px; border-radius: 8px; background: var(--mist); color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .ai-model-editor-grid input[readonly] { background: var(--mist); color: var(--muted); cursor: not-allowed; }
+    .ai-model-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+    .ai-model-editor-grid label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .ai-model-editor-grid .span-2 { grid-column: span 2; }
+    .ai-status-pill { display: inline-flex; align-items: center; border: 1px solid #a8cdb5; border-radius: 999px; padding: 4px 7px; color: var(--green); font-size: 10px; white-space: nowrap; }
+    .ai-status-pill.missing { border-color: #e0b9a8; color: var(--danger); }
+    .ai-provider-status-card__chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+    #aiModelSwitchHistory small { display: block; margin-top: 3px; }
+    @media (max-width: 900px) { .ai-management-grid { grid-template-columns: 1fr; } .ai-feature-route-row { grid-template-columns: 1fr; } }
     @media (max-width: 900px) { .quota-model-cards { grid-template-columns: 1fr; } }
     .admin-layout { max-width: 1540px; margin: 0 auto; display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: start; }
     .admin-nav { position: sticky; top: 16px; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
@@ -311,6 +356,25 @@
     .data-table tr:last-child td { border-bottom: 0; }
     .data-table select { height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: var(--paper); font-size: 12px; }
     .data-table code { font: 11px/1.4 "SFMono-Regular", Consolas, monospace; word-break: break-all; }
+    .data-table--traces { overflow-x: auto; }
+    .data-table--traces table { min-width: 1120px; table-layout: fixed; }
+    .data-table--traces th, .data-table--traces td { overflow: hidden; }
+    .data-table--traces th:nth-child(1), .data-table--traces td:nth-child(1) { width: 205px; }
+    .data-table--traces th:nth-child(2), .data-table--traces td:nth-child(2) { width: 330px; }
+    .data-table--traces th:nth-child(3), .data-table--traces td:nth-child(3) { width: 72px; }
+    .data-table--traces th:nth-child(4), .data-table--traces td:nth-child(4) { width: 78px; }
+    .data-table--traces th:nth-child(5), .data-table--traces td:nth-child(5) { width: 76px; }
+    .data-table--traces th:nth-child(6), .data-table--traces td:nth-child(6) { width: 92px; }
+    .data-table--traces th:nth-child(7), .data-table--traces td:nth-child(7) { width: 96px; }
+    .data-table--traces th:nth-child(8), .data-table--traces td:nth-child(8) { width: 88px; }
+    .data-table--traces th:nth-child(9), .data-table--traces td:nth-child(9) { width: 132px; }
+    .trace-cell--id,
+    .trace-cell--status,
+    .trace-cell--http,
+    .trace-cell--duration,
+    .trace-cell--time { white-space: nowrap; }
+    .trace-cell--id .ops-inline-link { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .trace-cell--route { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .user-image-thumb {
       display: block; width: 56px; height: 56px; padding: 0; border: 1px solid var(--line);
       border-radius: 10px; overflow: hidden; background: var(--linen); cursor: zoom-in;
@@ -439,6 +503,7 @@
 <body>
   <section id="loginGate" class="login-gate" aria-label="后台登录">
     <form id="loginForm" class="login-card" autocomplete="on">
+      <span id="loginEnvironmentBadge" class="environment-badge">DEV 测试环境</span>
       <p class="eyebrow">Nordic Nutri · Admin Console</p>
       <h1>登录管理后台</h1>
       <p class="lead">请先输入帐号密码，通过后再进入食材管理与生图。</p>
@@ -451,7 +516,7 @@
 
   <main id="adminApp" class="ops-shell admin-shell nn-shell" hidden>
     <header class="ops-header nn-topbar">
-      <div class="brand"><div class="brand-mark" aria-hidden="true">N</div><div><p class="eyebrow">Nordic Nutri · Admin Console</p><h1>管理后台</h1></div><span id="currentArea" class="topbar-context">食材生图</span></div>
+      <div class="brand"><div class="brand-mark" aria-hidden="true">N</div><div><p class="eyebrow">Nordic Nutri · Admin Console</p><h1>管理后台</h1></div><span id="adminEnvironmentBadge" class="environment-badge">DEV 测试环境</span><span id="currentArea" class="topbar-context">食材生图</span></div>
       <div class="header-actions"><span id="connectionStatus" class="muted">尚未登录</span><button id="refreshAll" class="button secondary" type="button">刷新批次</button><button id="logoutBtn" class="button secondary" type="button">退出登录</button><button id="openTools" class="button secondary" type="button">系统配置</button></div>
     </header>
 
@@ -674,12 +739,47 @@
             </select>
             <button id="refreshQuota" class="button secondary" type="button">刷新</button>
           </div>
-          <div id="quotaFeatureStats" class="ops-overview-stats status-metrics"><span class="status-metric">加载中<b>…</b></span></div>
-          <div id="quotaModelBoard" class="quota-model-board"><p class="muted">加载中…</p></div>
-          <div class="ops-table-block">
-            <h3>模型限额配置</h3>
-            <div id="quotaModelTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
-            <p class="muted" style="margin-top:10px">识别日限额 10 次、10 分钟突发 3 次；教练日对话 20 次。调整需改云函数环境变量后重新部署。</p>
+          <div class="ai-workspace-tabs" role="tablist" aria-label="AI 管理工作区">
+            <button class="ai-workspace-tab active" type="button" data-ai-workspace="routing" role="tab">模型路由</button>
+            <button class="ai-workspace-tab" type="button" data-ai-workspace="quota" role="tab">模型额度</button>
+            <button class="ai-workspace-tab" type="button" data-ai-workspace="history" role="tab">切换记录</button>
+          </div>
+          <div id="aiWorkspaceRouting" class="ai-workspace-panel">
+            <div class="ai-management-grid">
+              <section class="ops-panel">
+                <div class="ops-panel__head"><div><h3>模型参数</h3><p class="muted">管理已接入的模型参数；应用功能在下方统一配置。</p></div><button id="addAiModel" class="button" type="button">新增模型</button></div>
+                <div id="aiModelConfigBoard" class="ai-model-config-list"><p class="muted">请先连接后台</p></div>
+                <section class="ai-feature-route-config">
+                  <div class="ops-panel__head"><div><h3>应用功能配置</h3><p class="muted">按功能选择主模型和备用模型；保存后立即生效。</p></div></div>
+                  <div id="aiFeatureRouteBoard" class="ai-feature-route-list"><p class="muted">请先连接后台</p></div>
+                  <div class="ai-model-config-card__actions"><button id="saveAiRoutes" class="button" type="button">保存应用配置并生效</button></div>
+                </section>
+              </section>
+              <section class="ops-panel"><div class="ops-panel__head"><div><h3>Provider 与模型状态</h3><p class="muted">仅显示配置状态，不显示 API Key 明文。</p></div></div><div id="aiProviderStatusBoard" class="ai-provider-status-list"><p class="muted">加载中…</p></div></section>
+            </div>
+          </div>
+          <div id="aiWorkspaceQuota" class="ai-workspace-panel" hidden>
+            <p id="quotaUpdatedAt" class="muted" style="margin:0 0 8px">等待加载额度数据…</p>
+            <p class="quota-data-note"><strong>统计来源：</strong>当前展示的是系统请求与 Token 观测，以及内部每日限额；厂商真实账单/剩余额度暂未接入，不能作为供应商控制台余额使用。</p>
+            <section class="ops-panel" style="margin:12px 0"><div class="ops-panel__head"><div><h3>功能额度与当前模型路由</h3><p class="muted">按登录用户和自然日计数；切换厂商/模型不会重置额度。留空表示不限制。厂商额度来源仅作状态参考。</p></div><button id="refreshFeatureUserQuotas" class="button secondary" type="button">刷新</button></div><div id="featureUserQuotaBoard" class="data-table"><p class="muted" style="padding:18px">加载中…</p></div><p class="muted" style="margin-top:10px">单人每日上限由本表直接控制；厂商额度自动同步需对应厂商提供只读接口，否则显示手工或未接入。</p></section>
+            <div id="quotaFeatureStats" class="ops-overview-stats status-metrics"><span class="status-metric">加载中<b>…</b></span></div>
+            <div id="quotaModelBoard" class="quota-model-board"><p class="muted">加载中…</p></div>
+          </div>
+          <div id="aiWorkspaceHistory" class="ai-workspace-panel" hidden>
+            <section class="ops-panel"><div class="ops-panel__head"><div><h3>切换记录</h3><p class="muted">记录模型配置和应用关联的变更，优先显示可识别的模型名称。</p></div><button id="refreshAiHistory" class="button secondary" type="button">刷新记录</button></div><div id="aiModelSwitchHistory" class="data-table"><p class="muted" style="padding:18px">加载中…</p></div></section>
+          </div>
+          <div id="aiModelEditorModal" class="food-admin-modal" hidden>
+            <button type="button" class="food-admin-modal__backdrop" id="aiModelEditorBackdrop" aria-label="关闭模型编辑"></button>
+            <section class="food-admin-modal__panel" role="dialog" aria-modal="true" aria-labelledby="aiModelEditorTitle">
+              <div class="food-admin-editor__head"><h3 id="aiModelEditorTitle">新增模型</h3><button id="aiModelEditorClose" class="button link" type="button">关闭</button></div>
+              <div class="ai-model-editor-grid">
+                <label>选择厂商 *<select id="aiProviderSelect" class="nn-select" aria-label="选择 AI 厂商"></select></label>
+                <label class="span-2">API Key / Token <small class="muted">若该厂商已配置运行时凭据，可留空</small><input id="aiProviderApiKey" type="password" autocomplete="new-password" placeholder="仅在需要更新该厂商凭据时填写" /></label>
+                <label class="span-2">旗下模型（可手动同步）<div class="ai-model-picker-row"><select id="aiProviderModelSelect" class="nn-select" aria-label="选择厂商模型"></select><button id="aiProviderSync" class="button secondary" type="button">同步模型</button></div></label>
+                <p id="aiProviderSyncNote" class="ai-model-default-note span-2">选择厂商后，系统会从运行时目录读取当前模型；支持的厂商可使用“同步最新模型”。</p>
+              </div>
+              <div class="food-admin-editor__actions"><button id="aiModelEditorCancel" class="button secondary" type="button">取消</button><button id="aiModelEditorSave" class="button" type="button">保存模型</button></div>
+            </section>
           </div>
         </section>
 
@@ -763,9 +863,9 @@
 
         <section id="moduleTraces" class="admin-module" hidden>
           <div class="module-toolbar"><h2>Trace Explorer</h2><span class="muted">按请求状态定位阶段耗时与 Provider</span><button id="refreshTraces" class="button secondary" type="button">刷新</button></div>
-    <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / Error Code" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="processing">processing</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="admin">admin</option></select><select id="traceStageFilter"><option value="">全部阶段</option><option value="init">init</option><option value="upload">upload</option><option value="uploaded">uploaded</option><option value="safety_check">safety_check</option><option value="evaluation">evaluation</option><option value="flash">flash</option><option value="nutrition">nutrition</option><option value="persistence">persistence</option><option value="storage_upload">storage_upload</option><option value="temp_url_generation">temp_url_generation</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
+    <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / 接口 / 错误码" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="processing">processing</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceHttpStatusFilter"><option value="">全部状态码</option><option value="200">200</option><option value="202">202</option><option value="400">400</option><option value="401">401</option><option value="404">404</option><option value="408">408</option><option value="409">409</option><option value="429">429</option><option value="500">500</option><option value="503">503</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="foods">foods</option><option value="feedback">feedback</option><option value="milestones">milestones</option><option value="profile">profile</option><option value="admin">admin</option><option value="system">system</option></select><select id="traceStageFilter"><option value="">全部阶段</option><option value="request">request</option><option value="init">init</option><option value="upload">upload</option><option value="uploaded">uploaded</option><option value="safety_check">safety_check</option><option value="evaluation">evaluation</option><option value="flash">flash</option><option value="nutrition">nutrition</option><option value="persistence">persistence</option><option value="storage_upload">storage_upload</option><option value="temp_url_generation">temp_url_generation</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
           <div class="trace-quick-filters nn-status-filter" aria-label="Trace 快捷筛选"><span class="muted">快捷筛选</span><button class="filter" type="button" data-trace-quick-filter="all">全部</button><button class="filter" type="button" data-trace-quick-filter="failed">失败</button><button class="filter" type="button" data-trace-quick-filter="timed_out">超时</button><button class="filter" type="button" data-trace-quick-filter="last24h">最近 24 小时</button><button class="filter" type="button" data-trace-quick-filter="vision">Vision</button><button class="filter" type="button" data-trace-quick-filter="coach">Coach</button><button id="traceClearFilters" class="button link" type="button">清除筛选</button></div><p id="traceActiveFilters" class="muted" aria-live="polite">当前未应用筛选</p>
-          <div class="ops-page-grid"><section class="ops-panel"><div id="traceList" class="data-table"><p class="ops-empty">加载中…</p></div></section></div>
+          <div class="ops-page-grid"><section class="ops-panel"><div id="traceList" class="data-table data-table--traces"><p class="ops-empty">加载中…</p></div><div id="tracePagination" class="food-admin-pagination" hidden><span id="tracePageInfo"></span><div class="food-admin-pagination__jump"><button id="tracePagePrev" class="button secondary" type="button">上一页</button><button id="tracePageNext" class="button secondary" type="button">下一页</button></div></div></section></div>
           <section id="traceDrawer" class="nn-drawer" hidden aria-label="Trace Detail" role="dialog" aria-modal="true" aria-labelledby="traceDrawerTitle"><div class="nn-drawer__panel"><div class="nn-drawer__header"><div><span class="eyebrow">TRACE DETAIL</span><h3 id="traceDrawerTitle">Trace Detail</h3></div><button class="nn-drawer__close" type="button" data-trace-drawer-close aria-label="关闭 Trace Detail">关闭</button></div><div id="traceDetail"><p class="muted">选择一条 Trace 查看阶段。</p></div></div></section>
         </section>
 
@@ -894,11 +994,25 @@
       <div class="food-admin-editor__actions"><button id="feedbackReplyCancel" class="button secondary" type="button">取消</button><button id="feedbackReplySave" class="button" type="button">保存回复并通知用户</button></div>
     </section>
   </div>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"><span id="toastMessage"></span><button id="toastClose" class="toast__close" type="button" aria-label="关闭提示">×</button></div>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const DEFAULT_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
+    const PRODUCTION_API_BASE = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com/get-login-ticket";
+    const TEST_API_BASE = "https://test-dev-d4gyxnn0b5dfa2c8a.service.tcloudbase.com/get-login-ticket";
+    const DEFAULT_API_BASE = window.location.hostname.startsWith("test-dev-d4gyxnn0b5dfa2c8a")
+      ? TEST_API_BASE
+      : PRODUCTION_API_BASE;
+    function applyEnvironmentBadge() {
+      const label = window.location.hostname.startsWith("test-dev-d4gyxnn0b5dfa2c8a")
+        ? "DEV 测试环境"
+        : "PROD 生产环境";
+      ["loginEnvironmentBadge", "adminEnvironmentBadge"].forEach((id) => {
+        const element = $(id);
+        if (element) element.textContent = label;
+      });
+    }
+    applyEnvironmentBadge();
     const CREDENTIAL_KEYS = {
       token: "nordic-admin-session-token",
       username: "nordic-admin-username",
@@ -927,6 +1041,8 @@
     function showAdminApp() {
       $("loginGate").hidden = true;
       $("adminApp").hidden = false;
+      // Every fresh login/reload starts from the operational overview.
+      setModule("dashboard");
       setConnected(true);
     }
     function saveCredentials() {
@@ -956,7 +1072,7 @@
       const entry = moduleCache[key];
       return Boolean(entry && Date.now() - entry.at < MODULE_CACHE_TTL_MS);
     }
-    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, auditRun: null, auditItems: [], auditSelectedIds: new Set(), auditActiveFilter: "all", batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, feedbackReplyItem: null, batchRailCollapsed: false };
+    const state = { selectedQuotaModel: null, activeBatchId: "", activeFilter: "needs_review", selectedItemId: "", selectedJobId: "", selectedImageId: "", selectedFoodName: "", selectedImageIds: new Set(), previewFoods: [], previewSelectedFoodIds: new Set(), previewCategoryId: "", previewVisualProfileKey: "", previewRequestedCount: 0, previewSelectableCount: 0, previewExcludedReadyCount: 0, previewLoaded: false, auditRun: null, auditItems: [], auditSelectedIds: new Set(), auditActiveFilter: "all", batches: [], batchDetail: null, jobs: new Map(), categories: [], operations: [], foodAdminItems: [], foodAdminPagination: { page: 1, pageSize: 20, total: 0, hasMore: false }, tracePage: 1, tracePageSize: 50, traceTotal: 0, foodAdminSelectedIds: new Set(), foodAdminEditingId: null, feedbackReplyItem: null, batchRailCollapsed: false };
     try { state.batchRailCollapsed = localStorage.getItem(CREDENTIAL_KEYS.batchRailCollapsed) === "1"; } catch { /* ignore */ }
     // Same root taxonomy as mini-program food library chips (STANDARD_FOOD_CATEGORY_ROOT_CODES).
     const FOOD_LIBRARY_ROOT_CODES = ["meat_poultry", "seafood", "egg_dairy", "plant_protein", "grains_tubers", "vegetables", "fruits", "nuts_seeds", "oils_seasonings", "beverages", "basic_processed", "regional_staples", "nordic_staples", "north_american_staples"];
@@ -965,7 +1081,10 @@
     const rootCategoryCode = (code) => String(code || "").split(".")[0];
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", "\"":"&quot;" })[char]);
     const out = (data) => { $("out").textContent = JSON.stringify(data, null, 2); };
-    const toast = (message, isError = false) => { const el = $("toast"); el.textContent = message; el.className = `toast visible${isError ? " error" : ""}`; window.setTimeout(() => { el.className = "toast"; }, 3600); };
+    let toastTimer = null;
+    const hideToast = () => { const el = $("toast"); if (el) el.className = "toast"; if (toastTimer) window.clearTimeout(toastTimer); };
+    const shouldShowSuccessToast = (message) => /保存|生效|切换|成功|正常|耗时/.test(String(message || ""));
+    const toast = (message, isError = false) => { if (!isError && !shouldShowSuccessToast(message)) return; const el = $("toast"); const copy = $("toastMessage"); if (!el || !copy) return; copy.textContent = message; el.className = `toast visible${isError ? " error" : ""}`; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(hideToast, 3600); };
     const selectedBatch = () => state.batches.find((batch) => batch.id === state.activeBatchId) || null;
     const progress = (batch) => { const total = Number(batch?.totalCount || 0); const terminal = Number(batch?.reviewCount || 0) + Number(batch?.completedCount || 0) + Number(batch?.failedCount || 0) + Number(batch?.skippedCount || 0); return { total, terminal, percent: total ? Math.round((terminal / total) * 100) : 0 }; };
     const statusLabel = (status) => ({ draft: "草稿", running: "运行中", paused: "已暂停", completed: "已通过", completed_with_errors: "完成（有失败）", cancelled: "已取消", needs_review: "待审核", failed: "失败", generating: "生成中", pending: "待生成", needs_retry: "待重试", skipped: "已跳过" }[status] || status || "未知");
@@ -2184,13 +2303,21 @@
       }
       host.innerHTML = models.map((board, index) => {
         const features = (board.features || []).map((item) => item.featureLabel || item.feature).filter(Boolean);
-        const meta = [board.provider ? `提供商 ${board.provider}` : "", features.length ? `用于 ${features.join("、")}` : ""].filter(Boolean).join(" · ");
+        const displayName = board.displayName || configuredAiModelLabel(board.provider, board.model);
+        const meta = [board.provider ? `提供商 ${board.provider}` : "", features.length ? `用于 ${features.join("、")}` : "", board.model && board.model !== displayName ? `模型标识 ${board.model}` : ""].filter(Boolean).join(" · ");
         const modelKey = escapeHtml(board.model || "");
+        const limits = (board.features || []).map((item) => Number(item.dailyLimit)).filter((value) => Number.isFinite(value) && value >= 0);
+        const dailyLimit = limits.length && limits.every((value) => value === limits[0]) ? limits[0] : null;
+        const todayRequests = Number(board.requests?.today) || 0;
+        const quotaSummary = dailyLimit === null
+          ? "内部每日限额未设置"
+          : `今日 ${formatCompactNumber(todayRequests)} / ${formatCompactNumber(dailyLimit)}`;
         return `<section class="quota-model-section" data-model-board="${index}" data-model-name="${modelKey}">
           <div class="quota-model-section__head" data-model-toggle="${index}" role="button" tabindex="0" aria-expanded="false">
             <div>
-              <h3 class="quota-model-section__title">${escapeHtml(board.model || "—")}</h3>
+              <h3 class="quota-model-section__title">${escapeHtml(displayName)}</h3>
               <p class="quota-model-section__meta">${escapeHtml(meta || "近窗消耗")} · 点击展开图表</p>
+              <div class="quota-model-section__summary"><span>${escapeHtml(quotaSummary)}</span><span>厂商余额未接入</span></div>
             </div>
             <span class="quota-model-section__chevron" aria-hidden="true">▸</span>
           </div>
@@ -2250,8 +2377,8 @@
           }
         });
       });
-      host._openQuotaModel = (modelName) => {
-        const index = models.findIndex((board) => board.model === modelName);
+      host._openQuotaModel = (provider, modelName) => {
+        const index = models.findIndex((board) => board.model === modelName && board.provider === provider);
         if (index < 0) return false;
         setOpen(index, true);
         const section = host.querySelector(`[data-model-board="${index}"]`);
@@ -2259,45 +2386,346 @@
         return true;
       };
     }
-    async function loadQuotaManagement() {
-      const boardHost = $("quotaModelBoard");
-      const modelHost = $("quotaModelTable");
-      const featureHost = $("quotaFeatureStats");
-      if (!boardHost || !modelHost || !featureHost) return;
-      boardHost.innerHTML = "<p class=\"muted\">加载中…</p>";
-      modelHost.innerHTML = "<p class=\"muted\" style=\"padding:18px\">加载中…</p>";
-      featureHost.innerHTML = "<span class=\"status-metric\">加载中<b>…</b></span>";
+    const AI_FEATURES = [
+      { key: "vision", label: "食物识别", capability: "vision" },
+      { key: "coach", label: "营养教练", capability: "text" },
+      { key: "daily_insight", label: "每日洞察", capability: "text" },
+      { key: "weekly_review", label: "周回顾", capability: "text" },
+      { key: "nutrition_plan", label: "营养计划", capability: "text" },
+      { key: "meal_analysis", label: "餐食分析", capability: "text" },
+      { key: "meal_evaluation", label: "餐食评价", capability: "text" },
+      { key: "meal_insight", label: "餐食洞察", capability: "text" },
+      { key: "food_query_translation", label: "食材检索翻译", capability: "text" },
+      { key: "daily_tip", label: "每日小贴士", capability: "text" },
+      { key: "proactive_daily_brief", label: "NOVA 每日提醒", capability: "text" },
+      { key: "food_image_generation", label: "食材生图", capability: "image_generation" },
+    ];
+    const AI_FEATURE_ALIASES = Object.freeze([
+      { key: "food_image", label: "食材生图", canonicalKey: "food_image_generation" },
+    ]);
+    function aiFeatureLabel(featureKey) {
+      return AI_FEATURES.find((item) => item.key === featureKey)?.label
+        || AI_FEATURE_ALIASES.find((item) => item.key === featureKey)?.label
+        || featureKey;
+    }
+    const AI_CAPABILITY_COPY = Object.freeze({
+      text: "支持已接入的文本模型，保存后按厂商实际调用",
+      vision: "支持已接入的视觉模型，保存后按厂商实际调用",
+      image_generation: "支持已接入的生图模型，保存后按厂商实际调用",
+    });
+    const MODEL_DEFAULT_TIMEOUT_MS = 30000;
+    const MODEL_DEFAULT_MAX_TOKENS = 2048;
+    const MODEL_DEFAULT_TEMPERATURE = 0.2;
+    const AI_PROVIDER_CONFIG_DEFAULTS = Object.freeze({
+      deepseek: { apiKeyEnv: "DEEPSEEK_API_KEY", endpoint: "https://api.deepseek.com/chat/completions" },
+      qwen: { apiKeyEnv: "DASHSCOPE_API_KEY", endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions" },
+      openai: { apiKeyEnv: "OPENAI_API_KEY", endpoint: "https://api.openai.com/v1/chat/completions" },
+      moonshot: { apiKeyEnv: "MOONSHOT_API_KEY", endpoint: "https://api.moonshot.cn/v1/chat/completions" },
+      zhipu: { apiKeyEnv: "ZHIPU_API_KEY", endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions" },
+      minimax: { apiKeyEnv: "MINIMAX_API_KEY", endpoint: "https://api.minimaxi.chat/v1/chat/completions" },
+      siliconflow: { apiKeyEnv: "SILICONFLOW_API_KEY", endpoint: "https://api.siliconflow.cn/v1/chat/completions" },
+      openrouter: { apiKeyEnv: "OPENROUTER_API_KEY", endpoint: "https://openrouter.ai/api/v1/chat/completions" },
+      sensenova: { apiKeyEnv: "SENSENOVA_API_TOKEN", endpoint: "https://api.sensenova.cn/v1/llm/chat-completions" },
+    });
+    const aiModelState = { items: [], editingId: null, providers: [], catalog: [] };
+    function aiModelLabel(model) { return model.displayName || model.modelKey || "未命名模型"; }
+    function configuredAiModelLabel(providerKey, modelKey) {
+      const configured = aiModelState.items.find((item) => item.providerKey === providerKey && item.modelKey === modelKey);
+      return configured?.displayName || modelKey || "未命名模型";
+    }
+    function renderAiProviderStatus(items) {
+      const host = $("aiProviderStatusBoard");
+      if (!host) return;
+      const providers = new Map();
+      items.forEach((model) => {
+        const current = providers.get(model.providerKey) || { key: model.providerKey, models: [], features: new Set(), statuses: new Set(), protocols: new Set() };
+        current.models.push(model);
+        const applications = Object.keys(model.routeRoles || {}).filter((feature) => model.routeRoles[feature]);
+        (applications.length ? applications : (model.applications || [])).forEach((feature) => current.features.add(aiFeatureLabel(feature)));
+        current.statuses.add(model.apiKeyStatus || model.credentialStatus || "MISSING");
+        if (model.protocol) current.protocols.add(model.protocol);
+        providers.set(model.providerKey, current);
+      });
+      if (!providers.size) { host.innerHTML = '<p class="muted">暂无模型配置，请先新增模型。</p>'; return; }
+      host.innerHTML = [...providers.values()].map((provider) => {
+        const status = [...provider.statuses].includes("PRESENT") ? "已配置" : "未配置";
+        return `<article class="ai-provider-status-card"><div class="ai-provider-status-card__head"><div><h4>${escapeHtml(provider.key)}</h4><p class="ai-provider-status-card__meta">${escapeHtml([...provider.protocols].join(" · ") || "协议待配置")}</p></div><span class="ai-status-pill ${status === "未配置" ? "missing" : ""}">Key ${status}</span></div><div class="ai-provider-status-card__chips"><span class="ai-status-pill">${provider.models.length} 个模型</span>${[...provider.features].map((feature) => `<span class="ai-status-pill">应用 ${escapeHtml(feature)}</span>`).join("")}</div></article>`;
+      }).join("");
+    }
+    function renderAiProviderPicker() {
+      const provider = $("aiProviderSelect");
+      const model = $("aiProviderModelSelect");
+      if (!provider || !model) return;
+      const selectedProvider = provider.value;
+      provider.innerHTML = aiModelState.providers.map((item) => `<option value="${escapeHtml(item.providerKey)}">${escapeHtml(item.displayName)} · ${item.credentialStatus === "PRESENT" ? "Key 已配置" : "待配置"}</option>`).join("") || '<option value="">暂无可用厂商</option>';
+      const selected = aiModelState.providers.some((item) => item.providerKey === selectedProvider)
+        ? selectedProvider
+        : (aiModelState.providers[0]?.providerKey || "");
+      provider.value = selected;
+      const models = aiModelState.catalog.filter((item) => item.providerKey === selected && item.status === "active");
+      model.innerHTML = models.map((item) => `<option value="${escapeHtml(item.modelKey)}">${escapeHtml(item.displayName || item.modelKey)} · ${escapeHtml(item.modelKey)}</option>`).join("") || '<option value="">暂无模型，请先同步</option>';
+    }
+    async function syncAiProviderModels() {
+      const providerKey = $("aiProviderSelect")?.value || "";
+      const token = $("aiProviderApiKey")?.value || "";
+      const configuredProvider = aiModelState.providers.find((item) => item.providerKey === providerKey);
+      const button = $("aiProviderSync");
+      if (!providerKey) throw new Error("请先选择厂商");
+      if (!token.trim() && configuredProvider?.credentialStatus !== "PRESENT") throw new Error("请先填写 API Key 或 Token");
+      if (button) { button.disabled = true; button.textContent = "同步中…"; }
       try {
-        const days = $("quotaDaysFilter")?.value || "30";
-        const data = await api(`/ops/quota?days=${encodeURIComponent(days)}`);
-        const models = data.models || [];
+        if (token.trim()) await api(`/ai/providers/${encodeURIComponent(providerKey)}/credential`, { method: "PUT", body: { apiKey: token } });
+        await api(`/ai/providers/${encodeURIComponent(providerKey)}/sync`, { method: "POST", body: {} });
+        await loadAiProviderCatalog();
+        toast(`${$("aiProviderSelect")?.selectedOptions?.[0]?.textContent?.split(" · ")[0] || providerKey} 模型同步成功`);
+      } finally {
+        if (button) { button.disabled = false; button.textContent = "同步模型"; }
+      }
+    }
+    async function loadAiProviderCatalog() {
+      const [providersResult, catalogResult] = await Promise.allSettled([api("/ai/providers"), api("/ai/catalog")]);
+      if (providersResult.status === "rejected") throw providersResult.reason;
+      aiModelState.providers = providersResult.value.providers || [];
+      aiModelState.catalog = catalogResult.status === "fulfilled" ? (catalogResult.value.items || []) : [];
+      renderAiProviderPicker();
+      renderAiProviderStatus(aiModelState.catalog);
+    }
+    function renderAiModelConfigBoard(items) {
+      const host = $("aiModelConfigBoard");
+      if (!host) return;
+      if (!items.length) { host.innerHTML = '<p class="muted">暂无模型配置，请点击“新增模型”。</p>'; return; }
+      host.innerHTML = items.map((model) => `<article class="ai-model-config-card" data-ai-model-id="${escapeHtml(model.id)}"><div class="ai-model-config-card__head"><div><h4>${escapeHtml(aiModelLabel(model))}</h4><p class="ai-model-config-card__meta">提供商 ${escapeHtml(model.providerKey)} · ${escapeHtml(model.modelKey)} · Key ${escapeHtml(model.apiKeyStatus || model.credentialStatus || "MISSING")}</p></div><span class="ai-status-pill ${model.enabled === false ? "missing" : ""}">${model.source === "runtime" ? "运行时配置（只读）" : model.enabled === false ? "已停用" : "可用模型"}</span></div><p class="ai-model-config-card__meta">系统调用参数统一管理：超时 ${Number(model.timeoutMs) || MODEL_DEFAULT_TIMEOUT_MS}ms · 最大输出 ${Number(model.maxTokens) || MODEL_DEFAULT_MAX_TOKENS} Token · 温度 ${model.temperature ?? MODEL_DEFAULT_TEMPERATURE}</p><div class="ai-model-config-card__actions">${model.readOnly ? "" : `<button type="button" class="button secondary" data-ai-edit-model="${escapeHtml(model.id)}">编辑</button>`}<button type="button" class="button secondary" data-ai-test-model="${escapeHtml(model.id)}">检查状态</button>${model.readOnly ? "" : `<button type="button" class="button secondary" data-ai-delete-model="${escapeHtml(model.id)}">删除</button>`}</div></article>`).join("");
+      host.querySelectorAll("[data-ai-edit-model]").forEach((button) => button.addEventListener("click", () => openAiModelEditor(button.dataset.aiEditModel)));
+      host.querySelectorAll("[data-ai-test-model]").forEach((button) => button.addEventListener("click", () => testAiModel(button.dataset.aiTestModel).catch((error) => toast(apiErrorMessage(error), true))));
+      host.querySelectorAll("[data-ai-delete-model]").forEach((button) => button.addEventListener("click", () => deleteAiModel(button.dataset.aiDeleteModel).catch((error) => toast(apiErrorMessage(error), true))));
+    }
+    function renderAiFeatureRouteBoard(items) {
+      const host = $("aiFeatureRouteBoard");
+      if (!host) return;
+      if (!items.length) { host.innerHTML = '<p class="muted">暂无模型配置，请先新增模型。</p>'; return; }
+      const option = (selected, emptyLabel, availableItems = items) => `<option value="">${emptyLabel}</option>${availableItems.map((model) => `<option value="${escapeHtml(model.id)}" ${selected === model.id ? "selected" : ""}>${escapeHtml(aiModelLabel(model))} · ${escapeHtml(model.providerKey)}</option>`).join("")}`;
+      const compatibleItems = (featureKey) => {
+        const feature = AI_FEATURES.find((item) => item.key === featureKey);
+        const capability = feature?.capability;
+        return items.filter((model) => {
+          const capabilities = Array.isArray(model?.metadata?.capabilities) ? model.metadata.capabilities : [];
+          return !capabilities.length || capabilities.includes(capability);
+        });
+      };
+      const roleFor = (model, featureKey) => model.routeRoles?.[featureKey] || "";
+      const selectedModel = (featureKey, role) => compatibleItems(featureKey).find((model) => roleFor(model, featureKey) === role)?.id || (role === "primary" ? compatibleItems(featureKey).find((model) => (model.applications || []).includes(featureKey))?.id || "" : "");
+      host.innerHTML = AI_FEATURES.map((feature) => { const capabilityLabel = feature.capability === "text" ? "文本" : feature.capability === "vision" ? "视觉" : "生图"; const capabilityCopy = AI_CAPABILITY_COPY[feature.capability] || "支持已接入的模型，保存后按厂商实际调用"; return `<div class="ai-feature-route-row" data-ai-feature-route="${feature.key}"><div class="ai-feature-route-row__name">${feature.label}<small>${capabilityCopy}；仅显示已声明兼容${capabilityLabel}能力的模型，首次绑定未声明模型时会写入该功能所需能力</small></div><label>主模型<select data-ai-route-role="primary" aria-label="${feature.label}主模型">${option(selectedModel(feature.key, "primary"), "未设置", compatibleItems(feature.key))}</select></label><label>备用模型<select data-ai-route-role="fallback" aria-label="${feature.label}备用模型">${option(selectedModel(feature.key, "fallback"), "未设置", compatibleItems(feature.key))}</select></label></div>`; }).join("");
+    }
+    function openAiModelEditor(modelId = null) {
+      const model = aiModelState.items.find((item) => item.id === modelId);
+      aiModelState.editingId = modelId;
+      $("aiModelEditorTitle").textContent = model ? "更新厂商配置" : "配置 AI 厂商";
+      $("aiProviderSelect").value = model?.providerKey || aiModelState.providers[0]?.providerKey || "";
+      $("aiProviderApiKey").value = "";
+      renderAiProviderPicker();
+      if (model?.modelKey && [...$("aiProviderModelSelect").options].some((option) => option.value === model.modelKey)) {
+        $("aiProviderModelSelect").value = model.modelKey;
+      }
+      $("aiModelEditorModal").hidden = false;
+    }
+    function closeAiModelEditor() { $("aiModelEditorModal").hidden = true; aiModelState.editingId = null; }
+    function aiModelEditorPayload() {
+      const providerKey = $("aiProviderSelect")?.value || "";
+      const modelKey = $("aiProviderModelSelect")?.value || "";
+      const catalogModel = aiModelState.catalog.find((item) => item.providerKey === providerKey && item.modelKey === modelKey);
+      const existing = aiModelState.items.find((item) => item.providerKey === providerKey && item.modelKey === modelKey);
+      const defaults = AI_PROVIDER_CONFIG_DEFAULTS[providerKey] || { apiKeyEnv: `${providerKey.toUpperCase()}_API_KEY`, endpoint: "" };
+      return {
+        providerKey,
+        modelKey,
+        apiKey: $("aiProviderApiKey")?.value || "",
+        displayName: catalogModel?.displayName || existing?.displayName || modelKey,
+        apiKeyEnv: existing?.apiKeyEnv || defaults.apiKeyEnv,
+        endpoint: existing?.endpoint || defaults.endpoint,
+        protocol: existing?.protocol || "openai-chat-completions",
+        metadata: catalogModel?.metadata || existing?.metadata || {},
+        applications: existing?.applications || [],
+        routeRoles: existing?.routeRoles || {},
+        enabled: existing?.enabled !== false,
+      };
+    }
+    async function saveAiModelEditor() {
+      const payload = aiModelEditorPayload();
+      const configuredProvider = aiModelState.providers.find((item) => item.providerKey === payload.providerKey);
+      if (!payload.providerKey || !payload.modelKey || (!aiModelState.editingId && !payload.apiKey.trim() && configuredProvider?.credentialStatus !== "PRESENT")) throw new Error("请选择厂商、旗下模型；该厂商未配置运行时凭据时还需填写 API Key 或 Token");
+      if (payload.apiKey.trim()) await api(`/ai/providers/${encodeURIComponent(payload.providerKey)}/credential`, { method: "PUT", body: { apiKey: payload.apiKey } });
+      const { apiKey: _apiKey, ...modelPayload } = payload;
+      const current = aiModelState.items.find((item) => item.id === aiModelState.editingId)
+        || aiModelState.items.find((item) => item.providerKey === payload.providerKey && item.modelKey === payload.modelKey);
+      const saved = current
+        ? await api(`/ai/models/${encodeURIComponent(current.id)}`, { method: "PUT", body: modelPayload })
+        : await api("/ai/models", { method: "POST", body: modelPayload });
+      await loadAiModelConfigs();
+      closeAiModelEditor();
+      toast(`${aiModelLabel(saved)} 已保存，模型路由配置已生效`);
+    }
+    async function deleteAiModel(modelId) {
+      const model = aiModelState.items.find((item) => item.id === modelId);
+      if (!model || !window.confirm(`确定删除模型“${aiModelLabel(model)}”吗？其功能路由绑定也会被解除。`)) return;
+      await api(`/ai/models/${encodeURIComponent(modelId)}`, { method: "DELETE", body: {} });
+      aiModelState.items = aiModelState.items.filter((item) => item.id !== modelId);
+      renderAiModelConfigBoard(aiModelState.items);
+      renderAiFeatureRouteBoard(aiModelState.items);
+      renderAiProviderStatus(aiModelState.items);
+      await loadAiModelHistory();
+      toast(`${aiModelLabel(model)} 已删除，相关路由绑定已解除`);
+    }
+    async function saveAiModelApplications() {
+      const assignments = new Map(aiModelState.items.map((model) => [model.id, { applications: [], routeRoles: {} }]));
+      for (const row of [...($("aiFeatureRouteBoard")?.querySelectorAll("[data-ai-feature-route]") || [])]) {
+        const featureKey = row.dataset.aiFeatureRoute;
+        const primary = row.querySelector('[data-ai-route-role="primary"]')?.value || "";
+        const fallback = row.querySelector('[data-ai-route-role="fallback"]')?.value || "";
+        if (primary && fallback && primary === fallback) { throw new Error(`${AI_FEATURES.find((feature) => feature.key === featureKey)?.label || featureKey} 的主模型和备用模型不能相同`); }
+        [[primary, "primary"], [fallback, "fallback"]].forEach(([modelId, role]) => { if (modelId && assignments.has(modelId)) { const target = assignments.get(modelId); target.applications.push(featureKey); target.routeRoles[featureKey] = role; } });
+      }
+      const routePayload = (model, assignment) => ({
+        providerKey: model.providerKey,
+        modelKey: model.modelKey,
+        displayName: model.displayName,
+        baseUrl: model.baseUrl,
+        endpoint: model.endpoint,
+        protocol: model.protocol,
+        apiKeyEnv: model.apiKeyEnv,
+        timeoutMs: model.timeoutMs,
+        maxTokens: model.maxTokens,
+        temperature: model.temperature,
+        enabled: model.enabled !== false,
+        metadata: model.metadata || {},
+        applications: assignment?.applications || [],
+        routeRoles: assignment?.routeRoles || {},
+      });
+      for (const model of aiModelState.items) {
+        const assignment = assignments.get(model.id);
+        if (model.readOnly && !assignment?.applications?.length) continue;
+        const body = routePayload(model, assignment);
+        const saved = model.readOnly
+          ? await api("/ai/models", { method: "POST", body })
+          : await api(`/ai/models/${encodeURIComponent(model.id)}`, { method: "PUT", body: { ...body, apiKeyStatus: undefined } });
+        Object.assign(model, saved);
+        if (model.readOnly) { model.readOnly = false; model.source = "database"; }
+      }
+      renderAiModelConfigBoard(aiModelState.items); renderAiFeatureRouteBoard(aiModelState.items); renderAiProviderStatus(aiModelState.items); await loadAiModelHistory(); if (!$('moduleQuota')?.hidden) await loadQuotaManagement(); toast("应用配置已保存并生效");
+    }
+    async function testAiModel(modelId) {
+      const model = aiModelState.items.find((item) => item.id === modelId);
+      if (!model) return;
+      if (model.apiKeyStatus !== "PRESENT") throw new Error(`${aiModelLabel(model)}：API Key / Token 未配置`);
+      const button = [...document.querySelectorAll("[data-ai-test-model]")].find((item) => item.dataset.aiTestModel === modelId);
+      if (button) { button.disabled = true; button.textContent = "检查中…"; }
+      try {
+        const result = await api(`/ai/providers/${encodeURIComponent(model.providerKey)}/test`, { method: "POST", body: { modelKey: model.modelKey } });
+        const duration = Number.isFinite(Number(result?.durationMs)) ? `，耗时 ${Math.round(Number(result.durationMs))}ms` : "";
+        toast(`${aiModelLabel(model)}：厂商连接测试成功${duration}`);
+      } finally {
+        if (button) { button.disabled = false; button.textContent = "检查状态"; }
+      }
+    }
+    async function loadAiModelHistory() {
+      const host = $("aiModelSwitchHistory"); if (!host) return;
+      host.innerHTML = '<p class="muted" style="padding:18px">正在加载切换记录…</p>';
+      try {
+        const data = await api("/audit-logs?resourceType=ai_model_config&limit=50");
+        const items = data.items || data.logs || [];
+        host.innerHTML = items.length ? `<table><thead><tr><th>时间</th><th>操作</th><th>结果</th><th>模型</th></tr></thead><tbody>${items.map((item) => { const resourceId = item.resourceId || item.resource_id || ""; const model = aiModelState.items.find((entry) => entry.id === resourceId); const label = model ? `${aiModelLabel(model)} · ${model.providerKey}` : "模型配置"; return `<tr><td>${escapeHtml(formatTime(item.createdAt || item.created_at || item.at))}</td><td>${escapeHtml(item.action || "—")}</td><td>${escapeHtml(item.outcome || "—")}</td><td><strong>${escapeHtml(label)}</strong><small class="muted">记录编号 ${escapeHtml(shortId(resourceId))}</small></td></tr>`; }).join("")}</tbody></table>` : '<p class="muted" style="padding:18px">暂无切换记录</p>';
+      } catch (error) { host.innerHTML = `<div class="ops-empty"><p>${escapeHtml(apiErrorMessage(error))}</p><button class="button secondary" type="button" data-retry-ai-history>重新加载</button></div>`; host.querySelector("[data-retry-ai-history]")?.addEventListener("click", () => loadAiModelHistory()); }
+    }
+    async function loadAiModelConfigs() {
+      const host = $("aiModelConfigBoard"); if (!host) return;
+      host.innerHTML = '<p class="muted">加载中…</p>';
+      try { const [data] = await Promise.all([api("/ai/models"), loadAiProviderCatalog()]); aiModelState.items = data.items || []; renderAiModelConfigBoard(aiModelState.items); renderAiFeatureRouteBoard(aiModelState.items); } catch (error) { host.innerHTML = `<p class="muted">${escapeHtml(apiErrorMessage(error))}</p>`; $("aiFeatureRouteBoard").innerHTML = `<p class="muted">${escapeHtml(apiErrorMessage(error))}</p>`; $("aiProviderStatusBoard").innerHTML = `<p class="muted">${escapeHtml(apiErrorMessage(error))}</p>`; }
+    }
+    function setAiWorkspace(name) {
+      ["routing", "quota", "history"].forEach((key) => { const panel = $("aiWorkspace" + key.charAt(0).toUpperCase() + key.slice(1)); if (panel) panel.hidden = key !== name; });
+      document.querySelectorAll("[data-ai-workspace]").forEach((tab) => { const active = tab.dataset.aiWorkspace === name; tab.classList.toggle("active", active); tab.setAttribute("aria-selected", String(active)); });
+      if (name === "history") loadAiModelHistory();
+    }
+    const modelQuotaState = { policies: [] };
+    const featureUserQuotaState = { items: [] };
+    const featureUserQuotaLabels = { food_recognition: "食物识别", coach: "营养教练", daily_insight: "每日洞察", weekly_review: "周回顾", nutrition_plan: "营养计划", daily_tip: "每日小贴士", proactive_daily_brief: "NOVA 每日提醒", meal_analysis: "餐食分析", meal_evaluation: "餐食评估", meal_insight: "餐食洞察", food_query_translation: "食材搜索翻译", food_image_generation: "食材生图" };
+    async function loadFeatureUserQuotas(models = []) {
+      const host = $("featureUserQuotaBoard"); if (!host) return;
+      try {
+        const data = await api("/ops/feature-user-quota-policies");
+        featureUserQuotaState.items = data.items || [];
+        const keys = Object.keys(featureUserQuotaLabels);
+        const routeFor = (key) => models.filter((model) => model.feature === key || (key === "food_recognition" && model.feature === "vision"));
+        const routeMarkup = (key) => {
+          const routes = routeFor(key);
+          if (!routes.length) return '<span class="muted">暂无模型路由</span>';
+          return routes.map((model) => { const policy = policyForModel(model); return `<div class="quota-route"><span>${escapeHtml(model.provider || "—")}</span><button type="button" class="quota-model-link" data-open-provider="${escapeHtml(model.provider || "")}" data-open-model="${escapeHtml(model.model || "")}"><code>${escapeHtml(model.model || "—")}</code></button><small class="muted">${escapeHtml(providerBalanceLabel(policy))}</small></div>`; }).join("");
+        };
+        host.innerHTML = `<table><thead><tr><th>功能</th><th>单人每日上限</th><th>当前模型路由 / 厂商额度来源</th><th>状态</th><th>操作</th></tr></thead><tbody>${keys.map((key) => { const policy = featureUserQuotaState.items.find((item) => item.featureKey === key) || {}; return `<tr><td>${escapeHtml(featureUserQuotaLabels[key])}<small class="muted">${escapeHtml(key)}</small></td><td><input type="number" min="1" max="10000000" step="1" placeholder="不限制" value="${policy.dailyRequestLimit ?? ""}" data-feature-user-limit="${escapeHtml(key)}"></td><td>${routeMarkup(key)}</td><td>${policy.enabled === false ? "已停用" : policy.dailyRequestLimit == null ? "不限制" : "已启用"}</td><td><button type="button" class="button secondary" data-save-feature-user-quota="${escapeHtml(key)}">保存</button></td></tr>`; }).join("")}</tbody></table>`;
+        host.querySelectorAll("[data-save-feature-user-quota]").forEach((button) => { button.onclick = () => saveFeatureUserQuota(button.dataset.saveFeatureUserQuota).catch((error) => toast(apiErrorMessage(error), true)); });
+        host.querySelectorAll("[data-open-model]").forEach((button) => { button.addEventListener("click", () => { $("quotaModelBoard")?._openQuotaModel?.(button.getAttribute("data-open-provider"), button.getAttribute("data-open-model")); }); });
+      } catch (error) { host.innerHTML = `<p class="muted">${escapeHtml(apiErrorMessage(error))}</p>`; }
+    }
+    async function saveFeatureUserQuota(key) {
+      const input = document.querySelector(`[data-feature-user-limit="${CSS.escape(key)}"]`);
+      const saved = await api("/ops/feature-user-quota-policies", { method: "PUT", body: { featureKey: key, dailyRequestLimit: input?.value || null, enabled: true } });
+      const index = featureUserQuotaState.items.findIndex((item) => item.featureKey === key);
+      if (index >= 0) featureUserQuotaState.items[index] = saved; else featureUserQuotaState.items.push(saved);
+      toast(`${featureUserQuotaLabels[key] || key}的单人每日上限已保存`);
+      await loadQuotaManagement();
+    }
+    function modelQuotaKey({ providerKey, provider, modelKey, model, featureKey, feature }) {
+      return `${providerKey || provider || ""}:${modelKey || model || ""}:${featureKey || feature || ""}`;
+    }
+    function policyForModel(model) {
+      return modelQuotaState.policies.find((policy) => modelQuotaKey(policy) === modelQuotaKey(model)) || model.quotaPolicy || null;
+    }
+    function providerBalanceLabel(policy) {
+      if (!policy || policy.providerBalanceMode === "unsupported") return "未接入";
+      if (policy.providerBalanceMode === "automatic") return "自动同步（待接入）";
+      if (policy.providerBalanceManual == null) return "手工：未填写";
+      return `手工：${policy.providerBalanceManual}${policy.providerBalanceUnit ? ` ${policy.providerBalanceUnit}` : ""}`;
+    }
+    async function loadQuotaManagement() {
+      await loadAiModelConfigs();
+      const boardHost = $("quotaModelBoard");
+      const featureHost = $("quotaFeatureStats");
+      const updatedAtHost = $("quotaUpdatedAt");
+      if (!boardHost || !featureHost) return;
+      boardHost.innerHTML = "<p class=\"muted\">加载中…</p>";
+      featureHost.innerHTML = "<span class=\"status-metric\">加载中<b>…</b></span>";
+      if (updatedAtHost) updatedAtHost.textContent = "正在刷新系统观测数据…";
+      try {
+      const days = $("quotaDaysFilter")?.value || "30";
+      const data = await api(`/ops/quota?days=${encodeURIComponent(days)}`);
+      const models = data.models || [];
+      modelQuotaState.policies = data.modelQuotaPolicies || [];
+      await loadFeatureUserQuotas(models);
         const boards = data.modelBoard?.models || [];
         const features = data.usage?.features || [];
         const foodUsage = data.foodImageUsage || {};
         const vision = features.find((item) => item.key === "vision");
         const coach = features.find((item) => item.key === "coach");
+        const rateLimited = Number(data.metrics?.rateLimited) || 0;
+        const visionFailure = Number(data.metrics?.visionFailure) || 0;
         const featureCards = [];
         if (vision) featureCards.push(["识别", vision.today ?? 0, vision.windowTotal ?? 0, vision.total ?? 0]);
         if (coach) featureCards.push(["教练", coach.today ?? 0, coach.windowTotal ?? 0, coach.total ?? 0]);
         const foodTotal = foodUsage.windowTotal ?? (foodUsage.series || []).reduce((sum, point) => sum + (Number(point.value) || 0), 0);
         featureCards.push(["生图", foodUsage.today ?? 0, foodTotal, foodTotal]);
-        featureHost.innerHTML = featureCards.map(([label, today, windowTotal, total]) => `<span class="status-metric">${label}<b>今日 ${escapeHtml(today)} · 窗口 ${escapeHtml(windowTotal)} · 总量 ${escapeHtml(total)}</b></span>`).join("");
+        const configuredModels = new Set(models.map((item) => `${item.provider || ""}:${item.model || ""}`).filter((item) => item !== ":")).size;
+        featureHost.innerHTML = [
+          ...featureCards.map(([label, today, windowTotal]) => `<span class="status-metric">${label}<b>今日 ${escapeHtml(today)} · 窗口 ${escapeHtml(windowTotal)}</b></span>`),
+          `<span class="status-metric">已配模型<b>${escapeHtml(configuredModels)}</b></span>`,
+          `<span class="status-metric ${rateLimited || visionFailure ? "warning" : ""}">异常请求<b>${escapeHtml(rateLimited + visionFailure)}</b></span>`,
+        ].join("");
+        if (updatedAtHost) updatedAtHost.textContent = `最近刷新：${formatTime(new Date().toISOString())} · 统计范围近 ${days} 天`;
         renderModelBoard(boardHost, boards);
-        if (!models.length) {
-          modelHost.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无模型配置</p>";
-        } else {
-          modelHost.innerHTML = `<table><thead><tr><th>功能</th><th>提供商</th><th>模型</th><th>限额</th></tr></thead><tbody>${models.map((model) => `<tr><td>${escapeHtml(model.featureLabel || model.feature || "—")}</td><td>${escapeHtml(model.provider || "—")}</td><td><button type="button" class="quota-model-link" data-open-model="${escapeHtml(model.model || "")}"><code>${escapeHtml(model.model || "—")}</code></button></td><td>${escapeHtml(formatQuotaLimit(model))}</td></tr>`).join("")}</tbody></table>`;
-          modelHost.querySelectorAll("[data-open-model]").forEach((button) => {
-            button.addEventListener("click", () => {
-              boardHost._openQuotaModel?.(button.getAttribute("data-open-model"));
-            });
-          });
-        }
       } catch (error) {
         const message = escapeHtml(apiErrorMessage(error));
         boardHost.innerHTML = `<p class="muted">${message}</p>`;
-        modelHost.innerHTML = `<p class="muted" style="padding:18px">${message}</p>`;
+        $("featureUserQuotaBoard").innerHTML = `<p class="muted" style="padding:18px">${message}</p>`;
         featureHost.innerHTML = `<span class="status-metric danger">加载失败<b>${message}</b></span>`;
+        if (updatedAtHost) updatedAtHost.textContent = "额度数据加载失败，可点击刷新重试。";
       }
     }
     const userImagesState = { page: 1, pageSize: 40, total: 0, selectedKeys: new Set() };
@@ -2628,8 +3056,17 @@
     }
     function renderTraceList(data) {
       const host = $("traceList"); const items = data?.items || [];
+      state.tracePage = Math.max(1, Number(data?.page) || 1);
+      state.tracePageSize = Math.max(1, Number(data?.pageSize) || 50);
+      state.traceTotal = Math.max(0, Number(data?.total) || 0);
+      const pagination = $("tracePagination");
+      const totalPages = Math.max(1, Math.ceil(state.traceTotal / state.tracePageSize));
+      pagination.hidden = state.traceTotal <= state.tracePageSize;
+      $("tracePageInfo").textContent = `第 ${state.tracePage} / ${totalPages} 页 · 共 ${state.traceTotal} 条`;
+      $("tracePagePrev").disabled = state.tracePage <= 1;
+      $("tracePageNext").disabled = state.tracePage >= totalPages;
       if (!items.length) return setOpsMessage(host, "暂无符合条件的 Trace");
-      host.innerHTML = `<table><thead><tr><th>Trace ID</th><th>功能</th><th>状态</th><th>阶段</th><th>耗时</th><th>时间</th></tr></thead><tbody>${items.map((item) => `<tr><td><button class="ops-inline-link" type="button" data-trace-id="${escapeHtml(item.traceId)}" aria-controls="traceDrawer" aria-expanded="false">${escapeHtml(item.traceId)}</button></td><td>${escapeHtml(item.feature || "—")}</td><td><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span></td><td>${escapeHtml(item.lastStage || "—")}</td><td>${escapeHtml(item.durationMs ?? "—")} ms</td><td>${escapeHtml(formatTime(item.startedAt))}</td></tr>`).join("")}</tbody></table>`;
+      host.innerHTML = `<table><thead><tr><th>Trace ID</th><th>接口</th><th>功能</th><th>状态</th><th>状态码</th><th>错误码</th><th>阶段</th><th>耗时</th><th>时间</th></tr></thead><tbody>${items.map((item) => `<tr><td class="trace-cell trace-cell--id"><button class="ops-inline-link" type="button" data-trace-id="${escapeHtml(item.traceId)}" aria-controls="traceDrawer" aria-expanded="false">${escapeHtml(item.traceId)}</button></td><td class="trace-cell trace-cell--route" title="${escapeHtml(item.route || "")}">${escapeHtml(item.route || "—")}</td><td class="trace-cell">${escapeHtml(item.feature || "—")}</td><td class="trace-cell trace-cell--status"><span class="ops-status-pill ${opsTone(item.status)}">${escapeHtml(opsStatusLabel(item.status))}</span></td><td class="trace-cell trace-cell--http">${escapeHtml(item.httpStatus ?? "—")}</td><td class="trace-cell">${escapeHtml(item.errorCode || "—")}</td><td class="trace-cell">${escapeHtml(item.lastStage || "—")}</td><td class="trace-cell trace-cell--duration">${escapeHtml(item.durationMs ?? "—")} ms</td><td class="trace-cell trace-cell--time">${escapeHtml(formatTime(item.startedAt))}</td></tr>`).join("")}</tbody></table>`;
       host.querySelectorAll("[data-trace-id]").forEach((button) => { button.onclick = () => loadTraceDetail(button.dataset.traceId, button); });
     }
     let traceDrawerTrigger = null;
@@ -2678,17 +3115,24 @@
         host.innerHTML = `<h4>Diagnostic Package</h4><p class="muted">仅显示脱敏后的排障字段。</p>${diagnosticBlock("Request", diagnostic.request)}${diagnosticBlock("Runtime", diagnostic.runtime)}${diagnosticBlock("Vision", diagnostic.vision)}${diagnosticBlock("Quota", diagnostic.quota)}${diagnosticBlock("Database", diagnostic.database)}${diagnosticBlock("Result", diagnostic.result)}${diagnosticBlock("Replay Hints", diagnostic.replayHints)}`;
       } catch (error) { setOpsMessage(host, traceDetailErrorMessage(error), "danger"); }
     }
-    async function loadTraces() {
+    async function loadTraces({ resetPage = false } = {}) {
       const host = $("traceList"); setOpsMessage(host, "加载中…");
       try {
-        const params = new URLSearchParams({ page: "1", limit: "50" }); const query = ($("traceSearch").value || "").trim();
-        if (query) params.set(query.startsWith("trace_") ? "traceId" : "errorCode", query);
+        if (resetPage) state.tracePage = 1;
+        const params = new URLSearchParams({ page: String(state.tracePage), limit: String(state.tracePageSize) }); const query = ($("traceSearch").value || "").trim();
+        if (query) {
+          if (query.startsWith("trace_")) params.set("traceId", query);
+          else if (query.startsWith("/")) params.set("route", query);
+          else params.set("errorCode", query);
+        }
         if ($("traceSearch").dataset.from) params.set("from", $("traceSearch").dataset.from);
         if ($("traceStatusFilter").value) params.set("status", $("traceStatusFilter").value);
+        if ($("traceHttpStatusFilter").value) params.set("httpStatus", $("traceHttpStatusFilter").value);
         if ($("traceFeatureFilter").value) params.set("feature", $("traceFeatureFilter").value);
         if ($("traceStageFilter").value) params.set("stage", $("traceStageFilter").value);
         const active = [];
         if ($("traceStatusFilter").value) active.push(`状态：${opsStatusLabel($("traceStatusFilter").value)}`);
+        if ($("traceHttpStatusFilter").value) active.push(`状态码：${$("traceHttpStatusFilter").value}`);
         if ($("traceFeatureFilter").value) active.push(`功能：${$("traceFeatureFilter").value}`);
         if ($("traceStageFilter").value) active.push(`阶段：${$("traceStageFilter").value}`);
         if ($( "traceSearch").dataset.from) active.push("时间：最近 24 小时");
@@ -2700,10 +3144,11 @@
     function applyTraceQuickFilter(filter) {
       $("traceSearch").value = "";
       $("traceStatusFilter").value = filter === "failed" || filter === "timed_out" ? filter : "";
+      $("traceHttpStatusFilter").value = "";
       $("traceFeatureFilter").value = filter === "vision" || filter === "coach" ? filter : "";
       $("traceStageFilter").value = "";
       if (filter === "last24h") $("traceSearch").dataset.from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); else delete $("traceSearch").dataset.from;
-      loadTraces().catch((error) => toast(apiErrorMessage(error), true));
+      loadTraces({ resetPage: true }).catch((error) => toast(apiErrorMessage(error), true));
     }
     function renderJobs(data) {
       const items = data?.items || []; const select = $("runNowJobKey");
@@ -2816,8 +3261,10 @@
     $("traceDrawer").onclick = (event) => { if (event.target === event.currentTarget) closeTraceDrawer(); };
     $("refreshHealth").onclick = () => loadSystemHealth().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshTraces").onclick = () => loadTraces().catch((error) => toast(apiErrorMessage(error), true));
-    $("traceApplyFilters").onclick = () => loadTraces().catch((error) => toast(apiErrorMessage(error), true));
-    $("traceClearFilters").onclick = () => { $("traceSearch").value = ""; delete $("traceSearch").dataset.from; $("traceStatusFilter").value = ""; $("traceFeatureFilter").value = ""; $("traceStageFilter").value = ""; loadTraces().catch((error) => toast(apiErrorMessage(error), true)); };
+    $("traceApplyFilters").onclick = () => loadTraces({ resetPage: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("traceClearFilters").onclick = () => { $("traceSearch").value = ""; delete $("traceSearch").dataset.from; $("traceStatusFilter").value = ""; $("traceHttpStatusFilter").value = ""; $("traceFeatureFilter").value = ""; $("traceStageFilter").value = ""; loadTraces({ resetPage: true }).catch((error) => toast(apiErrorMessage(error), true)); };
+    $("tracePagePrev").onclick = () => { if (state.tracePage > 1) { state.tracePage -= 1; loadTraces().catch((error) => toast(apiErrorMessage(error), true)); } };
+    $("tracePageNext").onclick = () => { if (state.tracePage * state.tracePageSize < state.traceTotal) { state.tracePage += 1; loadTraces().catch((error) => toast(apiErrorMessage(error), true)); } };
     document.querySelectorAll("[data-trace-quick-filter]").forEach((button) => { button.onclick = () => applyTraceQuickFilter(button.dataset.traceQuickFilter); });
     $("traceSearch").onkeydown = (event) => { if (event.key === "Enter") loadTraces().catch((error) => toast(apiErrorMessage(error), true)); };
     $("deleteSelectedUserImages").onclick = () => deleteSelectedUserImages();
@@ -2833,7 +3280,19 @@
     $("feedbackStatusFilter").onchange = () => loadFeedback({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("refreshOps").onclick = () => loadOpsOverview().catch((error) => toast(apiErrorMessage(error), true));
     $("runOpsPatrol").onclick = () => runOpsPatrolFromOverview().catch((error) => toast(apiErrorMessage(error), true));
+    document.querySelectorAll("[data-ai-workspace]").forEach((tab) => { tab.onclick = () => setAiWorkspace(tab.dataset.aiWorkspace); });
+    $("addAiModel").onclick = () => openAiModelEditor();
+    $("saveAiRoutes").onclick = () => saveAiModelApplications().catch((error) => toast(apiErrorMessage(error), true));
+    $("aiModelEditorSave").onclick = () => saveAiModelEditor().catch((error) => toast(apiErrorMessage(error), true));
+    $("aiModelEditorCancel").onclick = closeAiModelEditor;
+    $("aiModelEditorClose").onclick = closeAiModelEditor;
+    $("aiModelEditorBackdrop").onclick = closeAiModelEditor;
+    $("toastClose").onclick = hideToast;
+    $("aiProviderSelect").onchange = renderAiProviderPicker;
+    $("aiProviderSync").onclick = () => syncAiProviderModels().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshQuota").onclick = () => loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshFeatureUserQuotas").onclick = () => loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
+    $("refreshAiHistory").onclick = () => loadAiModelHistory();
     $("quotaDaysFilter").onchange = () => loadQuotaManagement().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshModeration").onclick = () => loadModerationModule().catch((error) => toast(apiErrorMessage(error), true));
     $("moderationStatusFilter").onchange = () => loadModerationModule().catch((error) => toast(apiErrorMessage(error), true));

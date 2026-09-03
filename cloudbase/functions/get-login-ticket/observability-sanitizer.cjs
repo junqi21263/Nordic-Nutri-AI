@@ -1,6 +1,6 @@
-const MAX_STRING_LENGTH = 200;
-const MAX_PAYLOAD_DEPTH = 3;
-const MAX_PAYLOAD_KEYS = 24;
+const MAX_STRING_LENGTH = 2000;
+const MAX_PAYLOAD_DEPTH = 5;
+const MAX_PAYLOAD_KEYS = 64;
 const SENSITIVE_PAYLOAD_KEY = /token|secret|password|authorization|cookie|apikey|api_key|access_key|private_key|signature|base64|image/i;
 
 const TRACE_META_KEYS = new Set([
@@ -118,6 +118,7 @@ function sanitizeTraceStage(stage) {
     "durationMs",
     "status",
     "provider",
+    "errorCode",
     "providerRequestIdHash",
     "timeoutBudgetMs",
     "providerHttpStatus",

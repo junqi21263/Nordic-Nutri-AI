@@ -8,6 +8,13 @@ async function pageSource() {
   return readFile(pagePath, "utf8");
 }
 
+test("all admin select controls share the Nordic Nutri select treatment", async () => {
+  const source = await pageSource();
+  assert.match(source, /(^|[,{\s])select,?\s*\.nn-select\s*\{/);
+  assert.match(source, /select:focus,?\s*\.nn-select:focus\s*\{/);
+  assert.match(source, /appearance:\s*none/);
+});
+
 test("batch rail contains no unused operation area", async () => {
   const source = await pageSource();
   assert.doesNotMatch(source, /id="batchActions"/);
@@ -154,7 +161,9 @@ test("API failures are retained in the visible operation feed with request metad
 
 test("admin connection defaults to the primary CloudBase HTTP function without exposing API Base on login", async () => {
   const source = await pageSource();
-  assert.match(source, /const DEFAULT_API_BASE = "https:\/\/lewis-healthy-d4glgqqzv73a5bc10\.service\.tcloudbase\.com\/get-login-ticket"/);
+  assert.match(source, /const PRODUCTION_API_BASE = "https:\/\/lewis-healthy-d4glgqqzv73a5bc10\.service\.tcloudbase\.com\/get-login-ticket"/);
+  assert.match(source, /const TEST_API_BASE = "https:\/\/test-dev-d4gyxnn0b5dfa2c8a\.service\.tcloudbase\.com\/get-login-ticket"/);
+  assert.match(source, /window\.location\.hostname\.startsWith\("test-dev-d4gyxnn0b5dfa2c8a"\)/);
   assert.match(source, /function apiBase\(\)/);
   assert.doesNotMatch(source, /高级：API Base/);
   assert.doesNotMatch(source, /id="baseUrl"/);
@@ -342,7 +351,6 @@ test("quota and moderation admin modules wire dedicated APIs", async () => {
   const source = await pageSource();
   assert.match(source, /id="moduleQuota"/);
   assert.match(source, /id="quotaModelBoard"/);
-  assert.match(source, /id="quotaModelTable"/);
   assert.match(source, /id="quotaFeatureStats"/);
   assert.match(source, /id="quotaDaysFilter"/);
   assert.match(source, /function loadQuotaManagement\(/);
@@ -476,6 +484,34 @@ test("trace explorer exposes stage and quick filters", async () => {
   assert.match(source, /params\.set\("stage"/);
 });
 
+test("trace explorer exposes route and HTTP status search and filters", async () => {
+  const source = await pageSource();
+  assert.match(source, /Trace ID \/ 接口 \/ 错误码/);
+  assert.match(source, /id="traceHttpStatusFilter"/);
+  assert.match(source, /value="503">503/);
+  assert.match(source, /<th>接口<\/th>/);
+  assert.match(source, /<th>状态码<\/th>/);
+  assert.match(source, /params\.set\("route"/);
+  assert.match(source, /params\.set\("httpStatus"/);
+});
+
+test("trace explorer keeps status, time, and trace id readable in fixed columns", async () => {
+  const source = await pageSource();
+  assert.match(source, /class="data-table data-table--traces"/);
+  assert.match(source, /\.data-table--traces table \{ min-width: 1120px; table-layout: fixed; \}/);
+  assert.match(source, /\.trace-cell--status,\s*\.trace-cell--http,\s*\.trace-cell--duration,\s*\.trace-cell--time \{ white-space: nowrap; \}/);
+  assert.match(source, /\.trace-cell--id \.ops-inline-link \{ display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; \}/);
+});
+
+test("trace explorer exposes pagination for older and non-success traces", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="tracePagination"/);
+  assert.match(source, /tracePagePrev/);
+  assert.match(source, /tracePageNext/);
+  assert.match(source, /new URLSearchParams\(\{ page: String\(state\.tracePage\), limit: String\(state\.tracePageSize\) \}/);
+  assert.match(source, /data\.total/);
+});
+
 test("shows a login gate before revealing the admin console", async () => {
   const source = await pageSource();
   assert.match(source, /id="loginGate"/);
@@ -487,6 +523,16 @@ test("shows a login gate before revealing the admin console", async () => {
   assert.match(source, /showLoginGate\(\)/);
   assert.match(source, /id="logoutBtn"/);
   assert.match(source, /loginForm"\.onsubmit|id="loginForm"/);
+});
+
+test("marks the admin console from the API environment instead of hardcoding DEV", async () => {
+  const source = await pageSource();
+  assert.match(source, /DEV 测试环境/);
+  assert.match(source, /PROD 生产环境/);
+  assert.match(source, /id="loginEnvironmentBadge"/);
+  assert.match(source, /id="adminEnvironmentBadge"/);
+  assert.match(source, /function applyEnvironmentBadge\(/);
+  assert.match(source, /applyEnvironmentBadge\(\)/);
 });
 
 test("persists admin credentials in localStorage and auto-connects on reload", async () => {
@@ -501,6 +547,13 @@ test("persists admin credentials in localStorage and auto-connects on reload", a
   assert.match(source, /if \(hasToken\(\)\) connect\(\)/);
   assert.match(source, /saveCredentials\(\)/);
   assert.doesNotMatch(source, /管理员 Bearer Token/);
+});
+
+test("fresh login and reload open the overview module", async () => {
+  const source = await pageSource();
+  assert.match(source, /function showAdminApp\([\s\S]*?setModule\("dashboard"\)/);
+  assert.match(source, /id="moduleDashboard" class="admin-module" hidden/);
+  assert.match(source, /id="moduleImages" class="admin-module nn-food-operations"/);
 });
 
 test("food image admin exposes a safe old-image audit workflow", async () => {
@@ -520,4 +573,100 @@ test("feedback console uses Chinese statuses and exposes a reply action", async 
   assert.match(source, /回复反馈/);
   assert.match(source, /保存回复并通知用户/);
   assert.match(source, /body: \{ reply \}/);
+});
+
+test("AI management uses the complete quota feature catalog and feature-first routing", async () => {
+  const source = await pageSource();
+  for (const feature of [
+    ["vision", "食物识别"],
+    ["coach", "营养教练"],
+    ["daily_insight", "每日洞察"],
+    ["weekly_review", "周回顾"],
+    ["nutrition_plan", "营养计划"],
+    ["daily_tip", "每日小贴士"],
+    ["proactive_daily_brief", "NOVA 每日提醒"],
+    ["food_image", "食材生图"],
+  ]) {
+    assert.match(source, new RegExp(`key: "${feature[0]}"`));
+    assert.match(source, new RegExp(`label: "${feature[1]}"`));
+  }
+  assert.match(source, /id="aiFeatureRouteBoard"/);
+  assert.match(source, /data-ai-feature-route=/);
+  assert.match(source, /应用功能配置/);
+  assert.doesNotMatch(source, /data-ai-application=/);
+});
+
+test("AI provider editor only asks for provider credentials and catalog model", async () => {
+  const source = await pageSource();
+  assert.match(source, /const MODEL_DEFAULT_TIMEOUT_MS = 30000/);
+  assert.match(source, /const MODEL_DEFAULT_MAX_TOKENS = 2048/);
+  assert.match(source, /const MODEL_DEFAULT_TEMPERATURE = 0\.2/);
+  assert.match(source, /id="aiProviderSelect"/);
+  assert.match(source, /id="aiProviderApiKey"[^>]*type="password"/);
+  assert.match(source, /id="aiProviderModelSelect"/);
+  assert.doesNotMatch(source, /id="aiModelProtocol"/);
+  assert.doesNotMatch(source, /id="aiModelBaseUrl"/);
+  assert.doesNotMatch(source, /id="aiModelEndpoint"/);
+  assert.match(source, /\/ai\/providers/);
+  assert.match(source, /\/ai\/catalog/);
+});
+
+test("AI model creation reuses a configured runtime credential when no new key is entered", async () => {
+  const source = await pageSource();
+  assert.match(source, /aiModelState\.providers\.find\(\(item\) => item\.providerKey === payload\.providerKey\)/);
+  assert.match(source, /payload\.apiKey\.trim\(\) && configuredProvider\?\.credentialStatus !== "PRESENT"/);
+  assert.match(source, /if \(payload\.apiKey\.trim\(\)\) await api\(`\/ai\/providers\//);
+});
+
+test("AI provider sync reuses a configured runtime credential without opening the credential store", async () => {
+  const source = await pageSource();
+  assert.match(source, /const configuredProvider = aiModelState\.providers\.find\(\(item\) => item\.providerKey === providerKey\)/);
+  assert.match(source, /!token\.trim\(\) && configuredProvider\?\.credentialStatus !== "PRESENT"/);
+  assert.match(source, /if \(token\.trim\(\)\) await api\(`\/ai\/providers\/\$\{encodeURIComponent\(providerKey\)\}\/credential`/);
+  assert.match(source, /await api\(`\/ai\/providers\/\$\{encodeURIComponent\(providerKey\)\}\/sync`/);
+});
+
+test("saving a route materializes selected runtime models before refreshing the board", async () => {
+  const source = await pageSource();
+  assert.match(source, /model\.readOnly\s*\?\s*await api\("\/ai\/models",\s*\{ method: "POST"/);
+  assert.match(source, /providerKey: model\.providerKey/);
+  assert.match(source, /applications: assignment\?\.applications \|\| \[\]/);
+  assert.match(source, /model\.readOnly\s*=\s*false/);
+});
+
+test("AI routing explains that food vision uses the selected provider adapter", async () => {
+  const source = await pageSource();
+  assert.match(source, /支持已接入的视觉模型，保存后按厂商实际调用/);
+  assert.match(source, /data-ai-feature-route=/);
+});
+
+test("admin toast is centered, dismissible, and accessible", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="toastMessage"/);
+  assert.match(source, /id="toastClose"/);
+  assert.match(source, /left: 50%/);
+  assert.match(source, /top: 50%/);
+  assert.match(source, /toastClose.*hideToast|hideToast.*toastClose/s);
+});
+
+test("success toast policy only allows save or activation feedback", async () => {
+  const source = await pageSource();
+  assert.match(source, /shouldShowSuccessToast/);
+  assert.match(source, /保存|生效|切换/);
+  assert.match(source, /if \(!isError && !shouldShowSuccessToast\(message\)\) return/);
+});
+
+test("AI workspaces and provider status keep routing, quota, history, and secrets separated", async () => {
+  const source = await pageSource();
+  assert.match(source, /data-ai-workspace="routing"/);
+  assert.match(source, /data-ai-workspace="quota"/);
+  assert.match(source, /data-ai-workspace="history"/);
+  assert.match(source, /模型路由/);
+  assert.match(source, /模型额度/);
+  assert.match(source, /切换记录/);
+  assert.match(source, /Provider 与模型状态/);
+  assert.match(source, /Key \$\{status\}/);
+  assert.match(source, /已配置/);
+  assert.match(source, /未配置/);
+  assert.doesNotMatch(source, /Key：[^<\n]+/);
 });

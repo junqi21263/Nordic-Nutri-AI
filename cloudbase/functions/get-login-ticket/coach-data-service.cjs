@@ -409,7 +409,7 @@ function formatContent(reply) {
 }
 
 function addReplyMetadata(reply, source, model) {
-  return { ...reply, source, model: source === "deepseek" ? model : null };
+  return { ...reply, source, model: source && source !== "rule_v2" ? model : null };
 }
 
 function validateStreamedText(value) {
@@ -626,8 +626,8 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     return userMessage.data;
   }
 
-  async function persistResponse({ userId, conversationId, userMessage, request, context, reply, source, content, dailyUsage }) {
-    const persistedReply = addReplyMetadata(reply, source, model);
+  async function persistResponse({ userId, conversationId, userMessage, request, context, reply, source, effectiveModel = model, content, dailyUsage }) {
+    const persistedReply = addReplyMetadata(reply, source, effectiveModel);
     const assistantMessage = await db.from("coach_messages").insert({
       user_id: userId,
       conversation_id: conversationId,
@@ -637,7 +637,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
       context_snapshot: context,
       answer: persistedReply,
       provider: source,
-      model: source === "deepseek" ? model : "rule_v2",
+      model: source && source !== "rule_v2" ? effectiveModel : "rule_v2",
     }).select("*").single();
     if (assistantMessage.error || !assistantMessage.data) throw new Error("Coach answer save failed");
     return { conversationId, messages: [mapMessage(userMessage), mapMessage(assistantMessage.data)], reply: persistedReply, dailyUsage };
@@ -657,20 +657,23 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     let reply = createRuleReply(request.prompt, context, { inScope: questionInScope });
     let usage = null;
     let usedModel = null;
+    let usedProvider = null;
     if (reply.safety === "none" && questionInScope && typeof answer === "function") {
       try {
         const answered = await answer({ prompt: request.prompt, context, history });
         usage = answered?.usage || null;
         usedModel = typeof answered?.model === "string" ? answered.model : null;
+        usedProvider = typeof answered?.provider === "string" ? answered.provider : null;
         const { usage: _usage, model: _model, ...cleanReply } = answered && typeof answered === "object" ? answered : { ...answered };
         reply = cleanReply;
-        source = "deepseek";
+        source = usedProvider || "deepseek";
       } catch {
         // The deterministic reply remains available if the optional provider is unavailable.
       }
     }
-    const persisted = await persistResponse({ userId, conversationId, userMessage, request, context, reply, source, dailyUsage });
-    return { ...persisted, usage, model: usedModel || (source === "deepseek" ? model : null) };
+    const effectiveModel = usedModel || (source !== "rule_v2" ? model : null);
+    const persisted = await persistResponse({ userId, conversationId, userMessage, request, context, reply, source, effectiveModel, dailyUsage });
+    return { ...persisted, usage, model: effectiveModel, provider: source !== "rule_v2" ? source : null };
   }
 
   async function* streamMessage(userId, input) {
@@ -698,11 +701,18 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     let pending = "";
     let usage = null;
     let usedModel = null;
+    let usedProvider = null;
     try {
       for await (const chunk of streamAnswer({ prompt: request.prompt, context, history })) {
         if (chunk && typeof chunk === "object" && chunk.type === "usage") {
           usage = chunk.usage || null;
           usedModel = typeof chunk.model === "string" ? chunk.model : usedModel;
+          usedProvider = typeof chunk.provider === "string" ? chunk.provider : usedProvider;
+          continue;
+        }
+        if (chunk && typeof chunk === "object" && chunk.type === "route") {
+          usedModel = typeof chunk.model === "string" ? chunk.model : usedModel;
+          usedProvider = typeof chunk.provider === "string" ? chunk.provider : usedProvider;
           continue;
         }
         if (typeof chunk !== "string") continue;
@@ -727,7 +737,8 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
         request,
         context,
         reply: fallback,
-        source: "deepseek",
+        source: usedProvider || "deepseek",
+        effectiveModel: usedModel || model,
         content,
         dailyUsage,
       });
@@ -736,6 +747,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
         ...result,
         usage,
         model: usedModel || model,
+        provider: usedProvider || "deepseek",
       };
     } catch {
       yield { type: "complete", ...await persistResponse({ userId, conversationId, userMessage, request, context, reply: fallback, source: "rule_v2", dailyUsage }) };
@@ -862,7 +874,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
   }
 
   async function writeCachedDailyTip(userId, tipDate, contextHash, tip) {
-    const provider = ["deepseek", "hunyuan-exp", "rule_v2"].includes(tip?.source) ? tip.source : "rule_v2";
+    const provider = typeof tip?.source === "string" && tip.source.trim() ? tip.source.trim() : "rule_v2";
     const persisted = await db.from("coach_daily_tips").upsert({
       user_id: userId,
       tip_date: tipDate,
@@ -901,7 +913,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
   }
 
   async function writeCachedDailyBrief(userId, briefDate, contextHash, brief) {
-    const provider = ["deepseek", "hunyuan-exp", "rule_v2"].includes(brief?.source) ? brief.source : "rule_v2";
+    const provider = typeof brief?.source === "string" && brief.source.trim() ? brief.source.trim() : "rule_v2";
     const payload = (({ greeting, summary, suggestion, theme }) => ({ greeting, summary, suggestion, theme }))(brief);
     const persisted = await db.from("nova_daily_briefs").upsert({
       user_id: userId,

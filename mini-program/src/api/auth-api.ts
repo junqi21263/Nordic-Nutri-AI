@@ -3,6 +3,7 @@ import { extractFunctionDiagnostics, truncateProjectRef } from "./function-reque
 import { getPublicRuntimeConfig } from "./environment";
 import type { AppAuthUser } from "../auth/auth-store";
 import { requestWechatHttpsLogin } from "./wechat-https-login-api";
+import { productApiEndpoint } from "./product-api-config";
 import { restoreSession, setNativeSession } from "../auth/session-manager";
 import { syncOnboardingCompletedFromServer } from "../utils/local-experience";
 
@@ -48,7 +49,7 @@ function logFunctionEvent(
   if (getPublicRuntimeConfig().environment !== "development") return;
   console.info("[dev-auth] function-invoke-" + event, {
     targetProjectRef: truncateProjectRef(
-      "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com",
+      productApiEndpoint,
     ),
     httpStatus: diagnostics?.httpStatus ?? null,
     requestId: diagnostics?.requestId ?? null,

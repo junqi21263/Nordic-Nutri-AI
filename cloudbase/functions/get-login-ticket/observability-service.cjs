@@ -100,7 +100,7 @@ function buildDaySeries(dayKeys, rows, metrics) {
 }
 
 function readMeta(row) {
-  const meta = row?.meta;
+  const meta = row?.meta ?? row?.meta_json;
   if (!meta) return {};
   if (typeof meta === "string") {
     try { return JSON.parse(meta) || {}; } catch { return {}; }
@@ -111,6 +111,11 @@ function readMeta(row) {
 function rowModel(row) {
   const meta = readMeta(row);
   return typeof meta.model === "string" ? meta.model.trim() : "";
+}
+
+function rowProvider(row) {
+  const meta = readMeta(row);
+  return typeof meta.provider === "string" ? meta.provider.trim() : "";
 }
 
 function rowFeature(row) {
@@ -132,6 +137,7 @@ const TRACE_LIST_COLUMNS = [
   "error_code",
   "provider",
   "fallback_used",
+  "meta_json",
   "expires_at",
 ].join(",");
 
@@ -139,7 +145,6 @@ const TRACE_DETAIL_COLUMNS = [
   TRACE_LIST_COLUMNS,
   "provider_request_id_hash",
   "stages_json",
-  "meta_json",
 ].join(",");
 
 function parseJsonObject(value) {
@@ -159,11 +164,13 @@ function parseJsonArray(value) {
 }
 
 function mapTraceListRow(row = {}) {
+  const meta = readMeta(row);
   return {
     traceId: boundedText(row.trace_id, 160),
     clientRequestId: boundedText(row.client_request_id, 80),
     userHash: boundedText(row.user_hash, 200),
     feature: boundedText(row.feature, 80),
+    route: boundedText(meta.route, 160),
     status: normalizeTraceStatus(row.status),
     lastStage: boundedText(row.last_stage, 120),
     startedAt: row.started_at || null,
@@ -489,6 +496,8 @@ function createObservabilityService({ db }) {
     stage,
     status,
     errorCode,
+    route,
+    httpStatus,
     from,
     to,
     page = 1,
@@ -505,6 +514,8 @@ function createObservabilityService({ db }) {
     if (stage) query = query.eq("last_stage", boundedText(stage, 120));
     if (status && TRACE_STATUSES.has(status)) query = query.eq("status", status);
     if (errorCode) query = query.eq("error_code", boundedText(errorCode, 80));
+    if (route) query = query.eq("meta_json->>route", boundedText(route, 160));
+    if (Number.isInteger(Number(httpStatus))) query = query.eq("http_status", Number(httpStatus));
     if (from) query = query.gte("started_at", from);
     if (to) query = query.lte("started_at", to);
     const result = await query
@@ -658,9 +669,10 @@ function createObservabilityService({ db }) {
     };
   }
 
-  async function getModelDetail({ model, days = 30, catalog = [], foodImageSeries = [] } = {}) {
+  async function getModelDetail({ provider = null, model, days = 30, catalog = [], foodImageSeries = [] } = {}) {
     const modelName = String(model || "").trim();
     if (!modelName) throw new Error("Model name is required");
+    const providerKey = String(provider || "").trim() || null;
     const dayKeys = enumerateDays(days);
     const sinceIso = new Date(`${dayKeys[0]}T00:00:00+08:00`).toISOString();
     const [windowRows, allRows] = await Promise.all([
@@ -668,9 +680,10 @@ function createObservabilityService({ db }) {
       loadMetricRows({ limit: 10000 }),
     ]);
 
-    const catalogEntries = (catalog || []).filter((entry) => entry?.model === modelName);
+    const catalogEntries = (catalog || []).filter((entry) => entry?.model === modelName
+      && (!providerKey || String(entry.provider || "").trim() === providerKey));
     const catalogFeatures = new Set(catalogEntries.map((entry) => entry.feature));
-    const isFoodImageModel = catalogFeatures.has("food_image");
+    const isFoodImageModel = catalogFeatures.has("food_image") || catalogFeatures.has("food_image_generation");
     const featureMetricMap = {
       vision: ["vision_success", "vision_failure"],
       coach: ["coach_message", "coach_limited"],
@@ -679,11 +692,17 @@ function createObservabilityService({ db }) {
       nutrition_plan: ["nutrition_plan"],
       daily_tip: ["daily_tip"],
       food_image: [],
+      food_image_generation: [],
     };
 
     function rowBelongsToModel(row) {
       const explicit = rowModel(row);
-      if (explicit) return explicit === modelName;
+      if (explicit) {
+        if (explicit !== modelName) return false;
+        const metricProvider = rowProvider(row);
+        if (providerKey) return metricProvider ? metricProvider === providerKey : catalogEntries.length === 1;
+        return true;
+      }
       const feature = rowFeature(row);
       if (feature && catalogFeatures.has(feature)) return true;
       // Attribute legacy rows that only have metric names, no meta.model.
@@ -720,7 +739,8 @@ function createObservabilityService({ db }) {
     }
     if (isFoodImageModel) {
       const foodTotal = foodImageSeries.reduce((sum, point) => sum + (Number(point.value) || 0), 0);
-      featureCounts.food_image = (featureCounts.food_image || 0) + foodTotal;
+      const foodFeature = catalogFeatures.has("food_image_generation") ? "food_image_generation" : "food_image";
+      featureCounts[foodFeature] = (featureCounts[foodFeature] || 0) + foodTotal;
     }
 
     const today = todayShanghaiKey();
@@ -750,7 +770,9 @@ function createObservabilityService({ db }) {
 
     return {
       model: modelName,
-      provider: catalogEntries[0]?.provider || null,
+      modelRef: providerKey ? `${providerKey}:${modelName}` : modelName,
+      displayName: catalogEntries[0]?.displayName || modelName,
+      provider: providerKey || catalogEntries[0]?.provider || null,
       days: dayKeys.length,
       today,
       timezone: "Asia/Shanghai",
@@ -789,14 +811,17 @@ function createObservabilityService({ db }) {
     const seen = new Set();
     for (const entry of catalog || []) {
       const name = String(entry?.model || "").trim();
-      if (!name || seen.has(name)) continue;
-      seen.add(name);
-      uniqueModels.push(name);
+      const provider = String(entry?.provider || "").trim();
+      const identity = `${provider}:${name}`;
+      if (!name || seen.has(identity)) continue;
+      seen.add(identity);
+      uniqueModels.push({ provider: provider || null, model: name });
     }
     const boards = [];
-    for (const modelName of uniqueModels) {
+    for (const candidate of uniqueModels) {
       boards.push(await getModelDetail({
-        model: modelName,
+        provider: candidate.provider,
+        model: candidate.model,
         days,
         catalog,
         foodImageSeries,

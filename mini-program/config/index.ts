@@ -54,6 +54,9 @@ export default defineConfig({
     "process.env.TARO_APP_USE_REAL_BACKEND": JSON.stringify(
       process.env.TARO_APP_USE_REAL_BACKEND ?? "false",
     ),
+    "process.env.TARO_APP_API_BASE_URL": JSON.stringify(
+      process.env.TARO_APP_API_BASE_URL ?? "",
+    ),
     "process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY": JSON.stringify(
       process.env.TARO_APP_CLOUDBASE_PUBLISHABLE_KEY ?? "",
     ),

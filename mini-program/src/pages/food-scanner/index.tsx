@@ -2,7 +2,12 @@ import { Image, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { getProductAccountUsage } from "../../api/product-data-api";
-import { analyzeProductImage, readPendingVisionAnalysisId, resumeVisionAnalysis } from "../../api/vision-api";
+import {
+  analyzeProductImage,
+  readPendingVisionAnalysisId,
+  resumeVisionAnalysis,
+  VISION_CLIENT_TOTAL_BUDGET_MS,
+} from "../../api/vision-api";
 import { AppButton } from "../../components/app-button";
 import { BottomSheet } from "../../components/bottom-sheet";
 import { FirstRunTip } from "../../components/first-run-tip";
@@ -31,7 +36,6 @@ function shouldShowScannerTip(): boolean {
 }
 
 const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
-const visionClientBudgetMs = 15_000;
 
 function isUserCancelMediaChoice(error: unknown): boolean {
   const pieces = [
@@ -144,7 +148,7 @@ export default function FoodScannerPage() {
     try {
       let meal;
       try {
-        const clientDeadlineAt = recognitionStartedAt + visionClientBudgetMs;
+        const clientDeadlineAt = recognitionStartedAt + VISION_CLIENT_TOTAL_BUDGET_MS;
         meal = await analyzeProductImage(previewPath, {
           recognitionStartedAt,
           deadlineAt: clientDeadlineAt,

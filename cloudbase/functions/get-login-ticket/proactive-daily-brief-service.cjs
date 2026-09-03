@@ -12,6 +12,7 @@ const themes = new Set([
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const unsafeWording = /诊断|治疗|处方|药物|吃药|用药|孕期|怀孕|哺乳|厌食|暴食|替代医疗/i;
 const presentationWording = /```|[`*#]|^\s*(?:回复|答复|回答|建议|说明)\s*[:：]/m;
+const staleNoMealClaim = /没有餐次|没有.*记录|第一餐|首餐/i;
 
 const PROACTIVE_DAILY_BRIEF_SYSTEM_PROMPT = `你是 Nordic Nutri AI 的 NOVA，长期陪伴用户管理饮食目标的 AI 营养教练。用户打开 App 时，你主动给出当天最有价值的提醒；不是长篇报告。只使用 dailyContext 提供的事实，绝不编造饮食、体重、训练或运动表现。按 userJourneyStage 调整重点：new_user 帮助开始第一餐记录；habit_building 强化连续记录习惯；regular_user 优先依据 recentTrend 反馈近期变化或当前最重要缺口。每日从行动提醒、数据反馈、鼓励反馈、习惯培养中选择唯一主题；结合目标语言：muscle_gain=增益增肌、fat_loss=轻盈减脂、maintain=保持状态、performance=健康饮食。避免连续重复：recentThemes 的第一个主题是昨天主题，今天绝不能输出同一主题。只围绕饮食营养，不讨论训练、恢复或运动表现；不得诊断、治疗、开药、承诺减重或增肌效果。输出只能是 JSON，不要 Markdown 或额外解释。首卡只负责一个今日最重要行动，绝不能包含具体食物、食材、搭配或“早餐建议”等饮食推荐；具体饮食优化会由另一张卡片展示。必须恰好 3 段短句：greeting 为按当前时段和姓名的问候；summary 为一句有数据的观察、鼓励或启动提醒；suggestion 必须以“今日行动：”开头，给出一个可执行动作。不要使用“欢迎开启营养之旅”。JSON：{"greeting":"不超过18字","summary":"不超过40字","suggestion":"不超过50字","theme":"starter|protein_gap|energy_gap|meal_rhythm|dietary_balance|progress|consistency"}`;
 
@@ -86,7 +87,8 @@ function fallbackForContext(context = {}) {
   let alternatives = ["meal_rhythm", "starter", "consistency", "progress"];
   let summary = "今天先把每一餐的结构安排得更均衡。";
 
-  if (stage === "new_user" || !context?.yesterday?.recorded) {
+  const hasTodayMealRecord = Boolean(context?.today?.hasMealRecord) || Number(context?.today?.recordedMeals) > 0;
+  if (!hasTodayMealRecord && (stage === "new_user" || !context?.yesterday?.recorded)) {
     preferred = "starter";
     alternatives = ["meal_rhythm", "dietary_balance", "consistency"];
     summary = "今天先完成一餐记录，建立自己的饮食基线。";
@@ -114,6 +116,12 @@ function fallbackForContext(context = {}) {
     suggestion: actionForTheme(theme, period),
     theme,
   };
+}
+
+function enforceBriefFacts(context, brief) {
+  const hasTodayMealRecord = Boolean(context?.today?.hasMealRecord) || Number(context?.today?.recordedMeals) > 0;
+  const combined = [brief?.summary, brief?.suggestion].filter(Boolean).join("\n");
+  return hasTodayMealRecord && staleNoMealClaim.test(combined) ? fallbackForContext(context) : brief;
 }
 
 function createDeepseekCompletion({ apiKey, model, fetchImpl = globalThis.fetch } = {}) {
@@ -149,7 +157,7 @@ function createDeepseekCompletion({ apiKey, model, fetchImpl = globalThis.fetch 
   };
 }
 
-function createProactiveDailyBriefService({ apiKey, model = "deepseek-v4-flash", requestCompletion, fetchImpl } = {}) {
+function createProactiveDailyBriefService({ apiKey, model = "deepseek-v4-flash", requestCompletion, fetchImpl, source = "deepseek", routeManaged = false } = {}) {
   const complete = requestCompletion ?? createDeepseekCompletion({ apiKey, model, fetchImpl });
   const generateBrief = async ({ date, context }) => {
     if (!complete) return { ...fallbackForContext(context), source: "rule_v2", model: null, usage: null };
@@ -159,8 +167,16 @@ function createProactiveDailyBriefService({ apiKey, model = "deepseek-v4-flash",
       const brief = validateProactiveDailyBrief(payload);
       const recentThemes = Array.isArray(context?.recentThemes) ? context.recentThemes : [];
       if (recentThemes[0] === brief.theme) throw error();
-      return { ...brief, source: "deepseek", model, usage: raw?.usage ?? null };
-    } catch {
+      const consistentBrief = enforceBriefFacts(context, brief);
+      const usedFactFallback = consistentBrief !== brief;
+      return {
+        ...consistentBrief,
+        source: usedFactFallback ? "rule_v2" : source,
+        model: usedFactFallback ? null : model,
+        usage: usedFactFallback ? null : raw?.usage ?? null,
+      };
+    } catch (error) {
+      if (routeManaged) throw error;
       return { ...fallbackForContext(context), source: "rule_v2", model: null, usage: null };
     }
   };

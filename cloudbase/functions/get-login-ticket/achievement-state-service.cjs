@@ -1,3 +1,5 @@
+const { withDbReadRetry } = require("./db-read-retry.cjs");
+
 function timestamp(value, fallback) {
   if (typeof value === "string" && !Number.isNaN(new Date(value).getTime())) return value;
   return fallback().toISOString();
@@ -8,10 +10,10 @@ function createAchievementStateService({ db, clock = () => new Date() }) {
 
   return {
     async reconcile(userId, achievements) {
-      const existingResult = await db
+      const existingResult = await withDbReadRetry(() => db
         .from("user_achievements")
         .select("achievement_id,completed_at,celebrated_at")
-        .eq("user_id", userId);
+        .eq("user_id", userId));
       if (existingResult.error) throw new Error("Achievement state read failed");
 
       const completedById = new Map(
