@@ -75,7 +75,7 @@ function validateInput(input) {
   return { imageUrl: input.imageUrl, foodNameZh, foodNameEn, expectedVisualType, matchedKeywords };
 }
 
-function createFoodImageAuditRequestCompletion({ apiKey, workspaceId, model = "qwen3-vl-flash", timeoutMs = 18_000, fetchImpl = globalThis.fetch } = {}) {
+function createFoodImageAuditRequestCompletion({ apiKey, workspaceId, model = "qwen3-vl-flash", endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", timeoutMs = 18_000, maxTokens = 512, temperature = 0, fetchImpl = globalThis.fetch } = {}) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("QWEN_API_KEY configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "qwen3-vl-flash";
@@ -86,12 +86,13 @@ function createFoodImageAuditRequestCompletion({ apiKey, workspaceId, model = "q
     try {
       const headers = { authorization: `Bearer ${apiKey}`, "content-type": "application/json" };
       if (workspaceId) headers["X-DashScope-WorkSpace"] = workspaceId;
-      const response = await fetchImpl("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
+      const response = await fetchImpl(endpoint, {
         method: "POST",
         headers,
         body: JSON.stringify({
           model: selectedModel,
-          temperature: 0,
+          temperature: Number.isFinite(Number(temperature)) ? Number(temperature) : 0,
+          max_tokens: Number.isInteger(Number(maxTokens)) && Number(maxTokens) > 0 ? Number(maxTokens) : 512,
           response_format: { type: "json_object" },
           messages: [{
             role: "user",
@@ -124,9 +125,8 @@ function unwrapCompletion(raw) {
   return { content: raw, usage: null };
 }
 
-function createFoodImageAuditVision({ apiKey, workspaceId, model = "qwen3-vl-flash", requestCompletion, fetchImpl } = {}) {
-  const complete = requestCompletion ?? createFoodImageAuditRequestCompletion({ apiKey, workspaceId, model, fetchImpl });
-  const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "qwen3-vl-flash";
+function createFoodImageAuditVision({ apiKey, workspaceId, model = "qwen3-vl-flash", endpoint, timeoutMs, maxTokens, temperature, requestCompletion, fetchImpl } = {}) {
+  const complete = requestCompletion ?? createFoodImageAuditRequestCompletion({ apiKey, workspaceId, model, endpoint, timeoutMs, maxTokens, temperature, fetchImpl });
   return async (input) => {
     const request = validateInput(input);
     try {

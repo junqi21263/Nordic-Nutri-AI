@@ -58,3 +58,37 @@ test("audit vision rejects confidence outside the inclusive zero-to-one range", 
     (error) => error instanceof FoodImageAuditVisionError && error.code === "FOOD_IMAGE_AUDIT_RESULT_INVALID",
   );
 });
+
+test("audit vision uses the configured route endpoint and model", async () => {
+  let request;
+  const audit = createFoodImageAuditVision({
+    apiKey: "provider-key",
+    model: "configured-audit-model",
+    endpoint: "https://provider.example/v1/chat/completions",
+    maxTokens: 300,
+    temperature: 0.1,
+    fetchImpl: async (url, init) => {
+      request = { url, body: JSON.parse(init.body) };
+      return {
+        ok: true,
+        async json() {
+          return {
+            choices: [{ message: { content: JSON.stringify({
+              verdict: "pass",
+              detectedSubject: "碗装饮料粉",
+              confidence: 0.9,
+              reasons: ["主体符合预期形态"],
+            }) } }],
+          };
+        },
+      };
+    },
+  });
+
+  await audit(auditInput);
+
+  assert.equal(request.url, "https://provider.example/v1/chat/completions");
+  assert.equal(request.body.model, "configured-audit-model");
+  assert.equal(request.body.max_tokens, 300);
+  assert.equal(request.body.temperature, 0.1);
+});

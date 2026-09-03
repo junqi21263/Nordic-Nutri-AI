@@ -501,6 +501,24 @@ test("trace explorer keeps all filter controls on one desktop toolbar row", asyn
   assert.match(source, /\.trace-filter-toolbar \{ display: flex;[^}]*flex-wrap: nowrap;/);
 });
 
+test("admin filter toolbars keep audit, user image, and moderation controls on one desktop row", async () => {
+  const source = await pageSource();
+  assert.match(source, /class="nn-filter-bar nn-audit-filter-bar"[\s\S]*id="auditActionFilter"[\s\S]*id="auditApplyFilters"/);
+  assert.match(source, /id="moduleUserImages"[\s\S]*class="module-toolbar nn-user-images-toolbar"[\s\S]*id="userImageKindFilter"[\s\S]*id="purgeVisionImages"/);
+  assert.match(source, /id="moduleModeration"[\s\S]*class="module-toolbar nn-moderation-toolbar"[\s\S]*id="moderationStatusFilter"[\s\S]*id="refreshModeration"/);
+  assert.match(source, /\.nn-audit-filter-bar,\s*\.nn-user-images-toolbar,\s*\.nn-moderation-toolbar \{ display: flex;[^}]*flex-wrap: nowrap;/);
+  for (const selector of ["nn-audit-filter-bar", "nn-user-images-toolbar", "nn-moderation-toolbar"]) {
+    assert.match(source, new RegExp(`\\.${selector} select \\{[^}]*width: auto;`));
+  }
+});
+
+test("system health core component cards use one desktop row", async () => {
+  const source = await pageSource();
+  assert.match(source, /id="healthComponents"><\/div>/);
+  assert.match(source, /ops-component-grid--health \{[^}]*grid-template-columns: repeat\(5,/);
+  assert.match(source, /ops-component-grid ops-component-grid--health/);
+});
+
 test("trace explorer keeps status, time, and trace id readable in fixed columns", async () => {
   const source = await pageSource();
   assert.match(source, /class="data-table data-table--traces"/);

@@ -344,6 +344,10 @@
     .ops-health-banner.unhealthy .ops-health-status { color: var(--danger); }
     .ops-health-meta { margin-top: 5px; color: var(--muted); font-size: 12px; }
     .ops-component-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 14px; }
+    .ops-component-grid.ops-component-grid--health { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    @media (max-width: 1160px) { .ops-component-grid.ops-component-grid--health { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 900px) { .ops-component-grid.ops-component-grid--health { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .ops-component-grid.ops-component-grid--health { grid-template-columns: 1fr; } }
     .ops-component { padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--linen); }
     .ops-component strong, .ops-component span { display: block; }
     .ops-component strong { color: var(--ink); font-size: 12px; }
@@ -392,6 +396,24 @@
     .module-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
     .module-toolbar h2 { flex: 1 1 auto; min-width: 120px; }
     .module-toolbar input, .module-toolbar select { height: 40px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; background: var(--paper); color: var(--text); min-width: 180px; }
+    .nn-audit-filter-bar, .nn-user-images-toolbar, .nn-moderation-toolbar { display: flex; align-items: center; flex-wrap: nowrap; }
+    .nn-audit-filter-bar input { width: auto; min-width: 0; flex: 1 1 320px; }
+    .nn-audit-filter-bar select { width: auto; min-width: 0; flex: 0 1 190px; }
+    .nn-audit-filter-bar .button,
+    .nn-user-images-toolbar .button,
+    .nn-moderation-toolbar .button { flex: 0 0 auto; }
+    .nn-user-images-toolbar h2,
+    .nn-moderation-toolbar h2 { flex: 0 0 auto; min-width: 0; }
+    .nn-user-images-toolbar select { width: auto; min-width: 0; flex: 0 1 160px; }
+    .nn-user-images-toolbar input { width: auto; min-width: 0 !important; flex: 1 1 220px; }
+    .nn-moderation-toolbar select { width: auto; min-width: 0; flex: 0 1 180px; }
+    @media (max-width: 1200px) {
+      .nn-user-images-toolbar { flex-wrap: wrap; }
+    }
+    @media (max-width: 900px) {
+      .nn-audit-filter-bar, .nn-moderation-toolbar { flex-wrap: wrap; }
+      .nn-user-images-toolbar h2, .nn-moderation-toolbar h2 { flex: 1 1 100%; }
+    }
     .data-table { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
     .data-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .data-table th, .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
@@ -848,7 +870,7 @@
         </section>
 
         <section id="moduleUserImages" class="admin-module" hidden>
-          <div class="module-toolbar">
+          <div class="module-toolbar nn-user-images-toolbar">
             <h2>用户图片</h2>
             <select id="userImageKindFilter" aria-label="图片类型">
               <option value="all">全部</option>
@@ -875,7 +897,7 @@
         </section>
 
         <section id="moduleModeration" class="admin-module" hidden>
-          <div class="module-toolbar">
+          <div class="module-toolbar nn-moderation-toolbar">
             <h2>内容安全</h2>
             <select id="moderationStatusFilter">
               <option value="open">open</option>
@@ -920,7 +942,7 @@
           <div class="nn-page-header"><div><p class="eyebrow">System / Runtime</p><h2>System Health</h2><p class="muted">真实运行指标；刷新不会调用收费 Provider。</p></div><button id="refreshHealth" class="button secondary" type="button">刷新</button></div>
           <div id="healthBanner" class="ops-health-banner nn-status-hero"><div><p class="eyebrow">Overall status</p><div class="ops-health-status">加载中</div><p class="ops-health-meta">—</p></div></div>
           <div id="healthMetricStrip" class="nn-metric-strip" aria-label="系统健康指标"></div>
-          <section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Components</p><h3>核心组件</h3></div><span class="muted">配置状态与近期真实观测分开显示</span></div><div id="healthComponents" class="ops-component-grid"></div></section>
+          <section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Components</p><h3>核心组件</h3></div><span class="muted">配置状态与近期真实观测分开显示</span></div><div id="healthComponents"></div></section>
           <div id="healthWindows" class="ops-window-grid"></div>
           <div class="nn-dashboard-grid nn-dashboard-grid--health"><section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Providers</p><h3>Provider</h3></div></div><div id="healthProviders" class="ops-component-grid"></div></section><section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">Runtime</p><h3>最近 Worker</h3></div><button class="button link" data-open-module="jobs">查看 Jobs</button></div><div id="healthJobs" class="data-table"></div></section></div>
         </section>
@@ -944,7 +966,7 @@
 
         <section id="moduleAuditLogs" class="admin-module" hidden>
           <div class="nn-page-header"><div><p class="eyebrow">System / Accountability</p><h2>Audit Logs</h2><p class="muted">高风险管理操作的结果留痕，可沿 Trace 继续排障。</p></div><button id="refreshAuditLogs" class="button secondary" type="button">刷新</button></div>
-          <section class="ops-panel nn-compact-panel nn-audit-explorer"><div class="nn-filter-bar"><input id="auditActionFilter" type="search" placeholder="操作，如 food.archive" autocomplete="off" /><select id="auditResultFilter"><option value="">全部结果</option><option value="succeeded">succeeded</option><option value="failed">failed</option><option value="rejected">rejected</option></select><button id="auditApplyFilters" class="button" type="button">筛选</button></div><div id="auditLogsTable" class="nn-audit-table"><p class="ops-empty nn-audit-empty">加载中…</p></div></section>
+          <section class="ops-panel nn-compact-panel nn-audit-explorer"><div class="nn-filter-bar nn-audit-filter-bar"><input id="auditActionFilter" type="search" placeholder="操作，如 food.archive" autocomplete="off" /><select id="auditResultFilter"><option value="">全部结果</option><option value="succeeded">succeeded</option><option value="failed">failed</option><option value="rejected">rejected</option></select><button id="auditApplyFilters" class="button" type="button">筛选</button></div><div id="auditLogsTable" class="nn-audit-table"><p class="ops-empty nn-audit-empty">加载中…</p></div></section>
         </section>
 
         <section id="moduleUserDetail" class="admin-module nn-user-detail" data-module="user-detail" hidden>
@@ -3109,7 +3131,7 @@
       if (!dashboard) {
         const components = $("healthComponents");
         const entries = Object.entries(data?.components || {});
-        components.innerHTML = entries.length ? `<div class="ops-component-grid">${entries.map(([key, value]) => `<div class="ops-component"><span>${escapeHtml(key)}</span><strong class="${opsTone(value?.status)}">${escapeHtml(opsStatusLabel(value?.status))}</strong><small>${escapeHtml(value?.detail || value?.lastError || "基于近期观测数据")}</small></div>`).join("")}</div>` : "<p class=\"ops-empty\">暂无组件数据</p>";
+        components.innerHTML = entries.length ? `<div class="ops-component-grid ops-component-grid--health">${entries.map(([key, value]) => `<div class="ops-component"><span>${escapeHtml(key)}</span><strong class="${opsTone(value?.status)}">${escapeHtml(opsStatusLabel(value?.status))}</strong><small>${escapeHtml(value?.detail || value?.lastError || "基于近期观测数据")}</small></div>`).join("")}</div>` : "<p class=\"ops-empty\">暂无组件数据</p>";
         $("healthProviders").innerHTML = Object.entries(data?.providers || {}).map(([key, value]) => `<div class="ops-component"><span>${escapeHtml(key)}</span><strong class="${opsTone(value?.status)}">${escapeHtml(value?.configured ? opsStatusLabel(value?.status) : "未配置")}</strong><small>${escapeHtml(value?.lastSuccessAt ? `最近成功 ${formatTime(value.lastSuccessAt)}` : "暂无近期真实调用")}</small></div>`).join("") || "<p class=\"ops-empty\">暂无 Provider 观测数据</p>";
         $("healthWindows").innerHTML = [renderHealthWindow(last1h), renderHealthWindow({ ...(data?.windows?.last24h || {}), label: "最近 24 小时" })].join("");
         renderHealthMetricStrip(last1h);

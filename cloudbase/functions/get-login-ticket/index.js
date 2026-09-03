@@ -58,7 +58,7 @@ const { createModelQuotaPolicyService, ModelQuotaPolicyError } = require("./mode
 const { createFeatureUserQuotaPolicyService, FeatureUserQuotaPolicyError } = require("./feature-user-quota-policy-service.cjs");
 const { createModelRouteResolver, ModelRouteError } = require("./model-route-resolver.cjs");
 const { createRoutedModelInvoker, createRoutedModelStreamInvoker } = require("./routed-model-invoker.cjs");
-const { createTextModelAdapter, createRoutedOpenAiFetch } = require("./text-model-adapter-registry.cjs");
+const { createTextModelAdapter, createRoutedOpenAiFetch, resolveChatEndpoint } = require("./text-model-adapter-registry.cjs");
 const { createHunyuanImageService, HunyuanImageError } = require("./hunyuan-image-service.cjs");
 const { createHunyuanWorkerClient } = require("./hunyuan-worker-client.cjs");
 const { createFoodImageJobService, FoodImageJobError } = require("./food-image-job-service.cjs");
@@ -1471,9 +1471,30 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     uploadImage: uploadVisionImage,
     recordTrace: (...args) => opsRef.observability?.recordMetric?.(...args),
   });
-  // Image audit has no configurable feature route yet, so keep it unavailable
-  // instead of silently calling a provider/model outside the routing contract.
-  const foodImageAudit = null;
+  const foodImageAuditVision = createRoutedVisionAnalyzer({
+    resolver: modelRouteResolver,
+    createService: ({ route }) => createFoodImageAuditVision({
+      apiKey: route.credential,
+      model: route.modelKey,
+      endpoint: resolveChatEndpoint(route),
+      timeoutMs: route.timeoutMs,
+      maxTokens: route.maxTokens,
+      temperature: route.temperature,
+      fetchImpl: createRoutedOpenAiFetch(route),
+    }),
+    beforeInvoke: ({ route, feature }) => modelQuotaPolicy.assertAllowed({
+      providerKey: route.providerKey,
+      modelKey: route.modelKey,
+      featureKey: feature,
+    }),
+  });
+  const foodImageAudit = createFoodImageAuditService({
+    db,
+    repository: foodRepository,
+    auditVision: foodImageAuditVision,
+    jobs: foodImageJobs,
+    requireAdmin: allowAdminConsole,
+  });
   const operationGuard = typeof db?.from === "function" ? createOperationGuard({ db }) : null;
   const contentModeration = createContentModerationService({ db });
   const visionImageReview = createVisionImageReviewService({
@@ -3596,19 +3617,33 @@ function createHttpServer({ service }) {
             if (committed === false) throw new PublicOperationError("VISION_QUOTA_COMMIT_FAILED", "识别结果提交失败，请重试");
           }
           const hybridStatus = hybridResponse.httpStatus === 202 ? "processing" : "succeeded";
+          const hybridResult = hybridResponse.body?.result || null;
+          const hybridLatencyMs = Date.now() - startedAt;
+          const hybridVisionMeta = {
+            ...traceMetaBase,
+            feature: "vision",
+            provider: hybridResult?.provider || service.vision?.provider || null,
+            model: hybridResult?.model || service.vision?.model || null,
+            analysisId: hybridResponse.body.analysisId,
+            requestTotalDurationMs: hybridLatencyMs,
+            remainingBudgetMs: budget.remainingMs(),
+            quotaState: hybridResponse.httpStatus === 202 ? "reserved" : "committed",
+            quotaDelta: hybridResponse.httpStatus === 202 ? 0 : 1,
+          };
+          if (hybridResponse.httpStatus === 200) {
+            service.observability?.recordMetric?.("vision_success", 1, hybridVisionMeta).catch(() => {});
+            service.observability?.recordMetric?.("vision_latency_ms", hybridLatencyMs, hybridVisionMeta).catch(() => {});
+            service.observability?.recordMetric?.("server_total_ms", hybridLatencyMs, hybridVisionMeta).catch(() => {});
+            service.observability?.recordMetric?.("total_ms", hybridLatencyMs, hybridVisionMeta).catch(() => {});
+          }
           service.observability?.finishTrace?.(visionTrace, {
             status: hybridStatus,
             httpStatus: hybridResponse.httpStatus,
-            provider: service.vision?.provider || null,
+            provider: hybridVisionMeta.provider,
             meta: {
-              ...traceMetaBase,
-              analysisId: hybridResponse.body.analysisId,
+              ...hybridVisionMeta,
               fastPathOutcome: hybridResponse.httpStatus === 202 ? "handed_off" : "completed",
               asyncTriggerReason: hybridResponse.httpStatus === 202 ? "fast_timeout_or_checkpoint" : null,
-              requestTotalDurationMs: Date.now() - startedAt,
-              remainingBudgetMs: budget.remainingMs(),
-              quotaState: hybridResponse.httpStatus === 202 ? "reserved" : "committed",
-              quotaDelta: hybridResponse.httpStatus === 202 ? 0 : 1,
               businessCode: null,
             },
           }).catch(() => {});

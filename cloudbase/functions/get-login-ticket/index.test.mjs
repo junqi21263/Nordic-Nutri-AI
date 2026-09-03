@@ -110,6 +110,23 @@ test("assembles every runtime service after the RDB client is available", () => 
   assert.equal(service.foodImageDispatchSecret, "");
 });
 
+test("wires old-image audit through the configured vision route", () => {
+  const service = createRuntimeService({
+    WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
+    CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret",
+  }, {
+    cloudbaseSdk: { init: () => ({ rdb: () => createRuntimeDb() }) },
+    cloudbaseNodeSdk: { init: () => ({}) },
+    modelRouteResolver: { resolveCandidates: async ({ feature }) => {
+      assert.equal(feature, "food_recognition");
+      return [{ providerKey: "qwen", modelKey: "configured-vision-model", credential: "provider-key" }];
+    } },
+  });
+
+  assert.equal(typeof service.foodImageAudit?.previewHighRisk, "function");
+  assert.equal(typeof service.foodImageAudit?.reviewItems, "function");
+});
+
 test("keeps an injected runtime model resolver private to function services", () => {
   const resolver = { resolveCandidates: async () => [] };
   const service = createRuntimeService({
@@ -1064,6 +1081,51 @@ test("accepts authenticated visual analysis without trusting a client user id", 
     assert.equal(response.status, 200);
   });
   assert.equal(calls[0].userId, "user-1");
+});
+
+test("records success metrics for a completed hybrid vision request", async () => {
+  const metrics = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      visionAnalysisFoundationEnabled: true,
+      visionAnalysisFoundation: {
+        createVisionAnalysis: async () => ({
+          analysisId: "11111111-1111-4111-8111-111111111111",
+          status: "created",
+          reused: false,
+          version: 1,
+        }),
+        commitQuota: async () => true,
+      },
+      vision: {
+        validateImage: () => {},
+        analyzeImage: async () => ({ mealName: "午餐", items: [{ name: "米饭" }] }),
+      },
+      observability: {
+        startTrace: () => ({ traceId: "trace_hybrid_success", stages: [] }),
+        finishTrace: async () => {},
+        recordMetric: async (metric, value) => metrics.push({ metric, value }),
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/vision-analysis`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({
+        clientRequestId: "22222222-2222-4222-8222-222222222222",
+        imageBase64: "AA==",
+        contentType: "image/jpeg",
+        clientCapabilities: { supportsAsyncVision: true },
+      }),
+    });
+    assert.equal(response.status, 200);
+  });
+
+  assert.equal(metrics.some((item) => item.metric === "vision_success" && item.value === 1), true);
+  assert.equal(metrics.some((item) => item.metric === "vision_latency_ms" && Number.isFinite(item.value) && item.value >= 0), true);
 });
 
 test("correlates vision timeout diagnostics across request, image, and provider stages", async () => {
