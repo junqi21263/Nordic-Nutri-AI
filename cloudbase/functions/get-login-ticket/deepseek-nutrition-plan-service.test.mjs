@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { normalizePlan } from "./deepseek-nutrition-plan-service.cjs";
+import {
+  createDeepseekNutritionPlanService,
+  normalizePlan,
+} from "./deepseek-nutrition-plan-service.cjs";
 
 test("accepts a balanced AI nutrition plan payload", () => {
   const plan = normalizePlan({
@@ -25,4 +28,34 @@ test("rejects macros that diverge too far from calories", () => {
     insight: "bad",
   });
   assert.equal(plan, null);
+});
+
+test("uses the configured route timeout for nutrition plan requests", async () => {
+  let configuredTimeoutMs = null;
+  const service = createDeepseekNutritionPlanService({
+    apiKey: "test-key",
+    model: "deepseek-v4-flash",
+    route: { timeoutMs: 30_000 },
+    setTimeoutImpl: (_callback, timeoutMs) => {
+      configuredTimeoutMs = timeoutMs;
+      return 1;
+    },
+    clearTimeoutImpl: () => {},
+    fetchImpl: async () => new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({ calories: 2500, proteinG: 150, carbsG: 275, fatG: 69, insight: "按目标计算。" }) } }],
+    }), { status: 200, headers: { "content-type": "application/json" } }),
+  });
+
+  const plan = await service({
+    age: 30,
+    sex: "male",
+    heightCm: 175,
+    weightKg: 70,
+    activityLevel: "moderate",
+    trainingDays: 3,
+    goalType: "maintenance",
+  });
+
+  assert.equal(plan.source, "deepseek");
+  assert.equal(configuredTimeoutMs, 30_000);
 });

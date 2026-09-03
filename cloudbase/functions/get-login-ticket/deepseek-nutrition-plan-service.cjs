@@ -74,14 +74,24 @@ function extractJson(content) {
   }
 }
 
-function createDeepseekNutritionPlanService({ apiKey, model, fetchImpl = globalThis.fetch, routeManaged = false } = {}) {
+function createDeepseekNutritionPlanService({
+  apiKey,
+  model,
+  fetchImpl = globalThis.fetch,
+  route = {},
+  routeManaged = false,
+  setTimeoutImpl = setTimeout,
+  clearTimeoutImpl = clearTimeout,
+} = {}) {
   if (typeof apiKey !== "string" || !apiKey.trim()) return null;
   if (typeof fetchImpl !== "function") return null;
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
 
   return async (input) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12_000);
+    const routeTimeoutMs = Number(route?.timeoutMs);
+    const timeoutMs = Number.isInteger(routeTimeoutMs) && routeTimeoutMs > 0 ? routeTimeoutMs : 30_000;
+    const timer = setTimeoutImpl(() => controller.abort(), timeoutMs);
     try {
       const goalLabel = GOAL_LABELS[input.goalType] || input.goalType;
       const activityLabel = ACTIVITY_LABELS[input.activityLevel] || input.activityLevel;
@@ -147,7 +157,7 @@ function createDeepseekNutritionPlanService({ apiKey, model, fetchImpl = globalT
       if (routeManaged) throw error;
       return null;
     } finally {
-      clearTimeout(timer);
+      clearTimeoutImpl(timer);
     }
   };
 }
