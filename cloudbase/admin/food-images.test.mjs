@@ -495,6 +495,12 @@ test("trace explorer exposes route and HTTP status search and filters", async ()
   assert.match(source, /params\.set\("httpStatus"/);
 });
 
+test("trace explorer keeps all filter controls on one desktop toolbar row", async () => {
+  const source = await pageSource();
+  assert.match(source, /class="trace-filter-toolbar"[\s\S]*id="traceApplyFilters"[\s\S]*class="trace-quick-filters/);
+  assert.match(source, /\.trace-filter-toolbar \{ display: flex;[^}]*flex-wrap: nowrap;/);
+});
+
 test("trace explorer keeps status, time, and trace id readable in fixed columns", async () => {
   const source = await pageSource();
   assert.match(source, /class="data-table data-table--traces"/);

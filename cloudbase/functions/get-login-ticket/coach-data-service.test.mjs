@@ -764,6 +764,7 @@ test("logging day still surfaces diet preference and avoidance prompts", () => {
 
 test("nutrition scope accepts common food names and nutrient ask patterns", () => {
   assert.equal(isNutritionQuestion("蓝莓"), true);
+  assert.equal(isNutritionQuestion("杨桃"), true);
   assert.equal(isNutritionQuestion("鸡胸肉怎么样"), true);
   assert.equal(isNutritionQuestion("蓝莓适不适合加餐"), true);
   assert.equal(isNutritionQuestion("今天股市怎么样"), false);

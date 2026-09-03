@@ -82,6 +82,6 @@ describe("plan regeneration motion state", () => {
   });
 
   it("bounds a stalled generation request so the button can recover", () => {
-    expect(planGenerationRequestTimeoutMs).toBe(15000);
+    expect(planGenerationRequestTimeoutMs).toBe(35_000);
   });
 });

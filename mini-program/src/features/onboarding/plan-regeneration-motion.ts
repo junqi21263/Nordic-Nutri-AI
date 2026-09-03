@@ -34,7 +34,9 @@ export const stitchInitialProcessingMotion = {
 } as const;
 
 export const minimumPlanProcessingMs = stitchInitialProcessingMotion.completingAtMs;
-export const planGenerationRequestTimeoutMs = 15000;
+// Keep the client-side guard longer than the backend model route timeout so
+// the mini program does not abort a valid but slower production request.
+export const planGenerationRequestTimeoutMs = 35_000;
 
 export function withPlanGenerationTimeout<T>(request: Promise<T>, timeoutMs = planGenerationRequestTimeoutMs): Promise<T> {
   return new Promise<T>((resolve, reject) => {

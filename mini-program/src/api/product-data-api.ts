@@ -203,6 +203,7 @@ export function previewProductNutritionPlan(input: {
     method: "POST",
     data: input,
     fallbackMessage: "营养计划计算失败，请稍后重试",
+    timeout: 35_000,
   });
 }
 

@@ -33,6 +33,7 @@ describe("product data HTTPS boundary", () => {
     expect(api).toContain("saveProductNutritionPlan");
     expect(api).toContain("previewProductNutritionPlan");
     expect(api).toContain('method: "PATCH"');
+    expect(api).toContain("timeout: 35_000");
     expect(bootstrap).toContain("account.settings");
     expect(bootstrap).toContain("account.nutritionPlan");
   });
