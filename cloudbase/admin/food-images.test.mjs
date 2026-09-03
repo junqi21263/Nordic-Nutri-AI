@@ -525,11 +525,14 @@ test("shows a login gate before revealing the admin console", async () => {
   assert.match(source, /loginForm"\.onsubmit|id="loginForm"/);
 });
 
-test("marks the admin console as the DEV test environment on login and after entry", async () => {
+test("marks the admin console from the API environment instead of hardcoding DEV", async () => {
   const source = await pageSource();
   assert.match(source, /DEV 测试环境/);
+  assert.match(source, /PROD 生产环境/);
   assert.match(source, /id="loginEnvironmentBadge"/);
   assert.match(source, /id="adminEnvironmentBadge"/);
+  assert.match(source, /function applyEnvironmentBadge\(/);
+  assert.match(source, /applyEnvironmentBadge\(\)/);
 });
 
 test("persists admin credentials in localStorage and auto-connects on reload", async () => {
@@ -606,6 +609,29 @@ test("AI provider editor only asks for provider credentials and catalog model", 
   assert.doesNotMatch(source, /id="aiModelEndpoint"/);
   assert.match(source, /\/ai\/providers/);
   assert.match(source, /\/ai\/catalog/);
+});
+
+test("AI model creation reuses a configured runtime credential when no new key is entered", async () => {
+  const source = await pageSource();
+  assert.match(source, /aiModelState\.providers\.find\(\(item\) => item\.providerKey === payload\.providerKey\)/);
+  assert.match(source, /payload\.apiKey\.trim\(\) && configuredProvider\?\.credentialStatus !== "PRESENT"/);
+  assert.match(source, /if \(payload\.apiKey\.trim\(\)\) await api\(`\/ai\/providers\//);
+});
+
+test("AI provider sync reuses a configured runtime credential without opening the credential store", async () => {
+  const source = await pageSource();
+  assert.match(source, /const configuredProvider = aiModelState\.providers\.find\(\(item\) => item\.providerKey === providerKey\)/);
+  assert.match(source, /!token\.trim\(\) && configuredProvider\?\.credentialStatus !== "PRESENT"/);
+  assert.match(source, /if \(token\.trim\(\)\) await api\(`\/ai\/providers\/\$\{encodeURIComponent\(providerKey\)\}\/credential`/);
+  assert.match(source, /await api\(`\/ai\/providers\/\$\{encodeURIComponent\(providerKey\)\}\/sync`/);
+});
+
+test("saving a route materializes selected runtime models before refreshing the board", async () => {
+  const source = await pageSource();
+  assert.match(source, /model\.readOnly\s*\?\s*await api\("\/ai\/models",\s*\{ method: "POST"/);
+  assert.match(source, /providerKey: model\.providerKey/);
+  assert.match(source, /applications: assignment\?\.applications \|\| \[\]/);
+  assert.match(source, /model\.readOnly\s*=\s*false/);
 });
 
 test("AI routing explains that food vision uses the selected provider adapter", async () => {

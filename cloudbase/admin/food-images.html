@@ -774,7 +774,7 @@
               <div class="food-admin-editor__head"><h3 id="aiModelEditorTitle">新增模型</h3><button id="aiModelEditorClose" class="button link" type="button">关闭</button></div>
               <div class="ai-model-editor-grid">
                 <label>选择厂商 *<select id="aiProviderSelect" class="nn-select" aria-label="选择 AI 厂商"></select></label>
-                <label class="span-2">API Key / Token *<input id="aiProviderApiKey" type="password" autocomplete="new-password" placeholder="只在这里填写该厂商的 API Key 或 Token" /></label>
+                <label class="span-2">API Key / Token <small class="muted">若该厂商已配置运行时凭据，可留空</small><input id="aiProviderApiKey" type="password" autocomplete="new-password" placeholder="仅在需要更新该厂商凭据时填写" /></label>
                 <label class="span-2">旗下模型（可手动同步）<div class="ai-model-picker-row"><select id="aiProviderModelSelect" class="nn-select" aria-label="选择厂商模型"></select><button id="aiProviderSync" class="button secondary" type="button">同步模型</button></div></label>
                 <p id="aiProviderSyncNote" class="ai-model-default-note span-2">选择厂商后，系统会从运行时目录读取当前模型；支持的厂商可使用“同步最新模型”。</p>
               </div>
@@ -1003,6 +1003,16 @@
     const DEFAULT_API_BASE = window.location.hostname.startsWith("test-dev-d4gyxnn0b5dfa2c8a")
       ? TEST_API_BASE
       : PRODUCTION_API_BASE;
+    function applyEnvironmentBadge() {
+      const label = window.location.hostname.startsWith("test-dev-d4gyxnn0b5dfa2c8a")
+        ? "DEV 测试环境"
+        : "PROD 生产环境";
+      ["loginEnvironmentBadge", "adminEnvironmentBadge"].forEach((id) => {
+        const element = $(id);
+        if (element) element.textContent = label;
+      });
+    }
+    applyEnvironmentBadge();
     const CREDENTIAL_KEYS = {
       token: "nordic-admin-session-token",
       username: "nordic-admin-username",
@@ -2458,12 +2468,13 @@
     async function syncAiProviderModels() {
       const providerKey = $("aiProviderSelect")?.value || "";
       const token = $("aiProviderApiKey")?.value || "";
+      const configuredProvider = aiModelState.providers.find((item) => item.providerKey === providerKey);
       const button = $("aiProviderSync");
       if (!providerKey) throw new Error("请先选择厂商");
-      if (!token.trim()) throw new Error("请先填写 API Key 或 Token");
+      if (!token.trim() && configuredProvider?.credentialStatus !== "PRESENT") throw new Error("请先填写 API Key 或 Token");
       if (button) { button.disabled = true; button.textContent = "同步中…"; }
       try {
-        await api(`/ai/providers/${encodeURIComponent(providerKey)}/credential`, { method: "PUT", body: { apiKey: token } });
+        if (token.trim()) await api(`/ai/providers/${encodeURIComponent(providerKey)}/credential`, { method: "PUT", body: { apiKey: token } });
         await api(`/ai/providers/${encodeURIComponent(providerKey)}/sync`, { method: "POST", body: {} });
         await loadAiProviderCatalog();
         toast(`${$("aiProviderSelect")?.selectedOptions?.[0]?.textContent?.split(" · ")[0] || providerKey} 模型同步成功`);
@@ -2483,7 +2494,7 @@
       const host = $("aiModelConfigBoard");
       if (!host) return;
       if (!items.length) { host.innerHTML = '<p class="muted">暂无模型配置，请点击“新增模型”。</p>'; return; }
-      host.innerHTML = items.map((model) => `<article class="ai-model-config-card" data-ai-model-id="${escapeHtml(model.id)}"><div class="ai-model-config-card__head"><div><h4>${escapeHtml(aiModelLabel(model))}</h4><p class="ai-model-config-card__meta">提供商 ${escapeHtml(model.providerKey)} · ${escapeHtml(model.modelKey)} · Key ${escapeHtml(model.apiKeyStatus || model.credentialStatus || "MISSING")}</p></div><span class="ai-status-pill ${model.enabled === false ? "missing" : ""}">${model.enabled === false ? "已停用" : "可用模型"}</span></div><p class="ai-model-config-card__meta">系统调用参数统一管理：超时 ${MODEL_DEFAULT_TIMEOUT_MS}ms · 最大输出 ${MODEL_DEFAULT_MAX_TOKENS} Token · 温度 ${MODEL_DEFAULT_TEMPERATURE}</p><div class="ai-model-config-card__actions"><button type="button" class="button secondary" data-ai-edit-model="${escapeHtml(model.id)}">编辑</button><button type="button" class="button secondary" data-ai-test-model="${escapeHtml(model.id)}">检查状态</button><button type="button" class="button secondary" data-ai-delete-model="${escapeHtml(model.id)}">删除</button></div></article>`).join("");
+      host.innerHTML = items.map((model) => `<article class="ai-model-config-card" data-ai-model-id="${escapeHtml(model.id)}"><div class="ai-model-config-card__head"><div><h4>${escapeHtml(aiModelLabel(model))}</h4><p class="ai-model-config-card__meta">提供商 ${escapeHtml(model.providerKey)} · ${escapeHtml(model.modelKey)} · Key ${escapeHtml(model.apiKeyStatus || model.credentialStatus || "MISSING")}</p></div><span class="ai-status-pill ${model.enabled === false ? "missing" : ""}">${model.source === "runtime" ? "运行时配置（只读）" : model.enabled === false ? "已停用" : "可用模型"}</span></div><p class="ai-model-config-card__meta">系统调用参数统一管理：超时 ${Number(model.timeoutMs) || MODEL_DEFAULT_TIMEOUT_MS}ms · 最大输出 ${Number(model.maxTokens) || MODEL_DEFAULT_MAX_TOKENS} Token · 温度 ${model.temperature ?? MODEL_DEFAULT_TEMPERATURE}</p><div class="ai-model-config-card__actions">${model.readOnly ? "" : `<button type="button" class="button secondary" data-ai-edit-model="${escapeHtml(model.id)}">编辑</button>`}<button type="button" class="button secondary" data-ai-test-model="${escapeHtml(model.id)}">检查状态</button>${model.readOnly ? "" : `<button type="button" class="button secondary" data-ai-delete-model="${escapeHtml(model.id)}">删除</button>`}</div></article>`).join("");
       host.querySelectorAll("[data-ai-edit-model]").forEach((button) => button.addEventListener("click", () => openAiModelEditor(button.dataset.aiEditModel)));
       host.querySelectorAll("[data-ai-test-model]").forEach((button) => button.addEventListener("click", () => testAiModel(button.dataset.aiTestModel).catch((error) => toast(apiErrorMessage(error), true))));
       host.querySelectorAll("[data-ai-delete-model]").forEach((button) => button.addEventListener("click", () => deleteAiModel(button.dataset.aiDeleteModel).catch((error) => toast(apiErrorMessage(error), true))));
@@ -2540,7 +2551,8 @@
     }
     async function saveAiModelEditor() {
       const payload = aiModelEditorPayload();
-      if (!payload.providerKey || !payload.modelKey || (!aiModelState.editingId && !payload.apiKey.trim())) throw new Error("请选择厂商、旗下模型并填写 API Key 或 Token");
+      const configuredProvider = aiModelState.providers.find((item) => item.providerKey === payload.providerKey);
+      if (!payload.providerKey || !payload.modelKey || (!aiModelState.editingId && !payload.apiKey.trim() && configuredProvider?.credentialStatus !== "PRESENT")) throw new Error("请选择厂商、旗下模型；该厂商未配置运行时凭据时还需填写 API Key 或 Token");
       if (payload.apiKey.trim()) await api(`/ai/providers/${encodeURIComponent(payload.providerKey)}/credential`, { method: "PUT", body: { apiKey: payload.apiKey } });
       const { apiKey: _apiKey, ...modelPayload } = payload;
       const current = aiModelState.items.find((item) => item.id === aiModelState.editingId)
@@ -2572,10 +2584,31 @@
         if (primary && fallback && primary === fallback) { throw new Error(`${AI_FEATURES.find((feature) => feature.key === featureKey)?.label || featureKey} 的主模型和备用模型不能相同`); }
         [[primary, "primary"], [fallback, "fallback"]].forEach(([modelId, role]) => { if (modelId && assignments.has(modelId)) { const target = assignments.get(modelId); target.applications.push(featureKey); target.routeRoles[featureKey] = role; } });
       }
+      const routePayload = (model, assignment) => ({
+        providerKey: model.providerKey,
+        modelKey: model.modelKey,
+        displayName: model.displayName,
+        baseUrl: model.baseUrl,
+        endpoint: model.endpoint,
+        protocol: model.protocol,
+        apiKeyEnv: model.apiKeyEnv,
+        timeoutMs: model.timeoutMs,
+        maxTokens: model.maxTokens,
+        temperature: model.temperature,
+        enabled: model.enabled !== false,
+        metadata: model.metadata || {},
+        applications: assignment?.applications || [],
+        routeRoles: assignment?.routeRoles || {},
+      });
       for (const model of aiModelState.items) {
         const assignment = assignments.get(model.id);
-        const saved = await api(`/ai/models/${encodeURIComponent(model.id)}`, { method: "PUT", body: { ...model, applications: assignment?.applications || [], routeRoles: assignment?.routeRoles || {}, apiKeyStatus: undefined } });
+        if (model.readOnly && !assignment?.applications?.length) continue;
+        const body = routePayload(model, assignment);
+        const saved = model.readOnly
+          ? await api("/ai/models", { method: "POST", body })
+          : await api(`/ai/models/${encodeURIComponent(model.id)}`, { method: "PUT", body: { ...body, apiKeyStatus: undefined } });
         Object.assign(model, saved);
+        if (model.readOnly) { model.readOnly = false; model.source = "database"; }
       }
       renderAiModelConfigBoard(aiModelState.items); renderAiFeatureRouteBoard(aiModelState.items); renderAiProviderStatus(aiModelState.items); await loadAiModelHistory(); if (!$('moduleQuota')?.hidden) await loadQuotaManagement(); toast("应用配置已保存并生效");
     }

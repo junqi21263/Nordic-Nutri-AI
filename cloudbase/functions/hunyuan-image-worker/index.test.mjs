@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
 
-import { createWorkerHttpServer, extractWorkerUsage, readWorkerConfig } from "./index.js";
+import { createWorkerHttpServer, createWorkerService, extractWorkerUsage, readWorkerConfig } from "./index.js";
 
 async function withServer(server, run) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -35,6 +35,23 @@ test("requires the worker environment id and shared secret", () => {
     () => readWorkerConfig({ TCB_ENV: "dev-env" }),
     /Worker configuration is incomplete/,
   );
+});
+
+test("passes an explicit CloudBase API key to the SDK in an HTTP runtime", () => {
+  const initCalls = [];
+  createWorkerService({
+    TCB_ENV: "prod-env",
+    AI_WORKER_SHARED_SECRET: "worker-secret",
+    CLOUDBASE_APIKEY: "server-api-key",
+  }, {
+    cloudbaseNodeSdk: {
+      init: (options) => {
+        initCalls.push(options);
+        return { ai: () => ({ createImageModel: () => ({}), createModel: () => ({}) }) };
+      },
+    },
+  });
+  assert.deepEqual(initCalls, [{ env: "prod-env", accessKey: "server-api-key" }]);
 });
 
 test("accepts a valid signed generation request without trusting the caller model", async () => {

@@ -137,3 +137,52 @@ test("deletes a model only for an operator and returns an auditable result", asy
   await assert.rejects(() => service.deleteModel("visitor", "model-1"), (error) => error.code === "FORBIDDEN");
   assert.deepEqual(await service.deleteModel("operator", "model-1"), { id: "model-1", deleted: true });
 });
+
+test("lists runtime-configured models when persisted model records are empty", async () => {
+  const db = {
+    from() {
+      return {
+        select() { return this; },
+        order() { return this; },
+        then(resolve) { return Promise.resolve({ data: [], error: null }).then(resolve); },
+      };
+    },
+  };
+  const service = createAiModelConfigService({
+    db,
+    env: { DEEPSEEK_API_KEY: "configured" },
+    isAdmin: async () => true,
+    getCredentialStatus: async () => "PRESENT",
+    runtimeCatalog: [{ feature: "coach", provider: "deepseek", model: "deepseek-v4-flash" }],
+  });
+  const result = await service.listModels("operator");
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].providerKey, "deepseek");
+  assert.equal(result.items[0].modelKey, "deepseek-v4-flash");
+  assert.equal(result.items[0].source, "runtime");
+  assert.equal(result.items[0].readOnly, true);
+});
+
+test("aggregates all runtime feature assignments for one configured model", async () => {
+  const db = {
+    from() {
+      return {
+        select() { return this; },
+        order() { return this; },
+        then(resolve) { return Promise.resolve({ data: [], error: null }).then(resolve); },
+      };
+    },
+  };
+  const service = createAiModelConfigService({
+    db,
+    isAdmin: async () => true,
+    getCredentialStatus: async () => "PRESENT",
+    runtimeCatalog: [
+      { feature: "coach", provider: "configured-provider", model: "configured-model" },
+      { feature: "daily_insight", provider: "configured-provider", model: "configured-model" },
+    ],
+  });
+  const result = await service.listModels("operator");
+  assert.equal(result.items.length, 1);
+  assert.deepEqual(result.items[0].applications, ["coach", "daily_insight"]);
+});

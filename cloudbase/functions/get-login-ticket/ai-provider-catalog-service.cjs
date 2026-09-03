@@ -306,6 +306,12 @@ function createAiProviderCatalogService({ db, env = process.env, isAdmin = async
     requireProvider(providerKey);
     const value = String(apiKey || "").trim();
     if (!value) throw new AiProviderCatalogError("API_KEY_REQUIRED");
+    // Runtime credentials are already the active source of truth. Treat an
+    // identical value as a no-op so the admin UI can resync without requiring
+    // the optional encrypted credential store to be provisioned.
+    if (configuredEnvironmentCredential(env, providerKey) === value) {
+      return { providerKey, credentialStatus: "PRESENT", source: "environment" };
+    }
     const encrypted = encryptCredential(value, encryptionKeyFromEnvironment(env));
     try {
       const result = await db.from("ai_provider_credentials").upsert({

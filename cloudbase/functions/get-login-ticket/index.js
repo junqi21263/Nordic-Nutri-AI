@@ -596,11 +596,13 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   const modelQuotaPolicy = createModelQuotaPolicyService({ db, adminAudit });
   const featureUserQuotaPolicy = createFeatureUserQuotaPolicyService({ db, adminAudit });
   const deepseekModel = selectDeepseekModel(env.DEEPSEEK_MODEL);
+  const runtimeModelCatalog = buildModelCatalog({ env, vision, deepseekModel });
   // Runtime routing is intentionally private: credentials are resolved server-side
   // from the encrypted provider store (or legacy server env) and never cross an HTTP boundary.
   const runtimeProviderCatalog = createAiProviderCatalogService({ db, env });
   const modelRouteResolver = dependencies.modelRouteResolver ?? createModelRouteResolver({
     db,
+    runtimeCatalog: runtimeModelCatalog,
     getCredential: runtimeProviderCatalog.getRuntimeCredential,
   });
   const assertModelQuota = ({ feature, route }) => modelQuotaPolicy.assertAllowed({
@@ -1217,6 +1219,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   const aiModelConfigService = createAiModelConfigService({
     db,
     env,
+    runtimeCatalog: runtimeModelCatalog,
     isAdmin: allowAdminConsole,
     audit: adminAudit,
     getCredentialStatus: async (providerKey) => {

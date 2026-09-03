@@ -135,7 +135,91 @@ function toRow(config, actorUserId) {
   };
 }
 
-function createAiModelConfigService({ db, env = process.env, isAdmin = async () => false, audit = null, getCredentialStatus = async () => null } = {}) {
+function runtimeModelConfig(item = {}, { env = process.env, credentialStatus = null } = {}) {
+  const providerKey = String(item.providerKey ?? item.provider_key ?? item.provider ?? "").trim();
+  const modelKey = String(item.modelKey ?? item.model_key ?? item.model ?? "").trim();
+  if (!providerKey || !modelKey) return null;
+  const applications = Array.from(new Set([
+    ...(Array.isArray(item.applications) ? item.applications : []),
+    ...(item.feature ? [item.feature] : []),
+  ].map((feature) => String(feature).trim()).filter(Boolean)));
+  const metadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
+    ? { ...item.metadata }
+    : {};
+  metadata.capabilities = modelCapabilities({
+    modelKey,
+    capabilities: [...normalizeCapabilities(metadata.capabilities), ...applications.map(featureCapability).filter(Boolean)],
+  });
+  const safe = redactAiModelConfig({
+    id: item.id || `runtime:${providerKey}:${modelKey}`,
+    provider_key: providerKey,
+    model_key: modelKey,
+    display_name: item.displayName ?? item.display_name ?? modelKey,
+    base_url: item.baseUrl ?? item.base_url ?? "",
+    endpoint: item.endpoint ?? "",
+    protocol: item.protocol ?? "",
+    api_key_env: item.apiKeyEnv ?? item.api_key_env ?? "RUNTIME_PROVIDER_CREDENTIAL",
+    timeout_ms: item.timeoutMs ?? item.timeout_ms ?? 30000,
+    max_tokens: item.maxTokens ?? item.max_tokens ?? 2048,
+    temperature: item.temperature ?? 0.2,
+    enabled: item.enabled !== false,
+    metadata,
+    feature_keys: applications,
+  }, { env, applications, credentialStatus });
+  return { ...safe, source: "runtime", readOnly: true };
+}
+
+function mergeModelConfigs(persistedRows = [], runtimeCatalog = [], { env = process.env, getCredentialStatus = async () => null } = {}) {
+  const merged = new Map();
+  const runtimeItems = new Map();
+  for (const item of runtimeCatalog || []) {
+    const providerKey = String(item?.providerKey ?? item?.provider_key ?? item?.provider ?? "").trim();
+    const modelKey = String(item?.modelKey ?? item?.model_key ?? item?.model ?? "").trim();
+    if (!providerKey || !modelKey) continue;
+    const identity = `${providerKey}:${modelKey}`;
+    const existing = runtimeItems.get(identity);
+    const applications = [
+      ...(Array.isArray(existing?.applications) ? existing.applications : []),
+      ...(Array.isArray(item?.applications) ? item.applications : []),
+      ...(item?.feature ? [item.feature] : []),
+    ];
+    const metadata = item?.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
+      ? { ...item.metadata }
+      : {};
+    runtimeItems.set(identity, {
+      ...(existing || item),
+      ...item,
+      providerKey,
+      modelKey,
+      applications: Array.from(new Set(applications.map((feature) => String(feature).trim()).filter(Boolean))),
+      metadata: {
+        ...(existing?.metadata && typeof existing.metadata === "object" ? existing.metadata : {}),
+        ...metadata,
+        capabilities: [
+          ...normalizeCapabilities(existing?.metadata?.capabilities),
+          ...normalizeCapabilities(metadata.capabilities),
+        ],
+      },
+    });
+  }
+  for (const item of runtimeItems.values()) {
+    const config = runtimeModelConfig(item, { env });
+    if (config) merged.set(`${config.providerKey}:${config.modelKey}`, config);
+  }
+  for (const row of persistedRows || []) {
+    const config = redactAiModelConfig(row, {
+      env,
+      credentialStatus: null,
+    });
+    merged.set(`${config.providerKey}:${config.modelKey}`, { ...config, source: "database", readOnly: false });
+  }
+  return Promise.all([...merged.values()].map(async (config) => ({
+    ...config,
+    apiKeyStatus: (await getCredentialStatus(config.providerKey)) || config.apiKeyStatus,
+  })));
+}
+
+function createAiModelConfigService({ db, env = process.env, isAdmin = async () => false, audit = null, getCredentialStatus = async () => null, runtimeCatalog = [] } = {}) {
   async function requireAdmin(actorUserId) {
     if (!(await isAdmin(actorUserId))) throw new AiModelConfigError("FORBIDDEN");
   }
@@ -143,12 +227,7 @@ function createAiModelConfigService({ db, env = process.env, isAdmin = async () 
     await requireAdmin(actorUserId);
     const { data, error } = await db.from("ai_model_configs").select("*").order("provider_key").order("model_key");
     if (error) throw new AiModelConfigError("MODEL_CONFIG_READ_FAILED", error.message);
-    return {
-      items: await Promise.all((data || []).map(async (row) => redactAiModelConfig(row, {
-        env,
-        credentialStatus: await getCredentialStatus(String(row.provider_key || row.providerKey || "").trim()),
-      }))),
-    };
+    return { items: await mergeModelConfigs(data || [], runtimeCatalog, { env, getCredentialStatus }) };
   }
   async function saveModel(actorUserId, input, modelId = null) {
     await requireAdmin(actorUserId);
@@ -186,5 +265,7 @@ module.exports = {
   AiModelConfigError,
   normalizeAiModelConfig,
   redactAiModelConfig,
+  mergeModelConfigs,
+  runtimeModelConfig,
   createAiModelConfigService,
 };

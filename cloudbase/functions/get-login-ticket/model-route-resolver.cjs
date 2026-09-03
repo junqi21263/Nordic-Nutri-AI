@@ -4,6 +4,46 @@ const {
   modelCapabilities,
 } = require("./model-routing-contract.cjs");
 
+function runtimeCatalogRows(catalog = []) {
+  const models = new Map();
+  for (const item of catalog || []) {
+    const providerKey = String(item?.providerKey ?? item?.provider ?? "").trim();
+    const modelKey = String(item?.modelKey ?? item?.model ?? "").trim();
+    if (!providerKey || !modelKey) continue;
+    const id = `${providerKey}:${modelKey}`;
+    const current = models.get(id) || {
+      provider_key: providerKey,
+      model_key: modelKey,
+      display_name: item.displayName || modelKey,
+      base_url: item.baseUrl || null,
+      endpoint: item.endpoint || null,
+      protocol: item.protocol || null,
+      timeout_ms: item.timeoutMs ?? 30000,
+      max_tokens: item.maxTokens ?? 2048,
+      temperature: item.temperature ?? 0.2,
+      feature_keys: [],
+      enabled: item.enabled !== false,
+      metadata: { ...(item.metadata || {}), capabilities: [] },
+      updated_at: null,
+    };
+    const feature = String(item.feature || "").trim();
+    const applications = Array.isArray(item.applications) ? item.applications : [];
+    for (const key of [...applications, ...(feature ? [feature] : [])]) {
+      const normalized = String(key).trim();
+      if (normalized && !current.feature_keys.includes(normalized)) current.feature_keys.push(normalized);
+      const capability = featureCapability(normalized);
+      if (capability && !current.metadata.capabilities.includes(capability)) current.metadata.capabilities.push(capability);
+    }
+    if (Array.isArray(item.metadata?.capabilities)) {
+      for (const capability of item.metadata.capabilities) {
+        if (!current.metadata.capabilities.includes(capability)) current.metadata.capabilities.push(capability);
+      }
+    }
+    models.set(id, current);
+  }
+  return [...models.values()];
+}
+
 class ModelRouteError extends Error {
   constructor(code, message = code) {
     super(message);
@@ -43,7 +83,18 @@ function isCompatible(row, { capability, keys }) {
   if (!providerKey || !modelKey) return false;
   const applications = featureKeys(row);
   if (!applications.some((item) => keys.includes(item)) && !routeRole(row, keys)) return false;
-  return modelCapabilities({ modelKey, capabilities: row?.metadata?.capabilities }).includes(capability);
+  // Older persisted routes predate capability metadata. A binding to a
+  // feature-route key is itself an explicit capability declaration, so infer
+  // only the capability required by that route. This keeps legacy data
+  // compatible without introducing provider/model-specific assumptions.
+  const declaredCapabilities = modelCapabilities({ modelKey, capabilities: row?.metadata?.capabilities });
+  const inferredCapabilities = declaredCapabilities.length
+    ? []
+    : applications.some((item) => keys.includes(item)) ? [capability] : [];
+  return modelCapabilities({
+    modelKey,
+    capabilities: [...declaredCapabilities, ...inferredCapabilities],
+  }).includes(capability);
 }
 
 function compareCandidates(left, right, keys) {
@@ -84,7 +135,7 @@ function toBinding(row, { feature, capability, keys, credential }) {
   };
 }
 
-function createModelRouteResolver({ db = null, listConfigs = null, getCredential = async () => null } = {}) {
+function createModelRouteResolver({ db = null, listConfigs = null, runtimeCatalog = [], getCredential = async () => null } = {}) {
   const readConfigs = typeof listConfigs === "function"
     ? listConfigs
     : async () => {
@@ -104,7 +155,19 @@ function createModelRouteResolver({ db = null, listConfigs = null, getCredential
     const capability = featureCapability(feature);
     const keys = featureRouteKeys(feature);
     if (!capability || !keys.length) throw new ModelRouteError("MODEL_FEATURE_UNSUPPORTED");
-    const rows = await readConfigs();
+    const persistedRows = await readConfigs();
+    const persistedKeys = new Set((persistedRows || []).map((row) => `${row.provider_key ?? row.providerKey}:${row.model_key ?? row.modelKey}`));
+    const hasPersistedConfigs = (persistedRows || []).length > 0;
+    const rows = [
+      ...(persistedRows || []),
+      // Runtime catalog entries are compatibility defaults only for a truly
+      // empty route store. Once the configuration center has any persisted
+      // model, every feature must be explicitly configured there; otherwise
+      // an old default can silently win or be logged as the active route.
+      ...(!hasPersistedConfigs
+        ? runtimeCatalogRows(runtimeCatalog).filter((row) => !persistedKeys.has(`${row.provider_key}:${row.model_key}`))
+        : []),
+    ];
     const candidates = rows
       .filter((row) => isCompatible(row, { capability, keys }))
       .sort((left, right) => compareCandidates(left, right, keys));
@@ -130,5 +193,6 @@ module.exports = {
   featureKeys,
   routeRole,
   isCompatible,
+  runtimeCatalogRows,
   createModelRouteResolver,
 };

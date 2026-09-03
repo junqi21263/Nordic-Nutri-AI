@@ -148,6 +148,7 @@ export function streamProductCoachMessage(
   let abortRequest = () => undefined;
   const promise = new Promise<void>((resolve, reject) => {
     let buffered = "";
+    const decoder = new TextDecoder();
     let settled = false;
     const finish = (callback: () => void) => {
       if (settled) return;
@@ -161,8 +162,17 @@ export function streamProductCoachMessage(
       data: { clientRequestId, prompt, date },
       enableChunked: true,
       success: ({ statusCode }) => {
-        if (statusCode === 200) finish(resolve);
-        else finish(() => reject(new Error("营养教练暂时无法回答，请稍后重试")));
+        if (statusCode !== 200) {
+          finish(() => reject(new Error("营养教练暂时无法回答，请稍后重试")));
+          return;
+        }
+        try {
+          buffered += decoder.decode();
+          consumeLines(true);
+          finish(resolve);
+        } catch (error) {
+          finish(() => reject(error instanceof Error ? error : new Error("营养教练暂时无法回答，请稍后重试")));
+        }
       },
       fail: () => finish(() => reject(new Error("营养教练暂时无法回答，请稍后重试"))),
     });
@@ -181,29 +191,33 @@ export function streamProductCoachMessage(
     }
     task.onChunkReceived(({ data }) => {
       if (settled) return;
-      buffered += new TextDecoder().decode(new Uint8Array(data));
-      const lines = buffered.split("\n");
-      buffered = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const event: unknown = JSON.parse(line);
-          if (!isCoachStreamEvent(event)) throw new Error("流式事件无效");
-          if (event.type === "error") {
-            finish(() => {
-              const error = new Error("营养教练暂时无法回答，请稍后重试");
-              error.name = event.code;
-              reject(error);
-            });
-            return;
-          }
-          onEvent(event);
-        } catch {
-          finish(() => reject(new Error("营养教练暂时无法回答，请稍后重试")));
-          return;
-        }
+      buffered += decoder.decode(new Uint8Array(data), { stream: true });
+      try {
+        consumeLines(false);
+      } catch (error) {
+        finish(() => reject(error instanceof Error ? error : new Error("营养教练暂时无法回答，请稍后重试")));
       }
     });
+
+    function consumeLines(flush: boolean) {
+      const lines = buffered.split("\n");
+      buffered = lines.pop() ?? "";
+      if (flush && buffered.trim()) {
+        lines.push(buffered);
+        buffered = "";
+      }
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event: unknown = JSON.parse(line);
+        if (!isCoachStreamEvent(event)) throw new Error("流式事件无效");
+        if (event.type === "error") {
+          const error = new Error("营养教练暂时无法回答，请稍后重试");
+          error.name = event.code;
+          throw error;
+        }
+        onEvent(event);
+      }
+    }
   });
   return { promise, abort: () => abortRequest() };
 }

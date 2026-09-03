@@ -83,3 +83,70 @@ test("preserves numeric route controls returned by PostgreSQL", async () => {
   assert.equal(route.maxTokens, 256);
   assert.equal(route.temperature, 0.35);
 });
+
+test("uses a configured runtime catalog when persisted routes are empty", async () => {
+  const resolver = createModelRouteResolver({
+    listConfigs: async () => [],
+    runtimeCatalog: [{ feature: "coach", provider: "custom-provider", model: "custom-text-v1" }],
+    getCredential: async (providerKey) => `${providerKey}-credential`,
+  });
+  const route = await resolver.resolve({ feature: "coach" });
+  assert.equal(route.providerKey, "custom-provider");
+  assert.equal(route.modelKey, "custom-text-v1");
+  assert.equal(route.credential, "custom-provider-credential");
+});
+
+test("does not mix legacy runtime defaults into a feature with persisted routes", async () => {
+  const resolver = createModelRouteResolver({
+    listConfigs: async () => [{
+      provider_key: "configured-provider",
+      model_key: "configured-text-v1",
+      feature_keys: ["daily_tip"],
+      enabled: true,
+      metadata: { capabilities: ["text"], routeRoles: { daily_tip: "primary" } },
+    }],
+    runtimeCatalog: [{ feature: "daily_tip", provider: "legacy-provider", model: "legacy-text-v1" }],
+    getCredential: async (providerKey) => `${providerKey}-credential`,
+  });
+
+  const candidates = await resolver.resolveCandidates({ feature: "daily_tip" });
+  assert.deepEqual(candidates.map((candidate) => `${candidate.providerKey}:${candidate.modelKey}`), [
+    "configured-provider:configured-text-v1",
+  ]);
+});
+
+test("does not use runtime defaults when the persisted store omits a feature", async () => {
+  const resolver = createModelRouteResolver({
+    listConfigs: async () => [{
+      provider_key: "configured-provider",
+      model_key: "configured-text-v1",
+      feature_keys: ["coach"],
+      enabled: true,
+      metadata: { capabilities: ["text"], routeRoles: { coach: "primary" } },
+    }],
+    runtimeCatalog: [{ feature: "daily_tip", provider: "legacy-provider", model: "legacy-text-v1" }],
+    getCredential: async () => "credential",
+  });
+
+  await assert.rejects(
+    () => resolver.resolve({ feature: "daily_tip" }),
+    (error) => error instanceof ModelRouteError && error.code === "MODEL_ROUTE_NOT_CONFIGURED",
+  );
+});
+
+test("infers the required capability from a legacy feature binding", async () => {
+  const resolver = createModelRouteResolver({
+    listConfigs: async () => [{
+      provider_key: "custom-vision-provider",
+      model_key: "custom-vision-v1",
+      feature_keys: ["vision"],
+      enabled: true,
+      metadata: { capabilities: [] },
+    }],
+    getCredential: async () => "credential",
+  });
+
+  const route = await resolver.resolve({ feature: "food_recognition" });
+  assert.equal(route.providerKey, "custom-vision-provider");
+  assert.equal(route.modelKey, "custom-vision-v1");
+});

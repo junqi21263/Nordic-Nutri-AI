@@ -177,6 +177,7 @@ function readWorkerConfig(env) {
   const envId = typeof env.TCB_ENV === "string" ? env.TCB_ENV.trim() : "";
   const sharedSecret = typeof env.AI_WORKER_SHARED_SECRET === "string" ? env.AI_WORKER_SHARED_SECRET.trim() : "";
   if (!envId || !sharedSecret) throw new Error("Worker configuration is incomplete");
+  const cloudbaseApiKey = typeof env.CLOUDBASE_APIKEY === "string" ? env.CLOUDBASE_APIKEY.trim() : "";
   const modelName = typeof env.HY_IMAGE_MODEL === "string" && env.HY_IMAGE_MODEL.trim()
     ? env.HY_IMAGE_MODEL.trim()
     : DEFAULT_MODEL;
@@ -184,6 +185,7 @@ function readWorkerConfig(env) {
   return {
     envId,
     sharedSecret,
+    cloudbaseApiKey,
     modelName,
     size: ALLOWED_SIZES.has(requestedSize) ? requestedSize : DEFAULT_SIZE,
     textModelName: typeof env.HY_TEXT_MODEL === "string" && env.HY_TEXT_MODEL.trim()
@@ -195,7 +197,10 @@ function readWorkerConfig(env) {
 function createWorkerService(env = process.env, dependencies = {}) {
   const config = readWorkerConfig(env);
   const cloudbase = dependencies.cloudbaseNodeSdk ?? require("@cloudbase/node-sdk");
-  const app = cloudbase.init({ env: config.envId });
+  const app = cloudbase.init({
+    env: config.envId,
+    ...(config.cloudbaseApiKey ? { accessKey: config.cloudbaseApiKey } : {}),
+  });
   const ai = typeof app.ai === "function" ? app.ai() : app.ai;
   if (!ai || typeof ai.createImageModel !== "function" || typeof ai.createModel !== "function") throw new Error("Hunyuan AI SDK is unavailable");
   const imageModel = ai.createImageModel("hunyuan-image");

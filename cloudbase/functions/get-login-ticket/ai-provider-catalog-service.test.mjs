@@ -112,6 +112,18 @@ test("raw provider key storage fails closed until the dedicated encryption key i
   );
 });
 
+test("saving the already active environment credential does not require the credential store", async () => {
+  let writes = 0;
+  const service = createAiProviderCatalogService({
+    db: { from: () => ({ upsert: async () => { writes += 1; return { error: null }; } }) },
+    env: { QWEN_API_KEY: "active-environment-key" },
+    isAdmin: async () => true,
+  });
+  const result = await service.saveCredential("admin", "qwen", { apiKey: "active-environment-key" });
+  assert.equal(result.credentialStatus, "PRESENT");
+  assert.equal(writes, 0);
+});
+
 test("runtime credential lookup stays server-only and supports configured environment fallback", async () => {
   const service = createAiProviderCatalogService({
     db: { from: () => createQuery([]) },
