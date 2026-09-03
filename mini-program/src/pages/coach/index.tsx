@@ -1,4 +1,4 @@
-import { Image, MovableArea, MovableView, Text, View } from "@tarojs/components";
+import { Image, Text, View } from "@tarojs/components";
 import Taro, { useDidHide, useDidShow } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -56,9 +56,6 @@ const defaultHeroPrompt = "下一餐怎么补充蛋白质？";
 const defaultQuickPrompts = ["我今天吃什么？", "我的蛋白够吗？", "下一餐怎么搭配？"];
 const dailyLimitMessage = "因个人开发成本有限，当前每人每日限制聊20句";
 const defaultDailyUsage: ProductCoachDailyUsage = { limit: 20, used: 0, remaining: 20 };
-const scrollTopPositionStorageKey = "nordic.coach.scrollTopPosition";
-const scrollTopControlSize = 36;
-const scrollTopControlEdgeInset = 12;
 const defaultDailyTip: ProductCoachDailyTip = {
   type: "nutrition_tip",
   headline: "下一餐加一份深色蔬菜",
@@ -68,47 +65,6 @@ const defaultDailyTip: ProductCoachDailyTip = {
   source: "rule_v2",
   model: null,
 };
-type ScrollTopPosition = { x: number; y: number };
-
-function getDefaultScrollTopPosition(): ScrollTopPosition {
-  try {
-    const { windowHeight, windowWidth } = Taro.getWindowInfo();
-    return {
-      x: Math.max(0, windowWidth - scrollTopControlSize - scrollTopControlEdgeInset),
-      y: Math.max(0, Math.round((windowHeight - scrollTopControlSize) * 0.32)),
-    };
-  } catch {
-    return { x: 327, y: 250 };
-  }
-}
-
-function getStoredScrollTopPosition(): ScrollTopPosition {
-  const fallback = getDefaultScrollTopPosition();
-  try {
-    const stored = Taro.getStorageSync(scrollTopPositionStorageKey) as Partial<ScrollTopPosition> | null;
-    if (typeof stored?.x === "number" && typeof stored?.y === "number") {
-      return { x: Math.max(0, stored.x), y: Math.max(0, stored.y) };
-    }
-  } catch {
-    // The default position remains available when local storage is unavailable.
-  }
-  return fallback;
-}
-
-function getSnappedScrollTopPosition(position: ScrollTopPosition): ScrollTopPosition {
-  try {
-    const { windowWidth } = Taro.getWindowInfo();
-    const snapLeft = position.x + scrollTopControlSize / 2 < windowWidth / 2;
-    return {
-      x: snapLeft
-        ? scrollTopControlEdgeInset
-        : Math.max(0, windowWidth - scrollTopControlSize - scrollTopControlEdgeInset),
-      y: position.y,
-    };
-  } catch {
-    return position;
-  }
-}
 
 export default function CoachPage() {
   useAppShare();
@@ -134,10 +90,6 @@ export default function CoachPage() {
   const [selectedImagePath, setSelectedImagePath] = useState<string | null>(null);
   const [dailyUsage, setDailyUsage] = useState<ProductCoachDailyUsage>(defaultDailyUsage);
   const [completedReplyVersion, setCompletedReplyVersion] = useState(0);
-  const [scrollTopPosition, setScrollTopPosition] = useState<ScrollTopPosition>(getStoredScrollTopPosition);
-  const [scrollTopSnapAnimating, setScrollTopSnapAnimating] = useState(false);
-  const scrollTopPositionRef = useRef(scrollTopPosition);
-  const scrollTopDraggedRef = useRef(false);
   const activeStreamRef = useRef<{ id: string; abort: () => void } | null>(null);
   const pageActiveRef = useRef(true);
   const [expandedSections, setExpandedSections] = useState({
@@ -488,34 +440,6 @@ export default function CoachPage() {
     void Taro.switchTab({ url: "/pages/meal-records/index" });
   };
 
-  const handleScrollTopPositionChange = (event: {
-    detail: ScrollTopPosition & { source: "touch" | "touch-out-of-bounds" | "out-of-bounds" | "friction" | "" };
-  }) => {
-    if (event.detail.source !== "touch") return;
-    const nextPosition = { x: event.detail.x, y: event.detail.y };
-    setScrollTopSnapAnimating(false);
-    scrollTopDraggedRef.current = true;
-    scrollTopPositionRef.current = nextPosition;
-    setScrollTopPosition(nextPosition);
-  };
-
-  const handleScrollTopTouchEnd = () => {
-    if (!scrollTopDraggedRef.current) {
-      scrollToCoachTop();
-      return;
-    }
-    scrollTopDraggedRef.current = false;
-    const snappedPosition = getSnappedScrollTopPosition(scrollTopPositionRef.current);
-    setScrollTopSnapAnimating(true);
-    scrollTopPositionRef.current = snappedPosition;
-    setScrollTopPosition(snappedPosition);
-    try {
-      Taro.setStorageSync(scrollTopPositionStorageKey, snappedPosition);
-    } catch {
-      // The new position is still retained for the current page session.
-    }
-  };
-
   return (
     <PageLayout
       activeTab="coach"
@@ -523,14 +447,32 @@ export default function CoachPage() {
       title="你的营养教练"
       scrollLocked={restartDialogOpen}
       overlay={
-        <ConfirmDialog
-          open={restartDialogOpen}
-          title="新对话"
-          description="当前对话会清空，历史记录仍会保留。确定重新开始吗？"
-          confirmLabel="开启新对话"
-          onConfirm={() => void handleRestartConversation()}
-          onCancel={() => setRestartDialogOpen(false)}
-        />
+        <>
+          <ConfirmDialog
+            open={restartDialogOpen}
+            title="新对话"
+            description="当前对话会清空，历史记录仍会保留。确定重新开始吗？"
+            confirmLabel="开启新对话"
+            onConfirm={() => void handleRestartConversation()}
+            onCancel={() => setRestartDialogOpen(false)}
+          />
+          <CoachComposer
+            value={draft}
+            disabled={sending || dailyUsage.remaining <= 0}
+            selectedImagePath={selectedImagePath}
+            onInput={setDraft}
+            onSend={() => void sendMessage()}
+            onPickImage={() => void chooseCoachImage()}
+            onClearImage={() => setSelectedImagePath(null)}
+          />
+          <View
+            className="coach-chat__scroll-top"
+            ariaLabel="回到顶部"
+            onClick={scrollToCoachTop}
+          >
+            <NordicIcon name="arrow-up" size={22} ariaLabel="回到顶部" />
+          </View>
+        </>
       }
       className="page-layout--coach-chat"
     >
@@ -789,37 +731,12 @@ export default function CoachPage() {
         </View>
       </View>
 
-      <MovableArea className="coach-chat__scroll-top-area">
-        <MovableView
-          className="coach-chat__scroll-top"
-          direction="all"
-          x={scrollTopPosition.x}
-          y={scrollTopPosition.y}
-          animation={scrollTopSnapAnimating}
-          onChange={handleScrollTopPositionChange}
-          onTouchEnd={handleScrollTopTouchEnd}
-        >
-          <View className="coach-chat__scroll-top-content" ariaLabel="回到顶部">
-            <NordicIcon name="arrow-up" size={22} ariaLabel="回到顶部" />
-          </View>
-        </MovableView>
-      </MovableArea>
-
       {dailyUsage.remaining <= 3 ? (
         <Text className="usage-quota-tip usage-quota-tip--coach">
           今日教练对话剩余 {dailyUsage.remaining} 次
         </Text>
       ) : null}
 
-      <CoachComposer
-        value={draft}
-        disabled={sending || dailyUsage.remaining <= 0}
-        selectedImagePath={selectedImagePath}
-        onInput={setDraft}
-        onSend={() => void sendMessage()}
-        onPickImage={() => void chooseCoachImage()}
-        onClearImage={() => setSelectedImagePath(null)}
-      />
     </PageLayout>
   );
 }

@@ -1482,32 +1482,20 @@
     opacity: 1;
   }
 }
-.coach-chat__scroll-top-area {
-  bottom: calc($bottom-tab-height + $safe-area-bottom + 120px);
-  height: calc(100vh - #{$safe-area-top} - $bottom-tab-height - $safe-area-bottom - 120px);
-  left: 0;
-  pointer-events: none;
-  position: fixed;
-  right: 0;
-  top: calc($safe-area-top + 96px);
-  width: 100%;
-  z-index: 90;
-}
 .coach-chat__scroll-top {
+  align-items: center;
   background: rgba($color-warm-white, 0.78);
   border: 1px solid rgba($color-forest-green, 0.48);
   border-radius: $radius-full;
   box-shadow: $shadow-card;
-  height: 72px;
-  pointer-events: auto;
-  width: 72px;
-}
-.coach-chat__scroll-top-content {
-  align-items: center;
   display: flex;
-  height: 100%;
+  height: 72px;
   justify-content: center;
-  width: 100%;
+  position: fixed;
+  right: $space-12;
+  top: 40vh;
+  width: 72px;
+  z-index: 90;
 }
 .coach-chat__scroll-top .nordic-icon {
   opacity: 0.86;

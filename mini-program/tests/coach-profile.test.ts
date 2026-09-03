@@ -114,30 +114,27 @@ describe("local coach and profile", () => {
     expect(source).toContain("Taro.pageScrollTo({ scrollTop: 999999, duration: 300 })");
   });
 
-  it("keeps a draggable, remembered translucent control for returning the coach page to the top", () => {
+  it("keeps a right-aligned fixed control without a full-screen gesture layer", () => {
     const source = coachPageSource();
     const styles = readFileSync(resolve(import.meta.dirname, "../src/styles/page.scss"), "utf8");
 
-    expect(source).toContain("MovableArea");
-    expect(source).toContain("MovableView");
+    expect(source).not.toContain("MovableArea");
+    expect(source).not.toContain("MovableView");
     expect(source).toContain('className="coach-chat__scroll-top"');
     expect(source).toContain('ariaLabel="回到顶部"');
     expect(source).toContain("Taro.pageScrollTo({ scrollTop: 0, duration: 300 })");
     expect(source).toContain('name="arrow-up" size={22}');
-    expect(source).toContain("Taro.getStorageSync(scrollTopPositionStorageKey)");
-    expect(source).toContain("Taro.setStorageSync(scrollTopPositionStorageKey");
-    expect(source).toContain("function getSnappedScrollTopPosition");
-    expect(source).toContain("scrollTopControlSize / 2");
-    expect(source).toContain("const snappedPosition = getSnappedScrollTopPosition");
-    expect(source).toContain("Taro.setStorageSync(scrollTopPositionStorageKey, snappedPosition)");
-    expect(source).toContain("animation={scrollTopSnapAnimating}");
-    expect(source).toContain("onChange={handleScrollTopPositionChange}");
-    expect(source).toContain("onTouchEnd={handleScrollTopTouchEnd}");
-    expect(source).toContain('direction="all"');
+    expect(source).toContain("onClick={scrollToCoachTop}");
+    const overlayStart = source.indexOf("overlay={");
+    const scrollTopStart = source.indexOf('className="coach-chat__scroll-top"');
+    const pageClassStart = source.indexOf('className="page-layout--coach-chat"');
+    expect(scrollTopStart).toBeGreaterThan(overlayStart);
+    expect(scrollTopStart).toBeLessThan(pageClassStart);
     expect(styles).toContain(".coach-chat__scroll-top");
-    expect(styles).toContain(".coach-chat__scroll-top-area");
-    expect(styles).toContain("height: calc(100vh - #{$safe-area-top} - $bottom-tab-height - $safe-area-bottom - 120px);");
-    expect(styles).toContain("width: 100%;");
+    expect(styles).toContain("right: $space-12;");
+    expect(styles).toContain("position: fixed;");
+    expect(styles).toContain("top: 40vh;");
+    expect(styles).toContain("z-index: 90;");
     expect(styles).toContain("background: rgba($color-warm-white, 0.78);");
     expect(styles).toContain("border: 1px solid rgba($color-forest-green, 0.48);");
   });
