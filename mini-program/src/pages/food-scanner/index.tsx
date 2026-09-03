@@ -296,7 +296,7 @@ export default function FoodScannerPage() {
             <View className="scanner-ai-status__icon">
               <NordicIcon name="scan-line" size={22} ariaLabel="识别中" />
             </View>
-            <Text>AI 识别中</Text>
+            <Text>识别中</Text>
           </View>
         </View>
 
@@ -395,7 +395,7 @@ export default function FoodScannerPage() {
             visualDisabled={visionQuotaExhausted}
             onClick={() => void chooseImage("camera")}
           >
-            {isScanning ? "正在 AI 分析" : visionQuotaExhausted ? "今日识别已用完" : "拍摄并 AI 分析"}
+            {isScanning ? "正在分析" : visionQuotaExhausted ? "今日识别已用完" : "拍摄并分析"}
           </AppButton>
         </View>
         <Text className="scanner-upload-hint">{formatVisionUploadHint()}</Text>
