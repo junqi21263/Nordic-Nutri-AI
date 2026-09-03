@@ -174,44 +174,71 @@ test("vision analysis status is read-only and enforces owner isolation", async (
   assert.equal(mutations, 0);
 });
 
-test("delegates food insight to dev through the existing signed worker configuration", async () => {
-  const workerOptions = [];
-  const service = createRuntimeService({
-    WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
-    CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret",
-    HY_IMAGE_WORKER_ENDPOINT: "https://dev-d8g3hqv2b0de38046.service.tcloudbase.com/hunyuan-image-worker/generate",
-    AI_WORKER_SHARED_SECRET: "worker-secret",
-  }, {
-    cloudbaseSdk: { init: () => ({ rdb: () => createRuntimeDb() }) },
-    cloudbaseNodeSdk: { init: () => ({}) },
-    nutritionInsightWorkerClientFactory: (options) => {
-      workerOptions.push(options);
-      return {
-        generateInsight: async () => ({
-          headline: "鸡胸肉的营养参考",
-          content: "每100g约含19.3g蛋白质，可搭配蔬菜和主食。",
-          source: "hunyuan-exp",
-          model: "hunyuan-2.0-instruct-20251111",
-        }),
-      };
-    },
-  });
+test("routes food insight through the configured provider and model", async () => {
+  const routeFeatures = [];
+  const db = createRuntimeDb();
+  db.from = (table) => {
+    if (table !== "ai_model_quota_policies") return {};
+    const query = {
+      select() { return query; },
+      eq() { return query; },
+      async maybeSingle() { return { data: null, error: null }; },
+    };
+    return query;
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    const request = JSON.parse(init.body);
+    assert.equal(request.model, "configured-food-insight-model");
+    return {
+      ok: true,
+      async json() {
+        return {
+          choices: [{ message: { content: JSON.stringify({
+            headline: "鸡胸肉的营养参考",
+            content: "每100g约含19.3g蛋白质，可搭配蔬菜和主食。",
+          }) } }],
+          usage: { total_tokens: 42 },
+        };
+      },
+    };
+  };
+  try {
+    const service = createRuntimeService({
+      WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
+      CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret",
+    }, {
+      cloudbaseSdk: { init: () => ({ rdb: () => db }) },
+      cloudbaseNodeSdk: { init: () => ({}) },
+      modelRouteResolver: {
+        resolveCandidates: async ({ feature }) => {
+          routeFeatures.push(feature);
+          return feature === "food_insight" ? [{
+            providerKey: "test-provider",
+            modelKey: "configured-food-insight-model",
+            credential: "provider-key",
+            endpoint: "https://provider.example/v1/chat/completions",
+          }] : [];
+        },
+      },
+    });
 
-  const insight = await service.foodInsight.getInsight({
-    nameZh: "鸡胸肉",
-    nutritionPer100g: { calories: 132, protein: 19.3, carbs: 0, fat: 1 },
-  });
+    const insight = await service.foodInsight.getInsight({
+      nameZh: "鸡胸肉",
+      nutritionPer100g: { calories: 132, protein: 19.3, carbs: 0, fat: 1 },
+    });
 
-  assert.equal(workerOptions.length, 1);
-  assert.equal(workerOptions[0].endpoint, "https://dev-d8g3hqv2b0de38046.service.tcloudbase.com/hunyuan-image-worker/nutrition-insight");
-  assert.equal(workerOptions[0].sharedSecret, "worker-secret");
-  assert.equal(insight.source, "hunyuan-exp");
+    assert.deepEqual(routeFeatures, ["food_insight"]);
+    assert.equal(insight.source, "test-provider");
+    assert.equal(insight.model, "configured-food-insight-model");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
-test("does not instantiate a fixed daily-insight provider during runtime setup", () => {
-  const dailyInsightOptions = [];
+test("does not instantiate the legacy nutrition worker during runtime setup", () => {
   const workerOptions = [];
-  const service = createRuntimeService({
+  createRuntimeService({
     WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
     CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret",
     DEEPSEEK_API_KEY: "deepseek-key", DEEPSEEK_MODEL: "deepseek-v4-pro",
@@ -220,10 +247,6 @@ test("does not instantiate a fixed daily-insight provider during runtime setup",
   }, {
     cloudbaseSdk: { init: () => ({ rdb: () => createRuntimeDb() }) },
     cloudbaseNodeSdk: { init: () => ({}) },
-    dailyInsightFactory: (options) => {
-      dailyInsightOptions.push(options);
-      return async () => ({ focus: "protein", headline: "补蛋白", content: "下一餐补一份蛋白质。", source: "deepseek", model: options.model });
-    },
     nutritionInsightWorkerClientFactory: (options) => {
       workerOptions.push(options);
       return {
@@ -232,8 +255,7 @@ test("does not instantiate a fixed daily-insight provider during runtime setup",
     },
   });
 
-  assert.equal(dailyInsightOptions.length, 0);
-  assert.equal(workerOptions.length, 1);
+  assert.equal(workerOptions.length, 0);
 });
 
 test("uses the primary runtime identity for generated-image storage in remote-worker mode", async () => {
@@ -306,6 +328,18 @@ test("lists NOVA proactive reminders separately in the admin model quota catalog
   assert.deepEqual(entry, {
     feature: "proactive_daily_brief",
     featureLabel: "NOVA 每日提醒",
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+  });
+});
+
+test("lists food insights as a configurable text route", () => {
+  const entry = buildModelCatalog({ env: { DEEPSEEK_MODEL: "deepseek-v4-flash" } })
+    .find((item) => item.feature === "food_insight");
+
+  assert.deepEqual(entry, {
+    feature: "food_insight",
+    featureLabel: "食材洞察",
     provider: "deepseek",
     model: "deepseek-v4-flash",
   });

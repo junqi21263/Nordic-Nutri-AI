@@ -10,11 +10,13 @@ import {
 test("maps each configurable feature to its required model capability", () => {
   assert.equal(featureCapability("coach"), "text");
   assert.equal(featureCapability("daily_insight"), "text");
+  assert.equal(featureCapability("food_insight"), "text");
   assert.equal(featureCapability("food_recognition"), "vision");
   assert.equal(featureCapability("food_image_generation"), "image_generation");
   assert.equal(featureCapability("unknown_feature"), null);
   assert.deepEqual(featureRouteKeys("food_recognition"), ["food_recognition", "vision"]);
   assert.deepEqual(featureRouteKeys("food_image_generation"), ["food_image_generation", "food_image"]);
+  assert.deepEqual(featureRouteKeys("food_insight"), ["food_insight"]);
 });
 
 test("normalizes model capabilities without accepting unsupported values", () => {

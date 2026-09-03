@@ -22,7 +22,7 @@ test("CloudBase manifest declares the Phase 2 vision foundation functions", asyn
 
   assert.deepEqual(entries.get("vision-analysis-dispatcher"), {
     name: "vision-analysis-dispatcher",
-    type: "HTTP",
+    type: "Event",
     timeout: 60,
     runtime: "Nodejs18.15",
     handler: "index.main",
@@ -32,7 +32,7 @@ test("CloudBase manifest declares the Phase 2 vision foundation functions", asyn
   });
   assert.deepEqual(entries.get("vision-analysis-worker"), {
     name: "vision-analysis-worker",
-    type: "HTTP",
+    type: "Event",
     timeout: 60,
     runtime: "Nodejs18.15",
     handler: "index.main",
@@ -41,7 +41,7 @@ test("CloudBase manifest declares the Phase 2 vision foundation functions", asyn
   });
   assert.deepEqual(entries.get("vision-analysis-reaper"), {
     name: "vision-analysis-reaper",
-    type: "HTTP",
+    type: "Event",
     timeout: 60,
     runtime: "Nodejs18.15",
     handler: "index.main",

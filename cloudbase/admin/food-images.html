@@ -281,6 +281,7 @@
     .ai-feature-route-list { display: grid; gap: 8px; margin-top: 10px; }
     .ai-feature-route-row { display: grid; grid-template-columns: minmax(130px, .7fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
     .ai-feature-route-row__name { color: var(--ink); font-size: 12px; font-weight: 800; }
+    .ai-feature-route-row__name small { display: none; }
     .ai-feature-route-row label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; font-weight: 700; }
     .ai-feature-route-row select, .ai-model-editor-grid input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--paper); color: var(--text); }
     .ai-model-default-note { margin: 0 0 2px; padding: 8px 10px; border-radius: 8px; background: var(--mist); color: var(--muted); font-size: 11px; line-height: 1.5; }
@@ -292,6 +293,35 @@
     .ai-status-pill.missing { border-color: #e0b9a8; color: var(--danger); }
     .ai-provider-status-card__chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
     #aiModelSwitchHistory small { display: block; margin-top: 3px; }
+    .quota-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(180px, 260px) auto; align-items: center; flex-wrap: nowrap; }
+    .quota-toolbar h2, .quota-toolbar > span { min-width: 0; }
+    .quota-toolbar > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ops-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: nowrap; }
+    .ops-panel__head > div { min-width: 0; }
+    .ai-model-parameters-head { align-items: center; }
+    .quota-feature-panel { margin: 12px 0; }
+    .quota-feature-panel > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; list-style: none; cursor: pointer; color: var(--ink); font-weight: 800; }
+    .quota-feature-panel > summary::-webkit-details-marker { display: none; }
+    .quota-feature-panel > summary::after { content: "▸"; color: var(--muted); transition: transform .18s ease; }
+    .quota-feature-panel[open] > summary::after { transform: rotate(90deg); }
+    .quota-feature-panel__body { margin-top: 12px; }
+    .quota-feature-panel__body .ops-panel__head { align-items: center; }
+    .quota-data-note { display: none; }
+    .nn-user-detail-data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .nn-user-detail-data-card { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+    .nn-user-detail-data-card strong, .nn-user-detail-data-card span { display: block; }
+    .nn-user-detail-data-card strong { color: var(--ink); font-size: 12px; }
+    .nn-user-detail-data-card span { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .nn-user-detail-data-card b { display: block; margin-top: 3px; color: var(--ink); font-size: 24px; }
+    .nn-user-detail-panel__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .nn-user-detail-panel__heading h3 { margin: 0; }
+    .nn-user-detail-panel__table { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+    .nn-user-detail-panel__table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .nn-user-detail-panel__table th, .nn-user-detail-panel__table td { padding: 9px 11px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .nn-user-detail-panel__table th { color: var(--muted); background: var(--linen); font-size: 11px; white-space: nowrap; }
+    .nn-user-detail-panel__table tr:last-child td { border-bottom: 0; }
+    @media (max-width: 900px) { .quota-toolbar { display: flex; flex-wrap: wrap; } .quota-toolbar > span { flex: 1 1 100%; order: 3; } .quota-toolbar #quotaDaysFilter { flex: 1 1 180px; } .ops-panel__head { flex-wrap: wrap; } .nn-user-detail-data-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .nn-user-detail-data-grid { grid-template-columns: 1fr; } }
     @media (max-width: 900px) { .ai-management-grid { grid-template-columns: 1fr; } .ai-feature-route-row { grid-template-columns: 1fr; } }
     @media (max-width: 900px) { .quota-model-cards { grid-template-columns: 1fr; } }
     .admin-layout { max-width: 1540px; margin: 0 auto; display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: start; }
@@ -431,6 +461,19 @@
     .food-row-actions .button.link { font-size: 12px; }
     .module-toolbar label.food-admin-toggle { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
     .module-toolbar label.food-admin-toggle input { accent-color: var(--green); width: auto; min-width: 0; height: auto; }
+    .module-toolbar.quota-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(220px, 300px); align-items: center; flex-wrap: nowrap; }
+    .module-toolbar.quota-toolbar h2 { flex: 0 0 auto; min-width: 0; }
+    .module-toolbar.quota-toolbar > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .quota-toolbar__range { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+    .quota-toolbar__range select { min-width: 0; width: 100%; }
+    .quota-toolbar__range .button { flex: 0 0 auto; }
+    .nn-food-filter-bar { flex-wrap: nowrap; }
+    .nn-food-filter-bar input { flex: 1 1 260px; min-width: 180px; }
+    .nn-food-filter-bar select { flex: 0 1 210px; min-width: 160px; }
+    .nn-food-filter-bar .food-admin-toggle { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; width: max-content; min-width: max-content; white-space: nowrap; }
+    .nn-food-filter-bar .food-admin-toggle input[type="checkbox"] { width: 16px; min-width: 16px; height: 16px; margin: 0; padding: 0; }
+    @media (max-width: 900px) { .module-toolbar.quota-toolbar { display: flex; flex-wrap: wrap; } .module-toolbar.quota-toolbar > span { flex: 1 1 100%; order: 3; } .quota-toolbar__range { flex: 1 1 260px; justify-content: flex-start; } }
+    @media (max-width: 760px) { .nn-food-filter-bar { flex-wrap: wrap; } }
     .reject-modal__panel { width: min(440px, 100%); padding: 0; overflow: hidden; border-radius: 18px; background: var(--linen); border: 1px solid var(--line); box-shadow: 0 28px 56px rgba(23, 61, 42, .2); }
     .reject-modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 16px; background: linear-gradient(180deg, #f3f6f0 0%, var(--linen) 100%); border-bottom: 1px solid var(--line); }
     .reject-modal__header-copy { min-width: 0; }
@@ -729,15 +772,17 @@
         </section>
 
         <section id="moduleQuota" class="admin-module" hidden>
-          <div class="module-toolbar">
+          <div class="module-toolbar quota-toolbar">
             <h2>额度管理</h2>
             <span class="muted">按模型查看请求次数与 Token 趋势 · 每 15 分钟自动刷新</span>
-            <select id="quotaDaysFilter" aria-label="时间范围">
-              <option value="7">近 7 天</option>
-              <option value="14">近 14 天</option>
-              <option value="30" selected>近 30 天</option>
-            </select>
-            <button id="refreshQuota" class="button secondary" type="button">刷新</button>
+            <div class="quota-toolbar__range">
+              <select id="quotaDaysFilter" aria-label="时间范围">
+                <option value="7">近 7 天</option>
+                <option value="14">近 14 天</option>
+                <option value="30" selected>近 30 天</option>
+              </select>
+              <button id="refreshQuota" class="button secondary" type="button">刷新</button>
+            </div>
           </div>
           <div class="ai-workspace-tabs" role="tablist" aria-label="AI 管理工作区">
             <button class="ai-workspace-tab active" type="button" data-ai-workspace="routing" role="tab">模型路由</button>
@@ -747,7 +792,7 @@
           <div id="aiWorkspaceRouting" class="ai-workspace-panel">
             <div class="ai-management-grid">
               <section class="ops-panel">
-                <div class="ops-panel__head"><div><h3>模型参数</h3><p class="muted">管理已接入的模型参数；应用功能在下方统一配置。</p></div><button id="addAiModel" class="button" type="button">新增模型</button></div>
+                <div class="ops-panel__head ai-model-parameters-head"><div><h3>模型参数</h3><p class="muted">管理已接入的模型参数；应用功能在下方统一配置。</p></div><button id="addAiModel" class="button" type="button">新增模型</button></div>
                 <div id="aiModelConfigBoard" class="ai-model-config-list"><p class="muted">请先连接后台</p></div>
                 <section class="ai-feature-route-config">
                   <div class="ops-panel__head"><div><h3>应用功能配置</h3><p class="muted">按功能选择主模型和备用模型；保存后立即生效。</p></div></div>
@@ -760,8 +805,14 @@
           </div>
           <div id="aiWorkspaceQuota" class="ai-workspace-panel" hidden>
             <p id="quotaUpdatedAt" class="muted" style="margin:0 0 8px">等待加载额度数据…</p>
-            <p class="quota-data-note"><strong>统计来源：</strong>当前展示的是系统请求与 Token 观测，以及内部每日限额；厂商真实账单/剩余额度暂未接入，不能作为供应商控制台余额使用。</p>
-            <section class="ops-panel" style="margin:12px 0"><div class="ops-panel__head"><div><h3>功能额度与当前模型路由</h3><p class="muted">按登录用户和自然日计数；切换厂商/模型不会重置额度。留空表示不限制。厂商额度来源仅作状态参考。</p></div><button id="refreshFeatureUserQuotas" class="button secondary" type="button">刷新</button></div><div id="featureUserQuotaBoard" class="data-table"><p class="muted" style="padding:18px">加载中…</p></div><p class="muted" style="margin-top:10px">单人每日上限由本表直接控制；厂商额度自动同步需对应厂商提供只读接口，否则显示手工或未接入。</p></section>
+            <details class="ops-panel quota-feature-panel" open>
+              <summary>功能额度与当前模型路由</summary>
+              <div class="quota-feature-panel__body">
+                <div class="ops-panel__head"><div><p class="muted">按登录用户和自然日计数；切换厂商/模型不会重置额度。留空表示不限制。厂商额度来源仅作状态参考。</p></div><button id="refreshFeatureUserQuotas" class="button secondary" type="button">刷新</button></div>
+                <div id="featureUserQuotaBoard" class="data-table"><p class="muted" style="padding:18px">加载中…</p></div>
+                <p class="muted" style="margin-top:10px">单人每日上限由本表直接控制；厂商额度自动同步需对应厂商提供只读接口，否则显示手工或未接入。</p>
+              </div>
+            </details>
             <div id="quotaFeatureStats" class="ops-overview-stats status-metrics"><span class="status-metric">加载中<b>…</b></span></div>
             <div id="quotaModelBoard" class="quota-model-board"><p class="muted">加载中…</p></div>
           </div>
@@ -884,23 +935,23 @@
           <div class="nn-page-header"><div><p class="eyebrow">Users / Detail</p><h2>User Detail</h2><p class="muted">用户摘要与运营事件 Timeline</p></div><div class="nn-filter-bar"><input id="userDetailId" class="nn-input" type="search" placeholder="输入内部用户 UUID" autocomplete="off" /><button id="loadUserDetail" class="button" type="button">查看</button></div></div>
           <div id="userDetailTabs" class="nn-tabs nn-user-detail-tabs" role="tablist" aria-label="User Detail sections">
             <button id="userDetailTabOverview" class="nn-tab" type="button" role="tab" aria-selected="true" aria-controls="userDetailPanelOverview" data-user-detail-tab="overview">Overview</button>
-            <button id="userDetailTabMeals" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelMeals" data-user-detail-tab="meals">Meals</button>
-            <button id="userDetailTabAiUsage" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelAiUsage" data-user-detail-tab="ai-usage">AI Usage</button>
-            <button id="userDetailTabImages" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelImages" data-user-detail-tab="images">Images</button>
-            <button id="userDetailTabFeedback" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelFeedback" data-user-detail-tab="feedback">Feedback</button>
-            <button id="userDetailTabModeration" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelModeration" data-user-detail-tab="moderation">Moderation</button>
-            <button id="userDetailTabDeletion" class="nn-tab nn-tab--unavailable" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelDeletion" data-user-detail-tab="deletion">Deletion</button>
+            <button id="userDetailTabMeals" class="nn-tab" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelMeals" data-user-detail-tab="meals">Meals</button>
+            <button id="userDetailTabAiUsage" class="nn-tab" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelAiUsage" data-user-detail-tab="ai-usage">AI Usage</button>
+            <button id="userDetailTabImages" class="nn-tab" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelImages" data-user-detail-tab="images">Images</button>
+            <button id="userDetailTabFeedback" class="nn-tab" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelFeedback" data-user-detail-tab="feedback">Feedback</button>
+            <button id="userDetailTabModeration" class="nn-tab" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelModeration" data-user-detail-tab="moderation">Moderation</button>
+            <button id="userDetailTabDeletion" class="nn-tab" type="button" role="tab" aria-selected="false" aria-controls="userDetailPanelDeletion" data-user-detail-tab="deletion">Deletion</button>
           </div>
           <section id="userDetailPanelOverview" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabOverview">
             <div id="userDetailSummary" class="ops-panel nn-user-detail-summary"><div class="ops-empty">从用户列表点击，或输入内部 UUID。</div></div>
             <div class="ops-panel nn-user-detail-timeline"><div class="nn-section-heading"><div><p class="eyebrow">Operational events</p><h3>Timeline</h3></div><button id="refreshUserTimeline" class="button link" type="button">刷新</button></div><div id="userTimeline" class="ops-timeline"><div class="ops-empty">暂无用户事件。</div></div></div>
           </section>
-          <section id="userDetailPanelMeals" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabMeals" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
-          <section id="userDetailPanelAiUsage" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabAiUsage" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
-          <section id="userDetailPanelImages" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabImages" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
-          <section id="userDetailPanelFeedback" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabFeedback" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
-          <section id="userDetailPanelModeration" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabModeration" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
-          <section id="userDetailPanelDeletion" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabDeletion" hidden><div class="nn-known-gap">该视图暂未提供</div></section>
+          <section id="userDetailPanelMeals" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabMeals" hidden><div class="ops-panel"><div id="userDetailMealsView" class="nn-user-detail-panel__content"><div class="ops-empty">加载用户后显示餐食记录概览。</div></div></div></section>
+          <section id="userDetailPanelAiUsage" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabAiUsage" hidden><div class="ops-panel"><div id="userDetailAiUsageView" class="nn-user-detail-panel__content"><div class="ops-empty">加载用户后显示 AI 使用概览。</div></div></div></section>
+          <section id="userDetailPanelImages" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabImages" hidden><div class="ops-panel"><div id="userDetailImagesView" class="nn-user-detail-panel__content"><div class="ops-empty">加载用户后显示图片资产概览。</div></div></div></section>
+          <section id="userDetailPanelFeedback" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabFeedback" hidden><div class="ops-panel"><div id="userDetailFeedbackView" class="nn-user-detail-panel__content"><div class="ops-empty">加载用户后显示反馈记录。</div></div></div></section>
+          <section id="userDetailPanelModeration" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabModeration" hidden><div class="ops-panel"><div id="userDetailModerationView" class="nn-user-detail-panel__content"><div class="ops-empty">加载用户后显示内容安全记录。</div></div></div></section>
+          <section id="userDetailPanelDeletion" class="nn-user-detail-tab-panel" role="tabpanel" aria-labelledby="userDetailTabDeletion" hidden><div class="ops-panel"><div id="userDetailDeletionView" class="nn-user-detail-panel__content"><div class="ops-empty">加载用户后显示删除记录。</div></div></div></section>
         </section>
 
         <section id="moduleSystem" class="admin-module" hidden>
@@ -2395,6 +2446,7 @@
       { key: "meal_analysis", label: "餐食分析", capability: "text" },
       { key: "meal_evaluation", label: "餐食评价", capability: "text" },
       { key: "meal_insight", label: "餐食洞察", capability: "text" },
+      { key: "food_insight", label: "食材洞察", capability: "text" },
       { key: "food_query_translation", label: "食材检索翻译", capability: "text" },
       { key: "daily_tip", label: "每日小贴士", capability: "text" },
       { key: "proactive_daily_brief", label: "NOVA 每日提醒", capability: "text" },
@@ -2632,7 +2684,7 @@
       try {
         const data = await api("/audit-logs?resourceType=ai_model_config&limit=50");
         const items = data.items || data.logs || [];
-        host.innerHTML = items.length ? `<table><thead><tr><th>时间</th><th>操作</th><th>结果</th><th>模型</th></tr></thead><tbody>${items.map((item) => { const resourceId = item.resourceId || item.resource_id || ""; const model = aiModelState.items.find((entry) => entry.id === resourceId); const label = model ? `${aiModelLabel(model)} · ${model.providerKey}` : "模型配置"; return `<tr><td>${escapeHtml(formatTime(item.createdAt || item.created_at || item.at))}</td><td>${escapeHtml(item.action || "—")}</td><td>${escapeHtml(item.outcome || "—")}</td><td><strong>${escapeHtml(label)}</strong><small class="muted">记录编号 ${escapeHtml(shortId(resourceId))}</small></td></tr>`; }).join("")}</tbody></table>` : '<p class="muted" style="padding:18px">暂无切换记录</p>';
+        host.innerHTML = items.length ? `<table><thead><tr><th>时间</th><th>操作</th><th>结果</th><th>模型</th></tr></thead><tbody>${items.map((item) => { const resourceId = item.resourceId || item.resource_id || ""; const model = aiModelState.items.find((entry) => entry.id === resourceId); const label = model ? `${aiModelLabel(model)} · ${model.providerKey}` : "模型配置"; const result = item.result || item.outcome || item.status || "—"; const resultLabel = ({ succeeded: "成功", failed: "失败", rejected: "已拒绝" })[result] || result; return `<tr><td>${escapeHtml(formatTime(item.createdAt || item.created_at || item.at))}</td><td>${escapeHtml(item.action || "—")}</td><td><span class="ops-status-pill ${opsTone(result)}">${escapeHtml(resultLabel)}</span></td><td><strong>${escapeHtml(label)}</strong><small class="muted">记录编号 ${escapeHtml(shortId(resourceId))}</small></td></tr>`; }).join("")}</tbody></table>` : '<p class="muted" style="padding:18px">暂无切换记录</p>';
       } catch (error) { host.innerHTML = `<div class="ops-empty"><p>${escapeHtml(apiErrorMessage(error))}</p><button class="button secondary" type="button" data-retry-ai-history>重新加载</button></div>`; host.querySelector("[data-retry-ai-history]")?.addEventListener("click", () => loadAiModelHistory()); }
     }
     async function loadAiModelConfigs() {
@@ -3187,9 +3239,25 @@
         };
       });
     }
+    function userDetailMetric(label, value, note = "") { return `<div class="nn-user-detail-data-card"><strong>${escapeHtml(label)}</strong><b>${escapeHtml(value ?? 0)}</b>${note ? `<span>${escapeHtml(note)}</span>` : ""}</div>`; }
+    function userDetailTable(title, headers, rows, empty = "暂无记录") {
+      const body = rows.length ? `<table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>` : `<div class="ops-empty" style="min-height:120px">${escapeHtml(empty)}</div>`;
+      return `<div class="nn-user-detail-panel__heading"><h3>${escapeHtml(title)}</h3></div><div class="nn-user-detail-panel__table">${body}</div>`;
+    }
+    function renderUserDetailPanels(data) {
+      const meals = data?.meals || {}; const aiUsage = data?.aiUsage || {}; const images = data?.images || {};
+      const feedback = data?.feedback || {}; const moderation = data?.moderation || {}; const deletion = data?.deletion || {};
+      $("userDetailMealsView").innerHTML = `<div class="nn-user-detail-data-grid">${userDetailMetric("餐食记录", meals.count ?? 0, `最近记录 ${formatTime(meals.lastRecordedAt)}`)}</div><p class="muted" style="margin-top:12px">当前接口提供餐食数量和最近记录时间；详细餐食字段将在接入餐食明细接口后展示。</p>`;
+      $("userDetailAiUsageView").innerHTML = `<div class="nn-user-detail-data-grid">${userDetailMetric("视觉识别", aiUsage.visionCount ?? 0)}${userDetailMetric("营养教练", aiUsage.coachMessageCount ?? 0)}${userDetailMetric("Trace 记录", aiUsage.totalTraceCount ?? 0)}</div><p class="muted" style="margin-top:12px">Provider：${escapeHtml((aiUsage.providers || []).join("、") || "暂无记录")} · 最近使用 ${escapeHtml(formatTime(aiUsage.lastAt))}</p>`;
+      $("userDetailImagesView").innerHTML = `<div class="nn-user-detail-data-grid">${userDetailMetric("图片资产", images.count ?? 0)}${userDetailMetric("已就绪", images.readyCount ?? 0)}${userDetailMetric("最近上传", formatTime(images.lastAt))}</div>`;
+      $("userDetailFeedbackView").innerHTML = userDetailTable("反馈记录", ["分类", "状态", "提交时间"], (feedback.items || []).map((item) => `<tr><td>${escapeHtml(item.category || "—")}</td><td>${escapeHtml(item.status || "—")}</td><td>${escapeHtml(formatTime(item.createdAt))}</td></tr>`));
+      $("userDetailModerationView").innerHTML = userDetailTable("内容安全记录", ["来源", "状态", "创建时间", "复核时间"], (moderation.items || []).map((item) => `<tr><td>${escapeHtml(item.source || "—")}</td><td>${escapeHtml(item.status || "—")}</td><td>${escapeHtml(formatTime(item.createdAt))}</td><td>${escapeHtml(formatTime(item.reviewedAt))}</td></tr>`));
+      $("userDetailDeletionView").innerHTML = userDetailTable("删除记录", ["结果", "错误码", "时间"], (deletion.items || []).map((item) => `<tr><td>${escapeHtml(item.outcome || "—")}</td><td>${escapeHtml(item.errorCode || "—")}</td><td>${escapeHtml(formatTime(item.createdAt))}</td></tr>`));
+    }
     function renderUserDetail(data) {
       const profile = data?.profile || {}; const overview = data?.overview || {};
       $("userDetailSummary").innerHTML = `<div class="ops-user-summary"><div><span class="eyebrow">USER DETAIL</span><h3>${escapeHtml(profile.nickname || data.id)}</h3><code>${escapeHtml(data.id)}</code></div><div class="ops-window-grid">${[["餐食", overview.mealsCount], ["AI 使用", overview.aiUsageCount], ["图片", overview.imageCount], ["反馈", overview.feedbackCount], ["内容安全", overview.moderationCount], ["删除记录", overview.deletionCount]].map(([label, value]) => `<span>${label}<b>${escapeHtml(value ?? 0)}</b></span>`).join("")}</div></div><p class="muted">注册 ${escapeHtml(formatTime(profile.createdAt))} · 最近活跃 ${escapeHtml(formatTime(profile.lastActiveAt))}</p>`;
+      renderUserDetailPanels(data);
     }
     function renderUserTimeline(data) {
       const host = $("userTimeline"); const items = data?.items || [];

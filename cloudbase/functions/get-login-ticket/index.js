@@ -16,8 +16,7 @@ const {
 const { createInsightDataService } = require("./insight-data-service.cjs");
 const { createDailyInsightService } = require("./daily-insight-service.cjs");
 const { createDeepseekWeeklyReviewService } = require("./deepseek-weekly-review-service.cjs");
-const { createFoodInsightService } = require("./food-insight-service.cjs");
-const { createNutritionInsightWorkerClient } = require("./nutrition-insight-worker-client.cjs");
+const { createFoodInsightService, createRoutedFoodInsightCompletion } = require("./food-insight-service.cjs");
 const { createDeepseekCoachService, createDeepseekCoachStreamService } = require("./deepseek-coach-service.cjs");
 const { createDailyTipService } = require("./daily-tip-service.cjs");
 const { createProactiveDailyBriefService } = require("./proactive-daily-brief-service.cjs");
@@ -460,6 +459,12 @@ function buildModelCatalog({ env = process.env, vision = null, hunyuanModel = nu
     {
       feature: "meal_insight",
       featureLabel: "餐食洞察",
+      provider: "deepseek",
+      model: resolvedDeepseek,
+    },
+    {
+      feature: "food_insight",
+      featureLabel: "食材洞察",
       provider: "deepseek",
       model: resolvedDeepseek,
     },
@@ -927,28 +932,15 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     },
     createTemporaryUrl: getTemporaryUrl,
   });
-  const configuredTextWorkerEndpoint = typeof env.AI_TEXT_WORKER_ENDPOINT === "string" ? env.AI_TEXT_WORKER_ENDPOINT.trim() : "";
-  const textWorkerEndpoint = configuredTextWorkerEndpoint || (workerEndpoint.endsWith("/generate")
-    ? `${workerEndpoint.slice(0, -"/generate".length)}/nutrition-insight`
-    : "");
-  const textWorkerSecret = (typeof env.AI_TEXT_WORKER_SHARED_SECRET === "string" ? env.AI_TEXT_WORKER_SHARED_SECRET.trim() : "")
-    || (typeof env.AI_WORKER_SHARED_SECRET === "string" ? env.AI_WORKER_SHARED_SECRET.trim() : "");
-  const devTextModel = typeof env.HY_TEXT_MODEL === "string" && env.HY_TEXT_MODEL.trim()
-    ? env.HY_TEXT_MODEL.trim()
-    : "hunyuan-2.0-instruct-20251111";
-  const nutritionInsightWorkerClientFactory = dependencies.nutritionInsightWorkerClientFactory ?? createNutritionInsightWorkerClient;
-  let nutritionContentWorker = null;
-  if (textWorkerEndpoint && textWorkerSecret) {
-    try {
-      nutritionContentWorker = nutritionInsightWorkerClientFactory({
-        endpoint: textWorkerEndpoint,
-        sharedSecret: textWorkerSecret,
-        timeoutMs: Number(env.AI_TEXT_WORKER_TIMEOUT_MS) || 30000,
-      });
-    } catch (error) {
-      console.error("[nutrition-content] dev worker configuration failed:", error?.code || error?.message || error);
-    }
-  }
+  const generateFoodInsightRouted = createFeatureInvoker({
+    feature: "food_insight",
+    createService: ({ apiKey, model, fetchImpl, route }) => createRoutedFoodInsightCompletion({
+      apiKey,
+      model,
+      fetchImpl,
+      route,
+    }),
+  });
   const generateMealInsightRouted = createFeatureInvoker({
     feature: "meal_insight",
     createService: createDeepseekMealInsightService,
@@ -1112,23 +1104,20 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   // separate is_admin DB gate so operators no longer need a promoted WeChat user.
   foodRepository.isAdmin = async () => true;
   const foodInsight = createFoodInsightService({
-    requestCompletion: nutritionContentWorker
-      ? async (context) => {
-        const result = await nutritionContentWorker.generateInsight(context);
-        if (result?.model) {
-          recordModelUsage(opsRef.observability, {
-            model: result.model,
-            feature: "food_insight",
-            provider: "hunyuan",
-            usage: result.usage || null,
-            requests: 1,
-          }).catch(() => {});
-        }
-        return result;
+    requestCompletion: async (context) => {
+      const result = await generateFoodInsightRouted(context);
+      if (result?.model) {
+        recordModelUsage(opsRef.observability, {
+          model: result.model,
+          feature: "food_insight",
+          provider: result.provider || result.source || null,
+          usage: result.usage || null,
+          requests: 1,
+        }).catch(() => {});
       }
-      : null,
-    model: devTextModel,
-    source: "hunyuan-exp",
+      return result;
+    },
+    source: "rule_v1",
     db,
   });
   const usdaService = typeof env.USDA_FDC_API_KEY === "string" && env.USDA_FDC_API_KEY.trim()

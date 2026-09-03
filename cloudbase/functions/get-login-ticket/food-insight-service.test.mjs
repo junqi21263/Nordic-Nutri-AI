@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createFoodInsightService } from "./food-insight-service.cjs";
+import { createFoodInsightService, createRoutedFoodInsightCompletion } from "./food-insight-service.cjs";
 
 const food = {
   id: "11111111-2222-4333-8444-555555555555",
@@ -59,6 +59,47 @@ test("falls back to a fact-based food introduction when the model response is in
   assert.equal(insight.model, null);
   assert.match(insight.content, /鸡胸肉/);
   assert.match(insight.content, /19\.3g/);
+});
+
+test("uses the configured provider and model for food insight completion", async () => {
+  let request;
+  const completion = createRoutedFoodInsightCompletion({
+    apiKey: "provider-key",
+    model: "configured-food-insight-model",
+    route: {
+      providerKey: "sensenova",
+      modelKey: "configured-food-insight-model",
+      endpoint: "https://provider.example/v1/chat/completions",
+    },
+    fetchImpl: async (_url, init) => {
+      request = JSON.parse(init.body);
+      return {
+        ok: true,
+        async json() {
+          return {
+            choices: [{ message: { content: JSON.stringify({
+              headline: "鸡胸肉的蛋白质优势",
+              content: "每100g约含19.3g蛋白质，适合搭配蔬菜和主食。",
+            }) } }],
+            usage: { total_tokens: 42 },
+          };
+        },
+      };
+    },
+  });
+  const service = createFoodInsightService({
+    requestCompletion: completion,
+    source: "sensenova",
+    model: "configured-food-insight-model",
+  });
+
+  const insight = await service.getInsight(food);
+
+  assert.equal(insight.source, "sensenova");
+  assert.equal(insight.model, "configured-food-insight-model");
+  assert.equal(request.model, "configured-food-insight-model");
+  assert.equal(request.messages[0].role, "system");
+  assert.match(request.messages[1].content, /鸡胸肉/);
 });
 
 test("preserves the dev worker model metadata for a valid delegated completion", async () => {

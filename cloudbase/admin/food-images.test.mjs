@@ -670,3 +670,32 @@ test("AI workspaces and provider status keep routing, quota, history, and secret
   assert.match(source, /未配置/);
   assert.doesNotMatch(source, /Key：[^<\n]+/);
 });
+
+test("admin detail views expose user activity data instead of placeholder panels", async () => {
+  const source = await pageSource();
+  for (const panel of ["Meals", "AiUsage", "Images", "Feedback", "Moderation", "Deletion"]) {
+    assert.match(source, new RegExp(`id=\"userDetailPanel${panel}\"`));
+  }
+  assert.doesNotMatch(source, /userDetailPanelMeals[\\s\\S]*?该视图暂未提供/);
+  assert.match(source, /function renderUserDetailPanels\(/);
+  assert.match(source, /data\?\.meals/);
+  assert.match(source, /data\?\.aiUsage/);
+});
+
+test("admin quota and food filters keep the requested compact desktop layout", async () => {
+  const source = await pageSource();
+  assert.match(source, /class=\"module-toolbar quota-toolbar\"/);
+  assert.match(source, /class=\"quota-toolbar__range\"/);
+  assert.match(source, /class=\"ops-panel__head ai-model-parameters-head\"/);
+  assert.match(source, /class=\"nn-filter-bar nn-status-filter nn-food-filter-bar\"/);
+  assert.match(source, /nn-food-filter-bar \{ flex-wrap: nowrap; \}/);
+  assert.match(source, /food-admin-toggle input\[type=\"checkbox\"\] \{ width: 16px; min-width: 16px; height: 16px/);
+  assert.match(source, /quota-data-note \{ display: none; \}/);
+  assert.match(source, /\.ai-feature-route-row__name small \{ display: none; \}/);
+  assert.match(source, /\.ops-panel__head \{ display: flex;/);
+});
+
+test("AI switch history renders the API result field", async () => {
+  const source = await pageSource();
+  assert.match(source, /item\.result \|\| item\.outcome/);
+});

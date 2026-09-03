@@ -14,6 +14,7 @@ const FEATURE_CAPABILITIES = Object.freeze({
   meal_analysis: "text",
   meal_evaluation: "text",
   meal_insight: "text",
+  food_insight: "text",
   food_query_translation: "text",
   food_recognition: "vision",
   food_image_generation: "image_generation",

@@ -111,6 +111,27 @@ test("persists inferred feature capabilities when an existing model route is sav
   assert.deepEqual(written.metadata.capabilities, ["text"]);
 });
 
+test("records successful model saves with the shared audit result field", async () => {
+  let auditInput = null;
+  const db = {
+    from() {
+      return {
+        insert(row) { return { select: () => ({ single: async () => ({ data: { id: "model-1", ...row }, error: null }) }) }; },
+      };
+    },
+  };
+  const service = createAiModelConfigService({
+    db,
+    env: { CUSTOM_API_KEY: "configured" },
+    isAdmin: async () => true,
+    getCredentialStatus: async () => "PRESENT",
+    audit: { record: async (input) => { auditInput = input; } },
+  });
+  await service.createModel("operator", { ...base, applications: ["coach"] });
+  assert.equal(auditInput.result, "succeeded");
+  assert.equal("outcome" in auditInput, false);
+});
+
 test("keeps only supported model capabilities in safe model metadata", () => {
   const result = normalizeAiModelConfig({
     ...base,

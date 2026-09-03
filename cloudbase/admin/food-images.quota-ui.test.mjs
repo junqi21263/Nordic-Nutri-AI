@@ -7,7 +7,7 @@ const pagePath = new URL("./food-images.html", import.meta.url);
 test("quota workspace combines personal limits with provider/model routes", async () => {
   const source = await readFile(pagePath, "utf8");
   assert.match(source, /id="quotaUpdatedAt"/);
-  assert.match(source, /厂商真实账单\/剩余额度暂未接入/);
+  assert.match(source, /quota-data-note \{ display: none; \}/);
   assert.match(source, /data-open-provider=/);
   assert.match(source, /当前模型路由 \/ 厂商额度来源/);
   assert.match(source, /id="featureUserQuotaBoard"/);

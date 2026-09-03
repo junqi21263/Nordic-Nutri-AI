@@ -243,7 +243,7 @@ function createAiModelConfigService({ db, env = process.env, isAdmin = async () 
       applications: config.applications,
       credentialStatus: await getCredentialStatus(config.providerKey),
     });
-    if (audit?.record) await audit.record({ actorUserId, action: modelId ? "ai_model.update" : "ai_model.create", resourceType: "ai_model_config", resourceId: saved.id, outcome: "succeeded" });
+    if (audit?.record) await audit.record({ actorUserId, action: modelId ? "ai_model.update" : "ai_model.create", resourceType: "ai_model_config", resourceId: saved.id, result: "succeeded" });
     return saved;
   }
   async function deleteModel(actorUserId, modelId) {

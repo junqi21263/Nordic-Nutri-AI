@@ -115,6 +115,31 @@ function createCloudbaseFoodInsightCompletion({ ai, model, groupName = "cloudbas
   };
 }
 
+function createRoutedFoodInsightCompletion({ apiKey, model, fetchImpl, route = {} } = {}) {
+  const { createTextModelAdapter } = require("./text-model-adapter-registry.cjs");
+  const adapter = createTextModelAdapter({
+    ...route,
+    credential: apiKey,
+    modelKey: model || route.modelKey,
+  }, { fetchImpl });
+  return async (context) => {
+    const response = await adapter.complete({
+      temperature: 0.45,
+      maxTokens: 256,
+      messages: [
+        { role: "system", content: FOOD_INSIGHT_SYSTEM_PROMPT },
+        { role: "user", content: JSON.stringify({ foodContext: context }) },
+      ],
+    });
+    return {
+      content: response.content,
+      usage: response.usage,
+      source: response.provider,
+      model: response.model,
+    };
+  };
+}
+
 function unwrapCompletionPayload(raw) {
   if (typeof raw === "string") return { content: raw, usage: null, source: null, model: null };
   if (!raw || typeof raw !== "object") return { content: null, usage: null, source: null, model: null };
@@ -156,9 +181,8 @@ function createFoodInsightService({ ai, model, requestCompletion, source = "clou
 
   async function writeCachedInsight(foodId, contextHash, insight) {
     if (!db || typeof db.from !== "function" || typeof foodId !== "string" || !foodId) return;
-    const provider = ["cloudbase", "deepseek", "hunyuan-exp", "rule_v1"].includes(insight?.source)
-      ? insight.source
-      : "rule_v1";
+    const source = typeof insight?.source === "string" ? insight.source.trim() : "";
+    const provider = /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(source) ? source : "rule_v1";
     const persisted = await db.from("food_nutrition_insights").upsert({
       food_id: foodId,
       context_hash: contextHash,
@@ -235,6 +259,7 @@ function createFoodInsightService({ ai, model, requestCompletion, source = "clou
 module.exports = {
   FOOD_INSIGHT_SYSTEM_PROMPT,
   createCloudbaseFoodInsightCompletion,
+  createRoutedFoodInsightCompletion,
   createFoodInsightService,
   createRuleFoodInsight,
   foodInsightContext,
