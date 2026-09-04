@@ -42,4 +42,26 @@ describe("Android auth API", () => {
       captchaAnswer: "efgh",
     });
   });
+
+  it("routes phone password auth and Google credential auth to the Android endpoints", async () => {
+    const request = vi.fn().mockResolvedValue({ user: { id: "u1" }, session: { accessToken: "token" } });
+    const api = createAndroidAuthApi({ request });
+
+    await api.sendPhoneCode({ phone: "+8613800138000", captchaId: "c1", captchaAnswer: "abcd" });
+    await api.loginPhone({ phone: "+8613800138000", password: "password", captchaId: "c2", captchaAnswer: "efgh" });
+    await api.loginGoogle("google-id-token");
+
+    expect(request).toHaveBeenNthCalledWith(1, "/auth/register/phone/send-code", {
+      phone: "+8613800138000",
+      captchaId: "c1",
+      captchaAnswer: "abcd",
+    });
+    expect(request).toHaveBeenNthCalledWith(2, "/auth/login/phone", {
+      phone: "+8613800138000",
+      password: "password",
+      captchaId: "c2",
+      captchaAnswer: "efgh",
+    });
+    expect(request).toHaveBeenNthCalledWith(3, "/auth/login/google", { idToken: "google-id-token" });
+  });
 });

@@ -18,8 +18,10 @@ function createRepo(clock = () => 1_700_000_000_000) {
       return row;
     },
     async findUserByEmail(email) { return this.users.find((user) => user.email_normalized === email) ?? null; },
+    async findUserByPhone(phone) { return this.users.find((user) => user.phone_e164 === phone) ?? null; },
+    async findUserByGoogleSub(sub) { return this.users.find((user) => user.google_sub === sub) ?? null; },
     async findUserById(id) { return this.users.find((user) => user.id === id) ?? null; },
-    async insertUser(user) { const created = { id: `user-${this.users.length + 1}`, token_version: 1, ...user }; this.users.push(created); return created; },
+    async insertUser(user) { const created = { id: `user-${this.users.length + 1}`, status: "active", token_version: 1, ...user }; this.users.push(created); return created; },
     async updatePassword(userId, passwordHash) { const user = this.users.find((item) => item.id === userId); user.password_hash = passwordHash; user.token_version += 1; return user; },
   };
   return repo;
@@ -162,4 +164,49 @@ test("reports an expired OTP separately from an invalid OTP", async () => {
     () => service.resetPassword({ email: "user@example.com", code: "123456", password: "newpass8" }),
     (error) => error.code === "AUTH_OTP_EXPIRED",
   );
+});
+
+test("registers and logs in a phone account with SMS OTP and password", async () => {
+  const repo = createRepo();
+  const sent = [];
+  const service = createService(repo, {
+    random: () => 0.123456,
+    sendSms: async (phone, code) => sent.push({ phone, code }),
+  });
+
+  await service.sendVerificationCode({ targetType: "phone", target: "+8613800138000", purpose: "register", captchaId: "c1", captchaAnswer: "ok" });
+  assert.deepEqual(sent, [{ phone: "+8613800138000", code: "123456" }]);
+  const created = await service.registerPhone({ phone: "+86 13800138000", code: "123456", password: "password" });
+  assert.equal(created.user.id, "user-1");
+  assert.equal(repo.users[0].phone_e164, "+8613800138000");
+
+  const login = await service.loginPhone({ phone: "+8613800138000", password: "password", captchaId: "c1", captchaAnswer: "ok" });
+  assert.equal(login.user.id, "user-1");
+});
+
+test("fails closed when the SMS provider is not configured", async () => {
+  const repo = createRepo();
+  const service = createService(repo);
+  await assert.rejects(
+    () => service.sendVerificationCode({ targetType: "phone", target: "+8613800138000", purpose: "register", captchaId: "c1", captchaAnswer: "ok" }),
+    (error) => error.code === "AUTH_PROVIDER_UNAVAILABLE",
+  );
+  assert.equal(repo.verification.length, 0);
+});
+
+test("creates a new Google account and rejects automatic email merging", async () => {
+  const repo = createRepo();
+  const service = createService(repo, {
+    verifyGoogleToken: async () => ({ sub: "google-sub-1", email: "google@example.com", email_verified: true }),
+  });
+
+  const created = await service.loginGoogle({ idToken: "google-id-token" });
+  assert.equal(created.user.id, "user-1");
+  assert.equal(repo.users[0].google_sub, "google-sub-1");
+
+  repo.users.push({ id: "user-email", email_normalized: "existing@example.com", status: "active", token_version: 1, password_hash: "argon2id:password" });
+  const conflictService = createService(repo, {
+    verifyGoogleToken: async () => ({ sub: "google-sub-2", email: "existing@example.com", email_verified: true }),
+  });
+  await assert.rejects(() => conflictService.loginGoogle({ idToken: "google-id-token" }), (error) => error.code === "AUTH_EMAIL_ALREADY_REGISTERED");
 });

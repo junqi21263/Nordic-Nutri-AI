@@ -16,3 +16,4 @@ const configuredApiBaseUrl = resolveProductApiBaseUrl({
 });
 
 export const productApiEndpoint = `${configuredApiBaseUrl}/get-login-ticket`;
+export const googleServerClientId = process.env.TARO_APP_GOOGLE_SERVER_CLIENT_ID ?? "";

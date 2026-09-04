@@ -65,15 +65,28 @@ function createApi(request: AndroidAuthRequest) {
       request("/auth/register/email/send-code", input),
     registerEmail: (input: { email: string; code: string; password: string }) =>
       request("/auth/register/email", input),
+    sendPhoneCode: (input: { phone: string; captchaId: string; captchaAnswer: string }) =>
+      request("/auth/register/phone/send-code", input),
+    registerPhone: (input: { phone: string; code: string; password: string }) =>
+      request("/auth/register/phone", input),
     loginEmail: (input: {
       email: string;
       password: string;
       captchaId: string;
       captchaAnswer: string;
     }) => request("/auth/login/email", input),
+    loginPhone: (input: {
+      phone: string;
+      password: string;
+      captchaId: string;
+      captchaAnswer: string;
+    }) => request("/auth/login/phone", input),
+    loginGoogle: (idToken: string) => request("/auth/login/google", { idToken }),
     forgotEmail: (input: { email: string; captchaId: string; captchaAnswer: string }) =>
       request("/auth/password/forgot/email", input),
-    resetPassword: (input: { email: string; code: string; password: string }) =>
+    forgotPhone: (input: { phone: string; captchaId: string; captchaAnswer: string }) =>
+      request("/auth/password/forgot/phone", input),
+    resetPassword: (input: { targetType?: "email" | "phone"; email?: string; phone?: string; code: string; password: string }) =>
       request("/auth/password/reset", input),
     getMe: () => request("/auth/me", undefined, "GET"),
   };

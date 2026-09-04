@@ -15,5 +15,6 @@ test("simplified Android auth migration keeps one user table and one verificatio
   assert.match(sql, /add column if not exists password_changed_at/);
   assert.match(sql, /create or replace function public\.consume_auth_verification_code/);
   assert.doesNotMatch(sql, /user_identities|auth_sessions|session_family/i);
-  assert.doesNotMatch(sql, /phone_e164|google_sub/i);
+  assert.match(sql, /phone_e164/);
+  assert.match(sql, /google_sub/);
 });

@@ -4,7 +4,10 @@ alter table public.app_users
   add column if not exists email text,
   add column if not exists email_normalized text,
   add column if not exists email_verified_at timestamptz,
+  add column if not exists phone_e164 text,
+  add column if not exists phone_verified_at timestamptz,
   add column if not exists password_hash text,
+  add column if not exists google_sub text,
   add column if not exists created_platform text not null default 'wechat_mini_program',
   add column if not exists token_version integer not null default 1,
   add column if not exists password_changed_at timestamptz;
@@ -24,6 +27,14 @@ end $$;
 create unique index if not exists app_users_email_normalized_uidx
   on public.app_users (email_normalized)
   where email_normalized is not null;
+
+create unique index if not exists app_users_phone_e164_uidx
+  on public.app_users (phone_e164)
+  where phone_e164 is not null;
+
+create unique index if not exists app_users_google_sub_uidx
+  on public.app_users (google_sub)
+  where google_sub is not null;
 
 create table if not exists public.auth_verification_codes (
   id uuid primary key default gen_random_uuid(),
@@ -140,3 +151,6 @@ grant execute on function public.update_app_user_password(uuid, text)
 -- alter table public.app_users drop column if exists email_verified_at;
 -- alter table public.app_users drop column if exists email_normalized;
 -- alter table public.app_users drop column if exists email;
+-- alter table public.app_users drop column if exists google_sub;
+-- alter table public.app_users drop column if exists phone_verified_at;
+-- alter table public.app_users drop column if exists phone_e164;

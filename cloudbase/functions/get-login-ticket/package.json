@@ -10,6 +10,7 @@
     "@cloudbase/js-sdk": "3.6.3",
     "@cloudbase/node-sdk": "^3.18.3",
     "argon2": "0.41.1",
+    "google-auth-library": "^9.15.1",
     "sharp": "0.32.6",
     "svg-captcha": "1.4.0",
     "ws": "8.18.3"
