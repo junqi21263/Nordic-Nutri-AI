@@ -20,7 +20,7 @@ describe("privacy policy and disclaimer", () => {
       "收集的信息",
       "使用目的",
       "存储与保留",
-      "AI 处理",
+      "智能处理",
       "你的权利",
       "注销 Nordic Nutri AI 产品账号",
       "不影响你的微信账号",

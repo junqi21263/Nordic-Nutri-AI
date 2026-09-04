@@ -336,7 +336,7 @@ export default function FoodDetailPage() {
             <NordicIcon name="nova" size={20} ariaLabel="营养洞察" />
           </View>
           <View>
-            <Text className="food-detail-page__insight-title">NOVA AI · 营养洞察</Text>
+            <Text className="food-detail-page__insight-title">NOVA · 营养洞察</Text>
             {insight?.headline ? <Text className="food-detail-page__insight-headline">{insight.headline}</Text> : null}
             <Text className="food-detail-page__insight-copy">
               {insightLoading ? "NOVA 正在根据这份食物的真实营养数据生成介绍…" : (insight?.content ?? "云端洞察暂时不可用，请稍后重试。")}

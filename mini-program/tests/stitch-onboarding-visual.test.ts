@@ -15,7 +15,7 @@ describe("Stitch onboarding visual contract", () => {
   it("uses localized Stitch copy and a vertical goal-card structure", () => {
     [
       "你的目标是什么？",
-      "AI 将根据你的目标，为你制定个性化营养计划。",
+      "我们将根据你的目标，为你制定个性化营养计划。",
       "增益增肌",
       "轻盈减脂",
       "保持状态",

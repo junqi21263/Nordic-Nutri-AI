@@ -162,7 +162,7 @@ export default function DietPreferencesPage() {
           <Text className="onboarding-heading__copy">
             {fromSettings
               ? "习惯、忌口与餐次变化后，下一步会按新偏好重算营养目标。"
-              : "告诉我们你的饮食习惯与限制，AI 会据此调整每日推荐。"}
+              : "告诉我们你的饮食习惯与限制，我们会据此调整每日推荐。"}
           </Text>
           </View>
 

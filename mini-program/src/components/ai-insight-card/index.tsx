@@ -15,7 +15,7 @@ export interface AIInsightCardProps {
 export function AIInsightCard({
   className = "",
   motionLayer,
-  label = "NOVA AI 洞察",
+  label = "NOVA 洞察",
   headline,
   content,
   loading = false,

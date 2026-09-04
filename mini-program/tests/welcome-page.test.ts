@@ -19,7 +19,7 @@ describe("first-time welcome page", () => {
     expect(page).toContain("markWelcomeSeen");
     expect(page).toContain("startApplicationAuth");
     expect(page).toContain("拍一餐，营养心中有数");
-    expect(page).toContain("AI 读懂餐盘里的食材与热量");
+    expect(page).toContain("读懂餐盘里的食材与热量");
     expect(page).toContain("陪你慢慢养成好习惯");
     expect(page).toContain('{"\\n"}');
     expect(page).not.toContain("看清今天吃得怎么样");

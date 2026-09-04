@@ -419,7 +419,7 @@ export default function NutritionPlanPage() {
         <View className={`nutrition-plan__insight ${
           shouldPreparePlanReady ? "nutrition-plan__reveal-item nutrition-plan__reveal-item--insight" : ""
         }`}>
-          <Text className="nutrition-plan__insight-label">AI INSIGHT</Text>
+          <Text className="nutrition-plan__insight-label">营养洞察</Text>
           <Text className="nutrition-plan__insight-copy">{activePlan.insight}</Text>
         </View>
 
