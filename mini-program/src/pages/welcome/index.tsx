@@ -50,7 +50,7 @@ export default function WelcomePage() {
           <Text className="welcome-page__brand">Nordic Nutri</Text>
           <Text className="welcome-page__title">拍一餐，营养心中有数</Text>
           <Text className="welcome-page__subtitle">
-            AI 读懂餐盘里的食材与热量，{"\n"}陪你慢慢养成好习惯
+            读懂餐盘里的食材与热量，{"\n"}陪你慢慢养成好习惯
           </Text>
         </View>
         <View className="welcome-page__actions">

@@ -78,7 +78,7 @@ export function AppNavbar({
             <Text className="onboarding-brand">{title}</Text>
           ) : (
             <View className="app-navbar__title-line">
-              {variant === "nova" ? <NordicIcon name="nova" size={18} ariaLabel="NOVA AI" /> : null}
+              {variant === "nova" ? <NordicIcon name="nova" size={18} ariaLabel="NOVA 洞察" /> : null}
               <Text className="app-navbar__title">{title}</Text>
             </View>
           )}

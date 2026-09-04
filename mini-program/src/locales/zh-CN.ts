@@ -7,7 +7,7 @@ export const zhCN = {
     progressAriaLabel: "当前为第 1 步，共 4 步",
     backAriaLabel: "返回",
     title: "你的目标是什么？",
-    subtitle: "AI 将根据你的目标，为你制定个性化营养计划。",
+    subtitle: "我们将根据你的目标，为你制定个性化营养计划。",
     continue: "继续",
     goals: {
       muscle_gain: {

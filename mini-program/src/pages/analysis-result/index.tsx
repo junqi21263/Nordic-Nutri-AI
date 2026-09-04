@@ -255,7 +255,7 @@ export default function AnalysisResultPage() {
           </View>
           <View className="analysis-result-page__ai-status">
             <NordicIcon name="check" size={22} ariaLabel="分析完成" />
-            <Text>AI 完成</Text>
+            <Text>分析完成</Text>
           </View>
         </View>
 

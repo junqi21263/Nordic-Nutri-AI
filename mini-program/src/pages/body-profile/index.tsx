@@ -221,7 +221,7 @@ export default function BodyProfilePage() {
           <Text className="onboarding-heading__copy">
             {fromSettings
               ? "修改后可继续调整饮食偏好，并重新生成营养目标。"
-              : "这些信息将帮助 AI 为你制定更合适的营养计划。"}
+              : "这些信息将帮助我们为你制定更合适的营养计划。"}
           </Text>
         </View>
 
