@@ -110,6 +110,8 @@ describe("first-run tips", () => {
 
     expect(home).toContain('tipId="home-first-meal"');
     expect(home).toContain("去拍照");
+    expect(home).toContain("识别后还能改餐次和份量再保存");
+    expect(home).not.toContain("AI 识别后还能改餐次和份量再保存");
     expect(home).toContain('markFirstRunTipSeen("home-first-meal")');
     expect(scanner).toContain('tipId="scanner-capture"');
     expect(scanner).toContain("开始拍摄");
