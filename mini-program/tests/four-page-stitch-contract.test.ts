@@ -324,7 +324,7 @@ describe("four-page Stitch visual contract", () => {
     expect(styles).toContain("margin: 0 auto;");
     expect(read("pages/food-scanner/index.config.ts")).toContain("disableScroll: true");
     expect(source).not.toContain('className="food-scanner-page__page-title"');
-    expect(source).toContain("拍摄并 AI 分析");
+    expect(source).toContain("拍摄并分析");
     expect(source).not.toContain("拍摄并本地分析");
     expect(styles).toContain(".food-scanner-page__page-title");
     expect(source).toContain('className="scanner-primary-action"');

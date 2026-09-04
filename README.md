@@ -18,6 +18,10 @@ Nordic Nutri AI is a Taro + React WeChat Mini Program backed by a CloudBase HTTP
 4. All account, plan, meal, insight, coach, feedback and vision traffic goes through the same authenticated HTTPS boundary.
 5. Only the function uses the CloudBase PostgreSQL API key. The Mini Program never receives a database credential or AI provider key.
 
+Android Auth V1 uses the same HTTPS Function with `/auth/*` routes. It supports Google Credential Manager, email/password and phone/password. Email/SMS codes are used only for registration and password recovery. Android accounts use `public.app_users.id`, are marked with `created_platform=android_app`, and use a seven-day signed Bearer token invalidated by `token_version` changes. The existing WeChat login path remains separate.
+
+The Android shell must provide two small native bridges before device acceptance: `NordicGoogleCredentialManager.getIdToken()` for Google Credential Manager and `NordicSecureStorage.get/set/remove` for token persistence. The web/Taro layer does not contain Google or storage secrets and does not fall back to plain browser storage for Android tokens.
+
 ## Prerequisites
 
 - Node.js 24.18.x (see `.nvmrc`)
@@ -46,4 +50,4 @@ pnpm --dir mini-program verify:weapp
 
 ## Secrets
 
-Use CloudBase function environment variables for `WX_SECRET`, `CLOUDBASE_APIKEY`, session and hashing secrets, and AI provider keys. Never commit `.env` files, database credentials, access tokens, OpenID values or real user images.
+Use CloudBase function environment variables for `WX_SECRET`, `CLOUDBASE_APIKEY`, session/auth hashing secrets, Google verification configuration, Brevo/httpSMS provider keys and AI provider keys. Never commit `.env` files, database credentials, access tokens, OpenID values, OTP/CAPTCHA answers or real user images. Do not enable `ANDROID_AUTH_ENABLED` in production until the migration, provider delivery and Android-device gates are explicitly accepted.

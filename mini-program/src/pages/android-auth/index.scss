@@ -1,0 +1,58 @@
+.android-auth-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100vh;
+  padding: 56px 24px 32px;
+  background: #fbfaf7;
+  box-sizing: border-box;
+}
+
+.android-auth-page__brand {
+  color: #153f2b;
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.android-auth-page__tabs,
+.android-auth-page__links {
+  display: flex;
+  justify-content: space-between;
+  color: #69716b;
+}
+
+.android-auth-page__tabs .active {
+  color: #153f2b;
+  font-weight: 700;
+}
+
+.android-auth-page__input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid #dfe5df;
+  border-radius: 12px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.android-auth-page__captcha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.android-auth-page__captcha .android-auth-page__input {
+  flex: 1;
+}
+
+.android-auth-page__captcha image {
+  width: 110px;
+  height: 48px;
+  overflow: hidden;
+}
+
+.android-auth-page__error {
+  color: #b33a2b;
+}

@@ -30,9 +30,6 @@ Use the current repository conventions. The backend is CommonJS today, so provid
 - Modify `cloudbase/functions/get-login-ticket/index.js`
   - Read auth provider configuration, wire the four services, add the `/auth/*` routes, and connect the shared Bearer verifier to `token_version`.
   - Leave the existing WeChat code-exchange route and Mini Program behavior unchanged.
-- Modify `cloudbase/functions/get-login-ticket/product-session-service.cjs`
-  - Preserve its public module shape where existing tests depend on it.
-  - Add the V1 token payload fields `sub`, `ver`, `iat`, `exp` and verification of the user’s current `token_version`.
 - Modify `cloudbase/functions/get-login-ticket/product-session-auth.cjs`
   - Resolve the token subject to an active `app_users` row and reject a mismatched token version or non-active account.
 - Create `cloudbase/functions/get-login-ticket/auth.test.mjs`
@@ -40,7 +37,7 @@ Use the current repository conventions. The backend is CommonJS today, so provid
 - Create `cloudbase/functions/get-login-ticket/auth-routes.test.mjs`
   - Cover route contracts, stable error codes, generic login failures and provider failure behavior.
 - Modify `cloudbase/functions/get-login-ticket/package.json`
-  - Add the pinned runtime dependency `svg-captcha: 1.4.0`.
+  - Add the runtime dependencies `argon2: 0.41.1`, `google-auth-library: ^10.0.0` and `svg-captcha: 1.4.0`.
 
 ### Database files
 
@@ -109,7 +106,7 @@ create unique index app_users_google_sub_uidx on public.app_users (google_sub) w
 
 The migration must use the repository’s existing update timestamp trigger convention. Existing rows are backfilled as `wechat_mini_program`; the server, not the client, writes `android_app` for newly created Android users.
 
-Create one server-owned table, preferably `private.auth_verification_codes` to match the existing private auth/rate-limit convention. Reuse it for email/SMS OTP and locally generated SVG CAPTCHA challenges; this avoids a second CAPTCHA table because `svg-captcha` only generates the SVG/text pair and does not persist or verify challenges.
+Create one server-owned `public.auth_verification_codes` table. CloudBase’s current server-side RDB client uses the public schema boundary, so protect the table with RLS, revoked client grants and server-only security-definer RPCs. Reuse it for email/SMS OTP and locally generated SVG CAPTCHA challenges; this avoids a second CAPTCHA table because `svg-captcha` only generates the SVG/text pair and does not persist or verify challenges.
 
 ```sql
 id uuid primary key default gen_random_uuid(),

@@ -1,5 +1,6 @@
 import { type AppAuthSession, type AppAuthUser, useAuthStore } from "./auth-store";
 import { useAchievementStore } from "../stores/achievement-store";
+import { createSecureTokenStorage } from "../platform/secure-token-storage";
 
 let refreshInFlight: Promise<AppAuthSession | null> | null = null;
 
@@ -12,12 +13,24 @@ type NativeStorage = {
 };
 const nativeStorage = () => (globalThis as { wx?: NativeStorage }).wx;
 
+function sessionStorage() {
+  const secure = createSecureTokenStorage();
+  if (secure) return secure;
+  const native = nativeStorage();
+  if (!native) return null;
+  return {
+    getItem: (key: string) => native.getStorageSync(key) as string | null,
+    setItem: (key: string, value: string) => native.setStorageSync(key, value),
+    removeItem: (key: string) => native.removeStorageSync(key),
+  };
+}
+
 function persistSession(session: AppAuthSession | null) {
   try {
     if (session) {
-      nativeStorage()?.setStorageSync(sessionStorageKey, session);
+      sessionStorage()?.setItem(sessionStorageKey, JSON.stringify(session));
     } else {
-      nativeStorage()?.removeStorageSync(sessionStorageKey);
+      sessionStorage()?.removeItem(sessionStorageKey);
     }
   } catch {
     // Best-effort persistence
@@ -26,9 +39,10 @@ function persistSession(session: AppAuthSession | null) {
 
 function readPersistedSession(): AppAuthSession | null {
   try {
-    const stored = nativeStorage()?.getStorageSync(sessionStorageKey);
-    if (stored && typeof stored === "object" && "user" in stored && "accessToken" in stored) {
-      return stored as AppAuthSession;
+    const serialized = sessionStorage()?.getItem(sessionStorageKey);
+    if (serialized) {
+      const stored = typeof serialized === "string" ? JSON.parse(serialized) : serialized;
+      if (stored && typeof stored === "object" && "user" in stored && "accessToken" in stored) return stored as AppAuthSession;
     }
   } catch {
     // Best-effort read

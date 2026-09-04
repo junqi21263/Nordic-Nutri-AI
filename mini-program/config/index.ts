@@ -48,6 +48,7 @@ export default defineConfig({
   plugins: ["@tarojs/plugin-platform-weapp", "@tarojs/plugin-platform-h5"],
   defineConstants: {
     "process.env.TARO_APP_ENV": JSON.stringify(appEnvironment),
+    "process.env.TARO_APP_PLATFORM": JSON.stringify(process.env.TARO_APP_PLATFORM ?? "wechat"),
     "process.env.TARO_APP_ENABLE_REAL_AUTH": JSON.stringify(
       process.env.TARO_APP_ENABLE_REAL_AUTH ?? "false",
     ),

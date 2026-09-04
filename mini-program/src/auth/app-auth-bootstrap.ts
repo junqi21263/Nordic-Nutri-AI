@@ -22,11 +22,18 @@ import {
   restoreSession,
 } from "./session-manager";
 
+const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
+
 function openWelcomeIfNeeded() {
   const pages = Taro.getCurrentPages();
   const route = pages[pages.length - 1]?.route || "";
   if (route.includes("pages/welcome/index")) return Promise.resolve();
   return Taro.reLaunch({ url: "/pages/welcome/index" });
+}
+
+function openLoginPage() {
+  if (isAndroidApp) return Taro.reLaunch({ url: "/pages/android-auth/index" });
+  return Taro.reLaunch({ url: "/pages/auth-entry/index" });
 }
 
 async function loadIdentity(user: { id: string }) {
@@ -93,7 +100,7 @@ const authBootstrap = createAuthBootstrap({
   restore: restoreSession,
   getUser: getCurrentUser,
   refresh: refreshSession,
-  login: loginWithWechat,
+  login: isAndroidApp ? async () => null : loginWithWechat,
   loadIdentity,
   clear: clearInvalidSession,
 });
@@ -112,7 +119,7 @@ const applicationLaunch = createRuntimeApplicationLaunch(
     hasSeenWelcome,
     openHome: () => Taro.switchTab({ url: "/pages/home/index" }),
     openOnboarding: () => Taro.reLaunch({ url: "/pages/onboarding/index" }),
-    openLogin: () => Taro.reLaunch({ url: "/pages/auth-entry/index" }),
+    openLogin: openLoginPage,
     openWelcome: () => openWelcomeIfNeeded(),
   },
 );

@@ -36,6 +36,11 @@ const { createNutritionBackfillService } = require("./nutrition-backfill-service
 const { createProfileAvatarService, PublicProfileAvatarError, pickDefaultAvatarSentinel } = require("./profile-avatar-service.cjs");
 const { createAccountDeletionService, PublicAccountDeletionError } = require("./account-deletion-service.cjs");
 const { createProductUserExists, resolveProductSession } = require("./product-session-auth.cjs");
+const { createAuthRepository, createAuthService, createPasswordService } = require("./services/auth.cjs");
+const { createCaptchaService } = require("./services/captcha.cjs");
+const { createEmailService } = require("./services/email.cjs");
+const { createSmsService } = require("./services/sms.cjs");
+const { createGoogleVerifier } = require("./services/google.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
 const { getVisionQuotaPolicy } = require("./vision-quota-policy.cjs");
 const { createObservabilityService } = require("./observability-service.cjs");
@@ -339,6 +344,26 @@ function readRuntimeConfig(env) {
     throw new Error(`Login service configuration is incomplete: ${missing.join(", ")}`);
   }
 
+  const authConfig = [
+    "ANDROID_AUTH_ENABLED",
+    "AUTH_OTP_HMAC_SECRET",
+    "GOOGLE_OAUTH_SERVER_CLIENT_ID",
+    "BREVO_API_KEY",
+    "BREVO_SENDER_EMAIL",
+    "BREVO_SENDER_NAME",
+    "HTTPSMS_API_KEY",
+    "HTTPSMS_FROM_E164",
+  ].some((name) => env[name] !== undefined) ? {
+    authEnabled: env.ANDROID_AUTH_ENABLED === "true",
+    authHmacSecret: env.AUTH_OTP_HMAC_SECRET || "",
+    googleClientId: env.GOOGLE_OAUTH_SERVER_CLIENT_ID || "",
+    brevoApiKey: env.BREVO_API_KEY || "",
+    brevoSenderEmail: env.BREVO_SENDER_EMAIL || "",
+    brevoSenderName: env.BREVO_SENDER_NAME || "Nordic Nutri",
+    httpsmsApiKey: env.HTTPSMS_API_KEY || "",
+    httpsmsFrom: env.HTTPSMS_FROM_E164 || "",
+  } : {};
+
   return {
     appId: env.WX_APPID,
     appSecret: env.WX_SECRET,
@@ -346,6 +371,7 @@ function readRuntimeConfig(env) {
     identityPepper: env.IDENTITY_HASH_PEPPER,
     cloudbaseApiKey: env.CLOUDBASE_APIKEY,
     sessionSecret: env.APP_SESSION_SECRET,
+    ...authConfig,
   };
 }
 
@@ -595,6 +621,34 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   });
   const db = typeof app.rdb === "function" ? app.rdb() : app.rdb;
   if (!db || typeof db.from !== "function") throw new Error("Relational database client is unavailable");
+  let auth = null;
+  if (config.authEnabled) {
+    if (!config.authHmacSecret || !config.googleClientId || !config.brevoApiKey || !config.brevoSenderEmail || !config.httpsmsApiKey || !config.httpsmsFrom) {
+      throw new Error("Android auth configuration is incomplete");
+    }
+    const authRepository = createAuthRepository(db);
+    const captcha = createCaptchaService({ store: authRepository, secret: config.authHmacSecret });
+    const email = createEmailService({
+      apiKey: config.brevoApiKey,
+      senderEmail: config.brevoSenderEmail,
+      senderName: config.brevoSenderName,
+    });
+    const sms = createSmsService({ apiKey: config.httpsmsApiKey, from: config.httpsmsFrom });
+    const google = createGoogleVerifier({ audience: config.googleClientId });
+    const password = createPasswordService();
+    auth = createAuthService({
+      repo: authRepository,
+      authHmacSecret: config.authHmacSecret,
+      sessionSecret: config.sessionSecret,
+      verifyCaptcha: captcha.verifyCaptcha,
+      verifyGoogleToken: google.verify,
+      sendEmail: email.sendVerificationCode,
+      sendSms: sms.sendVerificationCode,
+      hashPassword: password.hash,
+      verifyPassword: password.verify,
+    });
+    auth.getCaptcha = captcha.getCaptcha;
+  }
   const observability = createObservabilityService({ db });
   opsRef.observability = observability;
   const adminAudit = typeof db.rpc === "function" ? createAdminAuditService({ db, observability }) : null;
@@ -1643,6 +1697,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   return {
     issue: session.issue,
     verifySession: (token) => verifyAccessToken(token, config.sessionSecret),
+    auth,
     productUserExists,
     data,
     meals,
@@ -1752,6 +1807,69 @@ async function authorizeProductRequest(service, req, res) {
     return null;
   }
   return resolved.session;
+}
+
+function getAuthRoute(pathname) {
+  const path = pathname.replace(/^\/get-login-ticket/, "");
+  return new Set([
+    "/auth/captcha",
+    "/auth/register/email/send-code",
+    "/auth/register/email",
+    "/auth/register/phone/send-code",
+    "/auth/register/phone",
+    "/auth/login/email",
+    "/auth/login/phone",
+    "/auth/login/google",
+    "/auth/password/forgot/email",
+    "/auth/password/forgot/phone",
+    "/auth/password/reset",
+    "/auth/me",
+  ]).has(path) ? path : null;
+}
+
+function authErrorStatus(code) {
+  if (code === "AUTH_INVALID_CREDENTIALS") return 401;
+  if (code === "AUTH_RATE_LIMITED") return 429;
+  if (code === "AUTH_EMAIL_ALREADY_REGISTERED" || code === "AUTH_PHONE_ALREADY_REGISTERED") return 409;
+  if (code === "AUTH_PROVIDER_UNAVAILABLE") return 503;
+  return 400;
+}
+
+async function handleAuthRoute({ req, res, route, service }) {
+  if (!service?.auth) {
+    sendJson(res, 503, { code: "AUTH_NOT_CONFIGURED" });
+    return;
+  }
+  if (route === "/auth/me") {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      return;
+    }
+  } else if (req.method !== "POST") {
+    sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+    return;
+  }
+
+  try {
+    const body = req.method === "POST" ? await readJsonBody(req) : null;
+    let result;
+    if (route === "/auth/captcha") result = await service.auth.getCaptcha();
+    else if (route === "/auth/register/email/send-code") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "register", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
+    else if (route === "/auth/register/email") result = await service.auth.registerEmail(body);
+    else if (route === "/auth/register/phone/send-code") result = await service.auth.sendVerificationCode({ targetType: "phone", target: body.phone, purpose: "register", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
+    else if (route === "/auth/register/phone") result = await service.auth.registerPhone(body);
+    else if (route === "/auth/login/email") result = await service.auth.loginEmail(body);
+    else if (route === "/auth/login/phone") result = await service.auth.loginPhone(body);
+    else if (route === "/auth/login/google") result = await service.auth.loginGoogle(body.idToken);
+    else if (route === "/auth/password/forgot/email") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "forgot_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
+    else if (route === "/auth/password/forgot/phone") result = await service.auth.sendVerificationCode({ targetType: "phone", target: body.phone, purpose: "forgot_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
+    else if (route === "/auth/password/reset") result = await service.auth.resetPassword(body);
+    else result = await service.auth.getMe(readBearerToken(req));
+    sendJson(res, 200, result);
+  } catch (error) {
+    const code = error?.code || (error instanceof PublicLoginError ? error.code : "AUTH_UNAVAILABLE");
+    sendJson(res, authErrorStatus(code), { code });
+  }
 }
 
 function getDataOperation(pathname) {
@@ -2058,6 +2176,11 @@ function createHttpServer({ service }) {
     const visionRoute = isVisionRoute(url.pathname);
     const visionAnalysisStatusRoute = getVisionAnalysisStatusRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
+    const authRoute = getAuthRoute(url.pathname);
+    if (authRoute) {
+      await handleAuthRoute({ req, res, route: authRoute, service });
+      return;
+    }
     const traceRoutes = { dataOperation, mealRoute, insightOperation, achievementCelebrationRoute, milestoneRoute, coachOperation, foodRoute, adminFoodRoute, internalFoodImageRoute, internalVisionAnalysisRoute, feedbackRoute, visionRoute, visionAnalysisStatusRoute, avatarRoute };
     const genericTrace = service?.observability?.startTrace && !visionRoute
       ? service.observability.startTrace({
@@ -4082,6 +4205,7 @@ module.exports = {
   mergeConfiguredModelCatalog,
   mergeModelQuotaPolicies,
   createHttpServer,
+  handleAuthRoute,
   createHunyuanGenerationService,
   createRuntimeService,
   readRuntimeConfig,
