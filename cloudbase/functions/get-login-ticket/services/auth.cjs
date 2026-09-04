@@ -1,18 +1,11 @@
 const { createHmac, randomInt, timingSafeEqual } = require("node:crypto");
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const E164_PATTERN = /^\+[1-9]\d{7,14}$/;
 
 function normalizeEmail(value) {
   const email = typeof value === "string" ? value.trim().toLowerCase() : "";
   if (!EMAIL_PATTERN.test(email) || email.length > 320) throw new AuthError("AUTH_INVALID_REQUEST", "邮箱无效");
   return email;
-}
-
-function normalizePhone(value) {
-  const phone = typeof value === "string" ? value.trim() : "";
-  if (!E164_PATTERN.test(phone)) throw new AuthError("AUTH_INVALID_REQUEST", "手机号无效");
-  return phone;
 }
 
 function validatePassword(value) {
@@ -30,6 +23,11 @@ function generateOtp(random) {
 function hashAuthValue(value, secret, purpose) {
   if (!secret) throw new Error("Auth HMAC secret is unavailable");
   return createHmac("sha256", secret).update(`${purpose}:${String(value)}`).digest("hex");
+}
+
+function hashVerificationCode(target, purpose, code, secret) {
+  if (!secret) throw new Error("Auth HMAC secret is unavailable");
+  return createHmac("sha256", secret).update(`${target}:${purpose}:${code}`).digest("hex");
 }
 
 function createAccessToken({ userId, tokenVersion, secret, now = Date.now }) {
@@ -99,7 +97,7 @@ function createAuthRepository(db) {
   if (!db || typeof db.from !== "function" || typeof db.rpc !== "function") {
     throw new Error("Auth database client is unavailable");
   }
-  const userFields = "id,email,email_normalized,email_verified_at,phone_e164,phone_verified_at,password_hash,google_sub,status,token_version";
+  const userFields = "id,email,email_normalized,email_verified_at,password_hash,status,token_version,created_platform,password_changed_at";
   const readUser = async (query) => {
     const result = await query.maybeSingle();
     if (result.error) throw new Error("Auth user lookup failed");
@@ -108,15 +106,6 @@ function createAuthRepository(db) {
   return {
     async findUserByEmail(email) {
       return readUser(db.from("app_users").select(userFields).eq("email_normalized", email));
-    },
-    async findUserByEmailForGoogle(email) {
-      return readUser(db.from("app_users").select(userFields).eq("email_normalized", email));
-    },
-    async findUserByGoogleSub(sub) {
-      return readUser(db.from("app_users").select(userFields).eq("google_sub", sub));
-    },
-    async findUserByPhone(phone) {
-      return readUser(db.from("app_users").select(userFields).eq("phone_e164", phone));
     },
     async findUserById(id) {
       return readUser(db.from("app_users").select(userFields).eq("id", id));
@@ -172,7 +161,7 @@ function createAuthRepository(db) {
     },
     async findLatestVerification({ target, targetType, purpose }) {
       const result = await db.from("auth_verification_codes")
-        .select("id,created_at,expires_at,used_at,attempt_count")
+        .select("id,code_hash,created_at,expires_at,used_at,attempt_count")
         .eq("target", target)
         .eq("target_type", targetType)
         .eq("purpose", purpose)
@@ -213,7 +202,8 @@ function publicUser(user) {
   return {
     id: user.id,
     email: user.email_normalized ?? null,
-    phone: user.phone_e164 ?? null,
+    emailVerified: Boolean(user.email_verified_at),
+    createdPlatform: user.created_platform ?? null,
   };
 }
 
@@ -222,9 +212,7 @@ function createAuthService({
   authHmacSecret,
   sessionSecret,
   verifyCaptcha = async () => true,
-  verifyGoogleToken = async () => { throw new Error("Google verification is unavailable"); },
   sendEmail = async () => {},
-  sendSms = async () => {},
   hashPassword = async (password) => password,
   verifyPassword = async () => false,
   now = Date.now,
@@ -232,6 +220,41 @@ function createAuthService({
 } = {}) {
   if (!repo) throw new Error("Auth repository is unavailable");
   if (!authHmacSecret || !sessionSecret) throw new Error("Auth secrets are unavailable");
+  // ponytail: process-local login limiter; use a shared store only if abuse or scale requires it.
+  const loginFailures = new Map();
+  const LOGIN_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+  const LOGIN_FAILURE_LIMIT = 5;
+
+  function loginRateKeys(email, ip) {
+    return [`email:${email}`, `ip:${typeof ip === "string" && ip.trim() ? ip.trim() : "unknown"}`];
+  }
+
+  function assertLoginRateAllowed(keys) {
+    const timestamp = now();
+    for (const key of keys) {
+      const entry = loginFailures.get(key);
+      if (entry && timestamp - entry.firstAttemptAt < LOGIN_FAILURE_WINDOW_MS && entry.count >= LOGIN_FAILURE_LIMIT) {
+        throw new AuthError("AUTH_RATE_LIMITED", "操作过于频繁，请稍后重试");
+      }
+      if (entry && timestamp - entry.firstAttemptAt >= LOGIN_FAILURE_WINDOW_MS) loginFailures.delete(key);
+    }
+  }
+
+  function recordLoginFailure(keys) {
+    const timestamp = now();
+    for (const key of keys) {
+      const entry = loginFailures.get(key);
+      if (!entry || timestamp - entry.firstAttemptAt >= LOGIN_FAILURE_WINDOW_MS) {
+        loginFailures.set(key, { count: 1, firstAttemptAt: timestamp });
+      } else {
+        entry.count += 1;
+      }
+    }
+  }
+
+  function clearLoginFailures(keys) {
+    for (const key of keys) loginFailures.delete(key);
+  }
 
   function issueSession(user) {
     const token = createAccessToken({ userId: user.id, tokenVersion: user.token_version ?? 1, secret: sessionSecret, now });
@@ -244,49 +267,47 @@ function createAuthService({
 
   function normalizeTarget(targetType, target) {
     if (targetType === "email") return normalizeEmail(target);
-    if (targetType === "phone") return normalizePhone(target);
     throw new AuthError("AUTH_INVALID_REQUEST", "认证参数无效");
   }
 
   async function sendVerificationCode({ targetType, target, purpose = "register", captchaId, captchaAnswer }) {
     const normalized = normalizeTarget(targetType, target);
+    if (purpose !== "register" && purpose !== "reset_password") {
+      throw new AuthError("AUTH_INVALID_REQUEST", "验证码用途无效");
+    }
     await verifyCaptcha(captchaId, captchaAnswer);
-    if (purpose === "forgot_password") {
-      const existing = targetType === "email"
-        ? await repo.findUserByEmail(normalized)
-        : await repo.findUserByPhone(normalized);
+    if (purpose === "reset_password") {
+      const existing = await repo.findUserByEmail(normalized);
       if (!existing) return { sent: true, expiresIn: 600, resendAfter: 60 };
     }
-    const targetHash = hashAuthValue(normalized, authHmacSecret, targetType);
+    const targetHash = hashAuthValue(normalized, authHmacSecret, "email-target");
     const latest = await repo.findLatestVerification?.({ target: targetHash, targetType, purpose });
     if (latest && new Date(latest.created_at).getTime() + 60 * 1000 > now()) {
       throw new AuthError("AUTH_RATE_LIMITED", "操作过于频繁，请稍后重试");
     }
-    const hourlyLimit = targetType === "phone" ? 3 : 5;
     const recentCount = await repo.countRecentVerification?.({
       target: targetHash,
       targetType,
       purpose,
       since: now() - 60 * 60 * 1000,
     });
-    if (Number(recentCount || 0) >= hourlyLimit) {
+    if (Number(recentCount || 0) >= 5) {
       throw new AuthError("AUTH_RATE_LIMITED", "操作过于频繁，请稍后重试");
     }
     await repo.invalidateVerification({ target: targetHash, targetType, purpose });
     const code = generateOtp(random);
     await repo.insertVerification({
       target: targetHash,
-      target_type: targetType,
+      target_type: "email",
       purpose,
-      code_hash: hashAuthValue(code, authHmacSecret, "otp"),
+      code_hash: hashVerificationCode(normalized, purpose, code, authHmacSecret),
       expires_at: new Date(now() + 10 * 60 * 1000).toISOString(),
       attempt_count: 0,
       used_at: null,
       created_at: new Date(now()).toISOString(),
     });
     try {
-      if (targetType === "email") await sendEmail(normalized, code);
-      else await sendSms(normalized, code);
+      await sendEmail(normalized, code);
     } catch {
       await repo.invalidateVerification({ target: targetHash, targetType, purpose });
       throw new AuthError("AUTH_PROVIDER_UNAVAILABLE", "验证码服务暂时不可用");
@@ -296,79 +317,60 @@ function createAuthService({
 
   async function consumeCode({ targetType, target, purpose, code }) {
     const normalized = normalizeTarget(targetType, target);
-    const targetHash = hashAuthValue(normalized, authHmacSecret, targetType);
+    const targetHash = hashAuthValue(normalized, authHmacSecret, "email-target");
     const latest = await repo.findLatestVerification?.({ target: targetHash, targetType, purpose });
     if (latest && new Date(latest.expires_at).getTime() <= now()) {
       throw new AuthError("AUTH_OTP_EXPIRED", "验证码已过期");
     }
+    const codeHash = hashVerificationCode(normalized, purpose, code, authHmacSecret);
+    const expected = typeof latest?.code_hash === "string" ? Buffer.from(latest.code_hash, "utf8") : null;
+    const actual = Buffer.from(codeHash, "utf8");
+    const matches = expected && expected.length === actual.length && timingSafeEqual(expected, actual);
     const result = await repo.consumeVerification({
       target: targetHash,
       targetType,
       purpose,
-      codeHash: hashAuthValue(code, authHmacSecret, "otp"),
+      codeHash,
       now: now(),
     });
-    if (!result) throw new AuthError("AUTH_OTP_INVALID", "验证码无效");
+    if (!result || (expected && !matches)) throw new AuthError("AUTH_OTP_INVALID", "验证码无效");
     return normalized;
   }
 
-  async function register(targetType, input) {
-    const normalized = await consumeCode({ targetType, target: input[targetType === "email" ? "email" : "phone"], purpose: "register", code: input.code });
+  async function registerEmail(input) {
+    const normalized = await consumeCode({ targetType: "email", target: input.email, purpose: "register", code: input.code });
     validatePassword(input.password);
     const passwordHash = await hashPassword(input.password);
-    const fields = targetType === "email"
-      ? { email: normalized, email_normalized: normalized, email_verified_at: new Date(now()).toISOString(), password_hash: passwordHash, created_platform: "android_app" }
-      : { phone_e164: normalized, phone_verified_at: new Date(now()).toISOString(), password_hash: passwordHash, created_platform: "android_app" };
+    const fields = { email: normalized, email_normalized: normalized, email_verified_at: new Date(now()).toISOString(), password_hash: passwordHash, created_platform: "android_app" };
     try {
       return issueSession(await repo.insertUser(fields));
     } catch (error) {
       if (error?.code === "UNIQUE_VIOLATION" || error?.code === "23505") {
-        throw new AuthError(targetType === "email" ? "AUTH_EMAIL_ALREADY_REGISTERED" : "AUTH_PHONE_ALREADY_REGISTERED", "账号已存在");
+        throw new AuthError("AUTH_EMAIL_ALREADY_REGISTERED", "账号已存在");
       }
       throw error;
     }
   }
 
-  async function login(targetType, input) {
+  async function loginEmail(input) {
     await verifyCaptcha(input.captchaId, input.captchaAnswer);
-    const normalized = normalizeTarget(targetType, input[targetType === "email" ? "email" : "phone"]);
-    const user = targetType === "email" ? await repo.findUserByEmail(normalized) : await repo.findUserByPhone(normalized);
+    const normalized = normalizeEmail(input.email);
+    const rateKeys = loginRateKeys(normalized, input.ip);
+    assertLoginRateAllowed(rateKeys);
+    const user = await repo.findUserByEmail(normalized);
     const valid = await verifyPassword(input.password, user?.password_hash ?? null);
-    if (!user || user.status !== "active" || !valid) throw new AuthError("AUTH_INVALID_CREDENTIALS", "账号或密码错误");
+    if (!user || user.status !== "active" || !valid) {
+      recordLoginFailure(rateKeys);
+      throw new AuthError("AUTH_INVALID_CREDENTIALS", "账号或密码错误");
+    }
+    clearLoginFailures(rateKeys);
     return issueSession(user);
   }
 
-  async function loginGoogle(idToken) {
-    let identity;
-    try {
-      identity = await verifyGoogleToken(idToken);
-    } catch {
-      throw new AuthError("AUTH_INVALID_CREDENTIALS", "Google 登录失败");
-    }
-    if (!identity?.sub) throw new AuthError("AUTH_INVALID_CREDENTIALS", "Google 登录失败");
-    const existingGoogle = await repo.findUserByGoogleSub(identity.sub);
-    if (existingGoogle) {
-      if (existingGoogle.status !== "active") throw new AuthError("AUTH_INVALID_CREDENTIALS", "Google 登录失败");
-      return issueSession(existingGoogle);
-    }
-    const normalizedEmail = identity.email ? normalizeEmail(identity.email) : null;
-    if (normalizedEmail && await repo.findUserByEmailForGoogle(normalizedEmail)) {
-      throw new AuthError("AUTH_EMAIL_ALREADY_REGISTERED", "该邮箱已注册，请使用邮箱密码登录");
-    }
-    const user = await repo.insertUser({
-      email: normalizedEmail,
-      email_normalized: normalizedEmail,
-      email_verified_at: identity.email_verified ? new Date(now()).toISOString() : null,
-      google_sub: identity.sub,
-      created_platform: "android_app",
-    });
-    return issueSession(user);
-  }
-
-  async function resetPassword({ targetType, target, code, password }) {
-    const normalized = await consumeCode({ targetType, target, purpose: "forgot_password", code });
+  async function resetPassword({ email, code, password }) {
+    const normalized = await consumeCode({ targetType: "email", target: email, purpose: "reset_password", code });
     validatePassword(password);
-    const user = targetType === "email" ? await repo.findUserByEmail(normalized) : await repo.findUserByPhone(normalized);
+    const user = await repo.findUserByEmail(normalized);
     if (!user || user.status !== "active") throw new AuthError("AUTH_OTP_INVALID", "验证码无效");
     await repo.updatePassword(user.id, await hashPassword(password));
     return { reset: true };
@@ -385,11 +387,8 @@ function createAuthService({
   }
 
   return {
-    loginEmail: (input) => login("email", input),
-    loginGoogle,
-    loginPhone: (input) => login("phone", input),
-    registerEmail: (input) => register("email", input),
-    registerPhone: (input) => register("phone", input),
+    loginEmail,
+    registerEmail,
     resetPassword,
     sendVerificationCode,
     getMe,
@@ -404,8 +403,8 @@ module.exports = {
   createPasswordService,
   generateOtp,
   hashAuthValue,
+  hashVerificationCode,
   normalizeEmail,
-  normalizePhone,
   validatePassword,
   verifyAccessToken,
 };

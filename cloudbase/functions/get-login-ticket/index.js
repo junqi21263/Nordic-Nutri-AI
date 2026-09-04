@@ -39,8 +39,6 @@ const { createProductUserExists, resolveProductSession } = require("./product-se
 const { createAuthRepository, createAuthService, createPasswordService } = require("./services/auth.cjs");
 const { createCaptchaService } = require("./services/captcha.cjs");
 const { createEmailService } = require("./services/email.cjs");
-const { createSmsService } = require("./services/sms.cjs");
-const { createGoogleVerifier } = require("./services/google.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
 const { getVisionQuotaPolicy } = require("./vision-quota-policy.cjs");
 const { createObservabilityService } = require("./observability-service.cjs");
@@ -346,22 +344,18 @@ function readRuntimeConfig(env) {
 
   const authConfig = [
     "ANDROID_AUTH_ENABLED",
-    "AUTH_OTP_HMAC_SECRET",
-    "GOOGLE_OAUTH_SERVER_CLIENT_ID",
+    "AUTH_OTP_SECRET",
     "BREVO_API_KEY",
     "BREVO_SENDER_EMAIL",
     "BREVO_SENDER_NAME",
-    "HTTPSMS_API_KEY",
-    "HTTPSMS_FROM_E164",
+    "AUTH_EMAIL_SEND_ENABLED",
   ].some((name) => env[name] !== undefined) ? {
     authEnabled: env.ANDROID_AUTH_ENABLED === "true",
-    authHmacSecret: env.AUTH_OTP_HMAC_SECRET || "",
-    googleClientId: env.GOOGLE_OAUTH_SERVER_CLIENT_ID || "",
+    authHmacSecret: env.AUTH_OTP_SECRET || "",
     brevoApiKey: env.BREVO_API_KEY || "",
     brevoSenderEmail: env.BREVO_SENDER_EMAIL || "",
     brevoSenderName: env.BREVO_SENDER_NAME || "Nordic Nutri",
-    httpsmsApiKey: env.HTTPSMS_API_KEY || "",
-    httpsmsFrom: env.HTTPSMS_FROM_E164 || "",
+    emailSendEnabled: env.AUTH_EMAIL_SEND_ENABLED === "true",
   } : {};
 
   return {
@@ -623,7 +617,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   if (!db || typeof db.from !== "function") throw new Error("Relational database client is unavailable");
   let auth = null;
   if (config.authEnabled) {
-    if (!config.authHmacSecret || !config.googleClientId || !config.brevoApiKey || !config.brevoSenderEmail || !config.httpsmsApiKey || !config.httpsmsFrom) {
+    if (!config.authHmacSecret || !config.emailSendEnabled || !config.brevoApiKey || !config.brevoSenderEmail) {
       throw new Error("Android auth configuration is incomplete");
     }
     const authRepository = createAuthRepository(db);
@@ -633,17 +627,13 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       senderEmail: config.brevoSenderEmail,
       senderName: config.brevoSenderName,
     });
-    const sms = createSmsService({ apiKey: config.httpsmsApiKey, from: config.httpsmsFrom });
-    const google = createGoogleVerifier({ audience: config.googleClientId });
     const password = createPasswordService();
     auth = createAuthService({
       repo: authRepository,
       authHmacSecret: config.authHmacSecret,
       sessionSecret: config.sessionSecret,
       verifyCaptcha: captcha.verifyCaptcha,
-      verifyGoogleToken: google.verify,
       sendEmail: email.sendVerificationCode,
-      sendSms: sms.sendVerificationCode,
       hashPassword: password.hash,
       verifyPassword: password.verify,
     });
@@ -1815,13 +1805,8 @@ function getAuthRoute(pathname) {
     "/auth/captcha",
     "/auth/register/email/send-code",
     "/auth/register/email",
-    "/auth/register/phone/send-code",
-    "/auth/register/phone",
     "/auth/login/email",
-    "/auth/login/phone",
-    "/auth/login/google",
     "/auth/password/forgot/email",
-    "/auth/password/forgot/phone",
     "/auth/password/reset",
     "/auth/me",
   ]).has(path) ? path : null;
@@ -1830,7 +1815,7 @@ function getAuthRoute(pathname) {
 function authErrorStatus(code) {
   if (code === "AUTH_INVALID_CREDENTIALS") return 401;
   if (code === "AUTH_RATE_LIMITED") return 429;
-  if (code === "AUTH_EMAIL_ALREADY_REGISTERED" || code === "AUTH_PHONE_ALREADY_REGISTERED") return 409;
+  if (code === "AUTH_EMAIL_ALREADY_REGISTERED") return 409;
   if (code === "AUTH_PROVIDER_UNAVAILABLE") return 503;
   return 400;
 }
@@ -1856,13 +1841,11 @@ async function handleAuthRoute({ req, res, route, service }) {
     if (route === "/auth/captcha") result = await service.auth.getCaptcha();
     else if (route === "/auth/register/email/send-code") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "register", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
     else if (route === "/auth/register/email") result = await service.auth.registerEmail(body);
-    else if (route === "/auth/register/phone/send-code") result = await service.auth.sendVerificationCode({ targetType: "phone", target: body.phone, purpose: "register", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
-    else if (route === "/auth/register/phone") result = await service.auth.registerPhone(body);
-    else if (route === "/auth/login/email") result = await service.auth.loginEmail(body);
-    else if (route === "/auth/login/phone") result = await service.auth.loginPhone(body);
-    else if (route === "/auth/login/google") result = await service.auth.loginGoogle(body.idToken);
-    else if (route === "/auth/password/forgot/email") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "forgot_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
-    else if (route === "/auth/password/forgot/phone") result = await service.auth.sendVerificationCode({ targetType: "phone", target: body.phone, purpose: "forgot_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
+    else if (route === "/auth/login/email") {
+      const forwardedFor = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+      result = await service.auth.loginEmail({ ...body, ip: forwardedFor || req.socket?.remoteAddress || "unknown" });
+    }
+    else if (route === "/auth/password/forgot/email") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "reset_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
     else if (route === "/auth/password/reset") result = await service.auth.resetPassword(body);
     else result = await service.auth.getMe(readBearerToken(req));
     sendJson(res, 200, result);
@@ -4206,6 +4189,7 @@ module.exports = {
   mergeModelQuotaPolicies,
   createHttpServer,
   handleAuthRoute,
+  getAuthRoute,
   createHunyuanGenerationService,
   createRuntimeService,
   readRuntimeConfig,

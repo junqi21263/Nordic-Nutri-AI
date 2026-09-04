@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createEmailService } from "./services/email.cjs";
-import { createSmsService } from "./services/sms.cjs";
 
 test("Brevo email service sends only the verification message payload", async () => {
   let request;
@@ -21,24 +20,6 @@ test("Brevo email service sends only the verification message payload", async ()
   assert.equal(request.options.headers["api-key"], "brevo-secret");
   assert.match(request.options.body, /user@example\.com/);
   assert.match(request.options.body, /123456/);
-});
-
-test("httpSMS service sends an E.164 verification message", async () => {
-  let request;
-  const service = createSmsService({
-    apiKey: "httpsms-secret",
-    from: "+8613800138000",
-    fetchImpl: async (url, options) => {
-      request = { url, options };
-      return { ok: true, status: 200, json: async () => ({ id: "sms-id" }) };
-    },
-  });
-
-  await service.sendVerificationCode("+8613900139000", "654321");
-  assert.equal(request.url, "https://api.httpsms.com/v1/messages/send");
-  assert.equal(request.options.headers["x-api-key"], "httpsms-secret");
-  assert.match(request.options.body, /\+8613900139000/);
-  assert.match(request.options.body, /654321/);
 });
 
 test("provider failures are surfaced without exposing response bodies", async () => {

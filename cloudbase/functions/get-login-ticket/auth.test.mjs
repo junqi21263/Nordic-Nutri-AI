@@ -4,20 +4,14 @@ import test from "node:test";
 import {
   createAccessToken,
   generateOtp,
-  hashAuthValue,
+  hashVerificationCode,
   normalizeEmail,
-  normalizePhone,
   validatePassword,
   verifyAccessToken,
 } from "./services/auth.cjs";
 
 test("normalizes email to a stable lookup value", () => {
   assert.equal(normalizeEmail("  User@Example.COM "), "user@example.com");
-});
-
-test("accepts only canonical E.164 phone values", () => {
-  assert.equal(normalizePhone("+8613800138000"), "+8613800138000");
-  assert.throws(() => normalizePhone("13800138000"), (error) => error.code === "AUTH_INVALID_REQUEST");
 });
 
 test("enforces the V1 password length boundaries", () => {
@@ -30,8 +24,9 @@ test("enforces the V1 password length boundaries", () => {
 test("generates six digit OTPs and stores only an HMAC digest", () => {
   const code = generateOtp(() => 0.123456);
   assert.match(code, /^\d{6}$/);
-  assert.notEqual(hashAuthValue(code, "test-secret", "otp"), code);
-  assert.equal(hashAuthValue(code, "test-secret", "otp").length, 64);
+  const digest = hashVerificationCode("user@example.com", "register", code, "test-secret");
+  assert.notEqual(digest, code);
+  assert.equal(digest.length, 64);
 });
 
 test("issues and verifies a seven-day token containing the user version", () => {

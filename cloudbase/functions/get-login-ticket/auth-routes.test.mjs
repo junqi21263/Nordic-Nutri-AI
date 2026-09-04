@@ -2,17 +2,14 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 
-import { handleAuthRoute } from "./index.js";
+import { getAuthRoute, handleAuthRoute } from "./index.js";
 
 function createAuthStub() {
   return {
     async getCaptcha() { return { captchaId: "c1", image: "<svg />", expiresIn: 300 }; },
     async loginEmail(input) { return { route: "email", input }; },
-    async loginPhone(input) { return { route: "phone", input }; },
-    async loginGoogle(idToken) { return { route: "google", idToken }; },
     async sendVerificationCode(input) { return { sent: true, input }; },
     async registerEmail(input) { return { route: "register-email", input }; },
-    async registerPhone(input) { return { route: "register-phone", input }; },
     async resetPassword(input) { return { reset: true, input }; },
     async getMe() { return { id: "user-1" }; },
   };
@@ -49,17 +46,21 @@ test("routes CAPTCHA and password login through the auth service", async () => {
   assert.equal(login.body.route, "email");
 });
 
-test("routes registration, Google and password reset without using the WeChat issue path", async () => {
+test("routes Email registration, forgot-password and reset without using the WeChat issue path", async () => {
   const requests = [
     ["/auth/register/email/send-code", { targetType: "email", target: "user@example.com" }],
     ["/auth/register/email", { email: "user@example.com", code: "123456", password: "password" }],
-    ["/auth/register/phone/send-code", { targetType: "phone", target: "+8613800138000" }],
-    ["/auth/register/phone", { phone: "+8613800138000", code: "123456", password: "password" }],
-    ["/auth/login/google", { idToken: "id-token" }],
+    ["/auth/password/forgot/email", { email: "user@example.com", captchaId: "c1", captchaAnswer: "abcd" }],
     ["/auth/password/reset", { targetType: "email", target: "user@example.com", code: "123456", password: "newpass8" }],
   ];
   for (const [path, body] of requests) {
     const response = await invoke(path, "POST", body, { "content-type": "application/json" });
     assert.equal(response.status, 200, path);
   }
+});
+
+test("does not expose Phone or Google routes in Email Auth V1", () => {
+  assert.equal(getAuthRoute("/get-login-ticket/auth/register/phone"), null);
+  assert.equal(getAuthRoute("/get-login-ticket/auth/login/google"), null);
+  assert.equal(getAuthRoute("/get-login-ticket/auth/login/email"), "/auth/login/email");
 });

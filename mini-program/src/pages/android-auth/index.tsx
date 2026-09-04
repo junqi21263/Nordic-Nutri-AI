@@ -2,39 +2,41 @@ import { Image, Input, Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
 import {
   androidAuthApi,
-  type AndroidCaptcha,
   type AndroidAuthSessionResult,
+  type AndroidCaptcha,
 } from "../../api/android-auth-api";
-import { setNativeSession } from "../../auth/session-manager";
 import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
+import { setNativeSession } from "../../auth/session-manager";
 import { AppButton } from "../../components/app-button";
 import { PageLayout } from "../../layouts/page-layout";
-import { getGoogleIdToken } from "../../platform/google-credential-manager";
 import "./index.scss";
 
-type AuthMode = "login" | "register-email" | "register-phone" | "forgot-email" | "forgot-phone";
+type AuthMode = "login" | "register-email" | "forgot-email";
 
 function valueOf(event: { detail?: { value?: string } }) {
   return event.detail?.value ?? "";
 }
 
 function errorMessage(error: unknown) {
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string")
+  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
     return error.message;
+  }
   return "操作未完成，请稍后重试";
 }
 
 export default function AndroidAuthPage() {
   const [mode, setMode] = useState<AuthMode>("login");
-  const [loginType, setLoginType] = useState<"email" | "phone">("email");
-  const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [code, setCode] = useState("");
   const [captcha, setCaptcha] = useState<AndroidCaptcha | null>(null);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const refreshCaptcha = async () => {
     try {
@@ -48,6 +50,7 @@ export default function AndroidAuthPage() {
   useEffect(() => {
     void refreshCaptcha();
   }, []);
+
   useEffect(() => {
     if (cooldown <= 0) return undefined;
     const timer = setTimeout(() => setCooldown((value) => Math.max(0, value - 1)), 1000);
@@ -60,35 +63,21 @@ export default function AndroidAuthPage() {
   };
 
   const sendCode = async () => {
-    if (cooldown > 0 || busy) return;
+    if (busy || cooldown > 0) return;
     setBusy(true);
     setError("");
+    setSuccess("");
     try {
-      const result =
-        mode === "register-email"
-          ? await androidAuthApi.sendEmailCode({
-              email: identifier,
-              captchaId: captcha?.captchaId ?? "",
-              captchaAnswer,
-            })
-          : mode === "register-phone"
-            ? await androidAuthApi.sendPhoneCode({
-                phone: identifier,
-                captchaId: captcha?.captchaId ?? "",
-                captchaAnswer,
-              })
-            : loginType === "email"
-              ? await androidAuthApi.forgotEmail({
-                  email: identifier,
-                  captchaId: captcha?.captchaId ?? "",
-                  captchaAnswer,
-                })
-              : await androidAuthApi.forgotPhone({
-                  phone: identifier,
-                  captchaId: captcha?.captchaId ?? "",
-                  captchaAnswer,
-                });
-      if (result) setCooldown(60);
+      const result = mode === "register-email"
+        ? await androidAuthApi.sendEmailCode({ email, captchaId: captcha?.captchaId ?? "", captchaAnswer })
+        : await androidAuthApi.forgotEmail({ email, captchaId: captcha?.captchaId ?? "", captchaAnswer });
+      if (result) {
+        setCodeSent(true);
+        setCooldown(60);
+        setSuccess(mode === "register-email"
+          ? "Check your email for the 6-digit verification code."
+          : "If an account exists, we've sent a verification code.");
+      }
     } catch (requestError) {
       setError(errorMessage(requestError));
       await refreshCaptcha();
@@ -98,87 +87,57 @@ export default function AndroidAuthPage() {
   };
 
   const submit = async () => {
-    if (busy) return;
+    if (busy || (mode !== "login" && !codeSent)) return;
+    if (mode !== "login" && password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
     setBusy(true);
     setError("");
+    setSuccess("");
     try {
       if (mode === "login") {
-        const result =
-          loginType === "email"
-            ? await androidAuthApi.loginEmail({
-                email: identifier,
-                password,
-                captchaId: captcha?.captchaId ?? "",
-                captchaAnswer,
-              })
-            : await androidAuthApi.loginPhone({
-                phone: identifier,
-                password,
-                captchaId: captcha?.captchaId ?? "",
-                captchaAnswer,
-              });
-        await finishLogin(result as AndroidAuthSessionResult);
-      } else if (mode === "register-email") {
-        await finishLogin(
-          (await androidAuthApi.registerEmail({
-            email: identifier,
-            code,
-            password,
-          })) as AndroidAuthSessionResult,
-        );
-      } else if (mode === "register-phone") {
-        await finishLogin(
-          (await androidAuthApi.registerPhone({
-            phone: identifier,
-            code,
-            password,
-          })) as AndroidAuthSessionResult,
-        );
-      } else {
-        await androidAuthApi.resetPassword({
-          target: identifier,
-          targetType: mode === "forgot-email" ? "email" : "phone",
-          code,
+        await finishLogin((await androidAuthApi.loginEmail({
+          email,
           password,
-        });
+          captchaId: captcha?.captchaId ?? "",
+          captchaAnswer,
+        })) as AndroidAuthSessionResult);
+      } else if (mode === "register-email") {
+        await finishLogin((await androidAuthApi.registerEmail({ email, code, password })) as AndroidAuthSessionResult);
+      } else {
+        await androidAuthApi.resetPassword({ email, code, password });
         setMode("login");
         setCode("");
         setPassword("");
+        setConfirmPassword("");
+        setCodeSent(false);
+        setSuccess("Password reset. You can sign in now.");
         await refreshCaptcha();
       }
     } catch (requestError) {
       setError(errorMessage(requestError));
-      if (mode === "login" || mode.startsWith("forgot")) await refreshCaptcha();
+      if (mode === "login" || mode === "forgot-email") await refreshCaptcha();
     } finally {
       setBusy(false);
     }
   };
 
-  const isCodeMode = mode !== "login";
-  const isForgot = mode.startsWith("forgot");
   const switchMode = (next: AuthMode) => {
     setMode(next);
-    setIdentifier("");
+    setEmail("");
     setPassword("");
+    setConfirmPassword("");
     setCode("");
-    setError("");
+    setCodeSent(false);
     setCooldown(0);
+    setError("");
+    setSuccess("");
     void refreshCaptcha();
   };
 
-  const googleLogin = async () => {
-    setBusy(true);
-    setError("");
-    try {
-      await finishLogin(
-        (await androidAuthApi.loginGoogle(await getGoogleIdToken())) as AndroidAuthSessionResult,
-      );
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const isLogin = mode === "login";
+  const isRegistration = mode === "register-email";
 
   return (
     <PageLayout
@@ -190,99 +149,124 @@ export default function AndroidAuthPage() {
     >
       <View className="android-auth-page">
         <Text className="android-auth-page__brand">Nordic</Text>
-        {mode === "login" && (
-          <AppButton
-            size="large"
-            variant="outline"
-            loading={busy}
-            onClick={() => void googleLogin()}
-          >
-            Continue with Google
+        {isLogin && (
+          <AppButton size="large" variant="outline" disabled visualDisabled>
+            Continue with Google · Coming soon
           </AppButton>
         )}
-        <View className="android-auth-page__tabs">
-          <Text
-            className={loginType === "email" ? "active" : ""}
-            onClick={() => setLoginType("email")}
-          >
-            Email
-          </Text>
-          <Text
-            className={loginType === "phone" ? "active" : ""}
-            onClick={() => setLoginType("phone")}
-          >
-            Phone
-          </Text>
+
+        <View className="android-auth-page__providers">
+          <Text className="active">Email</Text>
+          <Text className="disabled">Phone · Coming soon</Text>
         </View>
+
+        <Text className="android-auth-page__title">
+          {isLogin ? "Welcome back" : isRegistration ? "Create account" : "Forgot password"}
+        </Text>
+
         <Input
           className="android-auth-page__input"
-          value={identifier}
-          placeholder={loginType === "email" ? "Email" : "Phone (+country code)"}
-          onInput={(event) => setIdentifier(valueOf(event))}
+          value={email}
+          placeholder="Email"
+          type="text"
+          onInput={(event) => setEmail(valueOf(event))}
         />
-        <Input
-          className="android-auth-page__input"
-          password
-          value={password}
-          placeholder={isForgot ? "New password" : "Password"}
-          onInput={(event) => setPassword(valueOf(event))}
-        />
-        <View className="android-auth-page__captcha">
-          <Input
-            className="android-auth-page__input"
-            value={captchaAnswer}
-            placeholder="Image CAPTCHA"
-            onInput={(event) => setCaptchaAnswer(valueOf(event))}
-          />
-          {captcha && (
-            <Image
-              src={`data:image/svg+xml,${encodeURIComponent(captcha.image)}`}
-              mode="heightFix"
-              onClick={() => void refreshCaptcha()}
+
+        {!isLogin && !codeSent && (
+          <View className="android-auth-page__captcha">
+            <Input
+              className="android-auth-page__input"
+              value={captchaAnswer}
+              placeholder="Image CAPTCHA"
+              onInput={(event) => setCaptchaAnswer(valueOf(event))}
             />
-          )}
-        </View>
-        {isCodeMode && (
-          <Input
-            className="android-auth-page__input"
-            type="number"
-            value={code}
-            placeholder="6-digit verification code"
-            onInput={(event) => setCode(valueOf(event))}
-          />
+            {captcha && (
+              <Image
+                src={`data:image/svg+xml,${encodeURIComponent(captcha.image)}`}
+                mode="heightFix"
+                onClick={() => void refreshCaptcha()}
+              />
+            )}
+          </View>
         )}
-        {isCodeMode && (
-          <AppButton variant="secondary" disabled={cooldown > 0} onClick={() => void sendCode()}>
+
+        {isLogin && (
+          <>
+            <Input
+              className="android-auth-page__input"
+              password
+              value={password}
+              placeholder="Password"
+              onInput={(event) => setPassword(valueOf(event))}
+            />
+            <View className="android-auth-page__captcha">
+              <Input
+                className="android-auth-page__input"
+                value={captchaAnswer}
+                placeholder="Image CAPTCHA"
+                onInput={(event) => setCaptchaAnswer(valueOf(event))}
+              />
+              {captcha && (
+                <Image
+                  src={`data:image/svg+xml,${encodeURIComponent(captcha.image)}`}
+                  mode="heightFix"
+                  onClick={() => void refreshCaptcha()}
+                />
+              )}
+            </View>
+          </>
+        )}
+
+        {!isLogin && codeSent && (
+          <>
+            <Input
+              className="android-auth-page__input"
+              value={code}
+              placeholder="6-digit verification code"
+              type="number"
+              onInput={(event) => setCode(valueOf(event))}
+            />
+            <Input
+              className="android-auth-page__input"
+              password
+              value={password}
+              placeholder="Password"
+              onInput={(event) => setPassword(valueOf(event))}
+            />
+            <Input
+              className="android-auth-page__input"
+              password
+              value={confirmPassword}
+              placeholder="Confirm password"
+              onInput={(event) => setConfirmPassword(valueOf(event))}
+            />
+          </>
+        )}
+
+        {!isLogin && !codeSent && (
+          <AppButton variant="secondary" loading={busy} disabled={cooldown > 0} onClick={() => void sendCode()}>
             {cooldown > 0 ? `Resend in ${cooldown}s` : "Send verification code"}
           </AppButton>
         )}
-        <AppButton size="large" loading={busy} onClick={() => void submit()}>
-          {isForgot ? "Reset password" : mode === "login" ? "Sign In" : "Create account"}
+        {!isLogin && codeSent && (
+          <AppButton variant="secondary" loading={busy} disabled={cooldown > 0} onClick={() => void sendCode()}>
+            {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend verification code"}
+          </AppButton>
+        )}
+        <AppButton size="large" loading={busy} disabled={!isLogin && !codeSent} onClick={() => void submit()}>
+          {isLogin ? "Sign in" : isRegistration ? "Create account" : "Reset password"}
         </AppButton>
+
+        {success && <Text className="android-auth-page__success">{success}</Text>}
         {error && <Text className="android-auth-page__error">{error}</Text>}
         <View className="android-auth-page__links">
-          {mode === "login" ? (
+          {isLogin ? (
             <>
-              <Text
-                onClick={() => switchMode(loginType === "email" ? "forgot-email" : "forgot-phone")}
-              >
-                Forgot password?
-              </Text>
+              <Text onClick={() => switchMode("forgot-email")}>Forgot password?</Text>
               <Text onClick={() => switchMode("register-email")}>Create account</Text>
             </>
           ) : (
-            <>
-              <Text onClick={() => switchMode("login")}>Back to sign in</Text>
-              {(mode === "register-email" || mode === "register-phone") && (
-                <Text
-                  onClick={() =>
-                    switchMode(mode === "register-email" ? "register-phone" : "register-email")
-                  }
-                >
-                  {mode === "register-email" ? "Use phone" : "Use email"}
-                </Text>
-              )}
-            </>
+            <Text onClick={() => switchMode("login")}>Back to sign in</Text>
           )}
         </View>
       </View>

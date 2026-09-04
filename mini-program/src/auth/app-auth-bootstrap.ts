@@ -1,5 +1,7 @@
 import Taro from "@tarojs/taro";
 import { loginWithWechat } from "../api/auth-api";
+import { androidAuthApi } from "../api/android-auth-api";
+import type { AppAuthUser } from "./auth-store";
 import { getProductAccount } from "../api/product-data-api";
 import { getLocalDateString } from "../features/onboarding/domain";
 import { refreshProductAchievements } from "../features/coach/refresh-achievements";
@@ -96,9 +98,17 @@ async function loadIdentity(user: { id: string }) {
   }
 }
 
+function isAppAuthUser(value: unknown): value is AppAuthUser {
+  return Boolean(value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string");
+}
+
 const authBootstrap = createAuthBootstrap({
   restore: restoreSession,
-  getUser: getCurrentUser,
+  getUser: async () => {
+    if (!isAndroidApp) return getCurrentUser();
+    const result = await androidAuthApi.getMe() as { user?: unknown };
+    return isAppAuthUser(result.user) ? result.user : null;
+  },
   refresh: refreshSession,
   login: isAndroidApp ? async () => null : loginWithWechat,
   loadIdentity,

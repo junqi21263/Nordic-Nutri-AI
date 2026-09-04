@@ -15,15 +15,25 @@
   margin-bottom: 20px;
 }
 
-.android-auth-page__tabs,
+.android-auth-page__providers,
 .android-auth-page__links {
   display: flex;
   justify-content: space-between;
   color: #69716b;
 }
 
-.android-auth-page__tabs .active {
+.android-auth-page__providers .active {
   color: #153f2b;
+  font-weight: 700;
+}
+
+.android-auth-page__providers .disabled {
+  color: #aeb6b0;
+}
+
+.android-auth-page__title {
+  color: #153f2b;
+  font-size: 22px;
   font-weight: 700;
 }
 
@@ -55,4 +65,13 @@
 
 .android-auth-page__error {
   color: #b33a2b;
+}
+
+.android-auth-page__success {
+  color: #2e7250;
+}
+
+.android-auth-page__cooldown {
+  color: #69716b;
+  text-align: center;
 }

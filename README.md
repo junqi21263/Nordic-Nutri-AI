@@ -50,4 +50,4 @@ pnpm --dir mini-program verify:weapp
 
 ## Secrets
 
-Use CloudBase function environment variables for `WX_SECRET`, `CLOUDBASE_APIKEY`, session/auth hashing secrets, Google verification configuration, Brevo/httpSMS provider keys and AI provider keys. Never commit `.env` files, database credentials, access tokens, OpenID values, OTP/CAPTCHA answers or real user images. Do not enable `ANDROID_AUTH_ENABLED` in production until the migration, provider delivery and Android-device gates are explicitly accepted.
+Use CloudBase function environment variables for `WX_SECRET`, `CLOUDBASE_APIKEY`, session/auth hashing secrets, Brevo email configuration and AI provider keys. Never commit `.env` files, database credentials, access tokens, OpenID values, OTP/CAPTCHA answers or real user images. Do not enable `ANDROID_AUTH_ENABLED` in production until the Email Auth migration, provider delivery and Android-device gates are explicitly accepted.
