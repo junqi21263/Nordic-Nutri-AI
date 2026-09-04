@@ -20,7 +20,8 @@ function createCaptchaService({ store, secret, create, id = randomUUID, now = Da
     ignoreChars: "0o1i",
     noise: 1,
   }));
-  if (!store || typeof store.insert !== "function" || typeof store.find !== "function" || typeof store.update !== "function") {
+  const insert = store?.insert || store?.insertVerification;
+  if (typeof insert !== "function" || !store || typeof store.find !== "function" || typeof store.update !== "function") {
     throw new Error("Captcha store is unavailable");
   }
   if (!secret) throw new Error("Captcha HMAC secret is unavailable");
@@ -32,7 +33,7 @@ function createCaptchaService({ store, secret, create, id = randomUUID, now = Da
         throw new Error("Captcha generation failed");
       }
       const captchaId = id();
-      await store.insert({
+      await insert.call(store, {
         target: captchaId,
         target_type: "captcha",
         purpose: "captcha",
