@@ -6,7 +6,7 @@
 
 **Architecture:** Keep CloudBase HTTPS Function `get-login-ticket` as the only backend boundary and keep `public.app_users.id` as the product user ID. Add only the account columns and one `auth_verification_codes` table, issue the existing style of signed Bearer token with `sub`, `ver` and `exp`, and let `token_version` invalidate old tokens after password changes. Android-specific HTTP calls and secure token storage stay behind small client modules; the WeChat login code remains untouched.
 
-**Tech Stack:** Taro 4.2.0, React 18.3.1, TypeScript, CloudBase HTTPS Function on Node.js, CloudBase PostgreSQL, HMAC-signed token, Argon2id password hashing, Google Credential Manager, Brevo email, httpSMS SMS, one selected external CAPTCHA API.
+**Tech Stack:** Taro 4.2.0, React 18.3.1, TypeScript, CloudBase HTTPS Function on Node.js, CloudBase PostgreSQL, HMAC-signed token, Argon2id password hashing, Google Credential Manager, `svg-captcha` 1.4.0, Brevo email and httpSMS SMS.
 
 ---
 
@@ -21,7 +21,8 @@ Use the current repository conventions. The backend is CommonJS today, so provid
   - Keep database writes in this service or its existing database client pattern; do not create a generic repository framework.
 - Create `cloudbase/functions/get-login-ticket/services/captcha.cjs`
   - Export only `getCaptcha()` and `verifyCaptcha()`.
-  - Call the one configured third-party CAPTCHA API; pass its challenge ID back to the client and do not create a local CAPTCHA table.
+  - Call `svg-captcha.create()`, return the SVG and a random challenge ID, and store only the HMAC of `captcha.text` through `auth_verification_codes` with `target_type='captcha'` and `purpose='captcha'`.
+  - Never return or log `captcha.text`; do not create a separate CAPTCHA table.
 - Create `cloudbase/functions/get-login-ticket/services/email.cjs`
   - Export `sendVerificationCode(email, code)` and call the existing Brevo email provider configuration.
 - Create `cloudbase/functions/get-login-ticket/services/sms.cjs`
@@ -38,11 +39,13 @@ Use the current repository conventions. The backend is CommonJS today, so provid
   - Cover pure auth rules, token rules and provider seams without real network calls.
 - Create `cloudbase/functions/get-login-ticket/auth-routes.test.mjs`
   - Cover route contracts, stable error codes, generic login failures and provider failure behavior.
+- Modify `cloudbase/functions/get-login-ticket/package.json`
+  - Add the pinned runtime dependency `svg-captcha: 1.4.0`.
 
 ### Database files
 
 - Create `cloudbase/pg/migrations/0059_simplified_android_auth_v1.sql` after confirming that no newer numbered migration exists.
-  - Add only the requested `app_users` columns, indexes/constraints, and `auth_verification_codes`.
+  - Add only the requested `app_users` columns, indexes/constraints, and `auth_verification_codes`; use that one table for both OTP and locally generated CAPTCHA challenges.
   - Do not execute the migration in this phase.
 - Create `cloudbase/pg/migrations/0059_simplified_android_auth_v1.test.mjs` if the existing migration test convention requires a static schema assertion.
 
@@ -73,7 +76,7 @@ Use the current repository conventions. The backend is CommonJS today, so provid
 ### Configuration and documentation files
 
 - Modify `.env.example`
-  - Document names only, with empty values for `AUTH_OTP_HMAC_SECRET`, Google server client ID, Brevo sender/API configuration, SMS configuration and CAPTCHA configuration.
+  - Document names only, with empty values for `AUTH_OTP_HMAC_SECRET`, Google server client ID, Brevo sender/API configuration and httpSMS configuration. `svg-captcha` has no provider API key.
 - Modify `README.md`
   - Document the Android auth boundary, Node 24.18.x requirement and the fact that provider secrets belong only to the CloudBase Function.
 - Do not add credentials to `.env.production`, source files, client build constants or Git history.
@@ -106,13 +109,13 @@ create unique index app_users_google_sub_uidx on public.app_users (google_sub) w
 
 The migration must use the repository’s existing update timestamp trigger convention. Existing rows are backfilled as `wechat_mini_program`; the server, not the client, writes `android_app` for newly created Android users.
 
-Create one server-owned table, preferably `private.auth_verification_codes` to match the existing private auth/rate-limit convention:
+Create one server-owned table, preferably `private.auth_verification_codes` to match the existing private auth/rate-limit convention. Reuse it for email/SMS OTP and locally generated SVG CAPTCHA challenges; this avoids a second CAPTCHA table because `svg-captcha` only generates the SVG/text pair and does not persist or verify challenges.
 
 ```sql
 id uuid primary key default gen_random_uuid(),
 target text not null,
-target_type text not null check (target_type in ('email', 'phone')),
-purpose text not null check (purpose in ('register', 'forgot_password')),
+target_type text not null check (target_type in ('email', 'phone', 'captcha')),
+purpose text not null check (purpose in ('register', 'forgot_password', 'captcha')),
 code_hash char(64) not null,
 expires_at timestamptz not null,
 attempt_count integer not null default 0,
@@ -120,7 +123,7 @@ used_at timestamptz,
 created_at timestamptz not null default now()
 ```
 
-`target` is the server HMAC of normalized email or E.164 phone, not the raw destination. Add an index that finds the latest live record by target, type and purpose. On a new code, invalidate previous unused records for the same target/type/purpose before inserting the new row. Final verification must atomically check expiry, attempt count and `used_at`, increment failed attempts on wrong code, and set `used_at` on success.
+For email/phone, `target` is the server HMAC of the normalized destination, not the raw destination. For CAPTCHA, `target` is a random challenge ID. Add an index that finds the latest live record by target, type and purpose. On a new code/challenge, invalidate previous unused records for the same target/type/purpose before inserting the new row. Final verification must atomically check expiry, attempt count and `used_at`, increment failed attempts on wrong code, and set `used_at` on success.
 
 Do not add `user_identities`, registration flow state, CAPTCHA table, session table, device table, session family or account-linking tables in V1.
 
@@ -131,10 +134,10 @@ All routes are served by the existing Function endpoint. Every request is JSON o
 ### CAPTCHA
 
 - `POST /auth/captcha`
-  - Request: `{}` or the provider-required public parameters.
-  - Response: `{ captchaId, image, expiresIn }`.
+  - Request: `{}`.
+  - Server calls `svgCaptcha.create({ size: 4, ignoreChars: '0o1i', noise: 1 })`, stores an HMAC of the generated text in `auth_verification_codes`, and returns `{ captchaId, image, expiresIn }` where `image` is the SVG string.
   - The client submits `captchaId` and `captchaAnswer` to send-code/login routes.
-  - The server calls `verifyCaptcha(captchaId, captchaAnswer)` before any email/SMS send or password login.
+  - The server calls `verifyCaptcha(captchaId, captchaAnswer)` before any email/SMS send or password login. A successful verification marks the challenge used.
 
 ### Registration
 
@@ -276,7 +279,8 @@ identifier -> CAPTCHA -> generic send response
 - OTP expiry, five-attempt limit, wrong-attempt increment, successful `used_at`, replay rejection and previous-code invalidation.
 - Email/SMS resend cooldown and hourly limits.
 - CAPTCHA verification occurs before provider call; CAPTCHA failure makes no send call.
-- Provider failure does not return success or leave an active usable code.
+- Email/SMS provider failure does not return success or leave an active usable code.
+- CAPTCHA generation never returns the generated text; invalid/expired/replayed CAPTCHA challenges fail with `AUTH_CAPTCHA_INVALID` or `AUTH_CAPTCHA_EXPIRED`.
 - Email/phone registration uniqueness race returns a stable conflict.
 - Token signature, expiry, `sub`, `ver` and user `token_version` mismatch.
 - Password reset increments `token_version` and invalidates an old token.
@@ -320,9 +324,9 @@ identifier -> CAPTCHA -> generic send response
 
 ### Task 2 — Confirm provider contracts before code
 
-- Record the exact CAPTCHA vendor/API response shape and httpSMS configuration names.
+- Pin `svg-captcha` 1.4.0 and record the httpSMS configuration names.
 - Confirm Brevo sender configuration and httpSMS gateway readiness later; do not add secrets now.
-- If the CAPTCHA vendor is not selected, implementation stops at the service boundary until its API contract is supplied.
+- No CAPTCHA vendor contract or API key is required; the function owns generation and verification state through `auth_verification_codes`.
 
 ### Task 3 — Write auth tests and migration, but do not apply migration
 
