@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nordic Nutri</string>
+    <string name="title_activity_main">Nordic Nutri</string>
+    <string name="package_name">com.lewislee.nordicnutri</string>
+    <string name="custom_url_scheme">com.lewislee.nordicnutri</string>
+</resources>
