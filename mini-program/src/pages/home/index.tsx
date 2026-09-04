@@ -232,7 +232,7 @@ export default function HomePage() {
             tipId="home-first-meal"
             step="1/3"
             title="先拍下今天的第一餐"
-            body="点「去拍照」，对准整盘食物即可。AI 识别后还能改餐次和份量再保存。"
+            body="点「去拍照」，对准整盘食物即可。识别后还能改餐次和份量再保存。"
             actionLabel="去拍照"
             onAction={openScanner}
             onClose={() => setGuideFirstMeal(false)}
