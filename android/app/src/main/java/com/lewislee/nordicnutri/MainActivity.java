@@ -11,4 +11,14 @@ public class MainActivity extends BridgeActivity {
         getBridge().getWebView().addJavascriptInterface(new SecureStorageBridge(this), "NordicSecureStorage");
         getBridge().getWebView().addJavascriptInterface(new GoogleAuthBridge(this, getBridge().getWebView()), "NordicGoogleAuth");
     }
+
+    @Override
+    public void onBackPressed() {
+        getBridge().getWebView().evaluateJavascript(
+                "(function(){return window.__nordicAndroidBack ? window.__nordicAndroidBack() : false;})()",
+                result -> {
+                    if (!"true".equals(result)) super.onBackPressed();
+                }
+        );
+    }
 }
