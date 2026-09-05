@@ -351,8 +351,7 @@ function readRuntimeConfig(env) {
     "BREVO_SENDER_EMAIL",
     "BREVO_SENDER_NAME",
     "AUTH_EMAIL_SEND_ENABLED",
-    "HTTPSMS_API_KEY",
-    "HTTPSMS_FROM_E164",
+    "SPUG_SMS_TEMPLATE_URL",
     "GOOGLE_OAUTH_SERVER_CLIENT_ID",
   ].some((name) => env[name] !== undefined) ? {
     authEnabled: env.ANDROID_AUTH_ENABLED === "true",
@@ -361,8 +360,7 @@ function readRuntimeConfig(env) {
     brevoSenderEmail: env.BREVO_SENDER_EMAIL || "",
     brevoSenderName: env.BREVO_SENDER_NAME || "Nordic Nutri",
     emailSendEnabled: env.AUTH_EMAIL_SEND_ENABLED === "true",
-    httpsmsApiKey: env.HTTPSMS_API_KEY || "",
-    httpsmsFromE164: env.HTTPSMS_FROM_E164 || "",
+    spugSmsTemplateUrl: env.SPUG_SMS_TEMPLATE_URL || "",
     googleOAuthServerClientId: env.GOOGLE_OAUTH_SERVER_CLIENT_ID || "",
   } : {};
 
@@ -635,8 +633,8 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       senderEmail: config.brevoSenderEmail,
       senderName: config.brevoSenderName,
     });
-    const sms = config.httpsmsApiKey && config.httpsmsFromE164
-      ? createSmsService({ apiKey: config.httpsmsApiKey, fromE164: config.httpsmsFromE164 })
+    const sms = config.spugSmsTemplateUrl
+      ? createSmsService({ templateUrl: config.spugSmsTemplateUrl })
       : null;
     const google = config.googleOAuthServerClientId
       ? createGoogleTokenService({ clientId: config.googleOAuthServerClientId })
