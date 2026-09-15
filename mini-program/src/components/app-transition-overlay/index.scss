@@ -1,0 +1,88 @@
+@use "../../styles/tokens" as *;
+
+.app-transition-overlay {
+  align-items: center;
+  background: $color-background;
+  display: flex;
+  flex-direction: column;
+  inset: 0;
+  justify-content: center;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: fixed;
+  transition: opacity 360ms ease, visibility 0s linear 360ms;
+  visibility: hidden;
+  z-index: 1000;
+}
+.app-transition-overlay--visible {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0s;
+  visibility: visible;
+}
+.app-transition-overlay__glow {
+  animation: app-transition-glow 2.4s ease-in-out infinite;
+  background: radial-gradient(circle, rgba($color-sage, 0.34) 0%, rgba($color-sage, 0) 70%);
+  height: 640px;
+  position: absolute;
+  width: 640px;
+}
+.app-transition-overlay__bars {
+  align-items: flex-end;
+  display: flex;
+  gap: 16px;
+  height: 96px;
+  justify-content: center;
+  margin-bottom: 48px;
+  position: relative;
+}
+.app-transition-overlay__bar {
+  animation: app-transition-bar 800ms ease-in-out infinite alternate;
+  background: $color-forest-green;
+  border-radius: 999px;
+  height: 60px;
+  transform-origin: bottom;
+  width: 14px;
+}
+.app-transition-overlay__bar--2 {
+  animation-delay: 120ms;
+  background: #78917d;
+  height: 92px;
+}
+.app-transition-overlay__bar--3 {
+  animation-delay: 240ms;
+  background: $color-text-secondary;
+  height: 68px;
+}
+.app-transition-overlay__brand {
+  color: $color-dark-forest;
+  font-size: 56px;
+  font-weight: $font-weight-semibold;
+  letter-spacing: 0.035em;
+  position: relative;
+}
+.app-transition-overlay__copy {
+  color: $color-text-secondary;
+  font-size: 32px;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  margin-top: 24px;
+  position: relative;
+}
+@keyframes app-transition-bar {
+  from { transform: scaleY(0.72); }
+  to { transform: scaleY(1); }
+}
+@keyframes app-transition-glow {
+  0%, 100% { opacity: 0.42; transform: scale(0.92); }
+  50% { opacity: 0.72; transform: scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-transition-overlay,
+  .app-transition-overlay__glow,
+  .app-transition-overlay__bar {
+    animation: none;
+    transition-duration: 120ms;
+  }
+}

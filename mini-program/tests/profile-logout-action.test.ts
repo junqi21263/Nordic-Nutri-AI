@@ -11,7 +11,14 @@ describe("profile logout action", () => {
 
     expect(page).toContain("createLogoutFlow");
     expect(page).toContain("signOut");
-    expect(page).toContain('url: "/pages/auth-entry/index"');
+    expect(page).toContain(
+      'const loginEntryPath = isAndroidApp ? "/pages/android-auth/index" : "/pages/auth-entry/index";',
+    );
+    expect(page).toContain("url: loginEntryPath");
+    expect(page).toContain('title: "退出登录？"');
+    expect(page).toContain('description: "仅退出当前设备，不会删除你的饮食记录。"');
+    expect(page).toContain('primaryText: "退出登录"');
+    expect(page).toContain('secondaryText: "取消"');
     expect(page).toContain("退出登录");
   });
 });

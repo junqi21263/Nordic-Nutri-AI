@@ -1,0 +1,33 @@
+@use "../../styles/tokens" as *;
+.template-editor {
+  display: flex; flex-direction: column; gap: 28px; padding-bottom: 160px;
+  &__loading { display: flex; flex-direction: column; gap: 24px; }
+  &__skeleton-cover { width: 100%; height: 320px; border-radius: $radius-16; }
+  &__skeleton-label { width: 28%; height: 24px; }
+  &__skeleton-label--short { width: 22%; }
+  &__skeleton-input { width: 100%; height: 88px; border-radius: $radius-12; }
+  &__skeleton-types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  &__skeleton-type { height: 64px; border-radius: $radius-full; }
+  &__skeleton-food-card { gap: 20px; }
+  &__skeleton-heading { width: 42%; height: 32px; }
+  &__skeleton-food { width: 100%; height: 88px; border-radius: $radius-12; }
+  &__card { display: flex; flex-direction: column; gap: 24px; padding: 28px; background: $color-surface; border-radius: $radius-24; }
+  &__cover { width: 100%; height: 320px; border-radius: $radius-16; }
+  &__placeholder { display: flex; align-items: center; justify-content: center; background: $color-sage-light; }
+  &__label { font-size: $font-caption; color: $color-text-secondary; }
+  &__input-shell { display: flex; align-items: center; box-sizing: border-box; height: 88px; padding: 0 24px; border-radius: $radius-12; background: $color-selected-surface; }
+  &__input { display: block; flex: 1 1 auto; box-sizing: border-box; width: 100%; min-width: 0; height: 56px; padding: 0; border: 0; background: transparent; font-size: $font-body; line-height: 56px; vertical-align: middle; }
+  &__types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  &__food { display: grid; grid-template-columns: minmax(0, 1fr) 132px 48px; align-items: center; gap: 16px; padding: 20px; background: $color-selected-surface; border-radius: $radius-12; }
+  &__food-copy { display: flex; align-self: stretch; justify-content: center; min-width: 0; flex-direction: column; gap: 8px; font-size: $font-caption; }
+  &__food-copy > Text:first-child, &__food-copy > taro-text-core:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &__food-copy .frequent-meals__date { display: block; white-space: nowrap; }
+  &__quantity { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; font-size: $font-caption; white-space: nowrap; }
+  &__quantity-input-shell { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 84px; height: 56px; padding: 0 8px; border: 1px solid $color-divider; border-radius: $radius-8; background: $color-surface; }
+  &__quantity-input { display: block; box-sizing: border-box; width: 100%; min-width: 0; height: 40px; padding: 0; border: 0; background: transparent; text-align: right; line-height: 40px; vertical-align: middle; }
+  &__remove { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 48px; height: 48px; padding: 0; margin: 0; background: transparent; line-height: 1; &::after { border: 0; } }
+  &__energy { font-size: $font-display; color: $color-forest-green; }
+  &__macros { display: flex; flex-wrap: wrap; gap: 24px; font-size: $font-overline; color: $color-text-secondary; }
+  &__save { position: fixed; bottom: 0; left: 0; right: 0; padding: 20px 32px calc(20px + env(safe-area-inset-bottom)); background: $color-warm-white; z-index: 20; }
+  @media (max-width: 359px) { &__food { grid-template-columns: minmax(0, 1fr) 108px 44px; gap: 8px; padding: 16px; } &__quantity-input-shell { width: 64px; } &__remove { width: 44px; } &__skeleton-cover { height: 240px; } }
+}

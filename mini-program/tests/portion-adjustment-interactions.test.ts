@@ -30,10 +30,11 @@ describe("份量调整交互", () => {
   it("为新建和重新编辑的餐食均触发保存弹窗而不显示成功 Toast", () => {
     const source = read("pages/portion-adjustment/index.tsx");
     expect(source).toContain("const previousCalories = meals.getDailySummary(mealDate).consumed.calories");
-    expect(source).toContain("const syncedMeals = await getProductMeals(mealDate)");
+    expect(source).toContain("const savedDate = savedMeal.date");
+    expect(source).toContain("const syncedMeals = await getProductMeals(savedDate)");
     expect(source).toContain("useMealSavedCelebrationStore.getState().show");
-    expect(source).toContain("if (editingId)");
-    expect(source).toContain('kind: editingId ? "updated" : "created"');
+    expect(source).toContain("if (!savedMeal && editingId)");
+    expect(source).toContain('kind: isRepeating ? "reused" : editingId ? "updated" : "created"');
     expect(source).not.toContain('feedback.show({ message: "份量已更新并同步", tone: "success" })');
     const newMealBranch = source.slice(source.indexOf("} else {"), source.indexOf("const syncedMeals"));
     expect(newMealBranch).not.toContain('feedback.show({ message: "已保存并同步到饮食记录", tone: "success" })');

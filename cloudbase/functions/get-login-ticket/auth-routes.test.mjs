@@ -18,7 +18,7 @@ function createAuthStub() {
   };
 }
 
-async function invoke(route, method, body = null, headers = {}) {
+async function invoke(route, method, body = null, headers = {}, auth = createAuthStub()) {
   const req = new EventEmitter();
   req.method = method;
   req.headers = headers;
@@ -30,7 +30,7 @@ async function invoke(route, method, body = null, headers = {}) {
         try { resolve({ status: this.statusCode, body: JSON.parse(payload || "{}") }); } catch (error) { reject(error); }
       },
     };
-    void handleAuthRoute({ req, res, route, service: { auth: createAuthStub() } }).catch(reject);
+    void handleAuthRoute({ req, res, route, service: { auth } }).catch(reject);
     if (body !== null) {
       req.emit("data", Buffer.from(JSON.stringify(body)));
       req.emit("end");
@@ -38,6 +38,64 @@ async function invoke(route, method, body = null, headers = {}) {
   });
   return result;
 }
+
+async function invokeWithTrace(route, body, auth) {
+  const req = new EventEmitter();
+  req.method = "POST";
+  req.headers = { "content-type": "application/json" };
+  const traceContext = {};
+  const response = await new Promise((resolve, reject) => {
+    const res = {
+      statusCode: 200,
+      __traceContext: traceContext,
+      writeHead(statusCode) { this.statusCode = statusCode; },
+      end(payload = "") {
+        try { resolve({ status: this.statusCode, body: JSON.parse(payload || "{}") }); } catch (error) { reject(error); }
+      },
+    };
+    void handleAuthRoute({ req, res, route, service: { auth } }).catch(reject);
+    req.emit("data", Buffer.from(JSON.stringify(body)));
+    req.emit("end");
+  });
+  return { response, traceContext };
+}
+
+test("maps unexpected auth dependency failures to service unavailable", async () => {
+  const response = await invoke(
+    "/auth/register/email/send-code",
+    "POST",
+    { email: "user@example.com", captchaId: "c1", captchaAnswer: "abcd" },
+    { "content-type": "application/json" },
+    { async sendVerificationCode() { throw new Error("database unavailable"); } },
+  );
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(response.body, { code: "AUTH_UNAVAILABLE" });
+});
+
+test("captures auth failures in the request trace", async () => {
+  const { response, traceContext } = await invokeWithTrace(
+    "/auth/login/google",
+    { idToken: "token" },
+    { async loginGoogle() {
+      const error = new Error("Google ID token was rejected");
+      error.code = "AUTH_INVALID_CREDENTIALS";
+      error.authReason = "audience_mismatch";
+      error.verificationAttempts = [{ stage: "google_tokeninfo", code: "AUTH_INVALID_CREDENTIALS" }];
+      throw error;
+    } },
+  );
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(response.body, { code: "AUTH_INVALID_CREDENTIALS" });
+  assert.deepEqual(traceContext.internalError, {
+    name: "Error",
+    code: "AUTH_INVALID_CREDENTIALS",
+    message: "Google ID token was rejected",
+    authReason: "audience_mismatch",
+    verificationAttempts: [{ stage: "google_tokeninfo", code: "AUTH_INVALID_CREDENTIALS" }],
+  });
+});
 
 test("routes CAPTCHA and password login through the auth service", async () => {
   const captcha = await invoke("/auth/captcha", "POST", {}, { "content-type": "application/json" });

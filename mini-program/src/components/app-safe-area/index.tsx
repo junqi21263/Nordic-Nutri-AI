@@ -1,9 +1,10 @@
 import { View } from "@tarojs/components";
-import type { PropsWithChildren } from "react";
+import type { CSSProperties, PropsWithChildren } from "react";
 
 export function AppSafeArea({
   children,
   className = "",
-}: PropsWithChildren<{ className?: string }>) {
-  return <View className={`app-safe-area ${className}`}>{children}</View>;
+  style,
+}: PropsWithChildren<{ className?: string; style?: CSSProperties }>) {
+  return <View className={`app-safe-area ${className}`} style={style}>{children}</View>;
 }

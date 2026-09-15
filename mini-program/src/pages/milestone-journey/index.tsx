@@ -3,6 +3,7 @@ import Taro, { useDidShow } from "@tarojs/taro";
 import { useCallback, useMemo, useState } from "react";
 import { getMilestoneJourney, type ProductMilestoneEvent, type ProductMilestoneJourney } from "../../api/milestone-api";
 import { MilestoneJourneyIllustration } from "../../components/milestone-journey-illustration";
+import { Loading } from "../../components/loading";
 import { MilestoneStageCard } from "../../components/milestone-stage-card";
 import { MilestoneStageSheet } from "../../components/milestone-stage-sheet";
 import { getMilestoneIllustrationAssetById } from "../../features/milestones/config";
@@ -28,6 +29,17 @@ function snapshotIllustrationAsset(event: ProductMilestoneEvent | null) {
 
 function currentJourneyStage(streakDays: number): Milestone {
   return [...MILESTONES].reverse().find((milestone) => streakDays >= milestone) ?? 3;
+}
+
+function MilestoneJourneySkeleton() {
+  return <View className="milestone-journey-page__skeleton" ariaLabel="正在读取当前旅程">
+    <Loading label="正在读取当前旅程…" />
+    <View className="milestone-journey-page__skeleton-hero skeleton" />
+    <View className="milestone-journey-page__skeleton-heading skeleton" />
+    <View className="milestone-journey-page__skeleton-collection">
+      {[0, 1, 2, 3].map((index) => <View className="milestone-journey-page__skeleton-card skeleton" key={index} />)}
+    </View>
+  </View>;
 }
 
 export default function MilestoneJourneyPage() {
@@ -78,7 +90,7 @@ export default function MilestoneJourneyPage() {
       className="page-layout--milestone-journey"
     >
       <View className="milestone-journey-page">
-        <View className="milestone-journey-page__hero">
+        {loading ? <MilestoneJourneySkeleton /> : <View className="milestone-journey-page__hero">
           <View className="milestone-journey-page__hero-copy">
             <Text className="milestone-journey-page__eyebrow">CURRENT JOURNEY</Text>
             <Text className="milestone-journey-page__headline">连续记录 {streakDays} 天</Text>
@@ -101,9 +113,8 @@ export default function MilestoneJourneyPage() {
               );
             })}
           </View>
-        </View>
+        </View>}
 
-        {loading ? <View className="milestone-journey-page__state"><Text>正在读取当前旅程…</Text></View> : null}
         {error ? <View className="milestone-journey-page__state"><Text>{error}</Text><Text onClick={() => void load()}>重新尝试</Text></View> : null}
         {!loading && !error ? (
           <>

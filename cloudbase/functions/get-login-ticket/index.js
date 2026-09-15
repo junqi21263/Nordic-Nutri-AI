@@ -8,6 +8,9 @@ const { createDeepseekMealService, PublicMealAnalysisError } = require("./deepse
 const { createDeepseekEvaluationService } = require("./deepseek-evaluation-service.cjs");
 const { createDeepseekNutritionPlanService } = require("./deepseek-nutrition-plan-service.cjs");
 const { createMealDataService, PublicMealDataError } = require("./meal-data-service.cjs");
+const { createMealTemplateService } = require("./meal-template-service.cjs");
+const { createFcmPushService, PushNotificationError } = require("./push-notification-service.cjs");
+const { createScheduledReminderService } = require("./scheduled-reminder-service.cjs");
 const { createMilestoneStateService, eventSourceForMutation } = require("./milestone-state-service.cjs");
 const { createAchievementStateService } = require("./achievement-state-service.cjs");
 const {
@@ -57,6 +60,7 @@ const { createFoodImageService, FoodImageError } = require("./food-image-service
 const { createFoodBarcodeService, FoodBarcodeError } = require("./food-barcode-service.cjs");
 const { createFoodAdminService, FoodAdminError } = require("./food-admin-service.cjs");
 const { createAdminConsoleService, AdminConsoleError } = require("./admin-console-service.cjs");
+const { createVerificationCenterService, VerificationCenterError } = require("./verification-center-service.cjs");
 const { createAiModelConfigService, AiModelConfigError } = require("./ai-model-config-service.cjs");
 const { createAiProviderCatalogService, AiProviderCatalogError } = require("./ai-provider-catalog-service.cjs");
 const { createModelQuotaPolicyService, ModelQuotaPolicyError } = require("./model-quota-policy-service.cjs");
@@ -113,6 +117,8 @@ function pickNickname() {
 }
 
 const MAX_BODY_BYTES = 4096;
+const DEV_CLOUDBASE_ENV_ID = "test-dev-d4gyxnn0b5dfa2c8a";
+const PROD_CLOUDBASE_ENV_ID = "lewis-healthy-d4glgqqzv73a5bc10";
 // ~4MB decoded image ≈ ~5.4MB base64 + JSON envelope.
 const MAX_VISION_BODY_BYTES = 6 * 1024 * 1024;
 const VISION_SERVER_BUDGET_MS = VISION_BUDGETS.serverTotalMs;
@@ -335,6 +341,18 @@ function verifyVisionAnalysisInternalSignature(secret, req, { path, body, kind, 
   return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
+function verifyReminderDispatchSignature(secret, req, { path, body, now = Date.now() } = {}) {
+  if (!secret || !path) return false;
+  const timestamp = String(req.headers["x-reminder-dispatch-timestamp"] || "");
+  const signature = String(req.headers["x-reminder-dispatch-signature"] || "");
+  const numericTimestamp = Number(timestamp);
+  if (!Number.isInteger(numericTimestamp) || Math.abs(Math.floor(now / 1000) - numericTimestamp) > 300) return false;
+  const expected = signVisionAnalysisInternal(secret, { timestamp, method: req.method, path, body });
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const actualBuffer = Buffer.from(signature, "utf8");
+  return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
 function readRuntimeConfig(env) {
   const required = ["WX_APPID", "WX_SECRET", "TCB_ENV", "IDENTITY_HASH_PEPPER", "CLOUDBASE_APIKEY", "APP_SESSION_SECRET"];
   const missing = required.filter((name) => typeof env[name] !== "string" || !env[name]);
@@ -344,6 +362,16 @@ function readRuntimeConfig(env) {
     throw new Error(`Login service configuration is incomplete: ${missing.join(", ")}`);
   }
 
+  const authEnvironment = String(env.AUTH_ENVIRONMENT || "").trim().toLowerCase();
+  const debugOtpReveal = env.AUTH_DEBUG_OTP_REVEAL === "true";
+  // OTP debug reveal is deliberately tied to the exact DEV environment. An
+  // arbitrary AUTH_ENVIRONMENT label must never be enough to enable a fixed
+  // verification code.
+  const isKnownDevelopment = env.TCB_ENV === DEV_CLOUDBASE_ENV_ID;
+  const isProduction = authEnvironment === "production" || env.TCB_ENV === PROD_CLOUDBASE_ENV_ID;
+  if (debugOtpReveal && (!isKnownDevelopment || isProduction)) {
+    throw new Error("AUTH_DEBUG_OTP_REVEAL is allowed only in development or staging");
+  }
   const authConfig = [
     "ANDROID_AUTH_ENABLED",
     "AUTH_OTP_SECRET",
@@ -353,6 +381,7 @@ function readRuntimeConfig(env) {
     "AUTH_EMAIL_SEND_ENABLED",
     "SPUG_SMS_TEMPLATE_URL",
     "GOOGLE_OAUTH_SERVER_CLIENT_ID",
+    "AUTH_DEBUG_OTP_REVEAL",
   ].some((name) => env[name] !== undefined) ? {
     authEnabled: env.ANDROID_AUTH_ENABLED === "true",
     authHmacSecret: env.AUTH_OTP_SECRET || "",
@@ -362,6 +391,8 @@ function readRuntimeConfig(env) {
     emailSendEnabled: env.AUTH_EMAIL_SEND_ENABLED === "true",
     spugSmsTemplateUrl: env.SPUG_SMS_TEMPLATE_URL || "",
     googleOAuthServerClientId: env.GOOGLE_OAUTH_SERVER_CLIENT_ID || "",
+    googleCertificatesBaseUrl: env.GOOGLE_CERTIFICATES_BASE_URL || "",
+    debugOtpReveal: debugOtpReveal && isKnownDevelopment && !isProduction,
   } : {};
 
   return {
@@ -637,7 +668,11 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       ? createSmsService({ templateUrl: config.spugSmsTemplateUrl })
       : null;
     const google = config.googleOAuthServerClientId
-      ? createGoogleTokenService({ clientId: config.googleOAuthServerClientId })
+      ? createGoogleTokenService({
+        clientId: config.googleOAuthServerClientId,
+        cloudbaseAuthEnvId: config.cloudbaseEnvId,
+        certificatesBaseUrl: config.googleCertificatesBaseUrl,
+      })
       : null;
     const password = createPasswordService();
     auth = createAuthService({
@@ -650,11 +685,14 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       verifyGoogleToken: google?.verifyIdToken,
       hashPassword: password.hash,
       verifyPassword: password.verify,
+      debugOtpCode: config.debugOtpReveal ? "123456" : null,
     });
     auth.getCaptcha = captcha.getCaptcha;
   }
   const observability = createObservabilityService({ db });
   opsRef.observability = observability;
+  const push = createFcmPushService({ db, env });
+  const scheduledReminders = createScheduledReminderService({ db, push });
   const adminAudit = typeof db.rpc === "function" ? createAdminAuditService({ db, observability }) : null;
   const modelQuotaPolicy = createModelQuotaPolicyService({ db, adminAudit });
   const featureUserQuotaPolicy = createFeatureUserQuotaPolicyService({ db, adminAudit });
@@ -677,8 +715,8 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     const level = event.phase === "failed" ? "warn" : "info";
     console[level]("[model-route]", event);
   };
-  const createFeatureInvoker = ({ feature, createService }) => {
-    const routed = createRoutedModelInvoker({ feature, resolver: modelRouteResolver, createService, beforeInvoke: assertModelQuota, onAttempt: reportModelRouteAttempt });
+  const createFeatureInvoker = ({ feature, createService, getSignal }) => {
+    const routed = createRoutedModelInvoker({ feature, resolver: modelRouteResolver, createService, beforeInvoke: assertModelQuota, onAttempt: reportModelRouteAttempt, getSignal });
     return async (...args) => routed(...args);
   };
   const createFeatureStreamInvoker = ({ feature, createService }) => {
@@ -704,6 +742,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   const calculateNutritionPlanWithAi = createFeatureInvoker({
     feature: "nutrition_plan",
     createService: createDeepseekNutritionPlanService,
+    getSignal: (_input, options) => options?.signal,
   });
 
   const session = createProductSessionService({
@@ -1263,6 +1302,13 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     isAdmin: allowAdminConsole,
   });
+  const verificationCenter = createVerificationCenterService({
+    db,
+    isAdmin: allowAdminConsole,
+    auth,
+    audit: adminAudit,
+    debugOtpCode: config.debugOtpReveal ? "123456" : null,
+  });
   const aiModelConfigService = createAiModelConfigService({
     db,
     env,
@@ -1705,6 +1751,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     productUserExists,
     data,
     meals,
+    mealTemplates: createMealTemplateService({ db, meals, resolveImageUrl: getTemporaryUrl }),
+    push,
+    scheduledReminders,
     milestones,
     insights,
     coach: createCoachDataService({
@@ -1725,6 +1774,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodBarcode: foodBarcodeService,
     foodAdmin: foodAdminService,
     adminConsole: adminConsoleService,
+    verificationCenter,
     aiModelConfig: aiModelConfigService,
     aiProviderCatalog: aiProviderCatalogService,
     modelQuotaPolicy,
@@ -1754,6 +1804,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     foodImageDispatchSecret: env.FOOD_IMAGE_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
     visionAnalysisDispatchSecret: env.VISION_ANALYSIS_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
     visionAnalysisReaperSecret: env.VISION_ANALYSIS_REAPER_SECRET || env.AI_WORKER_SHARED_SECRET || "",
+    reminderDispatchSecret: env.REMINDER_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
     avatar,
     accountDeletion,
     operationGuard,
@@ -1837,6 +1888,7 @@ function authErrorStatus(code) {
   if (code === "AUTH_EMAIL_ALREADY_REGISTERED") return 409;
   if (code === "AUTH_PHONE_ALREADY_REGISTERED") return 409;
   if (code === "AUTH_PROVIDER_UNAVAILABLE") return 503;
+  if (code === "AUTH_UNAVAILABLE") return 503;
   return 400;
 }
 
@@ -1859,9 +1911,9 @@ async function handleAuthRoute({ req, res, route, service }) {
     const body = req.method === "POST" ? await readJsonBody(req) : null;
     let result;
     if (route === "/auth/captcha") result = await service.auth.getCaptcha();
-    else if (route === "/auth/register/email/send-code") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "register", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
+    else if (route === "/auth/register/email/send-code") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "register", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer, traceId: res.__traceId });
     else if (route === "/auth/register/email") result = await service.auth.registerEmail(body);
-    else if (route === "/auth/register/phone/send-code") result = await service.auth.sendVerificationCode({ targetType: "phone", target: body.phone, purpose: "register", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
+    else if (route === "/auth/register/phone/send-code") result = await service.auth.sendVerificationCode({ targetType: "phone", target: body.phone, purpose: "register", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer, traceId: res.__traceId });
     else if (route === "/auth/register/phone") result = await service.auth.registerPhone(body);
     else if (route === "/auth/login/email") {
       const forwardedFor = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
@@ -1872,12 +1924,13 @@ async function handleAuthRoute({ req, res, route, service }) {
       result = await service.auth.loginPhone({ ...body, ip: forwardedFor || req.socket?.remoteAddress || "unknown" });
     }
     else if (route === "/auth/login/google") result = await service.auth.loginGoogle(body);
-    else if (route === "/auth/password/forgot/email") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "reset_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
-    else if (route === "/auth/password/forgot/phone") result = await service.auth.sendVerificationCode({ targetType: "phone", target: body.phone, purpose: "reset_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer });
+    else if (route === "/auth/password/forgot/email") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "reset_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer, traceId: res.__traceId });
+    else if (route === "/auth/password/forgot/phone") result = await service.auth.sendVerificationCode({ targetType: "phone", target: body.phone, purpose: "reset_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer, traceId: res.__traceId });
     else if (route === "/auth/password/reset") result = await service.auth.resetPassword(body);
     else result = await service.auth.getMe(readBearerToken(req));
     sendJson(res, 200, result);
   } catch (error) {
+    captureTraceError(res, error);
     const code = error?.code || (error instanceof PublicLoginError ? error.code : "AUTH_UNAVAILABLE");
     sendJson(res, authErrorStatus(code), { code });
   }
@@ -1902,10 +1955,26 @@ function getDataOperation(pathname) {
 
 function getMealRoute(pathname) {
   const path = pathname.replace(/^\/get-login-ticket/, "");
+  if (path === '/meal-templates') return { operation: 'templates' };
+  const templateMatch = path.match(/^\/meal-templates\/([0-9a-f-]{36})$/i);
+  if (templateMatch) return { operation: 'template', mealId: templateMatch[1] };
   if (path === "/meal-analysis") return { operation: "createAnalysis" };
   if (path === "/meals") return { operation: "meals" };
   const match = path.match(/^\/meals\/([0-9a-f-]{36})$/i);
   return match ? { operation: "meal", mealId: match[1] } : null;
+}
+
+function getPushRoute(pathname) {
+  const path = pathname.replace(/^\/get-login-ticket/, "");
+  if (path === "/push-delivery/native-ack") return { operation: "nativeDeliveryAck" };
+  if (path === "/push-delivery/ack") return { operation: "deliveryAck" };
+  if (path === "/smart-reminders") return { operation: "smartReminders" };
+  return path === "/push-tokens" ? { operation: "token" } : null;
+}
+
+function getInternalReminderRoute(pathname) {
+  const path = normalizeFoodImageDispatchPath(pathname);
+  return path === "/api/internal/push-reminders/dispatch" ? { operation: "dispatchReminders" } : null;
 }
 
 function getInsightRoute(pathname) {
@@ -1973,6 +2042,11 @@ function getAdminFoodRoute(pathname) {
   if (!stripped.startsWith("/api/admin")) return null;
   const path = stripped.replace(/^\/api\/admin/, "") || "/";
   if (path === "/users") return { operation: "listUsers" };
+  const verificationResendMatch = path.match(/^\/verification-codes\/([^/]+)\/resend$/i);
+  if (verificationResendMatch) return { operation: "verificationResend", verificationId: decodeURIComponent(verificationResendMatch[1]) };
+  const verificationDetailMatch = path.match(/^\/verification-codes\/([^/]+)$/i);
+  if (verificationDetailMatch) return { operation: "verificationDetail", verificationId: decodeURIComponent(verificationDetailMatch[1]) };
+  if (path === "/verification-codes") return { operation: "verificationList" };
   const userTimelineMatch = path.match(/^\/users\/([^/]+)\/timeline$/i);
   if (userTimelineMatch) return { operation: "userTimeline", userId: decodeURIComponent(userTimelineMatch[1]) };
   const userDetailMatch = path.match(/^\/users\/([^/]+)$/i);
@@ -1990,6 +2064,9 @@ function getAdminFoodRoute(pathname) {
   if (aiModelItemMatch) return { operation: "aiModelItem", modelId: decodeURIComponent(aiModelItemMatch[1]) };
   if (path === "/ai/models") return { operation: "aiModels" };
   if (path === "/jobs") return { operation: "jobList" };
+  const pushStatusMatch = path.match(/^\/push\/test\/([0-9a-f-]{36})$/i);
+  if (pushStatusMatch) return { operation: "pushStatus", deliveryId: pushStatusMatch[1] };
+  if (path === "/push/test") return { operation: "testPush" };
   const jobRunMatch = path.match(/^\/jobs\/([a-z0-9_-]+)\/run-now$/i);
   if (jobRunMatch) return { operation: "jobRunNow", jobKey: jobRunMatch[1] };
   if (path === "/system/health") return { operation: "systemHealth" };
@@ -2132,7 +2209,9 @@ function isAvatarRoute(pathname) {
 }
 
 function getGenericTraceFeature(routes) {
+  if (routes.pushRoute || routes.adminFoodRoute?.operation === "testPush") return "push";
   if (routes.adminFoodRoute || routes.internalFoodImageRoute || routes.internalVisionAnalysisRoute) return "admin";
+  if (routes.authRoute) return "auth";
   if (routes.coachOperation) return "coach";
   if (routes.visionAnalysisStatusRoute || routes.visionRoute) return "vision";
   if (routes.mealRoute) return "meals";
@@ -2150,6 +2229,8 @@ function captureTraceError(res, error) {
     name: error?.name,
     code: error?.code,
     message: error?.message,
+    authReason: error?.authReason,
+    verificationAttempts: error?.verificationAttempts,
   });
 }
 
@@ -2175,6 +2256,7 @@ function createHttpServer({ service }) {
     const url = new URL(req.url || "/", "http://127.0.0.1");
     const dataOperation = getDataOperation(url.pathname);
     const mealRoute = getMealRoute(url.pathname);
+    const pushRoute = getPushRoute(url.pathname);
     const insightOperation = getInsightRoute(url.pathname);
     const achievementCelebrationRoute = getAchievementCelebrationRoute(url.pathname);
     const milestoneRoute = getMilestoneRoute(url.pathname);
@@ -2183,16 +2265,13 @@ function createHttpServer({ service }) {
     const adminFoodRoute = getAdminFoodRoute(url.pathname);
     const internalFoodImageRoute = getInternalFoodImageRoute(url.pathname);
     const internalVisionAnalysisRoute = getInternalVisionAnalysisRoute(url.pathname);
+    const internalReminderRoute = getInternalReminderRoute(url.pathname);
     const feedbackRoute = getFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
     const visionAnalysisStatusRoute = getVisionAnalysisStatusRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
     const authRoute = getAuthRoute(url.pathname);
-    if (authRoute) {
-      await handleAuthRoute({ req, res, route: authRoute, service });
-      return;
-    }
-    const traceRoutes = { dataOperation, mealRoute, insightOperation, achievementCelebrationRoute, milestoneRoute, coachOperation, foodRoute, adminFoodRoute, internalFoodImageRoute, internalVisionAnalysisRoute, feedbackRoute, visionRoute, visionAnalysisStatusRoute, avatarRoute };
+    const traceRoutes = { authRoute, dataOperation, mealRoute, pushRoute, insightOperation, achievementCelebrationRoute, milestoneRoute, coachOperation, foodRoute, adminFoodRoute, internalFoodImageRoute, internalVisionAnalysisRoute, internalReminderRoute, feedbackRoute, visionRoute, visionAnalysisStatusRoute, avatarRoute };
     const genericTrace = service?.observability?.startTrace && !visionRoute
       ? service.observability.startTrace({
         feature: getGenericTraceFeature(traceRoutes),
@@ -2201,7 +2280,7 @@ function createHttpServer({ service }) {
       : null;
     if (genericTrace) {
       res.__traceId = genericTrace.traceId;
-      res.__traceContext = { request: { method: req.method, route: url.pathname, query: Object.fromEntries(url.searchParams.entries()) }, response: null };
+      res.__traceContext = { trace: genericTrace, request: { method: req.method, route: url.pathname, query: Object.fromEntries(url.searchParams.entries()) }, response: null };
       req.__traceContext = res.__traceContext;
       res.once("finish", () => {
         const status = res.statusCode >= 400 ? (res.statusCode === 408 ? "timed_out" : "failed") : "succeeded";
@@ -2224,9 +2303,28 @@ function createHttpServer({ service }) {
         }).catch(() => {});
       });
     }
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !dataOperation && !mealRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !internalVisionAnalysisRoute && !feedbackRoute && !visionRoute && !visionAnalysisStatusRoute && !avatarRoute) {
+    if (authRoute) {
+      await handleAuthRoute({ req, res, route: authRoute, service });
+      return;
+    }
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !authRoute && !dataOperation && !mealRoute && !pushRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !internalVisionAnalysisRoute && !internalReminderRoute && !feedbackRoute && !visionRoute && !visionAnalysisStatusRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
+    }
+    if (internalReminderRoute) {
+      if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      try {
+        const payload = await readRawJsonBody(req);
+        const path = normalizeFoodImageDispatchPath(url.pathname);
+        if (!verifyReminderDispatchSignature(service?.reminderDispatchSecret, req, { path, body: payload.raw })) {
+          return sendJson(res, 401, { code: "UNAUTHORIZED" });
+        }
+        return sendJson(res, 200, await service.scheduledReminders.dispatch({ limit: payload.body?.limit }));
+      } catch (error) {
+        captureTraceError(res, error);
+        console.error("[push-reminder-dispatch] failed:", error?.code || error?.message || error);
+        return sendJson(res, 503, { code: "REMINDER_DISPATCH_FAILED" });
+      }
     }
     if (internalVisionAnalysisRoute) {
       if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -2513,6 +2611,35 @@ function createHttpServer({ service }) {
       const session = requireAdminConsoleSession(service, req);
       if (!session?.sub) return sendJson(res, 401, { code: "UNAUTHORIZED", message: "请先使用帐号密码登录后台" });
       try {
+        if (adminFoodRoute.operation === "testPush") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.push?.sendTest) return sendJson(res, 503, { code: "PUSH_SERVICE_UNAVAILABLE" });
+          const body = await readJsonBody(req, 16 * 1024);
+          const result = await service.push.sendTest({ userId: body?.userId, mealType: body?.mealType, scenario: body?.scenario, traceId: res.__traceId });
+          service.observability?.recordStage?.(res.__traceContext?.trace, {
+            name: "fcm_send",
+            status: "succeeded",
+            provider: "fcm",
+            providerHttpStatus: 200,
+          });
+          Promise.resolve(service.adminAudit?.record?.({
+            actorUserId: session.sub,
+            action: "push.test",
+            resourceType: "device_push",
+            resourceId: String(body?.userId || "").slice(0, 128),
+            result: "succeeded",
+            after: { mealType: body?.mealType, scenario: body?.scenario || "meal", sent: result.sent, accepted: result.accepted, invalidated: result.invalidated },
+            traceId: res.__traceId || null,
+          })).catch(() => {});
+          return sendJson(res, 200, { ...result, traceId: res.__traceId || null });
+        }
+        if (adminFoodRoute.operation === "pushStatus") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.push?.getDeliveryStatus) return sendJson(res, 503, { code: "PUSH_SERVICE_UNAVAILABLE" });
+          const result = await service.push.getDeliveryStatus(adminFoodRoute.deliveryId);
+          if (!result) return sendJson(res, 404, { code: "PUSH_DELIVERY_NOT_FOUND" });
+          return sendJson(res, 200, result);
+        }
         if (adminFoodRoute.operation === "aiModels") {
           if (!service.aiModelConfig) return sendJson(res, 503, { code: "AI_MODEL_CONFIG_UNAVAILABLE" });
           if (req.method === "GET") return sendJson(res, 200, await service.aiModelConfig.listModels(session.sub));
@@ -2574,6 +2701,29 @@ function createHttpServer({ service }) {
             ? await service.userOps.getUserDetail(session.sub, adminFoodRoute.userId)
             : await service.userOps.getUserTimeline(session.sub, adminFoodRoute.userId);
           return sendJson(res, 200, result);
+        }
+        if (adminFoodRoute.operation === "verificationList") {
+          if (!service.verificationCenter) return sendJson(res, 503, { code: "VERIFICATION_CENTER_UNAVAILABLE" });
+          if (req.method === "GET") {
+            return sendJson(res, 200, await service.verificationCenter.list(session.sub, {
+              targetType: url.searchParams.get("targetType") || undefined,
+              purpose: url.searchParams.get("purpose") || undefined,
+              status: url.searchParams.get("status") || undefined,
+              userId: url.searchParams.get("userId") || undefined,
+              limit: url.searchParams.get("limit"),
+            }));
+          }
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "verificationDetail") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.verificationCenter) return sendJson(res, 503, { code: "VERIFICATION_CENTER_UNAVAILABLE" });
+          return sendJson(res, 200, await service.verificationCenter.get(session.sub, adminFoodRoute.verificationId));
+        }
+        if (adminFoodRoute.operation === "verificationResend") {
+          if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.verificationCenter) return sendJson(res, 503, { code: "VERIFICATION_CENTER_UNAVAILABLE" });
+          return sendJson(res, 200, await service.verificationCenter.resend(session.sub, adminFoodRoute.verificationId, { traceId: res.__traceId }));
         }
         if (adminFoodRoute.operation === "systemHealth") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
@@ -3217,6 +3367,11 @@ function createHttpServer({ service }) {
           return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
         }
       } catch (error) {
+        captureTraceError(res, error);
+        if (error instanceof PushNotificationError) {
+          const status = error.code === "PUSH_DATABASE_FAILED" || error.code === "FCM_NOT_CONFIGURED" || error.code === "FCM_AUTH_FAILED" || error.code === "FCM_AUTH_TIMEOUT" || error.code === "FCM_SEND_FAILED" || error.code === "FCM_UNAVAILABLE" ? 503 : 400;
+          return sendJson(res, status, { code: error.code, message: error.message });
+        }
         if (error instanceof ModelQuotaPolicyError) {
           const status = error.code.endsWith("_READ_FAILED") || error.code.endsWith("_SAVE_FAILED") || error.code.endsWith("_UNAVAILABLE") ? 503 : 400;
           return sendJson(res, status, { code: error.code, ...(status === 400 ? { message: error.message } : {}) });
@@ -3251,6 +3406,16 @@ function createHttpServer({ service }) {
             : 503;
           return sendJson(res, status, { code });
         }
+        if (error instanceof VerificationCenterError) {
+          const code = error.code;
+          const status = code === "FORBIDDEN" ? 403
+            : code === "UNAUTHORIZED" ? 401
+            : code === "VERIFICATION_NOT_FOUND" ? 404
+            : code === "AUTH_NOT_CONFIGURED" ? 503
+            : code === "AUTH_PROVIDER_UNAVAILABLE" ? 503
+            : 400;
+          return sendJson(res, status, { code });
+        }
         if (error instanceof FoodAdminError || error instanceof FoodImageJobError || error instanceof FoodImageBatchError || error instanceof FoodImagePatrolError || error instanceof HunyuanImageError) {
           const code = error.code;
           const status = code === "FORBIDDEN" ? 403
@@ -3266,11 +3431,60 @@ function createHttpServer({ service }) {
         return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE", message: error?.message || "FOOD_ADMIN_UNAVAILABLE" });
       }
     }
+    if (pushRoute?.operation === "nativeDeliveryAck") {
+      if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      if (!service.push?.acknowledgeNativeDelivery) return sendJson(res, 503, { code: "PUSH_SERVICE_UNAVAILABLE" });
+      try {
+        return sendJson(res, 200, await service.push.acknowledgeNativeDelivery(await readJsonBody(req, 16 * 1024)));
+      } catch (error) {
+        captureTraceError(res, error);
+        if (error instanceof PushNotificationError) {
+          const status = error.code === "PUSH_DATABASE_FAILED" ? 503 : 400;
+          return sendJson(res, status, { code: error.code, message: error.message });
+        }
+        console.error("[push] native receipt failed:", error?.message || error);
+        return sendJson(res, 503, { code: "PUSH_SERVICE_UNAVAILABLE" });
+      }
+    }
+    if (pushRoute) {
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.push) return sendJson(res, 503, { code: "PUSH_SERVICE_UNAVAILABLE" });
+      try {
+        if (pushRoute.operation === "deliveryAck" && req.method === "POST") {
+          if (!service.push.acknowledgeDelivery) return sendJson(res, 503, { code: "PUSH_SERVICE_UNAVAILABLE" });
+          return sendJson(res, 200, await service.push.acknowledgeDelivery(session.sub, await readJsonBody(req, 16 * 1024)));
+        }
+        if (pushRoute.operation === "smartReminders" && req.method === "PUT") {
+          return sendJson(res, 200, await service.scheduledReminders.sync(session.sub, await readJsonBody(req, 16 * 1024)));
+        }
+        if (pushRoute.operation === "token" && req.method === "POST") {
+          return sendJson(res, 200, await service.push.registerToken(session.sub, await readJsonBody(req, 16 * 1024)));
+        }
+        if (pushRoute.operation === "token" && req.method === "DELETE") {
+          return sendJson(res, 200, await service.push.unregisterToken(session.sub, await readJsonBody(req, 16 * 1024)));
+        }
+        return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      } catch (error) {
+        captureTraceError(res, error);
+        if (error instanceof PushNotificationError) {
+          const status = error.code === "PUSH_DATABASE_FAILED" || error.code === "FCM_UNAVAILABLE" ? 503 : 400;
+          return sendJson(res, status, { code: error.code, message: error.message });
+        }
+        console.error("[push] token request failed:", error?.message || error);
+        return sendJson(res, 503, { code: "PUSH_SERVICE_UNAVAILABLE" });
+      }
+    }
     if (mealRoute) {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       if (!service.meals) return sendJson(res, 401, { code: "UNAUTHORIZED" });
       try {
+        if (mealRoute.operation === 'templates' && req.method === 'GET') return sendJson(res, 200, await service.mealTemplates.list(session.sub));
+        if (mealRoute.operation === 'templates' && req.method === 'POST') return sendJson(res, 200, await service.mealTemplates.save(session.sub, await readJsonBody(req)));
+        if (mealRoute.operation === 'template' && req.method === 'GET') return sendJson(res, 200, await service.mealTemplates.get(session.sub, mealRoute.mealId));
+        if (mealRoute.operation === 'template' && req.method === 'PATCH') return sendJson(res, 200, await service.mealTemplates.update(session.sub, mealRoute.mealId, await readJsonBody(req)));
+        if (mealRoute.operation === 'template' && req.method === 'DELETE') return sendJson(res, 200, await service.mealTemplates.remove(session.sub, mealRoute.mealId));
         if (mealRoute.operation === "meals" && req.method === "GET") {
           const date = url.searchParams.get("date");
           const from = url.searchParams.get("from");
@@ -4137,7 +4351,26 @@ function createHttpServer({ service }) {
         const formulaPlan = formulaNutritionPlanFallback(body);
         let aiPlan = null;
         if (typeof service.calculateNutritionPlan === "function") {
-          aiPlan = await service.calculateNutritionPlan(body);
+          // AI only enriches the insight; formula targets must not wait for model retries.
+          const controller = new AbortController();
+          let timer;
+          const deadline = new Promise((resolve) => {
+            timer = setTimeout(() => {
+              resolve(null);
+              controller.abort();
+            }, 5_000);
+          });
+          try {
+            aiPlan = await Promise.race([
+              service.calculateNutritionPlan(body, { signal: controller.signal }),
+              deadline,
+            ]);
+          } catch {
+            // Keep the existing formula insight when the optional provider fails.
+            console.warn("[nutrition-plan/preview] optional insight unavailable; using formula");
+          } finally {
+            clearTimeout(timer);
+          }
         }
         if (aiPlan?.usage && aiPlan?.model) {
           recordModelUsage(service.observability, {

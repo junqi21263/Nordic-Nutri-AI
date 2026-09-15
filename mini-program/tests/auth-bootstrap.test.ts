@@ -5,6 +5,20 @@ const session = { accessToken: "access", refreshToken: "refresh" };
 const user = { id: "user-1" };
 
 describe("auth bootstrap", () => {
+  it.each([{ code: "AUTH_NETWORK_ERROR" }, { status: 503 }])("preserves Android sessions on transient errors %j and permits retry", async (error) => {
+    const clear = vi.fn();
+    const bootstrap = createAuthBootstrap({
+      preserveSessionOnError: true,
+      restore: vi.fn().mockResolvedValue(session),
+      getUser: vi.fn().mockRejectedValueOnce(error).mockResolvedValue(user),
+      refresh: vi.fn(), login: vi.fn(), loadIdentity: vi.fn(), clear,
+    });
+    await expect(bootstrap.start()).rejects.toEqual(error);
+    expect(clear).not.toHaveBeenCalled();
+    expect(bootstrap.getState().status).not.toBe("authenticated");
+    await bootstrap.start();
+    expect(bootstrap.getState().status).toBe("authenticated");
+  });
   it("restores a verified session without calling wx.login", async () => {
     const login = vi.fn();
     const bootstrap = createAuthBootstrap({
@@ -26,6 +40,7 @@ describe("auth bootstrap", () => {
     const refresh = vi.fn().mockResolvedValue(null);
     const clear = vi.fn();
     const bootstrap = createAuthBootstrap({
+      preserveSessionOnError: true,
       restore: vi.fn().mockResolvedValue(session),
       getUser: vi.fn().mockRejectedValue({ status: 401 }),
       refresh,

@@ -24,7 +24,7 @@ export function FeedbackHost({ enabled = true }: { enabled?: boolean }) {
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = setTimeout(clear, feedbackDuration);
+    const timer = setTimeout(clear, toast.presentation === "status" ? 1700 : feedbackDuration);
     return () => clearTimeout(timer);
   }, [toast, clear]);
 
@@ -32,6 +32,6 @@ export function FeedbackHost({ enabled = true }: { enabled?: boolean }) {
   // may own the shared overlay, otherwise the same modal would render twice.
   if (!enabled) return null;
   if (modal) return <FeedbackModal modal={modal} onDismiss={closeModal} />;
-  if (!toast || (hasNativeToastBridge() && toast.presentation !== "prominent")) return null;
+  if (!toast || (hasNativeToastBridge() && toast.presentation !== "prominent" && toast.presentation !== "status")) return null;
   return <Toast message={toast.message} tone={toast.tone} presentation={toast.presentation} />;
 }

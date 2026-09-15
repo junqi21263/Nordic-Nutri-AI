@@ -7,7 +7,6 @@ import android.webkit.JavascriptInterface;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
-import java.security.SecureRandom;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -52,17 +51,20 @@ final class SecureStorageBridge {
     public synchronized void set(String key, String value) {
         if (!validKey(key) || value == null) return;
         try {
-            byte[] iv = new byte[IV_LENGTH_BYTES];
-            new SecureRandom().nextBytes(iv);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, loadKey(), new GCMParameterSpec(TAG_LENGTH_BITS, iv));
+            // AndroidKeyStore requires provider-generated IVs for randomized encryption.
+            cipher.init(Cipher.ENCRYPT_MODE, loadKey());
+            byte[] iv = cipher.getIV();
             byte[] ciphertext = cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
             byte[] packed = new byte[iv.length + ciphertext.length];
             System.arraycopy(iv, 0, packed, 0, iv.length);
             System.arraycopy(ciphertext, 0, packed, iv.length, ciphertext.length);
-            preferences.edit().putString(key, Base64.encodeToString(packed, Base64.NO_WRAP)).apply();
+            if (!preferences.edit().putString(key, Base64.encodeToString(packed, Base64.NO_WRAP)).commit()) {
+                throw new IllegalStateException("Secure storage write failed");
+            }
         } catch (Exception ignored) {
-            // A failed secure write must not fall back to plaintext storage.
+            // Never include credentials in logs or fall back to plaintext.
+            android.util.Log.e("NordicSecureStorage", "Secure storage write failed");
         }
     }
 

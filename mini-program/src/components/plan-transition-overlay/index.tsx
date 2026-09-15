@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import { useEffect, useState } from "react";
 import { NordicIcon } from "../nordic-icon";
 import { StitchPlanProcessingCanvas } from "../stitch-plan-processing-canvas";
 import "./index.scss";
@@ -22,8 +23,38 @@ export function PlanTransitionOverlay({
   phase,
   variant,
 }: PlanTransitionOverlayProps) {
+  const android = process.env.TARO_APP_PLATFORM === "android";
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!android || !visible || phase !== "processing") return;
+    setElapsed(0);
+    const start = Date.now();
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [android, visible, phase]);
   if (!visible) return null;
   const label = copyByVariant[variant];
+  if (android) {
+    return (
+      <View className="plan-transition-overlay plan-transition-overlay--android" ariaLabel={label}>
+        <View className="plan-transition-overlay__center">
+          {phase === "completing" ? (
+            <View className="plan-transition-overlay__initial-completion-mark">
+              <NordicIcon name="check-inverse" size={28} ariaLabel="计划生成完成" />
+            </View>
+          ) : <View className="plan-transition-overlay__android-spinner" />}
+          <Text className="plan-transition-overlay__android-title">
+            {phase === "completing" ? "计划已生成" : label}
+          </Text>
+          <Text className="plan-transition-overlay__android-copy">
+            {phase === "completing" ? "正在打开你的计划" : elapsed >= 10
+              ? `已等待 ${elapsed} 秒，服务仍在处理中，请稍候`
+              : "正在根据你的资料与饮食偏好生成，请稍候"}
+          </Text>
+        </View>
+      </View>
+    );
+  }
   const initial = variant === "initial";
   return (
     <View

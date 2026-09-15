@@ -1,10 +1,10 @@
-import Taro from "@tarojs/taro";
+import { productTransport } from "../platform/product-transport";
 import { useAuthStore } from "../auth/auth-store";
 import { clearInvalidSession } from "../auth/session-manager";
 import { clearProductLocalState } from "../features/account-cancellation/clear-local-state";
 import { productApiEndpoint } from "./product-api-config";
 
-export type ProductApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
+export type ProductApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 interface ProductApiRequest {
   method: ProductApiMethod;
@@ -19,7 +19,7 @@ const DEFAULT_PRODUCT_API_TIMEOUT_MS = 15_000;
 export async function requestProductApi<T>(path: string, request: ProductApiRequest): Promise<T> {
   const token = useAuthStore.getState().session?.accessToken;
   if (!token) throw new Error("登录状态已失效，请重新登录");
-  const response = await Taro.request<unknown>({
+  const response = await productTransport<unknown>({
     url: `${productApiEndpoint}${path}`,
     method: request.method,
     header: {

@@ -378,7 +378,7 @@ export default function NutritionPlanPage() {
         shouldPreparePlanReady ? "page-layout--nutrition-plan-animated" : ""
       }`}
     >
-      <View className={`nutrition-plan-page ${
+      <View className={`nutrition-plan-page ${process.env.TARO_APP_PLATFORM === "android" ? "nutrition-plan-page--android" : ""} ${
         shouldPreparePlanReady ? "nutrition-plan-page--entering" : ""
       } ${regenerated ? "nutrition-plan-page--regenerated" : ""} ${
         initialPlanEntry && shouldAnimatePlanReady

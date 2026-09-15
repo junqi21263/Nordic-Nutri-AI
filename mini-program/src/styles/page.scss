@@ -189,7 +189,8 @@
   line-height: 40rpx;
   margin-bottom: 16rpx;
 }
-.meal-saved-celebration__progress-head text:last-child {
+.meal-saved-celebration__progress-head text:last-child ,
+.meal-saved-celebration__progress-head taro-text-core:last-child {
   color: #173124;
   font-size: 24rpx;
   font-weight: 600;
@@ -379,7 +380,8 @@
 .meal-records-page__day--muted {
   opacity: 0.36;
 }
-.meal-records-page__day text {
+.meal-records-page__day text ,
+.meal-records-page__day taro-text-core {
   align-items: center;
   border-radius: $radius-full;
   display: flex;
@@ -387,12 +389,14 @@
   justify-content: center;
   width: 56px;
 }
-.meal-records-page__day--recorded text {
+.meal-records-page__day--recorded text ,
+.meal-records-page__day--recorded taro-text-core {
   background: rgba($color-sage-green, 0.42);
   color: $color-forest-green;
   font-weight: $font-weight-semibold;
 }
-.meal-records-page__day--active text {
+.meal-records-page__day--active text ,
+.meal-records-page__day--active taro-text-core {
   background: $color-forest-green;
   box-shadow: $shadow-small;
   color: $color-warm-white;
@@ -427,7 +431,8 @@
   font-weight: $font-weight-semibold;
   margin-top: $space-8;
 }
-.meal-records-page__summary-kcal text {
+.meal-records-page__summary-kcal text ,
+.meal-records-page__summary-kcal taro-text-core {
   color: $color-text-secondary;
   font-size: $font-body;
   font-weight: $font-weight-regular;
@@ -482,7 +487,8 @@
   display: flex;
   gap: 6px;
 }
-.meal-records-page__summary-macro-label text {
+.meal-records-page__summary-macro-label text ,
+.meal-records-page__summary-macro-label taro-text-core {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
@@ -615,7 +621,8 @@
   flex-wrap: wrap;
   gap: $space-4;
 }
-.meal-records-page__meal-tags text {
+.meal-records-page__meal-tags text ,
+.meal-records-page__meal-tags taro-text-core {
   background: $color-soft-beige;
   border-radius: $radius-4;
   color: $color-text-secondary;
@@ -629,7 +636,8 @@
   font-weight: $font-weight-semibold;
   white-space: nowrap;
 }
-.meal-records-page__meal-kcal text {
+.meal-records-page__meal-kcal text ,
+.meal-records-page__meal-kcal taro-text-core {
   color: $color-text-secondary;
   font-size: $font-overline;
   font-weight: $font-weight-medium;
@@ -914,7 +922,8 @@
   font-weight: $font-weight-semibold;
   line-height: 1;
 }
-.macro-number__value Text {
+.macro-number__value Text ,
+.macro-number__value taro-text-core {
   font-size: $font-overline;
 }
 .meal-list {
@@ -1091,7 +1100,8 @@
   text-align: center;
   width: 84px;
 }
-.date-rail__item Text {
+.date-rail__item Text ,
+.date-rail__item taro-text-core {
   color: $color-text-primary;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
@@ -1101,7 +1111,8 @@
   border-radius: $radius-16;
   color: $color-sage-green;
 }
-.date-rail__item--active Text {
+.date-rail__item--active Text ,
+.date-rail__item--active taro-text-core {
   color: $color-warm-white;
 }
 .coach-intro {
@@ -1601,10 +1612,19 @@
 .coach-chat__progress-heading {
   align-items: flex-start;
 }
+.coach-chat__progress-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
 .coach-chat__progress-score-group {
   align-items: center;
   display: flex;
+  flex: 0 0 auto;
   gap: $space-4;
+  margin-right: 42px;
 }
 .coach-chat__progress-title {
   color: $color-text-primary;
@@ -1736,6 +1756,7 @@
   display: flex;
   flex-direction: column;
   gap: $space-20;
+  padding-bottom: calc(176px + $safe-area-bottom);
 }
 .portion-adjustment-page__page-title,
 .meal-detail-page__page-title {
@@ -1893,7 +1914,8 @@
   justify-content: space-between;
   margin-bottom: -$space-12;
 }
-.profile-rhythm__section-head > Text:last-child {
+.profile-rhythm__section-head > Text:last-child ,
+.profile-rhythm__section-head > taro-text-core:last-child {
   color: $color-forest-green;
   font-size: $font-caption;
 }
@@ -1932,33 +1954,53 @@
   justify-content: space-between;
   padding: $space-16;
 }
-.profile-rhythm__weekly-review > View:first-child {
+.profile-rhythm__weekly-copy {
   display: flex;
   flex-direction: column;
   gap: $space-4;
+  min-width: 0;
 }
-.profile-rhythm__weekly-review > View:first-child > Text:first-child {
+.profile-rhythm__weekly-title {
   color: $color-forest-green;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
 }
-.profile-rhythm__weekly-review > View:first-child > Text:last-child {
+.profile-rhythm__weekly-description {
   color: $color-text-secondary;
   font-size: $font-overline;
+  line-height: $line-caption;
 }
 .profile-rhythm__weekly-score {
   align-items: baseline;
   color: $color-forest-green;
   display: flex;
+  flex: 0 0 auto;
   gap: 4px;
 }
-.profile-rhythm__weekly-score > Text:first-child,
-.profile-rhythm__weekly-score > Text:last-child {
+.profile-rhythm__weekly-score-label,
+.profile-rhythm__weekly-score-suffix {
   font-size: $font-overline;
 }
-.profile-rhythm__weekly-score > Text:nth-child(2) {
+.profile-rhythm__weekly-score-value {
   font-size: $font-h1;
   font-weight: $font-weight-semibold;
+}
+.profile-rhythm__entry-sections {
+  display: flex;
+  flex-direction: column;
+  gap: $space-20;
+}
+.profile-rhythm__settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: $space-8;
+}
+.profile-rhythm__settings-label {
+  color: $color-text-secondary;
+  font-size: $font-overline;
+  font-weight: $font-weight-semibold;
+  letter-spacing: 1.2px;
+  padding: 0 $space-4;
 }
 .profile-rhythm__settings-group {
   background: $color-surface;
@@ -1969,6 +2011,74 @@
 }
 .profile-rhythm__settings-group > View + View .list-item {
   border-top: 1px solid $color-divider;
+}
+.profile-rhythm__recommend-card {
+  align-items: center;
+  background: $color-soft-beige;
+  border: 1px solid rgba($color-forest-green, 0.06);
+  border-radius: $radius-16;
+  display: flex;
+  gap: $space-12;
+  min-height: 96px;
+  padding: $space-12 $space-16;
+  transition:
+    transform $duration-press $ease-standard,
+    opacity $duration-press $ease-standard;
+}
+.profile-rhythm__recommend-card:active {
+  opacity: 0.9;
+  transform: scale(0.98);
+}
+.profile-rhythm__recommend-icon {
+  align-items: center;
+  background: rgba($color-surface, 0.82);
+  border-radius: $radius-12;
+  display: flex;
+  flex: 0 0 auto;
+  height: 64px;
+  justify-content: center;
+  width: 64px;
+}
+.profile-rhythm__recommend-copy,
+.profile-rhythm__logout-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: $space-4;
+  min-width: 0;
+}
+.profile-rhythm__recommend-title {
+  color: $color-forest-green;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
+}
+.profile-rhythm__recommend-description,
+.profile-rhythm__logout-description {
+  color: $color-text-secondary;
+  font-size: $font-overline;
+  line-height: $line-caption;
+}
+.profile-rhythm__recommend-trailing {
+  color: $color-forest-green;
+  flex: 0 0 auto;
+  font-size: $font-h3;
+  font-weight: $font-weight-semibold;
+}
+.profile-rhythm__logout {
+  align-items: center;
+  color: $color-error;
+  display: flex;
+  gap: $space-12;
+  min-height: 64px;
+  padding: 0 $space-4;
+}
+.profile-rhythm__logout:active {
+  opacity: 0.72;
+}
+.profile-rhythm__logout-title {
+  color: $color-error;
+  font-size: $font-body;
+  font-weight: $font-weight-semibold;
 }
 .profile-sheet {
   min-height: 720px;
@@ -2043,10 +2153,21 @@
   font-size: $font-body;
   line-height: $line-body;
   min-height: 416px;
+  overflow-y: auto;
   padding: $space-12;
   white-space: pre-wrap;
   word-break: break-all;
   width: 100%;
+}
+.profile-sheet--info .profile-modal__lead {
+  font-size: $font-caption;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+@media (max-width: 359px) {
+  .profile-sheet--info .profile-modal__lead {
+    white-space: normal;
+  }
 }
 .profile-modal__hint {
   color: $color-text-tertiary;
@@ -2114,7 +2235,8 @@
   padding: $space-24;
   text-align: center;
 }
-.profile-feedback-empty Text:first-child {
+.profile-feedback-empty Text:first-child ,
+.profile-feedback-empty taro-text-core:first-child {
   color: $color-text-primary;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
@@ -2170,7 +2292,8 @@
   line-height: $line-body;
   padding: $space-16;
 }
-.account-cancellation__warning > Text:first-child {
+.account-cancellation__warning > Text:first-child ,
+.account-cancellation__warning > taro-text-core:first-child {
   color: $color-text-primary;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
@@ -2189,7 +2312,8 @@
   gap: $space-12;
   padding: $space-16;
 }
-.account-cancellation__step > Text:first-child {
+.account-cancellation__step > Text:first-child ,
+.account-cancellation__step > taro-text-core:first-child {
   align-items: center;
   background: $color-soft-beige;
   border-radius: $radius-full;
@@ -2206,7 +2330,8 @@
   flex-direction: column;
   gap: $space-4;
 }
-.account-cancellation__step Text:last-child {
+.account-cancellation__step Text:last-child ,
+.account-cancellation__step taro-text-core:last-child {
   color: $color-text-secondary;
   font-size: $font-caption;
   line-height: $line-body;
@@ -2279,7 +2404,8 @@
   min-height: 44px;
   padding: $space-4 $space-12;
 }
-.profile-edit__randomize Text {
+.profile-edit__randomize Text ,
+.profile-edit__randomize taro-text-core {
   font-size: $font-caption;
   font-weight: $font-weight-medium;
 }
@@ -2302,27 +2428,33 @@
   width: 56px;
 }
 .profile-form__summary > View:last-child,
+.profile-form__summary > taro-view-core:last-child,
 .profile-goal-hero > View {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 .profile-form__summary > View:last-child > Text:first-child,
-.profile-goal-hero > View > Text:first-child {
+.profile-form__summary > taro-view-core:last-child > taro-text-core:first-child,
+.profile-goal-hero > View > Text:first-child ,
+.profile-goal-hero > taro-view-core > taro-text-core:first-child {
   color: $color-text-secondary;
   font-size: $font-overline;
 }
-.profile-form__summary > View:last-child > Text:last-child {
+.profile-form__summary > View:last-child > Text:last-child ,
+.profile-form__summary > taro-view-core:last-child > taro-text-core:last-child {
   color: $color-text-primary;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
 }
-.profile-goal-hero > View > Text:first-child {
+.profile-goal-hero > View > Text:first-child ,
+.profile-goal-hero > taro-view-core > taro-text-core:first-child {
   color: $color-warm-white;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
 }
-.profile-goal-hero > View > Text:last-child {
+.profile-goal-hero > View > Text:last-child ,
+.profile-goal-hero > taro-view-core > taro-text-core:last-child {
   color: $color-sage;
   font-size: $font-overline;
 }
@@ -2344,12 +2476,15 @@
 .profile-form__field + .profile-form__field {
   border-top: 1px solid $color-divider;
 }
-.profile-form__field > Text:first-child {
+.profile-form__field > Text:first-child,
+.profile-form__field > taro-text-core:first-child,
+.profile-form__label {
   color: $color-text-primary;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
 }
 .profile-form__field > Input,
+.profile-form__field > taro-input-core,
 .profile-form__input-row {
   background: $color-warm-white;
   border: 1px solid rgba($color-divider, 0.9);
@@ -2358,6 +2493,20 @@
   font-size: $font-body;
   min-height: 84px;
   padding: 0 $space-12;
+}
+.profile-form__field > taro-input-core,
+.profile-form__input-row > taro-input-core {
+  align-items: center;
+  display: flex;
+  height: 84px;
+}
+.profile-form__input-row > taro-input-core {
+  flex: 1;
+}
+.profile-form__field > taro-input-core input {
+  box-sizing: border-box;
+  height: 84px;
+  line-height: 84px;
 }
 .profile-form__input-row {
   align-items: center;
@@ -2368,7 +2517,8 @@
   flex: 1;
   min-width: 0;
 }
-.profile-form__input-row Text {
+.profile-form__input-row Text ,
+.profile-form__input-row taro-text-core {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
@@ -2442,16 +2592,21 @@
   height: 48px;
   justify-content: center;
 }
-.profile-edit__notice > View:last-child {
+.profile-edit__notice > View:last-child,
+.profile-edit__notice > taro-view-core:last-child {
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: 4px;
+  min-width: 0;
 }
-.profile-edit__notice > View:last-child > Text:first-child {
+.profile-edit__notice > View:last-child > Text:first-child ,
+.profile-edit__notice > taro-view-core:last-child > taro-text-core:first-child {
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
 }
-.profile-edit__notice > View:last-child > Text:last-child {
+.profile-edit__notice > View:last-child > Text:last-child ,
+.profile-edit__notice > taro-view-core:last-child > taro-text-core:last-child {
   color: $color-text-secondary;
   font-size: $font-overline;
   line-height: $line-caption;
@@ -2633,6 +2788,11 @@
 .achievement-detail__badge--locked {
   background: rgba($color-divider, 0.35);
   opacity: 0.85;
+}
+.achievement-detail__badge .nordic-icon {
+  display: block;
+  flex: 0 0 auto;
+  margin: 0 auto;
 }
 .achievement-detail__title {
   color: $color-forest-green;
@@ -2863,6 +3023,28 @@
   text-align: center;
   width: 88%;
 }
+.achievement-unlock-overlay--android {
+  .achievement-unlock-overlay__backdrop { animation-duration: 600ms; }
+  .achievement-unlock-overlay__card { animation-duration: 1200ms; animation-delay: 1000ms; }
+  .achievement-unlock-overlay__icon { animation-duration: 1040ms, 4s; animation-delay: 1600ms, 2.5s; }
+  .achievement-unlock-overlay__sparkle { animation-duration: 1040ms, 4.4s; animation-delay: 1900ms, 3s; }
+  .achievement-unlock-overlay__eyebrow { animation-duration: 840ms; animation-delay: 2.3s; }
+  .achievement-unlock-overlay__title { animation-duration: 840ms; animation-delay: 2.4s; }
+  .achievement-unlock-overlay__copy { animation-duration: 840ms; animation-delay: 2.5s; }
+  .achievement-unlock-overlay__primary-action { animation-duration: 840ms; animation-delay: 2.7s; }
+  .achievement-unlock-overlay__secondary-action { animation-duration: 840ms; animation-delay: 2.9s; }
+  font-family: $font-family;
+  -webkit-text-size-adjust: 100%;
+
+  // Taro H5 aspectFit images inherit centered text and otherwise clip their right half.
+  .nordic-icon { display: block; text-align: left; }
+  .achievement-unlock-overlay__sparkle { display: flex; }
+  .achievement-unlock-overlay__eyebrow { font-size: 14PX; letter-spacing: normal; }
+  .achievement-unlock-overlay__title { font-size: 18PX; line-height: 1.4; }
+  .achievement-unlock-overlay__copy { font-size: 14PX; }
+  .achievement-unlock-overlay__primary-action { font-size: 14PX; }
+  .achievement-unlock-overlay__secondary-action { font-size: 13PX; }
+}
 @keyframes achievement-unlock-card-in {
   0% { opacity: 0; transform: translateY(50px) scale(0.8); }
   70% { opacity: 1; transform: translateY(0) scale(1.05); }
@@ -2899,18 +3081,22 @@
   display: flex;
   justify-content: space-between;
 }
-.weekly-review__hero > View:first-child {
+.weekly-review__hero-score {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
-.weekly-review__hero > View:first-child > Text:first-child {
+.weekly-review__hero-score-label {
   color: $color-sage;
+  display: block;
   font-size: $font-body;
   font-weight: $font-weight-medium;
 }
-.weekly-review__hero > View:first-child > Text:last-child {
+.weekly-review__hero-score-value {
   color: $color-warm-white;
+  display: block;
   font-size: 72px;
   font-weight: $font-weight-semibold;
   line-height: 1;
@@ -2921,16 +3107,19 @@
   flex-direction: column;
   gap: 4px;
   max-width: 46%;
+  min-width: 0;
   text-align: right;
 }
-.weekly-review__hero-aside > Text:first-child {
+.weekly-review__hero-aside-title {
   color: $color-warm-white;
+  display: block;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
   line-height: $line-caption;
 }
-.weekly-review__hero-aside > Text:last-child {
+.weekly-review__hero-aside-detail {
   color: $color-sage;
+  display: block;
   font-size: $font-overline;
   line-height: $line-caption;
 }
@@ -2939,7 +3128,7 @@
   gap: $space-8;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.weekly-review__metrics > View {
+.weekly-review__metric {
   background: $color-surface;
   border: 1px solid rgba($color-divider, 0.72);
   border-radius: $radius-12;
@@ -2947,24 +3136,30 @@
   flex-direction: column;
   gap: 4px;
   min-height: 142px;
+  min-width: 0;
   padding: $space-12;
 }
-.weekly-review__metrics Text:first-child,
-.weekly-review__metrics Text:last-child {
+.weekly-review__metric-label,
+.weekly-review__metric-detail {
   color: $color-text-secondary;
+  display: block;
   font-size: $font-overline;
+  min-width: 0;
 }
-.weekly-review__metrics Text:nth-child(2) {
+.weekly-review__metric-value {
   color: $color-forest-green;
+  display: block;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
+  white-space: nowrap;
 }
 .weekly-review__section {
   display: flex;
   flex-direction: column;
   gap: $space-12;
 }
-.weekly-review__section > Text {
+.weekly-review__section > Text ,
+.weekly-review__section > taro-text-core {
   color: $color-text-primary;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
@@ -2976,20 +3171,22 @@
   overflow: hidden;
   padding: 0 $space-16;
 }
-.weekly-review__insights > View {
+.weekly-review__insight {
   align-items: flex-start;
   display: flex;
   gap: $space-8;
   padding: $space-16 0;
 }
-.weekly-review__insights > View + View {
+.weekly-review__insight + .weekly-review__insight {
   border-top: 1px solid $color-divider;
 }
-.weekly-review__insights Text {
+.weekly-review__insight-copy {
   color: $color-text-secondary;
+  display: block;
   flex: 1;
   font-size: $font-caption;
   line-height: $line-body;
+  min-width: 0;
 }
 .weekly-review__advice {
   background: $color-soft-beige;
@@ -2998,19 +3195,22 @@
   gap: $space-12;
   padding: $space-16;
 }
-.weekly-review__advice > View {
+.weekly-review__advice-copy {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: $space-8;
+  min-width: 0;
 }
-.weekly-review__advice > View > Text:first-child {
+.weekly-review__advice-title {
   color: $color-forest-green;
+  display: block;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
 }
-.weekly-review__advice > View > Text:last-child {
+.weekly-review__advice-description {
   color: $color-text-secondary;
+  display: block;
   font-size: $font-caption;
   line-height: $line-body;
 }
@@ -3019,12 +3219,14 @@
   display: flex;
   justify-content: space-between;
 }
-.weekly-review__section-head > Text:first-child {
+.weekly-review__section-head > Text:first-child ,
+.weekly-review__section-head > taro-text-core:first-child {
   color: $color-text-primary;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
 }
-.weekly-review__section-head > Text:last-child {
+.weekly-review__section-head > Text:last-child ,
+.weekly-review__section-head > taro-text-core:last-child {
   color: $color-success;
   font-size: $font-overline;
   font-weight: $font-weight-semibold;
@@ -3074,21 +3276,25 @@
   display: flex;
   gap: $space-8;
 }
-.weekly-review__next-goals-head > View {
+.weekly-review__next-goals-copy {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
-.weekly-review__next-goals-head > View > Text:first-child {
+.weekly-review__next-goals-title {
+  display: block;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
 }
-.weekly-review__next-goals-head > View > Text:last-child {
+.weekly-review__next-goals-description {
   color: $color-text-secondary;
+  display: block;
   font-size: $font-overline;
 }
 .weekly-review__next-goal-row {
-  align-items: center;
+  align-items: flex-start;
   background: $color-surface;
   border-radius: $radius-12;
   color: $color-forest-green;
@@ -3096,18 +3302,22 @@
   gap: $space-8;
   padding: $space-12;
 }
-.weekly-review__next-goal-row > View {
+.weekly-review__next-goal-copy {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
-.weekly-review__next-goal-row > View > Text:first-child {
+.weekly-review__next-goal-title {
   color: $color-text-primary;
+  display: block;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
 }
-.weekly-review__next-goal-row > View > Text:last-child {
+.weekly-review__next-goal-description {
   color: $color-text-secondary;
+  display: block;
   font-size: $font-overline;
 }
 .weekly-review__source {
@@ -3134,7 +3344,8 @@
   padding: $space-12;
   text-align: center;
 }
-.achievement > Text:first-child {
+.achievement > Text:first-child ,
+.achievement > taro-text-core:first-child {
   font-size: $font-h2;
 }
 .achievement--locked {
@@ -3531,6 +3742,18 @@
   min-height: 108px;
 }
 
+.nutrition-plan-page--android .bottom-action-layout {
+  gap: 10PX;
+}
+
+.nutrition-plan-page--android .bottom-action-layout .app-button {
+  min-height: 44PX;
+  margin: 0;
+  padding: 10PX 20PX;
+  font-size: 14PX;
+  line-height: 1.4;
+}
+
 .nutrition-plan-page--entering .bottom-action-layout.nutrition-plan__regenerated-actions {
   background: $stitch-page-bg;
   bottom: 0;
@@ -3575,7 +3798,7 @@
 
 .onboarding-page .onboarding-heading__copy {
   font-size: 24px;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .onboarding-page .onboarding-goal-list {
@@ -3780,7 +4003,7 @@
 
 .body-profile-page .body-profile__heading .onboarding-heading__copy {
   font-size: 24px;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .diet-preferences-page .onboarding-progress {
@@ -3800,7 +4023,7 @@
 .diet-preferences-page .onboarding-heading__copy {
   font-size: 24px;
   line-height: 1.5;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .diet-preferences-page .diet-preferences-page__content {
@@ -3871,6 +4094,14 @@
   padding: calc($space-16 - 1px);
 }
 
+.diet-preferences-page__choice-name {
+  display: flex;
+  align-items: center;
+  gap: 6PX;
+  padding-right: 12PX;
+  .nordic-icon { flex-shrink: 0; }
+}
+
 .diet-preferences-page .diet-preferences-page__choice-title {
   color: $stitch-text-primary;
   display: block;
@@ -3907,12 +4138,15 @@
 }
 
 .diet-preferences-page .diet-preferences-page__tag-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: $space-8;
 }
 
 .diet-preferences-page .diet-preferences-page__tag {
+  box-sizing: border-box;
+  justify-content: center;
+  position: relative;
   align-items: center;
   background: $stitch-surface;
   border: 1px solid $stitch-border;
@@ -3922,14 +4156,15 @@
   font-size: 24px;
   font-weight: $font-weight-semibold;
   gap: 6px;
-  min-height: 64px;
-  padding: 0 $space-16;
+  min-height: 42PX;
+  padding: 0 4PX;
+  .nordic-icon { position: absolute; right: 3PX; width: 12PX !important; height: 12PX !important; }
 }
 
 .diet-preferences-page .diet-preferences-page__tag--active {
   background: $stitch-surface-green;
-  border: 2px solid $stitch-brand-green;
-  padding: 0 calc($space-16 - 1px);
+  border-color: $stitch-brand-green;
+  box-shadow: inset 0 0 0 1PX $stitch-brand-green;
 }
 
 .diet-preferences-page .diet-preferences-page__meal-count {
@@ -4423,7 +4658,8 @@
   height: 38px;
   width: 38px;
 }
-.meal-detail-page__hero--data .meal-detail-page__score-grade Text {
+.meal-detail-page__hero--data .meal-detail-page__score-grade Text ,
+.meal-detail-page__hero--data .meal-detail-page__score-grade taro-text-core {
   font-size: $font-caption;
 }
 .meal-detail-page__data-hero-arc {
@@ -4472,7 +4708,8 @@
   justify-content: center;
   width: 44px;
 }
-.meal-detail-page__score-grade Text {
+.meal-detail-page__score-grade Text ,
+.meal-detail-page__score-grade taro-text-core {
   font-size: $font-body;
   font-weight: $font-weight-semibold;
   line-height: 1;
@@ -4492,7 +4729,8 @@
   letter-spacing: -1px;
   line-height: 1;
 }
-.meal-detail-page__calories Text {
+.meal-detail-page__calories Text ,
+.meal-detail-page__calories taro-text-core {
   color: $color-text-primary;
   font-size: $font-body;
   font-weight: $font-weight-medium;
@@ -4661,12 +4899,14 @@
   flex-direction: column;
   gap: 2px;
 }
-.meal-detail-page__insight-title Text:first-child {
+.meal-detail-page__insight-title Text:first-child ,
+.meal-detail-page__insight-title taro-text-core:first-child {
   color: $color-forest-green;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
 }
-.meal-detail-page__insight-title Text:last-child {
+.meal-detail-page__insight-title Text:last-child ,
+.meal-detail-page__insight-title taro-text-core:last-child {
   color: $color-text-secondary;
   font-size: $font-overline;
 }
@@ -4696,16 +4936,19 @@
   gap: 2px;
   padding: $space-8;
 }
-.meal-detail-page__insight-detail > View Text:first-child {
+.meal-detail-page__insight-detail > View Text:first-child ,
+.meal-detail-page__insight-detail > taro-view-core taro-text-core:first-child {
   color: $color-text-secondary;
   font-size: $font-overline;
 }
-.meal-detail-page__insight-detail > View Text:last-child {
+.meal-detail-page__insight-detail > View Text:last-child ,
+.meal-detail-page__insight-detail > taro-view-core taro-text-core:last-child {
   color: $color-forest-green;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
 }
-.meal-detail-page__insight-detail > Text {
+.meal-detail-page__insight-detail > Text ,
+.meal-detail-page__insight-detail > taro-text-core {
   color: $color-text-secondary;
   font-size: $font-overline;
   grid-column: 1 / -1;
@@ -4750,11 +4993,13 @@
   gap: 2px;
   padding: $space-12;
 }
-.meal-detail-page__modal-metrics > View Text:first-child {
+.meal-detail-page__modal-metrics > View Text:first-child ,
+.meal-detail-page__modal-metrics > taro-view-core taro-text-core:first-child {
   color: $color-text-secondary;
   font-size: $font-overline;
 }
-.meal-detail-page__modal-metrics > View Text:last-child {
+.meal-detail-page__modal-metrics > View Text:last-child ,
+.meal-detail-page__modal-metrics > taro-view-core taro-text-core:last-child {
   color: $color-forest-green;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
@@ -4797,12 +5042,14 @@
   gap: $space-4;
   min-width: 0;
 }
-.meal-detail-page__ingredient-copy Text:first-child {
+.meal-detail-page__ingredient-copy Text:first-child ,
+.meal-detail-page__ingredient-copy taro-text-core:first-child {
   color: $color-text-primary;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
 }
-.meal-detail-page__ingredient-copy Text:last-child {
+.meal-detail-page__ingredient-copy Text:last-child ,
+.meal-detail-page__ingredient-copy taro-text-core:last-child {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
@@ -4820,12 +5067,29 @@
   bottom: 0;
   display: grid;
   gap: $space-12;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   left: 0;
   padding: $space-12 $page-horizontal calc($space-12 + $safe-area-bottom);
   position: fixed;
   right: 0;
   z-index: 20;
+}
+.meal-detail-page__template-action {
+  display: block;
+  width: 100%;
+  // Keep the in-flow template CTA clear of the fixed two-row action bar.
+  margin: $space-12 0 $space-48;
+}
+.meal-detail-page__template-action .app-button {
+  display: flex;
+  width: 100%;
+  min-height: 72px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.meal-detail-page__template-action .app-button taro-text-core {
+  display: block;
+  color: inherit;
 }
 .meal-detail-page__action {
   align-items: center;
@@ -4890,7 +5154,8 @@
   font-weight: $font-weight-semibold;
   letter-spacing: 0.8px;
 }
-.ingredient-detail-page__heading Text:last-child {
+.ingredient-detail-page__heading Text:last-child ,
+.ingredient-detail-page__heading taro-text-core:last-child {
   color: $color-text-secondary;
   font-size: $font-body;
 }
@@ -4927,7 +5192,8 @@
   font-weight: $font-weight-semibold;
   line-height: 1;
 }
-.ingredient-detail-page__calories Text {
+.ingredient-detail-page__calories Text ,
+.ingredient-detail-page__calories taro-text-core {
   color: $color-text-primary;
   font-size: $font-body;
   font-weight: $font-weight-regular;
@@ -4958,7 +5224,8 @@
   font-size: $font-caption;
   gap: 6px;
 }
-.ingredient-detail-page__macro Text:last-child {
+.ingredient-detail-page__macro Text:last-child ,
+.ingredient-detail-page__macro taro-text-core:last-child {
   color: $color-forest-green;
   font-size: $font-section-title;
   font-weight: $font-weight-semibold;
@@ -5018,17 +5285,6 @@
 .food-scanner-page .scanner-primary-action,
 .food-scanner-page .first-run-tip {
   flex-shrink: 0;
-}
-.food-scanner-page--with-tip .scanner-frame {
-  height: 460px;
-}
-.food-scanner-page--with-tip .scanner-frame::before {
-  height: 420px;
-  width: 420px;
-}
-.food-scanner-page--with-tip .scanner-frame__plate {
-  height: 200px;
-  width: 200px;
 }
 .food-scanner-page__page-title {
   align-items: center;
@@ -5226,6 +5482,84 @@
   min-height: 104px;
   width: 100%;
 }
+
+// Android compact viewport: keep the controls above the tab bar without changing WeChat.
+.page-layout--food-scanner-android .page-layout__content {
+  padding-top: $space-8;
+}
+.page-layout--food-scanner-android .food-scanner-page {
+  gap: $space-12;
+}
+.food-scanner-page.food-scanner-page--with-tip .scanner-frame {
+  height: min(460px, 31dvh);
+}
+.food-scanner-page.food-scanner-page--with-tip .scanner-frame::before {
+  height: 420px;
+  width: 420px;
+}
+.food-scanner-page.food-scanner-page--with-tip .scanner-frame__plate {
+  height: 200px;
+  width: 200px;
+}
+
+.page-layout--home-android .empty-state .app-button {
+  max-width: 240PX;
+  min-width: 180PX;
+  width: 40%;
+}
+.page-layout--meal-records-android .empty-state .app-button {
+  max-width: 220PX;
+  min-width: 180PX;
+  width: 40%;
+}
+.page-layout--profile-android .profile-rhythm {
+  gap: 16PX;
+}
+.page-layout--profile-android .profile-rhythm__identity {
+  gap: 16PX;
+  min-height: 108PX;
+  padding: 16PX 18PX;
+}
+.page-layout--profile-android .profile-rhythm__identity .avatar--large {
+  height: 64PX;
+  width: 64PX;
+}
+.page-layout--profile-android .profile-hero__copy {
+  align-items: flex-start;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.page-layout--profile-android .profile-hero__name {
+  font-size: 20PX;
+}
+.page-layout--profile-android .profile-hero__goal {
+  font-size: 14PX;
+  margin: 4PX 0 10PX;
+}
+.page-layout--profile-android .profile-rhythm__achievement {
+  gap: 6PX;
+  min-height: 72PX;
+  padding: 10PX 6PX;
+}
+.page-layout--profile-android .profile-rhythm__achievement > taro-text-core {
+  font-size: 12PX;
+  line-height: 1.25;
+}
+.page-layout--profile-android .profile-rhythm__achievement .nordic-icon {
+  display: block;
+  flex: 0 0 auto;
+  margin: 0 auto;
+}
+.page-layout--profile-android .profile-rhythm__weekly-review {
+  align-items: center;
+  gap: 14PX;
+  min-height: 92PX;
+}
+.page-layout--profile-android .profile-rhythm__weekly-score {
+  white-space: nowrap;
+}
 @keyframes scanner-sweep {
   from {
     transform: translateY(-8px);
@@ -5358,11 +5692,13 @@
   gap: $space-4;
   min-width: 0;
 }
-.manual-meal__selected-food text:first-child {
+.manual-meal__selected-food text:first-child ,
+.manual-meal__selected-food taro-text-core:first-child {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
-.manual-meal__selected-food text:last-child {
+.manual-meal__selected-food text:last-child ,
+.manual-meal__selected-food taro-text-core:last-child {
   color: $color-text-primary;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
@@ -5375,7 +5711,9 @@
   padding-bottom: $space-20;
 }
 .manual-meal__field > text:first-child,
-.manual-meal__nutrition-title text:first-child {
+.manual-meal__field > taro-text-core:first-child,
+.manual-meal__nutrition-title text:first-child ,
+.manual-meal__nutrition-title taro-text-core:first-child {
   color: $color-text-primary;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
@@ -5384,10 +5722,18 @@
   background: $color-warm-white;
   border: 1px solid $color-divider;
   border-radius: $radius-12;
+  box-sizing: border-box;
   color: $color-text-primary;
   font-size: $font-body;
+  height: 76px;
+  line-height: 76px;
   min-height: 76px;
   padding: 0 $space-16;
+}
+.manual-meal__field > taro-input-core {
+  align-items: center;
+  display: flex;
+  height: 76px;
 }
 .record-time-editor__summary {
   align-items: center;
@@ -5427,12 +5773,14 @@
   display: flex;
   justify-content: space-between;
 }
-.record-time-editor__sheet-head text:first-child {
+.record-time-editor__sheet-head text:first-child ,
+.record-time-editor__sheet-head taro-text-core:first-child {
   color: $color-text-primary;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
 }
-.record-time-editor__sheet-head text:last-child {
+.record-time-editor__sheet-head text:last-child ,
+.record-time-editor__sheet-head taro-text-core:last-child {
   color: $color-forest-green;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
@@ -5445,7 +5793,8 @@
   gap: $space-12;
   padding: $space-16;
 }
-.record-time-editor__time-controls > text {
+.record-time-editor__time-controls > text ,
+.record-time-editor__time-controls > taro-text-core {
   color: $color-text-secondary;
   font-size: $font-overline;
 }
@@ -5465,7 +5814,8 @@
   min-height: 72px;
   text-align: center;
 }
-.record-time-editor__direct-time text {
+.record-time-editor__direct-time text ,
+.record-time-editor__direct-time taro-text-core {
   color: $color-forest-green;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
@@ -5478,7 +5828,8 @@
   gap: $space-12;
   padding: $space-12;
 }
-.record-time-editor__control > text:first-child {
+.record-time-editor__control > text:first-child ,
+.record-time-editor__control > taro-text-core:first-child {
   color: $color-text-secondary;
   font-size: $font-overline;
 }
@@ -5492,7 +5843,8 @@
   font-size: $font-body;
   font-weight: $font-weight-semibold;
 }
-.record-time-editor__control > view > text {
+.record-time-editor__control > view > text ,
+.record-time-editor__control > taro-view-core > taro-text-core {
   color: $color-text-primary;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
@@ -5570,7 +5922,9 @@
   width: 100%;
 }
 .analysis-result-page__meal-type text,
-.portion-adjustment-page__meal-type text {
+.analysis-result-page__meal-type taro-text-core,
+.portion-adjustment-page__meal-type text ,
+.portion-adjustment-page__meal-type taro-text-core {
   text-align: center;
 }
 .manual-meal__nutrition-title {
@@ -5578,12 +5932,14 @@
   flex-direction: column;
   gap: $space-4;
 }
-.manual-meal__nutrition-title > text:first-child {
+.manual-meal__nutrition-title > text:first-child ,
+.manual-meal__nutrition-title > taro-text-core:first-child {
   color: $color-text-primary;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
 }
-.manual-meal__nutrition-title > text:last-child {
+.manual-meal__nutrition-title > text:last-child ,
+.manual-meal__nutrition-title > taro-text-core:last-child {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
@@ -5593,7 +5949,8 @@
   flex-direction: column;
   gap: $space-8;
 }
-.manual-meal__estimate-copy > text:first-child {
+.manual-meal__estimate-copy > text:first-child ,
+.manual-meal__estimate-copy > taro-text-core:first-child {
   color: $color-text-secondary;
   font-size: $font-caption;
   line-height: $line-caption;
@@ -5620,7 +5977,8 @@
   margin-bottom: $space-12;
   padding: $space-12 $space-16;
 }
-.manual-meal__portion > text {
+.manual-meal__portion > text ,
+.manual-meal__portion > taro-text-core {
   color: $color-text-primary;
   font-size: $font-caption;
   font-weight: $font-weight-semibold;
@@ -5636,7 +5994,8 @@
   text-align: right;
   width: 96px;
 }
-.manual-meal__portion > view text {
+.manual-meal__portion > view text ,
+.manual-meal__portion > taro-view-core taro-text-core {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
@@ -5648,7 +6007,8 @@
   gap: $space-8;
   padding: $space-16;
 }
-.manual-meal__nutrition-field > text {
+.manual-meal__nutrition-field > text ,
+.manual-meal__nutrition-field > taro-text-core {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
@@ -5663,7 +6023,8 @@
   font-size: $font-section-title;
   font-weight: $font-weight-semibold;
 }
-.manual-meal__nutrition-field > view text {
+.manual-meal__nutrition-field > view text ,
+.manual-meal__nutrition-field > taro-view-core taro-text-core {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
@@ -5775,14 +6136,17 @@
   overflow: visible;
 }
 .food-catalog-rail--tags {
-  background: $color-background;
-  border-radius: $radius-full;
-  box-shadow: 0 8px 18px rgba($color-dark-forest, 0.06);
+  background: rgba($color-warm-white, 0.98);
+  border-bottom: 1px solid rgba($color-forest-green, 0.1);
+  border-radius: 0;
+  box-shadow: none;
+  height: auto;
+  min-height: 48px;
+  flex: 0 0 auto;
+  margin-top: -12px;
   overflow: hidden;
-  padding: $space-8 0;
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  padding: 0 0 $space-8;
+  position: static;
 }
 .food-catalog-rail__spacer {
   flex-shrink: 0;
@@ -5808,6 +6172,14 @@
   padding: 0 $space-16;
   // Trailing room so the last item eases away instead of hitting the clip.
   padding-right: $space-32;
+}
+.food-catalog-tags__row {
+  // Block-level flex avoids the inline-flex baseline gap in the scroll view.
+  display: flex;
+  width: max-content;
+  align-items: center;
+  min-height: 40px;
+  padding-right: $space-16;
 }
 .food-catalog-recent__row {
   gap: $space-12;
@@ -6258,7 +6630,8 @@
   padding: $space-12 $space-16;
 }
 .food-catalog-filter-summary__eyebrow,
-.food-catalog-filters__heading > text:last-child {
+.food-catalog-filters__heading > text:last-child ,
+.food-catalog-filters__heading > taro-text-core:last-child {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
@@ -6417,7 +6790,8 @@
   flex-wrap: wrap;
   gap: $space-8;
 }
-.food-catalog-item__nutrition text {
+.food-catalog-item__nutrition text ,
+.food-catalog-item__nutrition taro-text-core {
   color: $color-forest-green;
   font-size: $font-caption;
 }
@@ -6524,12 +6898,14 @@
   display: flex;
   justify-content: space-between;
 }
-.food-detail-page__section-heading text:first-child {
+.food-detail-page__section-heading text:first-child ,
+.food-detail-page__section-heading taro-text-core:first-child {
   color: $color-text-primary;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
 }
-.food-detail-page__section-heading text:last-child {
+.food-detail-page__section-heading text:last-child ,
+.food-detail-page__section-heading taro-text-core:last-child {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
@@ -6546,11 +6922,13 @@
   gap: $space-8;
   padding: $space-16;
 }
-.food-detail-page__nutrition-item text:first-child {
+.food-detail-page__nutrition-item text:first-child ,
+.food-detail-page__nutrition-item taro-text-core:first-child {
   color: $color-text-secondary;
   font-size: $font-caption;
 }
-.food-detail-page__nutrition-item text:last-child {
+.food-detail-page__nutrition-item text:last-child ,
+.food-detail-page__nutrition-item taro-text-core:last-child {
   color: $color-forest-green;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
@@ -6718,7 +7096,8 @@
   justify-content: space-between;
   padding: $space-8 0;
 }
-.analysis-ingredient Text:last-child {
+.analysis-ingredient Text:last-child ,
+.analysis-ingredient taro-text-core:last-child {
   color: $color-text-secondary;
   font-size: $font-overline;
 }
@@ -6735,10 +7114,30 @@
 // Analysis result: scanner-aligned nutrition review.
 .page-layout--analysis-result .modal-backdrop {
   align-items: center;
+  min-height: 100dvh;
   touch-action: none;
 }
 
+.page-layout--analysis-result .modal {
+  max-width: 680px;
+}
+
+.page-layout--analysis-result .confirm-dialog__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+
 .page-layout--analysis-result .confirm-dialog__actions .app-button {
+  box-sizing: border-box;
+  flex: none;
+  height: 80px;
+  margin: 0;
+  max-width: none;
+  min-height: 80px;
+  padding-bottom: 0;
+  padding-top: 0;
+  width: 100%;
   white-space: nowrap;
 }
 
@@ -7182,7 +7581,8 @@
   padding: 0;
   width: 56px;
 }
-.portion-control__button text {
+.portion-control__button text ,
+.portion-control__button taro-text-core {
   display: block;
   height: 54px;
   line-height: 54px;
@@ -7258,11 +7658,13 @@
   gap: $space-4;
   min-height: 128px;
 }
-.coach-metric Text:first-child {
+.coach-metric Text:first-child ,
+.coach-metric taro-text-core:first-child {
   color: $color-text-secondary;
   font-size: $font-overline;
 }
-.coach-metric Text:last-child {
+.coach-metric Text:last-child ,
+.coach-metric taro-text-core:last-child {
   color: $color-forest-green;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
@@ -7343,7 +7745,8 @@
   line-height: 1.45;
   padding: $space-8 $space-12;
 }
-.home-page__sync-note Text:last-child {
+.home-page__sync-note Text:last-child ,
+.home-page__sync-note taro-text-core:last-child {
   color: $stitch-brand-green;
   flex: 0 0 auto;
   font-weight: $font-weight-semibold;
@@ -7499,7 +7902,8 @@
   justify-content: space-between;
   padding-top: $space-12;
 }
-.home-page .daily-summary__dashboard-foot Text:last-child {
+.home-page .daily-summary__dashboard-foot Text:last-child ,
+.home-page .daily-summary__dashboard-foot taro-text-core:last-child {
   color: $stitch-brand-green;
 }
 .home-page .daily-summary__dashboard-foot-over {
@@ -7654,7 +8058,7 @@
   box-sizing: border-box;
   min-height: 100vh;
   overflow: hidden;
-  background: #e8ffee;
+  background: $color-warm-white;
   opacity: 1;
   transform: translateY(0) scale(1);
   transition: opacity 0.42s ease, transform 0.42s ease;
@@ -7664,12 +8068,50 @@
   transform: translateY(-18px) scale(0.985);
   pointer-events: none;
 }
+.welcome-page--android .welcome-page__hero {
+  transition: opacity 0.42s ease, transform 0.42s ease;
+  will-change: opacity, transform;
+}
+.welcome-page--android .welcome-page__copy > *,
+.welcome-page--android .welcome-page__cta {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+  will-change: opacity, transform;
+}
+.welcome-page--android.welcome-page--exiting .welcome-page__hero {
+  opacity: 0.9;
+  transform: scale(1.03);
+}
+.welcome-page--android.welcome-page--exiting .welcome-page__brand {
+  opacity: 0;
+  transform: translateY(-12px);
+  transition-delay: 40ms;
+}
+.welcome-page--android.welcome-page--exiting .welcome-page__title {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition-delay: 70ms;
+}
+.welcome-page--android.welcome-page--exiting .welcome-page__subtitle {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition-delay: 100ms;
+}
+.welcome-page--android.welcome-page--exiting .welcome-page__cta {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition-delay: 60ms;
+}
 .welcome-page__hero {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   z-index: 0;
+}
+.welcome-page__hero--android {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 .welcome-page__veil {
   position: absolute;
@@ -7687,6 +8129,13 @@
   z-index: 2;
   height: calc(#{$safe-area-top} + 44px);
   flex-shrink: 0;
+}
+.welcome-page__panel {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 .welcome-page__body {
   position: relative;
@@ -7709,11 +8158,22 @@
   padding-top: $space-2;
 }
 .welcome-page__brand {
-  color: #144830;
+  color: $color-forest-green;
   font-size: 64px;
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.15;
+}
+.welcome-page__brand-lockup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.welcome-page__brand-caption {
+  color: $color-neutral-gray;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  line-height: 1.3;
 }
 .welcome-page__title {
   color: $color-text-primary;
@@ -7750,7 +8210,7 @@
   width: 100%;
   min-height: 96px;
   border-radius: $radius-12;
-  background: #144830;
+  background: $color-forest-green;
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 .welcome-page__cta:active {
@@ -7764,6 +8224,105 @@
   font-size: 26px;
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+.welcome-page--android .welcome-page__panel {
+  position: relative;
+  flex: 1;
+  box-sizing: border-box;
+  background: transparent;
+}
+.welcome-page--android {
+  min-height: 100dvh;
+  background: $color-warm-white;
+
+  .welcome-page__safe {
+    height: calc(#{$safe-area-top} + 24PX);
+  }
+  .welcome-page__hero {
+    inset: 0;
+    height: 100%;
+  }
+  .welcome-page__veil {
+    height: 100%;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(255, 255, 255, 0.4) 45%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+  .welcome-page__body {
+    position: static;
+    justify-content: flex-start;
+    padding: 0 24PX calc(#{$safe-area-bottom} + 20PX);
+  }
+  .welcome-page__copy {
+    align-items: center;
+    width: 100%;
+    margin-top: 0;
+    padding-top: 0;
+    gap: 18PX;
+    text-align: center;
+  }
+  .welcome-page__brand {
+    font-size: 31PX;
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+  .welcome-page__brand-caption {
+    display: none;
+  }
+  .welcome-page__title {
+    color: $color-dark-forest;
+    font-size: 22PX;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.3;
+    max-width: none;
+    white-space: normal;
+  }
+  .welcome-page__subtitle {
+    color: $color-text-secondary;
+    font-size: 15PX;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    line-height: 1.65;
+    max-width: none;
+    padding: 0;
+  }
+  .welcome-page__actions {
+    align-items: stretch;
+    gap: 12PX;
+    margin-top: auto;
+    padding-top: 28PX;
+  }
+  .welcome-page__cta {
+    min-height: 56PX;
+    padding: 0 18PX;
+    justify-content: space-between;
+    border-radius: 18PX;
+    box-shadow: 0 10PX 20PX rgba($color-forest-green, 0.15);
+  }
+  .welcome-page__cta-label {
+    font-size: 16PX;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .welcome-page__cta .nordic-icon {
+    flex: 0 0 auto;
+    filter: brightness(0) invert(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-page--android .welcome-page__hero,
+  .welcome-page--android .welcome-page__copy > *,
+  .welcome-page--android .welcome-page__cta {
+    transition: none;
+  }
 }
 
 .page-layout--recommend-friends {
@@ -7922,19 +8481,39 @@
   padding: $space-16;
 }
 .privacy-policy-page__cancellation > View {
+  min-width: 0;
+}
+.privacy-policy-page__cancellation-copy {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: $space-4;
+  min-width: 0;
 }
-.privacy-policy-page__cancellation > View > Text:first-child {
+.privacy-policy-page__cancellation-title {
+  display: block;
   font-size: $font-body;
   font-weight: $font-weight-semibold;
+  line-height: $line-body;
+  white-space: nowrap;
 }
-.privacy-policy-page__cancellation > View > Text:last-child {
+.privacy-policy-page__cancellation-description {
   color: $color-text-secondary;
+  display: block;
   font-size: $font-caption;
   line-height: $line-caption;
+  white-space: nowrap;
+}
+.privacy-policy-page__cancellation-chevron {
+  flex: 0 0 auto;
+  font-size: $font-h2;
+  line-height: 1;
+}
+@media (max-width: 359px) {
+  .privacy-policy-page__cancellation-title,
+  .privacy-policy-page__cancellation-description {
+    white-space: normal;
+  }
 }
 
 .milestone-poster-page {
@@ -8134,7 +8713,8 @@
   min-height: 28px;
 }
 
-.milestone-poster__highlight-value > Text {
+.milestone-poster__highlight-value > Text ,
+.milestone-poster__highlight-value > taro-text-core {
   display: block;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 42px;
@@ -8146,7 +8726,8 @@
   white-space: nowrap;
 }
 
-.milestone-poster__highlight-label > Text {
+.milestone-poster__highlight-label > Text ,
+.milestone-poster__highlight-label > taro-text-core {
   display: block;
   font-size: 18px;
   line-height: 1;
@@ -8190,7 +8771,8 @@
   border-color: #153f2b;
 }
 
-.milestone-poster__journey-step > Text {
+.milestone-poster__journey-step > Text ,
+.milestone-poster__journey-step > taro-text-core {
   font-size: 18px;
   margin-top: 12px;
 }
@@ -8212,7 +8794,8 @@
   left: calc(50% - 132px);
   position: absolute;
 }
-.milestone-poster__share > Text {
+.milestone-poster__share > Text ,
+.milestone-poster__share > taro-text-core {
   left: 50%;
   position: absolute;
   transform: translateX(-50%);
@@ -8585,6 +9168,34 @@
   text-align: center;
 }
 
+.milestone-journey-page__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.milestone-journey-page__skeleton-hero {
+  border-radius: 24px;
+  height: 420px;
+}
+
+.milestone-journey-page__skeleton-heading {
+  align-self: center;
+  height: 48px;
+  width: 52%;
+}
+
+.milestone-journey-page__skeleton-collection {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.milestone-journey-page__skeleton-card {
+  border-radius: 36px;
+  height: 260px;
+}
+
 .milestone-journey-page__collection-heading {
   align-items: center;
   display: flex;
@@ -8595,7 +9206,8 @@
   text-align: center;
 }
 
-.milestone-journey-page__collection-heading > Text:first-child {
+.milestone-journey-page__collection-heading > Text:first-child ,
+.milestone-journey-page__collection-heading > taro-text-core:first-child {
   color: #173124;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 46px;
@@ -8603,7 +9215,8 @@
   line-height: 64px;
 }
 
-.milestone-journey-page__collection-heading > Text:last-child {
+.milestone-journey-page__collection-heading > Text:last-child ,
+.milestone-journey-page__collection-heading > taro-text-core:last-child {
   color: #536257;
   font-size: 24px;
   font-weight: 600;
@@ -8967,6 +9580,7 @@
   padding: $space-16;
 }
 
-.weekly-review__milestone-link > Text {
+.weekly-review__milestone-link > Text ,
+.weekly-review__milestone-link > taro-text-core {
   flex: 1;
 }

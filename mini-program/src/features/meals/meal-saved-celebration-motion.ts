@@ -18,7 +18,7 @@ export const mealSavedCelebrationMotion = {
   ctaStartMs: 1900,
 } as const;
 
-export function getMealSavedCelebrationMotion(kind: "created" | "updated") {
+export function getMealSavedCelebrationMotion(kind: "created" | "updated" | "reused" | "template") {
   void kind;
   return mealSavedCelebrationMotion;
 }

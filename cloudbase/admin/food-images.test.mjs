@@ -15,6 +15,38 @@ test("all admin select controls share the Nordic Nutri select treatment", async 
   assert.match(source, /appearance:\s*none/);
 });
 
+test("push test controls stay aligned in one desktop action row", async () => {
+  const source = await pageSource();
+  assert.match(source, /class="nn-filter-bar nn-push-test-bar"/);
+  assert.match(source, /class="nn-field nn-push-test-field"[\s\S]*id="pushTestUserId"/);
+  assert.match(source, /id="pushTestScenario"[\s\S]*value="missed_streak">连续多天未记录<[\s\S]*value="recorded_streak">已连续记录</);
+  assert.match(source, /class="nn-field nn-push-test-field"[\s\S]*id="pushTestMealType"/);
+  assert.match(source, /id="pushTestSend" class="button nn-push-test-send"/);
+  assert.match(source, /\.nn-push-test-bar \{[^}]*display: grid;[^}]*grid-template-columns: minmax\(280px, 1fr\) 210px 180px auto;[^}]*align-items: center;/s);
+  assert.match(source, /\.nn-push-test-field \{[^}]*display: flex;[^}]*align-items: center;[^}]*gap: 8px;/s);
+  assert.match(source, /\.nn-push-test-field \.nn-input,[\s\S]*\.nn-push-test-field \.nn-select \{[^}]*height: 40px;/s);
+  assert.match(source, /body: \{ userId, mealType, scenario \}/);
+});
+
+test("admin API requests fail visibly instead of hanging forever", async () => {
+  const source = await pageSource();
+  assert.match(source, /API_REQUEST_TIMEOUT_MS\s*=\s*30_000/);
+  assert.match(source, /PUSH_RECEIPT_WAIT_TIMEOUT_MS\s*=\s*70_000/);
+  assert.match(source, /Date\.now\(\)\s*\+\s*PUSH_RECEIPT_WAIT_TIMEOUT_MS/);
+  assert.match(source, /AbortController/);
+  assert.match(source, /signal:\s*controller\.signal/);
+  assert.match(source, /NETWORK_TIMEOUT/);
+  assert.match(source, /FCM_AUTH_TIMEOUT/);
+});
+
+test("verification filters stay in one desktop row despite global select width", async () => {
+  const source = await pageSource();
+  assert.match(source, /class="module-toolbar nn-verification-toolbar"[\s\S]*id="verificationTypeFilter"[\s\S]*id="verificationStatusFilter"/);
+  assert.match(source, /\.nn-verification-toolbar > select \{[^}]*width: auto;[^}]*flex: 0 1 190px;[^}]*min-width: 160px;/s);
+  assert.match(source, /\.nn-verification-toolbar \{[^}]*flex-wrap: nowrap;/s);
+  assert.match(source, /@media \(max-width: 760px\)[\s\S]*?\.nn-verification-toolbar \{ flex-wrap: wrap; \}/s);
+});
+
 test("batch rail contains no unused operation area", async () => {
   const source = await pageSource();
   assert.doesNotMatch(source, /id="batchActions"/);
@@ -261,6 +293,7 @@ test("admin console shell uses left nav modules and renames the page", async () 
   assert.match(source, /<h1>管理后台<\/h1>/);
   assert.match(source, /Admin Console/);
   assert.match(source, /data-module="users"/);
+  assert.match(source, /data-module="verification"/);
   assert.match(source, /data-module="feedback"/);
   assert.match(source, /data-module="foods"/);
   assert.match(source, /data-module="images"/);
@@ -270,6 +303,7 @@ test("admin console shell uses left nav modules and renames the page", async () 
   assert.match(source, /data-module="moderation"/);
   assert.match(source, /data-module="system"/);
   assert.match(source, /id="moduleUsers"/);
+  assert.match(source, /id="moduleVerification"/);
   assert.match(source, /id="moduleFeedback"/);
   assert.match(source, /id="moduleFoods"/);
   assert.match(source, /id="moduleImages"/);
@@ -284,6 +318,14 @@ test("admin console shell uses left nav modules and renames the page", async () 
   assert.match(source, /额度管理/);
   assert.match(source, /用户图片/);
   assert.match(source, /内容安全/);
+});
+
+test("user operations display a readable registration channel", async () => {
+  const source = await pageSource();
+  assert.match(source, /const registrationChannelLabels =/);
+  assert.match(source, /<th>注册渠道<\/th>/);
+  assert.match(source, /registrationChannelLabel\(user\.registrationChannel\)/);
+  assert.match(source, /registrationChannelLabel\(profile\.registrationChannel\)/);
 });
 
 test("old image audit is a standalone admin module with explicit latest-prompt regeneration copy", async () => {

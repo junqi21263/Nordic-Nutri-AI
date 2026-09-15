@@ -5,6 +5,7 @@ import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { ErrorState } from "../../components/error-state";
 import { MacroProgress } from "../../components/macro-progress";
+import { RecordTimeEditor } from "../../components/record-time-editor";
 import { PageLayout } from "../../layouts/page-layout";
 import { mealTypeOptions } from "../../features/meals/meal-type";
 import { toMealSavedCelebration } from "../../features/meals/meal-saved-celebration-data";
@@ -19,6 +20,9 @@ import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { tryPresentPendingMilestone } from "../../features/milestones/presentation-flow";
+import { shouldClaimAfterMealSave } from "../../features/milestones/runtime";
+import { createClientRequestId } from "../../repositories/client-request-id";
+import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
 
 const nowTime = () => {
   const date = new Date();
@@ -31,7 +35,13 @@ export default function PortionAdjustmentPage() {
   const portion = usePortionDraftStore();
   const meals = useMealStore();
   const feedback = useFeedbackStore();
+  const isRepeating = portion.isRepeating;
+  const [recordDate, setRecordDate] = useState(getLocalDateString);
+  const [recordTime, setRecordTime] = useState(nowTime);
   const [isSaving, setIsSaving] = useState(false);
+  const saving = useRef(false);
+  const requestId = useRef(createClientRequestId());
+  const savedResult = useRef<Awaited<ReturnType<typeof createProductMeal>> | null>(null);
   const clearDraftAfterSuccess = useRef(false);
   useEffect(() => () => {
     if (clearDraftAfterSuccess.current) usePortionDraftStore.getState().reset();
@@ -54,7 +64,7 @@ export default function PortionAdjustmentPage() {
   const trackProgress = ((percentage - 25) / 175) * 100;
   const adjustmentCopy =
     percentage === 100
-      ? "与原始识别份量一致"
+      ? isRepeating ? "与上次记录份量一致" : "与原始识别份量一致"
       : percentage > 100
         ? `比原始份量增加 ${percentage - 100}%`
         : `比原始份量减少 ${100 - percentage}%`;
@@ -63,16 +73,19 @@ export default function PortionAdjustmentPage() {
   const selectedMealType = portion.meal.mealType;
   const setMealType = (mealType: MealType) => portion.setMealType(mealType);
   const save = async () => {
+    if (saving.current || clearDraftAfterSuccess.current) return;
     const editingId = portion.editingMealId;
     const draftMeal = portion.meal;
     const multiplier = portion.multiplier;
     if (!draftMeal || !adjusted) return;
-    const mealDate = getLocalDateString();
+    saving.current = true;
+    const mealDate = isRepeating ? recordDate : getLocalDateString();
+    const mealTime = isRepeating ? recordTime : nowTime();
     const previousCalories = meals.getDailySummary(mealDate).consumed.calories;
     setIsSaving(true);
     try {
-      let savedMeal = null;
-      if (editingId) {
+      let savedMeal = savedResult.current;
+      if (!savedMeal && editingId) {
         const current = meals.getMealById(editingId);
         if (!current) throw new Error("Meal not found");
         const originalQuantityByItemId = new Map(
@@ -89,20 +102,29 @@ export default function PortionAdjustmentPage() {
         });
         if (!saved) throw new Error("Meal not found");
         savedMeal = saved;
-      } else {
+      } else if (!savedMeal) {
         const localMeal = createMealFromAnalysis(
           draftMeal,
           multiplier,
-          getLocalDateString(),
-          nowTime(),
+          mealDate,
+          mealTime,
         );
-        savedMeal = await createProductMeal(toProductMealInput(localMeal));
+        const input = toProductMealInput(localMeal);
+        if (isRepeating) {
+          input.items = toProductMealInput({ ...localMeal, items: draftMeal.items }).items.map((item) => ({
+            ...item, quantityG: item.quantityG * multiplier,
+          }));
+        }
+        savedMeal = await createProductMeal({ ...input, templateId: portion.templateId, clientRequestId: requestId.current });
       }
-      const syncedMeals = await getProductMeals(mealDate);
-      meals.replaceRemoteMeals(syncedMeals, mealDate);
+      savedResult.current = savedMeal;
+      const savedDate = savedMeal.date;
+      const syncedMeals = await getProductMeals(savedDate);
+      meals.replaceRemoteMeals(syncedMeals, savedDate);
+      void refreshAndroidSmartReminders();
       try {
         const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
-        await evaluateProductAchievements(mealDate);
+        await evaluateProductAchievements(savedDate);
       } catch {
         // The saved meal remains valid if achievement refresh is temporarily unavailable.
       }
@@ -113,21 +135,22 @@ export default function PortionAdjustmentPage() {
             previousCalories,
             syncedMeals,
             targetCalories: meals.dailyTargets.calories,
-            kind: editingId ? "updated" : "created",
-            afterContinue: editingId ? undefined : async () => Boolean(await tryPresentPendingMilestone("normal_record_success")),
+            kind: isRepeating ? "reused" : editingId ? "updated" : "created",
+            afterContinue: isRepeating || editingId || !shouldClaimAfterMealSave(`${savedMeal.date}T${savedMeal.time}:00+08:00`) ? undefined : async () => Boolean(await tryPresentPendingMilestone("normal_record_success")),
           }),
         );
         clearDraftAfterSuccess.current = true;
       }
     } catch {
-      feedback.show({ message: "保存调整失败，请稍后重试", tone: "error" });
+      feedback.show({ message: savedResult.current ? "记录已保存，列表同步失败，请重试" : "保存调整失败，请稍后重试", tone: "error" });
     } finally {
+      saving.current = false;
       setIsSaving(false);
     }
   };
   return (
     <PageLayout
-      title="调整份量"
+      title={isRepeating ? "再吃一次" : "调整份量"}
       showTabs={false}
       hideNavigation
       showBack
@@ -146,6 +169,14 @@ export default function PortionAdjustmentPage() {
           </View>
         </AppCard>
         <AppCard className="content-stack content-stack--compact">
+          {isRepeating ? (
+            <RecordTimeEditor
+              date={recordDate}
+              time={recordTime}
+              onDateChange={setRecordDate}
+              onTimeChange={setRecordTime}
+            />
+          ) : null}
           <View className="portion-adjustment-page__meal-type-block">
             <Text className="portion-adjustment-page__meal-type-label">这是哪一餐？</Text>
             <View className="portion-adjustment-page__meal-types" ariaLabel="选择餐次类型">
@@ -224,7 +255,7 @@ export default function PortionAdjustmentPage() {
           <Text className="portion-score">Meal Score · {adjusted.score}</Text>
         </AppCard>
         <AppButton size="large" loading={isSaving} onClick={() => void save()}>
-          {portion.editingMealId ? "保存调整" : "保存本餐"} · {adjusted.calories} kcal
+          {portion.editingMealId ? "保存调整" : isRepeating ? "确认并记录" : "保存本餐"} · {adjusted.calories} kcal
         </AppButton>
       </View>
     </PageLayout>

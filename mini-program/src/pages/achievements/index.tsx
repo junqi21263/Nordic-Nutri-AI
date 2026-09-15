@@ -128,7 +128,7 @@ export default function AchievementsPage() {
                 <View className="achievement-center__item-icon">
                   <NordicIcon
                     name={getAchievementIcon(achievement)}
-                    size={26}
+                    size={20}
                     ariaLabel={achievement.title}
                   />
                 </View>

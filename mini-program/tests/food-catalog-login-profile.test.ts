@@ -19,6 +19,7 @@ describe("food catalog discovery and login profile sync", () => {
 
   it("loads a fresh discovery list on food catalog entry and renders a resilient food image", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/food-catalog/index.tsx"), "utf8");
+    const styles = readFileSync(resolve(sourceRoot, "styles/page.scss"), "utf8");
     const manualMeal = readFileSync(resolve(sourceRoot, "pages/manual-meal/index.tsx"), "utf8");
     const detail = readFileSync(resolve(sourceRoot, "pages/food-detail/index.tsx"), "utf8");
     const labels = readFileSync(
@@ -55,6 +56,8 @@ describe("food catalog discovery and login profile sync", () => {
     expect(api).toContain("standard_food_v1");
     expect(detail).toContain("版本选择");
     expect(appConfig).toContain('"pages/food-detail/index"');
+    expect(styles).toMatch(/\.food-catalog-rail--tags\s*\{[^}]*position:\s*static;/);
+    expect(styles).toMatch(/\.food-catalog-tags__row\s*\{[\s\S]*?align-items:\s*center;[\s\S]*?min-height:\s*40px;/);
   });
 
   it("keeps bootstrap default avatar and only syncs a real WeChat nickname on login", () => {

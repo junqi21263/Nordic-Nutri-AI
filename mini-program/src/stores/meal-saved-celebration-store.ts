@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export interface SavedMealCelebration {
-  kind?: "created" | "updated";
+  kind?: "created" | "updated" | "reused" | "template";
   mealId: string;
   calories: number;
   protein: number;

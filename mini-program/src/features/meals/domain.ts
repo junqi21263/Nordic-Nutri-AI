@@ -5,6 +5,7 @@ export interface MealItem {
   id: string;
   name: string;
   amount: string;
+  savedNutrition?: { quantityG: number; caloriesPer100g: number; proteinPer100g: number; carbsPer100g: number; fatPer100g: number };
   calories: number;
   protein: number;
   carbs: number;

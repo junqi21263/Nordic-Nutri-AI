@@ -27,7 +27,7 @@ export function ConfirmDialog({
         <Text className="confirm-dialog__title">{title}</Text>
         <Text className="confirm-dialog__description">{description}</Text>
         <View className="confirm-dialog__actions">
-          <AppButton variant="secondary" size="medium" onClick={onCancel}>
+          <AppButton size="medium" onClick={onCancel}>
             {cancelLabel}
           </AppButton>
           <AppButton variant="outline" size="medium" onClick={onConfirm}>

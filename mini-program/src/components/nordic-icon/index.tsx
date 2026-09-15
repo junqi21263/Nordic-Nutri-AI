@@ -35,6 +35,7 @@ import hourglass from "../../assets/icons/hourglass.svg";
 import switchCamera from "../../assets/icons/switch-camera.svg";
 import utensils from "../../assets/icons/utensils.svg";
 import x from "../../assets/icons/x.svg";
+import xInverse from "../../assets/icons/x-inverse.svg";
 import calendarDays from "../../assets/icons/calendar-days.svg";
 import ruler from "../../assets/icons/ruler.svg";
 import weight from "../../assets/icons/weight.svg";
@@ -63,6 +64,22 @@ import foodBowl from "../../assets/icons/food-bowl.svg";
 import wechat from "../../assets/icons/wechat-mark.svg";
 import bell from "../../assets/icons/bell.svg";
 import share from "../../assets/icons/share.svg";
+import google from "../../assets/icons/google.svg";
+import mail from "../../assets/icons/mail.svg";
+import phone from "../../assets/icons/phone.svg";
+import china from "../../assets/icons/china.svg";
+import bookmark from "../../assets/icons/bookmark.svg";
+import messageCircle from "../../assets/icons/message-circle.svg";
+import shieldCheck from "../../assets/icons/shield-check.svg";
+import info from "../../assets/icons/info.svg";
+import logOut from "../../assets/icons/log-out.svg";
+import reminderBell from "../../assets/icons/reminder-bell.svg";
+import reminderSunrise from "../../assets/icons/reminder-sunrise.svg";
+import reminderBowl from "../../assets/icons/reminder-bowl.svg";
+import reminderTray from "../../assets/icons/reminder-tray.svg";
+import reminderLeaf from "../../assets/icons/reminder-leaf.svg";
+import alarmClock from "../../assets/icons/alarm-clock.svg";
+import bellOff from "../../assets/icons/bell-off.svg";
 
 export type NordicIconName =
   | "back"
@@ -101,6 +118,7 @@ export type NordicIconName =
   | "switch-camera"
   | "utensils"
   | "x"
+  | "x-inverse"
   | "calendar-days"
   | "ruler"
   | "weight"
@@ -128,13 +146,31 @@ export type NordicIconName =
   | "food-bowl"
   | "wechat"
   | "bell"
-  | "share";
+  | "share"
+  | "google"
+  | "mail"
+  | "phone"
+  | "china"
+  | "bookmark"
+  | "message-circle"
+  | "shield-check"
+  | "info"
+  | "log-out"
+  | "reminder-bell"
+  | "reminder-sunrise"
+  | "reminder-bowl"
+  | "reminder-tray"
+  | "reminder-leaf"
+  | "alarm-clock"
+  | "bell-off";
 
 export interface NordicIconProps {
   name: NordicIconName;
   size?: number;
   ariaLabel?: string;
 }
+
+const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
 
 const iconSources: Record<NordicIconName, string> = {
   back,
@@ -173,6 +209,7 @@ const iconSources: Record<NordicIconName, string> = {
   "switch-camera": switchCamera,
   utensils,
   x,
+  "x-inverse": xInverse,
   "calendar-days": calendarDays,
   ruler,
   weight,
@@ -201,6 +238,22 @@ const iconSources: Record<NordicIconName, string> = {
   wechat,
   bell,
   share,
+  google,
+  mail,
+  phone,
+  china,
+  bookmark,
+  "message-circle": messageCircle,
+  "shield-check": shieldCheck,
+  info,
+  "log-out": logOut,
+  "reminder-bell": reminderBell,
+  "reminder-sunrise": reminderSunrise,
+  "reminder-bowl": reminderBowl,
+  "reminder-tray": reminderTray,
+  "reminder-leaf": reminderLeaf,
+  "alarm-clock": alarmClock,
+  "bell-off": bellOff,
 };
 
 /** Renderable local SVG asset for WeChat targets that do not expose Svg/Path components. */
@@ -209,7 +262,7 @@ export function NordicIcon({ name, size = 20, ariaLabel }: NordicIconProps) {
     <Image
       ariaLabel={ariaLabel}
       className="nordic-icon"
-      mode="aspectFit"
+      mode={isAndroidApp ? "scaleToFill" : "aspectFit"}
       src={iconSources[name]}
       style={{ height: `${size}px`, width: `${size}px` }}
     />

@@ -14,5 +14,7 @@ describe("page layout transition", () => {
     expect(styles).toContain(".page-layout__scroll--entered");
     expect(styles).toContain("page-layout-content-enter 180ms");
     expect(styles).toContain("translateY(6px)");
+    expect(styles).not.toContain("will-change: opacity, transform");
+    expect(styles).not.toContain("page-layout-content-enter 180ms ease-out both");
   });
 });

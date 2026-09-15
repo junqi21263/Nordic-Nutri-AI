@@ -81,61 +81,61 @@ export default function WeeklyReviewPage() {
     >
       <View className="weekly-review">
         <AppCard tone="dark" className="weekly-review__hero">
-          <View>
-            <Text>营养节奏分</Text>
-            <Text>{rhythmScore}</Text>
+          <View className="weekly-review__hero-score">
+            <Text className="weekly-review__hero-score-label">营养节奏分</Text>
+            <Text className="weekly-review__hero-score-value">{rhythmScore}</Text>
           </View>
           <View className="weekly-review__hero-aside">
-            <Text>{rhythmAside.title}</Text>
-            <Text>{rhythmAside.detail}</Text>
+            <Text className="weekly-review__hero-aside-title">{rhythmAside.title}</Text>
+            <Text className="weekly-review__hero-aside-detail">{rhythmAside.detail}</Text>
           </View>
         </AppCard>
 
         <View className="weekly-review__metrics">
-          <View>
-            <Text>已记录餐次</Text>
-            <Text>{recordedMeals}</Text>
-            <Text>本周</Text>
+          <View className="weekly-review__metric">
+            <Text className="weekly-review__metric-label">已记录餐次</Text>
+            <Text className="weekly-review__metric-value">{recordedMeals}</Text>
+            <Text className="weekly-review__metric-detail">本周</Text>
           </View>
-          <View>
-            <Text>蛋白完成度</Text>
-            <Text>{proteinCompletion}%</Text>
-            <Text>
+          <View className="weekly-review__metric">
+            <Text className="weekly-review__metric-label">蛋白完成度</Text>
+            <Text className="weekly-review__metric-value">{proteinCompletion}%</Text>
+            <Text className="weekly-review__metric-detail">
               {summary.consumed.protein}/{summary.protein} g
             </Text>
           </View>
-          <View>
-            <Text>目标热量</Text>
-            <Text>{targetCalories}</Text>
-            <Text>kcal</Text>
+          <View className="weekly-review__metric">
+            <Text className="weekly-review__metric-label">目标热量</Text>
+            <Text className="weekly-review__metric-value">{targetCalories}</Text>
+            <Text className="weekly-review__metric-detail">kcal</Text>
           </View>
         </View>
 
         <View className="weekly-review__section">
           <Text>本周观察</Text>
           <View className="weekly-review__insights">
-            <View>
+            <View className="weekly-review__insight">
               <NordicIcon name="check" size={18} ariaLabel="记录" />
-              <Text>{weeklyInsight?.strengths?.[0] ?? `本周已记录 ${recordedMeals} 餐，持续记录会让建议更贴近你的节奏。`}</Text>
+              <Text className="weekly-review__insight-copy">{weeklyInsight?.strengths?.[0] ?? `本周已记录 ${recordedMeals} 餐，持续记录会让建议更贴近你的节奏。`}</Text>
             </View>
-            <View>
+            <View className="weekly-review__insight">
               <NordicIcon name="protein" size={18} ariaLabel="蛋白" />
-              <Text>{weeklyInsight?.summary ?? (proteinLeft
+              <Text className="weekly-review__insight-copy">{weeklyInsight?.summary ?? (proteinLeft
                 ? `距离本周蛋白目标还差 ${proteinLeft} g，可优先补充一份高蛋白食物。`
                 : "本周蛋白目标已完成，恢复节奏很好。")}</Text>
             </View>
-            <View>
+            <View className="weekly-review__insight">
               <NordicIcon name="zap" size={18} ariaLabel="能量" />
-              <Text>营养节奏分为 {rhythmScore}，本周热量完成度 {calorieCompletion}%。</Text>
+              <Text className="weekly-review__insight-copy">营养节奏分为 {rhythmScore}，本周热量完成度 {calorieCompletion}%。</Text>
             </View>
           </View>
         </View>
 
         <View className="weekly-review__advice">
           <NordicIcon name="milestone" size={22} ariaLabel="本周建议" />
-          <View>
-            <Text>{weeklyInsight?.headline ?? "本周建议"}</Text>
-            <Text>{weeklyInsight?.nextSteps?.[0] ?? (proteinLeft
+          <View className="weekly-review__advice-copy">
+            <Text className="weekly-review__advice-title">{weeklyInsight?.headline ?? "本周建议"}</Text>
+            <Text className="weekly-review__advice-description">{weeklyInsight?.nextSteps?.[0] ?? (proteinLeft
               ? "下一周优先安排瘦肉、鸡蛋或高蛋白酸奶，让目标更容易完成。"
               : "维持当前的记录频率，并留意睡眠和补水，让恢复同样跟上。")}</Text>
           </View>
@@ -164,23 +164,23 @@ export default function WeeklyReviewPage() {
         <View className="weekly-review__next-goals">
           <View className="weekly-review__next-goals-head">
             <NordicIcon name="zap" size={20} ariaLabel="下周小目标" />
-            <View>
-              <Text>下周小目标</Text>
-              <Text>不求完美，先把节奏保持下来。</Text>
+            <View className="weekly-review__next-goals-copy">
+              <Text className="weekly-review__next-goals-title">下周小目标</Text>
+              <Text className="weekly-review__next-goals-description">不求完美，先把节奏保持下来。</Text>
             </View>
           </View>
           <View className="weekly-review__next-goal-row">
             <NordicIcon name="check" size={18} ariaLabel="下周动作" />
-            <View>
-              <Text>{nextGoalPrimary}</Text>
-              <Text>优先完成这一步，节奏会更清楚</Text>
+            <View className="weekly-review__next-goal-copy">
+              <Text className="weekly-review__next-goal-title">{nextGoalPrimary}</Text>
+              <Text className="weekly-review__next-goal-description">优先完成这一步，节奏会更清楚</Text>
             </View>
           </View>
           <View className="weekly-review__next-goal-row">
             <NordicIcon name="protein" size={18} ariaLabel="蛋白目标" />
-            <View>
-              <Text>{nextGoalSecondary}</Text>
-              <Text>让每日目标更容易完成</Text>
+            <View className="weekly-review__next-goal-copy">
+              <Text className="weekly-review__next-goal-title">{nextGoalSecondary}</Text>
+              <Text className="weekly-review__next-goal-description">让每日目标更容易完成</Text>
             </View>
           </View>
         </View>

@@ -62,6 +62,11 @@ export async function restoreSession(): Promise<AppAuthSession | null> {
   const persisted = readPersistedSession();
   if (persisted) {
     useAuthStore.getState().setSession(persisted);
+    if (process.env.TARO_APP_PLATFORM === "android") {
+      void import("../features/smart-reminders/push-coordinator")
+        .then(({ syncAndroidPushToken }) => syncAndroidPushToken())
+        .catch(() => undefined);
+    }
     return persisted;
   }
   return null;
@@ -77,6 +82,8 @@ export async function refreshSession(): Promise<AppAuthSession | null> {
 }
 
 export async function clearInvalidSession() {
+  await import("../features/smart-reminders/coordinator").then(({ cancelAndroidSmartReminders }) => cancelAndroidSmartReminders()).catch(() => undefined);
+  await import("../features/smart-reminders/push-coordinator").then(({ unregisterAndroidPushToken }) => unregisterAndroidPushToken()).catch(() => undefined);
   persistSession(null);
   useAuthStore.getState().clear();
   useAchievementStore.getState().reset();
@@ -90,5 +97,7 @@ export function setNativeSession(user: AppAuthUser, accessToken?: string): AppAu
   const session: AppAuthSession = { user, accessToken };
   persistSession(session);
   useAuthStore.getState().setSession(session);
+  void import("../features/smart-reminders/coordinator").then(({ refreshAndroidSmartReminders }) => refreshAndroidSmartReminders()).catch(() => undefined);
+  void import("../features/smart-reminders/push-coordinator").then(({ syncAndroidPushToken }) => syncAndroidPushToken()).catch(() => undefined);
   return session;
 }

@@ -367,6 +367,12 @@ function createMealDataService({
         return prior;
       }
       let imagePath = meal.imageUrl;
+      let templateId = null;
+      if (input.templateId) {
+        templateId = assertUuid(input.templateId, '常吃 ID');
+        const template = await db.from('meal_templates').select('id').eq('user_id', userId).eq('id', templateId).maybeSingle();
+        if (template.error || !template.data) throw invalid('常吃不存在');
+      }
       if (meal.analysisId) {
         const analysis = await db.from("ai_analysis").select("id,image_path,advice").eq("id", meal.analysisId).eq("user_id", userId).maybeSingle();
         if (analysis.error || !analysis.data?.id) throw invalid("分析记录无效");
@@ -401,6 +407,7 @@ function createMealDataService({
       const created = await db.from("meal_records").insert({
         user_id: userId,
         plan_id: activePlan?.id ?? null,
+        ...(templateId ? { template_id: templateId } : {}),
         analysis_id: meal.analysisId,
         client_request_id: meal.clientRequestId,
         meal_type: meal.mealType,
@@ -523,4 +530,4 @@ function createMealDataService({
   };
 }
 
-module.exports = { createMealDataService, PublicMealDataError, normalizeStoredImagePath };
+module.exports = { createMealDataService, PublicMealDataError, normalizeStoredImagePath, normalizeItems };

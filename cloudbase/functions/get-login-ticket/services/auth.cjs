@@ -2,6 +2,11 @@ const { createHmac, randomInt, timingSafeEqual } = require("node:crypto");
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
+const VERIFICATION_PURPOSES = ["register", "reset_password"];
+const VERIFICATION_LIMITS = {
+  phone: { tenMinute: 3, daily: 10 },
+  email: { tenMinute: 5, daily: 20 },
+};
 
 function normalizeEmail(value) {
   const email = typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -35,6 +40,12 @@ function hashAuthValue(value, secret, purpose) {
 function hashVerificationCode(target, purpose, code, secret) {
   if (!secret) throw new Error("Auth HMAC secret is unavailable");
   return createHmac("sha256", secret).update(`${target}:${purpose}:${code}`).digest("hex");
+}
+
+function applyPurposeFilter(query, { purpose, purposes } = {}) {
+  const values = Array.isArray(purposes) ? purposes : [purpose];
+  const filtered = values.filter((value) => typeof value === "string" && value);
+  return filtered.length > 1 ? query.in("purpose", filtered) : query.eq("purpose", filtered[0]);
 }
 
 function createAccessToken({ userId, tokenVersion, secret, now = Date.now }) {
@@ -104,7 +115,7 @@ function createAuthRepository(db) {
   if (!db || typeof db.from !== "function" || typeof db.rpc !== "function") {
     throw new Error("Auth database client is unavailable");
   }
-  const userFields = "id,email,email_normalized,email_verified_at,phone_e164,phone_verified_at,password_hash,google_sub,status,token_version,created_platform,password_changed_at";
+  const userFields = "id,email,email_normalized,email_verified_at,phone_e164,phone_verified_at,password_hash,google_sub,status,token_version,created_platform,registration_channel,password_changed_at";
   const readUser = async (query) => {
     const result = await query.maybeSingle();
     if (result.error) throw new Error("Auth user lookup failed");
@@ -135,6 +146,7 @@ function createAuthRepository(db) {
     async insertVerification(row) {
       const result = await db.from("auth_verification_codes").insert(row).select("id").single();
       if (result.error) throw new Error("Verification code creation failed");
+      return result.data ?? null;
     },
     async find(target) {
       const result = await db.from("auth_verification_codes")
@@ -155,41 +167,57 @@ function createAuthRepository(db) {
     },
     async invalidateVerification({ target, targetType, purpose }) {
       const result = await db.from("auth_verification_codes")
-        .update({ used_at: new Date().toISOString() })
+        .update({ status: "invalidated", invalidated_at: new Date().toISOString() })
         .eq("target", target)
         .eq("target_type", targetType)
         .eq("purpose", purpose)
         .is("used_at", null);
       if (result.error) throw new Error("Verification cleanup failed");
     },
-    async countRecentVerification({ target, targetType, purpose, since }) {
-      const result = await db.from("auth_verification_codes")
+    async countRecentVerification({ target, targetType, purpose, purposes, since }) {
+      let query = db.from("auth_verification_codes")
         .select("id", { count: "exact", head: true })
         .eq("target", target)
         .eq("target_type", targetType)
-        .eq("purpose", purpose)
         .gte("created_at", new Date(since).toISOString());
+      query = applyPurposeFilter(query, { purpose, purposes });
+      const result = await query;
       if (result.error) throw new Error("Verification rate lookup failed");
       return Number(result.count || 0);
     },
-    async findLatestVerification({ target, targetType, purpose }) {
-      const result = await db.from("auth_verification_codes")
-        .select("id,code_hash,created_at,expires_at,used_at,attempt_count")
+    async findLatestVerification({ target, targetType, purpose, purposes }) {
+      let query = db.from("auth_verification_codes")
+        .select("id,code_hash,created_at,expires_at,used_at,attempt_count,status")
         .eq("target", target)
         .eq("target_type", targetType)
-        .eq("purpose", purpose)
+        .is("used_at", null)
+        .in("status", ["created", "sent"])
         .order("created_at", { ascending: false })
-        .limit(1)
+        .limit(1);
+      query = applyPurposeFilter(query, { purpose, purposes });
+      const result = await query.maybeSingle();
+      if (result.error) throw new Error("Verification lookup failed");
+      return result.data ?? null;
+    },
+    async findVerificationById(id) {
+      const result = await db.from("auth_verification_codes")
+        .select("id,target_value,target_type,purpose,status,used_at")
+        .eq("id", id)
         .maybeSingle();
       if (result.error) throw new Error("Verification lookup failed");
       return result.data ?? null;
     },
-    async consumeVerification({ target, targetType, purpose, codeHash }) {
+    async updateVerification(id, patch) {
+      const result = await db.from("auth_verification_codes").update(patch).eq("id", id);
+      if (result.error) throw new Error("Verification update failed");
+    },
+    async consumeVerification({ target, targetType, purpose, codeHash, now = Date.now() }) {
       const result = await db.rpc("consume_auth_verification_code", {
         p_target: target,
         p_target_type: targetType,
         p_purpose: purpose,
         p_code_hash: codeHash,
+        p_now: new Date(now).toISOString(),
       });
       if (result.error) throw new Error("Verification failed");
       return rpcBoolean(result.data, "consume_auth_verification_code") ? { consumed: true } : null;
@@ -209,6 +237,16 @@ class AuthError extends Error {
     super(message);
     this.code = code;
   }
+}
+
+function isUniqueViolation(error) {
+  return ["23505", "DATABASE_23505", "UNIQUE_VIOLATION"].includes(error?.code);
+}
+
+function invalidGoogleCredentials(reason = "invalid_token") {
+  const error = new AuthError("AUTH_INVALID_CREDENTIALS", "Google 登录凭证无效");
+  error.authReason = reason;
+  return error;
 }
 
 function unavailableProvider() {
@@ -237,6 +275,7 @@ function createAuthService({
   verifyPassword = async () => false,
   now = Date.now,
   random,
+  debugOtpCode = null,
 } = {}) {
   if (!repo) throw new Error("Auth repository is unavailable");
   if (!authHmacSecret || !sessionSecret) throw new Error("Auth secrets are unavailable");
@@ -297,51 +336,87 @@ function createAuthService({
     throw new AuthError("AUTH_INVALID_REQUEST", "认证参数无效");
   }
 
-  async function sendVerificationCode({ targetType, target, purpose = "register", captchaId, captchaAnswer }) {
+  async function sendVerificationCode({ targetType, target, purpose = "register", captchaId, captchaAnswer, skipCaptcha = false, bypassCooldown = false, traceId = null }) {
     const normalized = normalizeTarget(targetType, target);
     if (purpose !== "register" && purpose !== "reset_password") {
       throw new AuthError("AUTH_INVALID_REQUEST", "验证码用途无效");
     }
-    await verifyCaptcha(captchaId, captchaAnswer);
+    if (!skipCaptcha) await verifyCaptcha(captchaId, captchaAnswer);
+    let linkedUserId = null;
     if (purpose === "reset_password") {
       const existing = await findUserByTarget(targetType, normalized);
       if (!existing) return { sent: true, expiresIn: 600, resendAfter: 60 };
+      linkedUserId = existing.id ?? null;
     }
     const targetHash = hashAuthValue(normalized, authHmacSecret, `${targetType}-target`);
-    const latest = await repo.findLatestVerification?.({ target: targetHash, targetType, purpose });
-    if (latest && new Date(latest.created_at).getTime() + 60 * 1000 > now()) {
+    const latest = await repo.findLatestVerification?.({ target: targetHash, targetType, purposes: VERIFICATION_PURPOSES });
+    if (!bypassCooldown && latest && new Date(latest.created_at).getTime() + 60 * 1000 > now()) {
       throw new AuthError("AUTH_RATE_LIMITED", "操作过于频繁，请稍后重试");
     }
-    const recentCount = await repo.countRecentVerification?.({
+    const limits = VERIFICATION_LIMITS[targetType];
+    const recentTenMinuteCount = await repo.countRecentVerification?.({
       target: targetHash,
       targetType,
-      purpose,
-      since: now() - 60 * 60 * 1000,
+      purposes: VERIFICATION_PURPOSES,
+      since: now() - 10 * 60 * 1000,
     });
-    const hourlyLimit = targetType === "phone" ? 3 : 5;
-    if (Number(recentCount || 0) >= hourlyLimit) {
+    if (Number(recentTenMinuteCount || 0) >= limits.tenMinute) {
       throw new AuthError("AUTH_RATE_LIMITED", "操作过于频繁，请稍后重试");
     }
-    await repo.invalidateVerification({ target: targetHash, targetType, purpose });
-    const code = generateOtp(random);
-    await repo.insertVerification({
+    const recentDailyCount = await repo.countRecentVerification?.({
       target: targetHash,
+      targetType,
+      purposes: VERIFICATION_PURPOSES,
+      since: now() - 24 * 60 * 60 * 1000,
+    });
+    if (Number(recentDailyCount || 0) >= limits.daily) {
+      throw new AuthError("AUTH_RATE_LIMITED", "今日验证码发送次数已达上限，请明日再试");
+    }
+    await repo.invalidateVerification({ target: targetHash, targetType, purpose });
+    const code = debugOtpCode || generateOtp(random);
+    const created = await repo.insertVerification({
+      target: targetHash,
+      target_value: normalized,
       target_type: targetType,
       purpose,
       code_hash: hashVerificationCode(normalized, purpose, code, authHmacSecret),
       expires_at: new Date(now() + 10 * 60 * 1000).toISOString(),
       attempt_count: 0,
       used_at: null,
+      status: "created",
+      captcha_status: skipCaptcha ? "admin_resend" : "passed",
+      rate_limit_status: bypassCooldown ? "admin_resend" : "allowed",
+      send_attempt_count: 1,
+      user_id: linkedUserId,
+      trace_id: traceId,
       created_at: new Date(now()).toISOString(),
     });
+    const verificationId = created?.id ?? null;
     try {
-      if (targetType === "phone") await sendSms(normalized, code);
-      else await sendEmail(normalized, code);
-    } catch {
-      await repo.invalidateVerification({ target: targetHash, targetType, purpose });
+      const delivery = targetType === "phone" ? await sendSms(normalized, code) : await sendEmail(normalized, code);
+      if (verificationId && typeof repo.updateVerification === "function") {
+        await repo.updateVerification(verificationId, {
+          status: "sent",
+          sent_at: new Date(now()).toISOString(),
+          provider: delivery?.provider || (targetType === "phone" ? "spug" : "brevo"),
+          provider_message_id: delivery?.messageId || null,
+          provider_delivery_status: delivery?.deliveryStatus || "accepted",
+          provider_http_status: delivery?.httpStatus ?? null,
+        });
+      }
+    } catch (error) {
+      if (verificationId && typeof repo.updateVerification === "function") {
+        await repo.updateVerification(verificationId, {
+          status: "failed",
+          provider: error?.provider || (targetType === "phone" ? "spug" : "brevo"),
+          provider_error_code: error?.providerErrorCode || error?.code || "AUTH_PROVIDER_UNAVAILABLE",
+          provider_error_reason: "provider rejected or did not accept the message",
+          provider_http_status: error?.providerHttpStatus ?? null,
+        }).catch(() => {});
+      } else await repo.invalidateVerification({ target: targetHash, targetType, purpose }).catch(() => {});
       throw new AuthError("AUTH_PROVIDER_UNAVAILABLE", "验证码服务暂时不可用");
     }
-    return { sent: true, expiresIn: 600, resendAfter: 60 };
+    return { sent: true, verificationId, expiresIn: 600, resendAfter: 60 };
   }
 
   async function consumeCode({ targetType, target, purpose, code }) {
@@ -349,6 +424,7 @@ function createAuthService({
     const targetHash = hashAuthValue(normalized, authHmacSecret, `${targetType}-target`);
     const latest = await repo.findLatestVerification?.({ target: targetHash, targetType, purpose });
     if (latest && new Date(latest.expires_at).getTime() <= now()) {
+      if (latest.id && typeof repo.updateVerification === "function") await repo.updateVerification(latest.id, { status: "expired" }).catch(() => {});
       throw new AuthError("AUTH_OTP_EXPIRED", "验证码已过期");
     }
     const codeHash = hashVerificationCode(normalized, purpose, code, authHmacSecret);
@@ -366,15 +442,32 @@ function createAuthService({
     return normalized;
   }
 
+  async function resendVerificationCode({ verificationId, traceId = null }) {
+    if (typeof repo.findVerificationById !== "function") throw new AuthError("AUTH_PROVIDER_UNAVAILABLE", "验证码服务暂时不可用");
+    const row = await repo.findVerificationById(verificationId);
+    if (!row || !row.target_value || !["email", "phone"].includes(row.target_type) || !["register", "reset_password"].includes(row.purpose)) {
+      throw new AuthError("AUTH_INVALID_REQUEST", "验证码记录无效");
+    }
+    const result = await sendVerificationCode({
+      targetType: row.target_type,
+      target: row.target_value,
+      purpose: row.purpose,
+      skipCaptcha: true,
+      bypassCooldown: true,
+      traceId,
+    });
+    return { ...result, oldVerificationId: row.id, targetType: row.target_type, purpose: row.purpose };
+  }
+
   async function registerEmail(input) {
     const normalized = await consumeCode({ targetType: "email", target: input.email, purpose: "register", code: input.code });
     validatePassword(input.password);
     const passwordHash = await hashPassword(input.password);
-    const fields = { email: normalized, email_normalized: normalized, email_verified_at: new Date(now()).toISOString(), password_hash: passwordHash, created_platform: "android_app" };
+    const fields = { email: normalized, email_normalized: normalized, email_verified_at: new Date(now()).toISOString(), password_hash: passwordHash, created_platform: "android_app", registration_channel: "email" };
     try {
       return issueSession(await repo.insertUser(fields));
     } catch (error) {
-      if (error?.code === "UNIQUE_VIOLATION" || error?.code === "23505") {
+      if (isUniqueViolation(error)) {
         throw new AuthError("AUTH_EMAIL_ALREADY_REGISTERED", "账号已存在");
       }
       throw error;
@@ -385,11 +478,11 @@ function createAuthService({
     const normalized = await consumeCode({ targetType: "phone", target: input.phone, purpose: "register", code: input.code });
     validatePassword(input.password);
     const passwordHash = await hashPassword(input.password);
-    const fields = { phone_e164: normalized, phone_verified_at: new Date(now()).toISOString(), password_hash: passwordHash, created_platform: "android_app" };
+    const fields = { phone_e164: normalized, phone_verified_at: new Date(now()).toISOString(), password_hash: passwordHash, created_platform: "android_app", registration_channel: "phone" };
     try {
       return issueSession(await repo.insertUser(fields));
     } catch (error) {
-      if (error?.code === "UNIQUE_VIOLATION" || error?.code === "23505") {
+      if (isUniqueViolation(error)) {
         throw new AuthError("AUTH_PHONE_ALREADY_REGISTERED", "账号已存在");
       }
       throw error;
@@ -397,7 +490,6 @@ function createAuthService({
   }
 
   async function loginEmail(input) {
-    await verifyCaptcha(input.captchaId, input.captchaAnswer);
     const normalized = normalizeEmail(input.email);
     const rateKeys = loginRateKeys(normalized, input.ip);
     assertLoginRateAllowed(rateKeys);
@@ -412,7 +504,6 @@ function createAuthService({
   }
 
   async function loginPhone(input) {
-    await verifyCaptcha(input.captchaId, input.captchaAnswer);
     const normalized = normalizePhone(input.phone);
     const rateKeys = loginRateKeys(normalized, input.ip);
     assertLoginRateAllowed(rateKeys);
@@ -431,10 +522,14 @@ function createAuthService({
     let claims;
     try {
       claims = await verifyGoogleToken(idToken);
-    } catch {
-      throw new AuthError("AUTH_INVALID_CREDENTIALS", "Google 登录凭证无效");
+    } catch (error) {
+      if (error?.code === "AUTH_PROVIDER_UNAVAILABLE") throw error;
+      const rejection = invalidGoogleCredentials(error?.authReason || "invalid_token");
+      rejection.verificationAttempts = error?.verificationAttempts;
+      throw rejection;
     }
-    if (!claims?.sub || claims.email_verified !== true) throw new AuthError("AUTH_INVALID_CREDENTIALS", "Google 登录凭证无效");
+    if (!claims?.sub) throw invalidGoogleCredentials("missing_subject");
+    if (claims.email_verified !== true) throw invalidGoogleCredentials("email_unverified");
     const existingGoogleUser = await repo.findUserByGoogleSub(claims.sub);
     if (existingGoogleUser) {
       if (existingGoogleUser.status !== "active") throw new AuthError("AUTH_INVALID_CREDENTIALS", "登录状态无效");
@@ -444,7 +539,7 @@ function createAuthService({
     try {
       email = normalizeEmail(claims.email);
     } catch {
-      throw new AuthError("AUTH_INVALID_CREDENTIALS", "Google 登录凭证无效");
+      throw invalidGoogleCredentials("email_invalid");
     }
     const existingEmailUser = await repo.findUserByEmail(email);
     if (existingEmailUser) throw new AuthError("AUTH_EMAIL_ALREADY_REGISTERED", "该邮箱已注册，请使用邮箱密码登录");
@@ -455,10 +550,11 @@ function createAuthService({
         email_verified_at: new Date(now()).toISOString(),
         google_sub: claims.sub,
         created_platform: "android_app",
+        registration_channel: "google",
       });
       return issueSession(user);
     } catch (error) {
-      if (error?.code === "UNIQUE_VIOLATION" || error?.code === "23505") {
+      if (isUniqueViolation(error)) {
         throw new AuthError("AUTH_EMAIL_ALREADY_REGISTERED", "该邮箱已注册，请使用邮箱密码登录");
       }
       throw error;
@@ -493,6 +589,7 @@ function createAuthService({
     registerPhone,
     resetPassword,
     sendVerificationCode,
+    resendVerificationCode,
     getMe,
   };
 }

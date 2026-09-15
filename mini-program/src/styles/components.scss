@@ -91,6 +91,15 @@
     opacity: 1;
   }
 }
+// Explicit variants outrank Taro's attribute-state defaults on H5.
+.app-button.app-button--primary { color: #fff; }
+.app-button.app-button--secondary,
+.app-button.app-button--ghost,
+.app-button.app-button--outline { color: $color-forest-green; }
+.app-button.app-button--disabled { color: #59645b; }
+.app-button taro-text-core,
+.app-button taro-view-core { color: inherit; }
+
 .app-button--active,
 .app-button:active {
   opacity: 0.92;
@@ -313,6 +322,9 @@
   min-height: 260px;
   padding: $space-24;
   text-align: center;
+}
+.state--loading {
+  min-height: 180px;
 }
 .state__title {
   color: $color-text-primary;
@@ -933,10 +945,10 @@
   border-top: 1px solid $color-divider;
   bottom: 0;
   display: flex;
-  height: calc($bottom-tab-height + $safe-area-bottom);
+  box-sizing: border-box;
+  height: calc(var(--app-tab-bar-height, #{$bottom-tab-height}) + var(--app-safe-bottom, 0px));
   left: 0;
-  padding-bottom: constant(safe-area-inset-bottom);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--app-safe-bottom, 0px);
   position: fixed;
   right: 0;
   z-index: 20;
@@ -1181,6 +1193,28 @@
   text-align: center;
   top: 42%;
 }
+.toast--status {
+  background: $color-surface;
+  border: 1px solid rgba($color-forest-green, 0.14);
+  border-radius: $radius-16;
+  color: $color-text-primary;
+  flex-direction: column;
+  font-size: $font-caption;
+  font-weight: $font-weight-semibold;
+  gap: $space-8;
+  justify-content: center;
+  left: 50%;
+  min-width: 216px;
+  padding: $space-16 $space-20;
+  right: auto;
+  text-align: center;
+  top: 46%;
+  transform: translateX(-50%);
+  animation: feedback-status-enter 320ms $ease-emphasized both;
+}
+.toast--status .nordic-icon { background: $color-sage-light; border-radius: $radius-full; padding: $space-8; }
+.toast--status.toast--error { color: $color-error; }
+.toast--status.toast--error .nordic-icon { background: rgba($color-error, 0.1); }
 .modal-backdrop,
 .bottom-sheet-backdrop {
   align-items: flex-end;
@@ -1195,10 +1229,19 @@
   z-index: 200;
   animation: overlay-enter $duration-overlay $ease-standard both;
 }
+.modal-backdrop {
+  align-items: center;
+  box-sizing: border-box;
+  z-index: 1200;
+}
 .modal {
+  box-sizing: border-box;
   background: $color-surface;
   border-radius: $radius-24;
-  margin: auto $page-gutter;
+  margin: 0 $page-gutter;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
   padding: $space-24;
   width: calc(100% - #{$page-gutter} * 2);
   animation: modal-enter $duration-overlay $ease-emphasized both;
@@ -1273,7 +1316,7 @@
   font-size: $font-caption;
   line-height: $line-body;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
 }
 .confirm-dialog__actions {
   display: flex;
@@ -1282,8 +1325,14 @@
   margin-top: $space-8;
 }
 .confirm-dialog__actions .app-button {
-  flex: 0 1 220px;
+  box-sizing: border-box;
+  flex: 1 1 0;
+  height: 80px;
   min-width: 0;
+  min-height: 80px;
+  margin: 0;
+  padding: 0 $space-12;
+  width: 100%;
   white-space: nowrap;
 }
 @keyframes breathe {
@@ -1306,6 +1355,10 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+@keyframes feedback-status-enter {
+  from { opacity: 0; transform: translate(-50%, $space-8) scale(0.92); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 @keyframes overlay-enter {
   from {
@@ -1451,7 +1504,8 @@
   line-height: 1.1;
   margin-top: $space-4;
 }
-.daily-summary__value Text {
+.daily-summary__value Text ,
+.daily-summary__value taro-text-core {
   color: $color-text-secondary;
   font-size: $font-overline;
 }
@@ -1509,6 +1563,13 @@
   display: flex;
   justify-content: space-between;
 }
+.meal-group__head-copy {
+  align-items: center;
+  display: flex;
+  gap: $space-8;
+}
+.meal-group__head > .nordic-icon { transform: rotate(90deg); transition: transform 180ms $ease-standard; }
+.meal-group__head[aria-label*="已收起"] > .nordic-icon { transform: rotate(0deg); }
 .meal-group__count {
   color: $color-neutral-gray;
   font-size: $font-overline;

@@ -52,14 +52,14 @@ export function AchievementUnlockModal({ achievement, onDismiss }: AchievementUn
           if (cancelled || !card?.width || !card.height) return;
           setCelebrationModalSize({ width: card.width, height: card.height });
         });
-    }, achievementConfettiDelayMs);
+    }, achievementConfettiDelayMs * (process.env.TARO_APP_PLATFORM === "android" ? 2 : 1));
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
   }, [celebrationCardId]);
   return (
-    <View className="achievement-unlock-overlay" ariaLabel="成就已解锁">
+    <View className={`achievement-unlock-overlay${process.env.TARO_APP_PLATFORM === "android" ? " achievement-unlock-overlay--android" : ""}`} ariaLabel="成就已解锁">
       <View className="achievement-unlock-overlay__backdrop" onClick={() => { void onDismiss(); }} />
       <View className="achievement-unlock-overlay__group">
         <AchievementConfettiCanvas

@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev:weapp": "NODE_ENV=development TARO_APP_ENV=development taro build --type weapp --watch",
+    "dev:h5": "CAPACITOR_LIVE_RELOAD=true NODE_ENV=development TARO_APP_ENV=development TARO_APP_PLATFORM=android taro build --type h5 --watch --port 10086",
     "build:weapp:dev": "NODE_ENV=development TARO_APP_ENV=development taro build --type weapp --no-check",
     "build:weapp": "NODE_ENV=production TARO_APP_ENV=production taro build --type weapp --no-check",
     "build:h5": "taro build --type h5 --no-check",
+    "build:android": "NODE_ENV=development TARO_APP_ENV=development TARO_APP_PLATFORM=android taro build --type h5 --no-check",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"config/**/*.ts\"",
     "format:check": "prettier --check .",
@@ -26,12 +28,14 @@
     "@tarojs/taro": "4.2.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "vconsole": "^3.15.1",
     "zustand": "5.0.14"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",
     "@babel/preset-react": "7.29.7",
     "@eslint/js": "10.0.1",
+    "@pmmmwh/react-refresh-webpack-plugin": "0.5.15",
     "@tarojs/cli": "4.2.0",
     "@tarojs/plugin-platform-h5": "4.2.0",
     "@tarojs/plugin-platform-weapp": "4.2.0",

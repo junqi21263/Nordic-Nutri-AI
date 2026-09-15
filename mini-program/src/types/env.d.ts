@@ -9,3 +9,9 @@ declare namespace NodeJS {
     TARO_APP_API_BASE_URL?: string;
   }
 }
+
+interface Window {
+  NordicPushIntent?: {
+    consume?: () => string;
+  };
+}

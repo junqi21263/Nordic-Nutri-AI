@@ -1,19 +1,23 @@
 import { Image, Input, Text, View } from "@tarojs/components";
 import { useState } from "react";
-import { BottomSheet } from "../../components/bottom-sheet";
+import { AppButton, type AppButtonProps } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
 import heroImage from "../../assets/images/welcome-hero.jpg";
-import logoImage from "../../assets/brand/nordic-nutri-logo.png";
+
+// Keep Stencil's button slot stable while React changes the busy label.
+export function AuthButton({ loading = false, disabled, children, ...props }: AppButtonProps) {
+  return <AppButton {...props} disabled={disabled || loading}>
+    <View className={`auth-button-content ${loading ? "auth-button-content--busy" : ""}`}>
+      {children}
+    </View>
+  </AppButton>;
+}
 
 export function AuthHero({ compact = false, muted = false }: { compact?: boolean; muted?: boolean }) {
   return (
     <View className={`auth-hero ${compact ? "auth-hero--compact" : ""} ${muted ? "auth-hero--muted" : ""}`}>
       <Image className="auth-hero__image" src={heroImage} mode="aspectFill" />
       <View className="auth-hero__fade" />
-      <View className="auth-hero__brand" ariaLabel="Nordic">
-        <Text className="auth-hero__wordmark">NORDIC</Text>
-        <Image className="auth-hero__mark" src={logoImage} mode="aspectFit" />
-      </View>
     </View>
   );
 }
@@ -21,11 +25,11 @@ export function AuthHero({ compact = false, muted = false }: { compact?: boolean
 export function AuthNav({ onBack }: { onBack: () => void }) {
   return (
     <View className="auth-nav">
-      <View className="auth-nav__back" onClick={onBack} ariaLabel="Back">
-        <NordicIcon name="back" size={18} ariaLabel="Back" />
-        <Text>Back</Text>
+      <View className="auth-nav__back" onClick={onBack} ariaLabel="返回">
+        <NordicIcon name="back" size={18} ariaLabel="返回" />
+        <Text>返回</Text>
       </View>
-      <Text className="auth-nav__title">NORDIC</Text>
+      <Text className="auth-nav__title">NORDIC-NUTRI</Text>
       <View className="auth-nav__spacer" />
     </View>
   );
@@ -61,10 +65,32 @@ export function AuthInput({
   );
 }
 
+export function PhoneInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <View className="auth-field">
+      <Text className="auth-field__label">手机号</Text>
+      <View className="auth-phone-input">
+        <View className="auth-phone-input__country">
+          <NordicIcon name="china" size={18} ariaLabel="中国" />
+          <Text>+86</Text>
+        </View>
+        <Input
+          className="auth-phone-input__control"
+          value={value}
+          placeholder="请输入手机号"
+          type="number"
+          maxlength={11}
+          onInput={(event) => onChange(event.detail?.value ?? "")}
+        />
+      </View>
+    </View>
+  );
+}
+
 export function PasswordInput({
   value,
   onChange,
-  label = "Password",
+  label = "密码",
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -79,12 +105,12 @@ export function PasswordInput({
           className="auth-field__input auth-password__input"
           value={value}
           password={!visible}
-          placeholder="Enter your password"
+          placeholder="请输入密码"
           maxlength={128}
           onInput={(event) => onChange(event.detail?.value ?? "")}
         />
         <Text className="auth-password__toggle" onClick={() => setVisible((current) => !current)}>
-          {visible ? "Hide" : "Show"}
+          {visible ? "隐藏" : "显示"}
         </Text>
       </View>
     </View>
@@ -111,25 +137,25 @@ export function CaptchaField({
   return (
     <View className={`auth-captcha ${error ? "auth-captcha--error" : ""}`}>
       <View className="auth-captcha__heading">
-        <Text className="auth-field__label">Security check</Text>
-        <Text className="auth-captcha__hint">Enter the characters</Text>
+        <Text className="auth-field__label">图形验证码</Text>
+        <Text className="auth-field__label">输入图形验证码</Text>
       </View>
       <View className="auth-captcha__row">
         <View className="auth-captcha__image-wrap">
-          {captcha ? <Image className="auth-captcha__image" src={captchaImage(captcha)} mode="aspectFit" /> : null}
-          <View className="auth-captcha__refresh" onClick={onRefresh} ariaLabel="Refresh security code">
-            <NordicIcon name="refresh-cw" size={18} ariaLabel="Refresh" />
+          {captcha ? <Image className="auth-captcha__image" src={captchaImage(captcha)} mode="aspectFit" /> : <Text className="auth-captcha__placeholder" onClick={onRefresh}>点击加载验证码</Text>}
+          <View className="auth-captcha__refresh" onClick={onRefresh} ariaLabel="刷新图形验证码">
+            <NordicIcon name="refresh-cw" size={18} ariaLabel="刷新" />
           </View>
         </View>
         <Input
           className="auth-field__input auth-captcha__input"
           value={value}
-          placeholder="Security code"
+          placeholder="输入图形验证码"
           maxlength={8}
           onInput={(event) => onChange(event.detail?.value ?? "")}
         />
       </View>
-      {error ? <Text className="auth-inline-error">The security code is incorrect.</Text> : null}
+      {error ? <Text className="auth-inline-error">图形验证码不正确，请重新输入</Text> : null}
     </View>
   );
 }
@@ -152,7 +178,7 @@ export function OtpInput({ value, onChange }: { value: string; onChange: (value:
   };
 
   return (
-    <View className="auth-otp" ariaLabel="6 digit verification code">
+    <View className="auth-otp" ariaLabel="6 位验证码">
       {Array.from({ length: 6 }, (_, index) => (
         <Input
           key={index}
@@ -180,60 +206,7 @@ export function InlineMessage({
   return (
     <View className={`auth-message auth-message--${kind}`}>
       <Text>{message}</Text>
-      {onRetry ? <Text className="auth-message__retry" onClick={onRetry}>Try again</Text> : null}
+      {onRetry ? <Text className="auth-message__retry" onClick={onRetry}>重试</Text> : null}
     </View>
   );
 }
-
-export type Country = { name: string; code: string };
-
-const countries: Country[] = [
-  { name: "Japan", code: "+81" },
-  { name: "United States", code: "+1" },
-  { name: "Canada", code: "+1" },
-  { name: "United Kingdom", code: "+44" },
-  { name: "Australia", code: "+61" },
-  { name: "Hong Kong", code: "+852" },
-  { name: "Taiwan", code: "+886" },
-];
-
-export function CountryPicker({
-  open,
-  selected,
-  onDismiss,
-  onSelect,
-}: {
-  open: boolean;
-  selected: Country;
-  onDismiss: () => void;
-  onSelect: (country: Country) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const visibleCountries = countries.filter((country) => `${country.name} ${country.code}`.toLowerCase().includes(query.toLowerCase()));
-  return (
-    <BottomSheet open={open} onDismiss={onDismiss} lockScroll className="auth-country-picker">
-      <Text className="auth-country-picker__title">Country or region</Text>
-      <View className="auth-country-picker__search">
-        <NordicIcon name="search" size={18} ariaLabel="Search" />
-        <Input value={query} placeholder="Search" onInput={(event) => setQuery(event.detail?.value ?? "")} />
-      </View>
-      <View className="auth-country-picker__list">
-        {visibleCountries.map((country) => (
-          <View
-            key={`${country.name}-${country.code}`}
-            className={`auth-country-picker__item ${selected.name === country.name ? "auth-country-picker__item--selected" : ""}`}
-            onClick={() => {
-              onSelect(country);
-              onDismiss();
-            }}
-          >
-            <Text>{country.name}</Text>
-            <Text>{country.code}</Text>
-          </View>
-        ))}
-      </View>
-    </BottomSheet>
-  );
-}
-
-export { countries };

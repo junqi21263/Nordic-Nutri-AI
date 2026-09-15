@@ -26,6 +26,8 @@ import { usePlanRegenerationStore } from "../../stores/plan-regeneration-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { queueOnboardingDraftSync } from "../../features/onboarding/onboarding-draft-cloud-sync";
 
+const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
+
 export default function DietPreferencesPage() {
   const router = useRouter();
   const fromSettings = isSettingsEditMode(router.params);
@@ -104,14 +106,14 @@ export default function DietPreferencesPage() {
         activityLevel: profile.activityLevel, trainingDays: profile.trainingDays, goalType: profile.goalType,
         dietaryPattern: draft.dietaryPattern, foodAvoidances: draft.foodAvoidances, mealsPerDay: Number(draft.mealsPerDay),
       }));
-      if (!fromSettings) {
+      if (!fromSettings && !isAndroidApp) {
         await new Promise<void>((resolve) => setTimeout(resolve, stitchInitialProcessingMotion.buttonPressMs));
         await new Promise<void>((resolve) => setTimeout(resolve, stitchInitialProcessingMotion.acknowledgementMs));
       }
       setShowProcessingOverlay(true);
       const [preview] = await Promise.all([
         previewRequest,
-        new Promise<void>((resolve) => setTimeout(resolve, minimumPlanProcessingMs)),
+        new Promise<void>((resolve) => setTimeout(resolve, isAndroidApp ? 0 : minimumPlanProcessingMs)),
       ]);
       completeRegeneration(preview);
       await new Promise<void>((resolve) => setTimeout(resolve, planReadyMotion.completingDurationMs));
@@ -139,6 +141,13 @@ export default function DietPreferencesPage() {
       hideNavigation
       showBrandHeader={false}
       className="page-layout--onboarding"
+      overlay={
+        <PlanTransitionOverlay
+          visible={overlayVisible}
+          phase={overlayPhase}
+          variant={fromSettings ? "regenerate" : "initial"}
+        />
+      }
     >
       <View className={`diet-preferences-page ${
         initialProcessing ? "diet-preferences-page--initial-processing" : ""
@@ -190,7 +199,10 @@ export default function DietPreferencesPage() {
                     }`}
                     onClick={() => setField("dietaryPattern", option.value)}
                   >
-                    <Text className="diet-preferences-page__choice-title">{option.label}</Text>
+                    <View className="diet-preferences-page__choice-name">
+                      <Text className="diet-preferences-page__choice-title">{option.label}</Text>
+                      <NordicIcon name={option.icon} size={16} />
+                    </View>
                     <Text className="diet-preferences-page__choice-copy">{option.description}</Text>
                     <View className="diet-preferences-page__choice-indicator">
                       {selected ? (
@@ -267,11 +279,6 @@ export default function DietPreferencesPage() {
               </View>
             </AppButton>
         </BottomActionLayout>
-        <PlanTransitionOverlay
-          visible={overlayVisible}
-          phase={overlayPhase}
-          variant={fromSettings ? "regenerate" : "initial"}
-        />
       </View>
     </PageLayout>
   );

@@ -93,11 +93,16 @@ describe("profile information bottom sheets", () => {
     expect(profile).toContain("cursorSpacing={20}");
     expect(profile).toContain("disableDefaultPadding");
     expect(profile).toContain("showConfirmBar={false}");
+    expect(profile).toContain("maxlength={2000}");
+    expect(profile).not.toContain("maxlength={120}");
     expect(profile).not.toContain("autoHeight");
     expect(profile).not.toContain('<Input\n            className="profile-modal__input"');
     expect(styles).toContain("min-height: 416px");
     expect(styles).toContain("font-size: $font-body");
     expect(styles).toContain("white-space: pre-wrap");
+    expect(styles).toContain("overflow-y: auto");
+    expect(styles).toContain(".profile-sheet--info .profile-modal__lead");
+    expect(styles).toContain("white-space: nowrap");
     expect(profile).toContain('nativeInput');
     expect(sheet).toContain("nativeInput?: boolean");
     expect(sheet).toContain('bottom-sheet--native-input');

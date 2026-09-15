@@ -42,6 +42,7 @@
   padding-left: $space-4;
 }
 .app-top-bar__side--right {
+  justify-content: flex-end;
   flex-shrink: 0;
 }
 .app-top-bar__btn {
@@ -57,19 +58,28 @@
 }
 .app-top-bar__right-action {
   align-items: center;
-  border: 1px solid rgba($color-forest-green, 0.18);
-  border-radius: $radius-8;
+  background: $color-soft-beige;
+  border: 0;
+  border-radius: $radius-full;
   color: $color-forest-green;
   display: flex;
   font-size: $font-overline;
   font-weight: $font-weight-semibold;
-  height: 36px;
+  height: 40px;
   justify-content: center;
-  padding: 0 $space-8;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 $space-12;
+  transition:
+    transform $duration-press $ease-standard,
+    background $duration-press $ease-standard,
+    opacity $duration-press $ease-standard;
   white-space: nowrap;
 }
 .app-top-bar__right-action:active {
-  background: rgba($color-forest-green, 0.06);
+  background: $color-sage-light;
+  opacity: 0.9;
+  transform: scale(0.96);
 }
 .app-top-bar__brand {
   align-items: center;

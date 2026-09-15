@@ -377,7 +377,7 @@ export default function FoodCatalogPage() {
     inspectFood(food, items);
     const pages = Taro.getCurrentPages();
     const fromManualMeal =
-      pages.length > 1 && pages[pages.length - 2]?.route === "pages/manual-meal/index";
+      pages.length > 1 && ["pages/manual-meal/index", "pages/frequent-meal-edit/index"].includes(pages[pages.length - 2]?.route ?? "");
     void Taro.navigateTo({
       url: `/pages/food-detail/index${fromManualMeal ? "?mode=select" : ""}`,
     });

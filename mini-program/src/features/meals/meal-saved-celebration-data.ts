@@ -13,7 +13,7 @@ export function toMealSavedCelebration({
   previousCalories: number;
   syncedMeals: Meal[];
   targetCalories: number;
-  kind?: "created" | "updated";
+  kind?: "created" | "updated" | "reused" | "template";
   afterContinue?: () => Promise<boolean>;
 }): SavedMealCelebration {
   const nutrition = getMealNutrition(savedMeal);

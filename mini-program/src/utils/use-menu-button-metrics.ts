@@ -5,7 +5,7 @@ import {
   type OnboardingNavigationMetrics,
 } from "./onboarding-navigation";
 
-const fallbackMetrics: OnboardingNavigationMetrics = getOnboardingNavigationMetrics({});
+const fallbackMetrics: OnboardingNavigationMetrics = getOnboardingNavigationMetrics({ windowWidth: 375 });
 
 function getWindowGeometry() {
   try {
@@ -34,11 +34,13 @@ export function useMenuButtonMetrics(): OnboardingNavigationMetrics {
   useEffect(() => {
     try {
       const windowGeometry = getWindowGeometry();
-      const menuButtonRect = Taro.getMenuButtonBoundingClientRect();
+      const menuButtonRect = process.env.TARO_ENV === "weapp"
+        ? Taro.getMenuButtonBoundingClientRect()
+        : null;
       setMetrics(
         getOnboardingNavigationMetrics({
           statusBarHeight: windowGeometry?.statusBarHeight,
-          windowWidth: windowGeometry?.windowWidth,
+          windowWidth: windowGeometry?.windowWidth || 375,
           menuButtonRect,
         }),
       );

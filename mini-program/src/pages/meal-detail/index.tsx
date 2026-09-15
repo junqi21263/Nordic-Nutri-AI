@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
-import Taro, { useRouter } from "@tarojs/taro";
+import Taro, { useRouter, useDidShow } from "@tarojs/taro";
+import { getMealTemplates, saveMealTemplate } from "../../api/meal-template-api";
 import { useEffect, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
@@ -21,6 +22,7 @@ import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
 import { usePortionDraftStore } from "../../stores/portion-draft-store";
 import { useFeedbackStore } from "../../stores/feedback-store";
+import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
 const scoreCopy = {
   A: {
     label: "优秀搭配",
@@ -49,6 +51,12 @@ export default function MealDetailPage() {
   const [remoteMeal, setRemoteMeal] = useState<ReturnType<typeof store.getMealById>>(undefined);
   const storedMeal = store.getMealById(router.params.id);
   const meal = remoteMeal ?? storedMeal;
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  useDidShow(() => {
+    setTemplateSaved(false);
+    void getMealTemplates().then((templates) => setTemplateSaved(templates.some((item) => item.sourceMealId === router.params.id))).catch(() => undefined);
+  });
   useEffect(() => {
     if (!isRemoteMealId(router.params.id)) return;
     let cancelled = false;
@@ -107,6 +115,10 @@ export default function MealDetailPage() {
     store.setEditingMealId(meal.id);
     portion.startMealEdit(meal);
     Taro.navigateTo({ url: `/pages/portion-adjustment/index?id=${meal.id}` });
+  };
+  const repeat = () => {
+    portion.startMealRepeat(meal);
+    Taro.navigateTo({ url: "/pages/portion-adjustment/index?mode=repeat" });
   };
   const handleTopBarBack = () => {
     if (router.params.from === "analysis") {
@@ -218,10 +230,36 @@ export default function MealDetailPage() {
           </View>
         </View>
       </View>
+      <View className="meal-detail-page__template-action"><AppButton variant="secondary" loading={savingTemplate} disabled={templateSaved || !isRemoteMealId(meal.id)} onClick={async () => {
+        if (savingTemplate) return;
+        setSavingTemplate(true);
+        try {
+          await saveMealTemplate(meal.id);
+          setTemplateSaved(true);
+          const dailyCalories = store.getDailySummary(meal.date).consumed.calories;
+          useMealSavedCelebrationStore.getState().show({
+            kind: "template",
+            mealId: meal.id,
+            calories: nutrition.calories,
+            protein: nutrition.protein,
+            carbs: nutrition.carbs,
+            fat: nutrition.fat,
+            previousCalories: dailyCalories,
+            currentCalories: dailyCalories,
+            targetCalories: store.dailyTargets.calories,
+          });
+        }
+        catch { feedback.show({ message: "保存常吃失败，请重试", tone: "error" }); }
+        finally { setSavingTemplate(false); }
+      }}>{templateSaved ? "已加入我的常吃" : "保存到我的常吃"}</AppButton></View>
       <View className="meal-detail-page__actions">
         <View className="meal-detail-page__action" ariaLabel="编辑本餐" onClick={edit}>
           <NordicIcon name="pencil" size={22} ariaLabel="编辑" />
           <Text>编辑</Text>
+        </View>
+        <View className="meal-detail-page__action" ariaLabel="再吃一次" onClick={repeat}>
+          <NordicIcon name="circle-plus" size={22} ariaLabel="再吃一次" />
+          <Text>再吃一次</Text>
         </View>
         <View
           className={`meal-detail-page__action ${meal.favorite ? "meal-detail-page__action--favorite" : ""}`}

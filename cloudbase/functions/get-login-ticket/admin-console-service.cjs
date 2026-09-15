@@ -22,6 +22,7 @@ function createAdminConsoleService({ db, isAdmin }) {
       nickname: profile?.nickname ?? null,
       isAdmin: Boolean(row.is_admin),
       lastLoginAt: profile?.last_login_at ?? null,
+      registrationChannel: row.registration_channel ?? null,
       createdAt: row.created_at,
     };
   }
@@ -87,7 +88,7 @@ function createAdminConsoleService({ db, isAdmin }) {
 
       let userQuery = db
         .from("app_users")
-        .select("id,is_admin,status,created_at")
+        .select("id,is_admin,status,registration_channel,created_at")
         .neq("status", "deleted")
         .order("created_at", { ascending: false })
         .limit(cap);

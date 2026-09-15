@@ -68,6 +68,12 @@ describe("Onboarding localization and WeChat layout contract", () => {
     expect(existsSync(sourcePath("src/utils/onboarding-navigation.ts"))).toBe(true);
   });
 
+  it("only queries the WeChat capsule API in WeChat builds", () => {
+    const systemLayout = readSource("src/hooks/useSystemLayout.ts");
+    expect(systemLayout).toContain('process.env.TARO_ENV === "weapp"');
+    expect(systemLayout).toContain("if (isWeChatRuntime)");
+  });
+
   it("uses compact Stitch-calibrated Onboarding dimensions", () => {
     const styles = readSource("src/styles/page.scss");
     expect(styles).toContain("$onboarding-page-gutter");

@@ -36,6 +36,7 @@ import { navigateBackOrHome } from "../../utils/navigation";
 import { useCountUp } from "../../hooks/useCountUp";
 import { useBottomActionReveal } from "../../hooks/useBottomActionReveal";
 import { useMealRecognitionMotion, type MealRecognitionMotionPhase } from "../../hooks/useMealRecognitionMotion";
+import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
 
 const nowTime = () => {
   const date = new Date();
@@ -205,6 +206,7 @@ export default function AnalysisResultPage() {
       );
       const syncedMeals = await getProductMeals(localMeal.date);
       meals.replaceRemoteMeals(syncedMeals, localMeal.date);
+      void refreshAndroidSmartReminders();
       useMealSavedCelebrationStore.getState().show(
         toMealSavedCelebration({
           savedMeal: saved,
@@ -227,6 +229,20 @@ export default function AnalysisResultPage() {
   const evaluation = meal.evaluation || "这餐吃得不错";
   const heroImage = scanner.previewPath ?? imageByKey[meal.imageKey];
   const previewImage = () => Taro.previewImage({ current: heroImage, urls: [heroImage] });
+  const exitConfirmDialog = (
+    <ConfirmDialog
+      open={exitConfirmOpen}
+      title="放弃本次分析？"
+      description="返回后，本次未保存的分析结果将不再保留。"
+      confirmLabel="放弃并返回"
+      cancelLabel="继续分析"
+      onCancel={() => setExitConfirmOpen(false)}
+      onConfirm={() => {
+        setExitConfirmOpen(false);
+        Taro.navigateBack();
+      }}
+    />
+  );
   return (
     <PageLayout
       title={evaluation}
@@ -235,15 +251,16 @@ export default function AnalysisResultPage() {
       showBack
       scrollLocked={exitConfirmOpen}
       onTopBarBack={() => setExitConfirmOpen(true)}
+      overlay={exitConfirmDialog}
       className="page-layout--analysis-result"
     >
       <View
         className="analysis-result-page"
         data-recognition-reveal={isRecognitionMotion ? "true" : undefined}
         data-motion-phase={motion.isRevealing ? motion.phase : undefined}
-        data-base-revealed={motion.isRevealing && isBaseVisible ? "true" : undefined}
-        data-nutrition-revealed={motion.isRevealing && isNutritionVisible ? "true" : undefined}
-        data-content-revealed={motion.isRevealing && isContentVisible ? "true" : undefined}
+        data-base-revealed={isBaseVisible ? "true" : undefined}
+        data-nutrition-revealed={isNutritionVisible ? "true" : undefined}
+        data-content-revealed={isContentVisible ? "true" : undefined}
         data-bottom-revealed={bottomAction.phase === "complete" ? "true" : undefined}
       >
         <View className="analysis-result-page__header" data-motion-layer="base">
@@ -483,18 +500,6 @@ export default function AnalysisResultPage() {
           </View>
         </View>
       </View>
-      <ConfirmDialog
-        open={exitConfirmOpen}
-        title="放弃本次分析？"
-        description="返回后，本次未保存的分析结果将不再保留。"
-        confirmLabel="放弃并返回"
-        cancelLabel="继续分析"
-        onCancel={() => setExitConfirmOpen(false)}
-        onConfirm={() => {
-          setExitConfirmOpen(false);
-          Taro.navigateBack();
-        }}
-      />
     </PageLayout>
   );
 }

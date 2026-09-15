@@ -66,12 +66,13 @@ export function AppNavbar({
             height: `${navigationBarHeight}px`,
             justifyContent: "center",
             left: "50%",
-            maxWidth: `${titleMaxWidth}px`,
+            maxWidth: process.env.TARO_ENV === "weapp" ? `${titleMaxWidth}px` : `calc(100% - ${navigationBarHeight * 2}px)`,
             pointerEvents: "none",
             position: "absolute",
             top: `${statusBarHeight}px`,
             transform: "translateX(-50%)",
             width: "100%",
+            whiteSpace: "nowrap",
           }}
         >
           {isOnboarding ? (

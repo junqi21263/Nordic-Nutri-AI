@@ -10,6 +10,7 @@ describe("app authentication wiring", () => {
     const bootstrap = readFileSync(resolve(root, "auth/app-auth-bootstrap.ts"), "utf8");
 
     expect(app).toContain("startApplicationAuth");
+    expect(app).toContain("void startAndroidDevConsole().then(() => startApplicationAuth());");
     expect(app).not.toContain("isOnboardingCompleted");
     expect(bootstrap).toContain("createAuthBootstrap");
     expect(bootstrap).toContain("loginWithWechat");

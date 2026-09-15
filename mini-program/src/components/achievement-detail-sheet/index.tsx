@@ -16,6 +16,8 @@ interface AchievementDetailSheetProps {
   onDismiss: () => void;
 }
 
+const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
+
 export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDetailSheetProps) {
   const metricLabel = achievement
     ? `${achievement.metric ?? Math.round(((achievement.progress || 0) / 100) * (achievement.target || 100))}/${achievement.target ?? "—"}${achievement.unit || ""}`
@@ -36,13 +38,13 @@ export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDe
     <BottomSheet
       open={Boolean(achievement)}
       onDismiss={onDismiss}
-      className="achievement-detail-sheet"
+      className={`achievement-detail-sheet${isAndroidApp ? " achievement-detail-sheet--android" : ""}`}
       lockScroll
     >
       {achievement ? (
         <View className="achievement-detail">
           <View className={`achievement-detail__badge ${achievement.unlocked ? "" : "achievement-detail__badge--locked"}`}>
-            <NordicIcon name={getAchievementIcon(achievement)} size={36} ariaLabel={achievement.title} />
+            <NordicIcon name={getAchievementIcon(achievement)} size={28} ariaLabel={achievement.title} />
           </View>
           <Text className="achievement-detail__title">{achievement.title}</Text>
           <Text className={`achievement-detail__state ${achievement.unlocked ? "achievement-detail__state--done" : ""}`}>

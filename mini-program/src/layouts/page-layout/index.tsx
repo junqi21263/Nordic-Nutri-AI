@@ -134,6 +134,7 @@ export function PageLayout({
 
   return (
     <AppSafeArea
+      style={cssVars}
       className={[
         "page-layout",
         showTabs ? "" : "page-layout--without-tabs",
@@ -161,7 +162,6 @@ export function PageLayout({
           pageVisible && !disablePageEnterAnimation ? "page-layout__scroll--entered" : "",
         ].filter(Boolean).join(" ")}
         style={{
-          ...cssVars,
           paddingTop: showBrandHeader ? `${layout.totalHeaderHeight}px` : "0px",
         }}
       >
@@ -202,6 +202,10 @@ export function PageLayout({
           targetCalories={savedMeal.targetCalories}
           onViewMeal={() => {
             dismissSavedMealCelebration();
+            if (savedMeal.kind === "reused" || savedMeal.kind === "template") {
+              void Taro.switchTab({ url: "/pages/meal-records/index" });
+              return;
+            }
             void finishMealSaveSuccessFlow()
               .then((openedPoster) => {
                 if (openedPoster) return undefined;
@@ -217,6 +221,10 @@ export function PageLayout({
           }}
           onContinue={() => {
             dismissSavedMealCelebration();
+            if (savedMeal.kind === "reused" || savedMeal.kind === "template") {
+              void Taro.switchTab({ url: "/pages/home/index" });
+              return;
+            }
             void finishMealSaveSuccessFlow()
               .then((openedPoster) => {
                 if (!openedPoster) return Taro.switchTab({ url: "/pages/home/index" });

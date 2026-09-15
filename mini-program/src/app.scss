@@ -4,4 +4,5 @@
 @use "./styles/components";
 @use "./styles/page";
 @use "./components/app-top-bar/index.scss" as app-top-bar;
+@use "./components/app-transition-overlay/index.scss" as app-transition-overlay;
 @use "./pages/coach/components/CoachComposer/index.scss" as coach-composer;

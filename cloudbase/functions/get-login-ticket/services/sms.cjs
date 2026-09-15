@@ -1,7 +1,10 @@
 class SmsProviderError extends Error {
-  constructor() {
+  constructor({ httpStatus = null, providerErrorCode = null } = {}) {
     super("SMS provider unavailable");
     this.code = "AUTH_PROVIDER_UNAVAILABLE";
+    this.provider = "spug";
+    this.providerHttpStatus = httpStatus;
+    this.providerErrorCode = providerErrorCode;
   }
 }
 
@@ -16,13 +19,20 @@ function createSmsService({ templateUrl, fetchImpl = fetch } = {}) {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          name: "Nordic Nutri AI",
+          to: phone,
           code: String(code),
-          targets: phone,
+          number: 10,
         }),
       }).catch(() => null);
-      if (!response?.ok) throw new SmsProviderError();
-      return true;
+      if (!response?.ok) throw new SmsProviderError({ httpStatus: response?.status ?? null, providerErrorCode: response?.status ? `HTTP_${response.status}` : null });
+      let result = null;
+      try { result = typeof response.json === "function" ? await response.json() : null; } catch { result = null; }
+      return {
+        provider: "spug",
+        messageId: result?.messageId || result?.message_id || result?.id || result?.data?.id || null,
+        deliveryStatus: result?.status || "accepted",
+        httpStatus: response.status ?? null,
+      };
     },
   };
 }

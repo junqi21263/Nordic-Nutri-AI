@@ -88,7 +88,7 @@ test("rejects non-admin callers", async () => {
 test("lists users with profile nickname and login time", async () => {
   const svc = createAdminConsoleService({
     db: makeDb({
-      users: [{ id: "u1", is_admin: true, status: "active", created_at: "2026-07-01T00:00:00Z" }],
+      users: [{ id: "u1", is_admin: true, status: "active", registration_channel: "phone", created_at: "2026-07-01T00:00:00Z" }],
       profiles: [{ id: "u1", nickname: "北欧", last_login_at: "2026-07-30T01:00:00Z" }],
     }),
     isAdmin: async () => true,
@@ -97,6 +97,7 @@ test("lists users with profile nickname and login time", async () => {
   assert.equal(result.items[0].nickname, "北欧");
   assert.equal(result.items[0].isAdmin, true);
   assert.equal(result.items[0].lastLoginAt, "2026-07-30T01:00:00Z");
+  assert.equal(result.items[0].registrationChannel, "phone");
 });
 
 test("lists feedback and updates status", async () => {

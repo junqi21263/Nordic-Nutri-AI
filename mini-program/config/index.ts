@@ -1,10 +1,22 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "@tarojs/cli";
+import type { IProjectConfig } from "@tarojs/taro/types/compile";
 import devConfig from "./dev";
+
+type H5ConfigWithTerser = NonNullable<IProjectConfig["h5"]> & {
+  terser: {
+    config: {
+      output: {
+        quote_keys: boolean;
+      };
+    };
+  };
+};
 
 const projectRoot = resolve(__dirname, "../..");
 const requestedNodeEnv = process.env.NODE_ENV === "production" ? "production" : "development";
+const isCapacitorLiveReload = process.env.CAPACITOR_LIVE_RELOAD === "true";
 // Taro does not reliably load env files for this project on its own. Node's
 // loadEnvFile keeps shell values highest priority. Production intentionally
 // excludes the ignored developer-local file so its configuration is portable.
@@ -44,7 +56,9 @@ export default defineConfig({
   sourceRoot: "src",
   outputRoot,
   framework: "react",
-  compiler: "webpack5",
+  compiler: isCapacitorLiveReload
+    ? { type: "webpack5", prebundle: { enable: false } }
+    : "webpack5",
   plugins: ["@tarojs/plugin-platform-weapp", "@tarojs/plugin-platform-h5"],
   defineConstants: {
     "process.env.TARO_APP_ENV": JSON.stringify(appEnvironment),
@@ -91,6 +105,18 @@ export default defineConfig({
   },
   h5: {
     staticDirectory: "static",
-  },
+    postcss: {
+      // Shared styles use doubled design pixels (48px heading -> 24 CSS px).
+      // Explicit PX values in native auth screens remain untransformed.
+      pxtransform: { enable: true, config: { deviceRatio: { 375: 0.5, 750: 1, 828: 1.1 } } },
+    },
+    terser: {
+      config: {
+        output: {
+          quote_keys: false,
+        },
+      },
+    },
+  } as H5ConfigWithTerser,
   ...(isDevelopment ? devConfig : {}),
 });

@@ -17,18 +17,22 @@ function attemptEvent({ feature, route, attempt, phase, startedAt, error = null 
   };
 }
 
-function createRoutedModelInvoker({ feature, resolver, createService, fetchImpl = globalThis.fetch, beforeInvoke = null, onAttempt = null } = {}) {
+function createRoutedModelInvoker({ feature, resolver, createService, fetchImpl = globalThis.fetch, beforeInvoke = null, onAttempt = null, getSignal = null } = {}) {
   if (!resolver || typeof resolver.resolveCandidates !== "function") throw new Error("Model route resolver is required");
   if (typeof createService !== "function") throw new Error("Routed service factory is required");
   return async (...args) => {
+    const signal = getSignal?.(...args);
+    signal?.throwIfAborted();
     const candidates = await resolver.resolveCandidates({ feature });
     let lastError = null;
     for (let index = 0; index < candidates.length; index += 1) {
+      signal?.throwIfAborted();
       const route = candidates[index];
       const startedAt = Date.now();
       try {
         reportAttempt(onAttempt, attemptEvent({ feature, route, attempt: index, phase: "started", startedAt }));
         if (typeof beforeInvoke === "function") await beforeInvoke({ feature, route, attempt: index });
+        signal?.throwIfAborted();
         const service = createService({
           apiKey: route.credential,
           model: route.modelKey,

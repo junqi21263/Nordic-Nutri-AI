@@ -1,7 +1,10 @@
 class EmailProviderError extends Error {
-  constructor() {
+  constructor({ httpStatus = null, providerErrorCode = null } = {}) {
     super("Email provider unavailable");
     this.code = "AUTH_PROVIDER_UNAVAILABLE";
+    this.provider = "brevo";
+    this.providerHttpStatus = httpStatus;
+    this.providerErrorCode = providerErrorCode;
   }
 }
 
@@ -23,8 +26,15 @@ function createEmailService({ apiKey, senderEmail, senderName = "Nordic Nutri", 
           textContent: `Your Nordic Nutri verification code is ${code}. It expires in 10 minutes.`,
         }),
       }).catch(() => null);
-      if (!response?.ok) throw new EmailProviderError();
-      return true;
+      if (!response?.ok) throw new EmailProviderError({ httpStatus: response?.status ?? null, providerErrorCode: response?.status ? `HTTP_${response.status}` : null });
+      let result = null;
+      try { result = typeof response.json === "function" ? await response.json() : null; } catch { result = null; }
+      return {
+        provider: "brevo",
+        messageId: result?.messageId || result?.message_id || null,
+        deliveryStatus: "accepted",
+        httpStatus: response.status ?? null,
+      };
     },
   };
 }

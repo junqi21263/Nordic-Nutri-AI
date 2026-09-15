@@ -236,7 +236,7 @@ export default function BodyProfilePage() {
 
             <View className="profile-form">
               <View className="profile-form__field">
-                <Text>昵称</Text>
+                <Text className="profile-form__label">昵称</Text>
                 <View className="profile-form__input-row profile-form__input-row--with-action">
                   <Input
                     className="profile-form__input--with-action"

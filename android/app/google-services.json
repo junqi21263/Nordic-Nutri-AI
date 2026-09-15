@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "430845260220",
+    "project_id": "nordic-nutri",
+    "storage_bucket": "nordic-nutri.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:430845260220:android:8d84df50e398c07c1e7bb9",
+        "android_client_info": {
+          "package_name": "com.lewislee.nordicnutri.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-VSFUB28Em0b3IFSoE7ahLg3kwP5NVS8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

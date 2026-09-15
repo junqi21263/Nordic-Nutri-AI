@@ -6,7 +6,7 @@ import { NordicIcon } from "../nordic-icon";
 
 export interface MealSavedCelebrationProps {
   visible: boolean;
-  kind?: "created" | "updated";
+  kind?: "created" | "updated" | "reused" | "template";
   calories: number;
   protein: number;
   carbs: number;
@@ -77,9 +77,13 @@ export function MealSavedCelebration({
     { icon: "carbs" as const, label: `碳水 ${formatAmount(carbsCount)}g`, tone: "secondary" },
     { icon: "fat" as const, label: `脂肪 ${formatAmount(fatCount)}g`, tone: "secondary" },
   ];
+  const isTemplate = kind === "template";
+  const isReused = kind === "reused";
+  const title = isTemplate ? "已加入我的常吃！" : isReused ? "再吃一次已记录！" : kind === "updated" ? "本餐已更新！" : "本餐已保存！";
+  const subtitle = isTemplate ? "下次可以一键记录这餐。" : isReused ? "复制的餐食已同步到今日进度。" : kind === "updated" ? "更新后的营养数据已同步到今日进度。" : "营养数据已同步到今日进度。";
 
   return (
-    <View className={`meal-saved-celebration meal-saved-celebration--${kind}`} ariaLabel="本餐已保存">
+    <View className={`meal-saved-celebration meal-saved-celebration--${kind}`} ariaLabel={isTemplate ? "已加入我的常吃" : "本餐已保存"}>
       <View className="meal-saved-celebration__backdrop" />
       <View className="meal-saved-celebration__card">
         <View className="meal-saved-celebration__success-icon">
@@ -94,9 +98,9 @@ export function MealSavedCelebration({
           <View className="meal-saved-celebration__particle meal-saved-celebration__particle--3" />
           <View className="meal-saved-celebration__particle meal-saved-celebration__particle--4" />
         </View>
-        <Text className="meal-saved-celebration__title">{kind === "updated" ? "本餐已更新！" : "本餐已保存！"}</Text>
+        <Text className="meal-saved-celebration__title">{title}</Text>
         <Text className="meal-saved-celebration__subtitle">
-          {kind === "updated" ? "更新后的营养数据已同步到今日进度。" : "营养数据已同步到今日进度。"}
+          {subtitle}
         </Text>
         <View className="meal-saved-celebration__chips">
           {nutrients.map((nutrient, index) => (
@@ -106,24 +110,26 @@ export function MealSavedCelebration({
             </View>
           ))}
         </View>
-        <View className="meal-saved-celebration__progress">
-          <View className="meal-saved-celebration__progress-head">
-            <Text>今日进度</Text>
-            <Text>{formatAmount(currentCalories)} / {formatAmount(targetCalories)} kcal</Text>
+        {!isTemplate && (
+          <View className="meal-saved-celebration__progress">
+            <View className="meal-saved-celebration__progress-head">
+              <Text>今日进度</Text>
+              <Text>{formatAmount(currentCalories)} / {formatAmount(targetCalories)} kcal</Text>
+            </View>
+            <View className="meal-saved-celebration__progress-track">
+              <View
+                className={`meal-saved-celebration__progress-fill ${progressAnimating ? "meal-saved-celebration__progress-fill--animating" : ""}`}
+                style={{ transform: `scaleX(${progressScale})` }}
+              />
+            </View>
           </View>
-          <View className="meal-saved-celebration__progress-track">
-            <View
-              className={`meal-saved-celebration__progress-fill ${progressAnimating ? "meal-saved-celebration__progress-fill--animating" : ""}`}
-              style={{ transform: `scaleX(${progressScale})` }}
-            />
-          </View>
-        </View>
+        )}
         <View className="meal-saved-celebration__actions">
           <View className="meal-saved-celebration__view-meal" onClick={() => { if (actionsReady) onViewMeal(); }}>
-            <Text>查看本餐</Text>
+            <Text>{isTemplate || isReused ? "继续记录" : "查看本餐"}</Text>
           </View>
           <View className="meal-saved-celebration__continue" onClick={() => { if (actionsReady) onContinue(); }}>
-            <Text>继续记录</Text>
+            <Text>{isTemplate || isReused ? "回到主页" : "继续记录"}</Text>
           </View>
         </View>
       </View>

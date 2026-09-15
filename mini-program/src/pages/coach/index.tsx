@@ -1,4 +1,5 @@
 import { Image, Text, View } from "@tarojs/components";
+import { chooseFoodImage } from "../../platform/food-media";
 import Taro, { useDidHide, useDidShow } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -379,6 +380,7 @@ export default function CoachPage() {
         return;
       }
       try {
+        if (process.env.TARO_ENV === "h5" && (!(streamError instanceof Error) || streamError.name !== "COACH_STREAM_UNSUPPORTED")) throw streamError;
         const result = await sendProductCoachMessage(content, date, requestId);
         if (!pageActiveRef.current) return;
         analysis = completeAnalysisForFallback(analysis, Date.now());
@@ -418,14 +420,7 @@ export default function CoachPage() {
   const chooseCoachImage = async () => {
     if (sending) return;
     try {
-      const result = await Taro.chooseMedia({
-        count: 1,
-        mediaType: ["image"],
-        sourceType: ["album", "camera"],
-        sizeType: ["compressed"],
-      });
-      const picked = result.tempFiles[0];
-      const path = picked?.tempFilePath;
+      const path = await chooseFoodImage();
       if (!path) throw new Error("没有获取到图片");
       setSelectedImagePath(path);
     } catch (error) {
@@ -525,7 +520,7 @@ export default function CoachPage() {
               setExpandedSections((current) => ({ ...current, progress: !current.progress }))
             }
           >
-            <View>
+            <View className="coach-chat__progress-copy">
               <Text className="coach-chat__progress-kicker">今日进度</Text>
               <Text className="coach-chat__progress-title">
                 {heroContext.ctaAction === "progress" ? "查看今天的营养完成度" : heroContext.summary}

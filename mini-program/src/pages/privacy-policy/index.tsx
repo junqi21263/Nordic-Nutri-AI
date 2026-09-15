@@ -74,11 +74,11 @@ export default function PrivacyPolicyPage() {
           ariaLabel="注销 Nordic Nutri AI 产品账号"
           onClick={() => void Taro.navigateTo({ url: "/pages/account-cancellation/index" })}
         >
-          <View>
-            <Text>注销 Nordic Nutri AI 产品账号</Text>
-            <Text>删除产品数据，不影响你的微信账号</Text>
+          <View className="privacy-policy-page__cancellation-copy">
+            <Text className="privacy-policy-page__cancellation-title">注销 Nordic Nutri AI 产品账号</Text>
+            <Text className="privacy-policy-page__cancellation-description">删除产品数据，不影响你的微信账号</Text>
           </View>
-          <Text>›</Text>
+          <Text className="privacy-policy-page__cancellation-chevron">›</Text>
         </View>
       </View>
     </PageLayout>

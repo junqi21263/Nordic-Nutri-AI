@@ -44,8 +44,10 @@ describe("meal saved celebration motion", () => {
 
   it("keeps the updated-meal celebration aligned with the saved-meal schedule", () => {
     const updatedMotion = getMealSavedCelebrationMotion("updated");
+    const reusedMotion = getMealSavedCelebrationMotion("reused");
 
     expect(updatedMotion).toEqual(getMealSavedCelebrationMotion("created"));
+    expect(reusedMotion).toEqual(getMealSavedCelebrationMotion("created"));
 
     const component = readFileSync(componentPath, "utf8");
     expect(component).toContain("const countDurationMs = 620;");
@@ -114,10 +116,14 @@ describe("meal saved celebration motion", () => {
     expect(component).toContain("本餐已更新！");
     expect(component).toContain("查看本餐");
     expect(component).toContain("继续记录");
+    expect(component).toContain("回到主页");
+    expect(component).toContain('kind === "reused"');
+    expect(component).toContain("!isTemplate && (");
     expect(layout).toContain("useMealSavedCelebrationStore");
     expect(layout).toContain("MealSavedCelebration");
     expect(layout).toContain("savedMeal.mealId");
     expect(layout).toContain('Taro.switchTab({ url: "/pages/home/index" })');
+    expect(layout).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');
     expect(layout).toContain('currentPage?.route === "pages/portion-adjustment/index"');
     expect(layout).toContain("Taro.navigateBack({ delta: 1 })");
     expect(layout).not.toContain('Taro.redirectTo({ url: `/pages/meal-detail/index?id=${savedMeal.mealId}` })');

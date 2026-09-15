@@ -1,7 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Nordic Nutri</string>
-    <string name="title_activity_main">Nordic Nutri</string>
+    <string name="app_name">Nordic-Nutri-AI</string>
+    <string name="title_activity_main">Nordic-Nutri-AI</string>
     <string name="package_name">com.lewislee.nordicnutri</string>
     <string name="custom_url_scheme">com.lewislee.nordicnutri</string>
+    <string name="default_notification_channel_id">meal-reminders</string>
+    <string name="push_receipt_api_base_url">https://test-dev-d4gyxnn0b5dfa2c8a.service.tcloudbase.com/get-login-ticket</string>
+    <string name="push_notification_channel_name">餐次记录提醒</string>
+    <string name="push_notification_channel_description">轻轻提醒尚未记录的餐次</string>
 </resources>

@@ -8,6 +8,7 @@ export const achievementConfettiDelayMs = 300;
 const gravity = 0.5;
 const drag = 0.95;
 const motionRate = 0.5;
+const animationSpeed = process.env.TARO_APP_PLATFORM === "android" ? 0.5 : 1;
 // Fade fully before a particle's visible bounds can reach the canvas edge.
 const bottomFadeDistance = 180;
 const bottomFadeRate = 0.06;
@@ -17,7 +18,7 @@ const CELEBRATION_EMITTER_CONFIG = {
   xRatio: 0.53,
   yRatio: 0.1,
 };
-const isDevelopment = process.env.NODE_ENV !== "production";
+const isDevelopment = process.env.NODE_ENV !== "production" && process.env.TARO_APP_PLATFORM !== "android";
 
 type ParticleSide = "left" | "right";
 
@@ -181,8 +182,9 @@ export function AchievementConfettiCanvas({ seed, modalSize }: AchievementConfet
 
           const entry = result[0] as { height?: number; node?: CanvasNode; width?: number } | undefined;
           const canvas = entry?.node;
-          const width = entry?.width || 0;
-          const height = entry?.height || 0;
+          // H5 returns early for node queries, omitting size. Reuse the exact CSS dimensions.
+          const width = entry?.width || modalSize.width + horizontalSpread * 2;
+          const height = entry?.height || modalSize.height + verticalSpread * 2;
           const ctx = canvas?.getContext("2d");
           if (!canvas || !ctx || !width || !height) return;
 
@@ -218,14 +220,14 @@ export function AchievementConfettiCanvas({ seed, modalSize }: AchievementConfet
 
             for (let index = particles.length - 1; index >= 0; index -= 1) {
               const particle = particles[index]!;
-              particle.vx *= Math.pow(drag, motionRate);
-              particle.vy += gravity * motionRate;
-              particle.x += particle.vx * motionRate;
-              particle.y += particle.vy * motionRate;
-              particle.rotation += particle.rotationSpeed * motionRate;
+              particle.vx *= Math.pow(drag, motionRate * animationSpeed);
+              particle.vy += gravity * motionRate * animationSpeed;
+              particle.x += particle.vx * motionRate * animationSpeed;
+              particle.y += particle.vy * motionRate * animationSpeed;
+              particle.rotation += particle.rotationSpeed * motionRate * animationSpeed;
 
               if (particle.y > height - bottomFadeDistance) {
-                particle.opacity -= bottomFadeRate;
+                particle.opacity -= bottomFadeRate * animationSpeed;
               }
 
               const particleHalfHeight = particle.isCircle ? particle.size / 2 : particle.size * 0.75;

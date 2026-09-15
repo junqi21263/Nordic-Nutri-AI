@@ -33,6 +33,10 @@ import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealStore } from "../../stores/meal-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
+import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+
+const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
+const loginEntryPath = isAndroidApp ? "/pages/android-auth/index" : "/pages/auth-entry/index";
 
 export default function ProfilePage() {
   useAppShare();
@@ -69,7 +73,7 @@ export default function ProfilePage() {
   const showAchievementCelebration = useAchievementStore((state) => state.showAchievementCelebration);
   const logoutFlow = createLogoutFlow({
     signOut,
-    openLogin: () => Taro.reLaunch({ url: "/pages/auth-entry/index" }),
+    openLogin: () => Taro.reLaunch({ url: loginEntryPath }),
   });
 
   useEffect(() => {
@@ -86,11 +90,9 @@ export default function ProfilePage() {
   useEffect(() => {
     void Promise.all([
       refreshProductAchievements(date),
-      getProductWeeklyReview(date, { preferFast: true }),
       getMilestoneJourney().catch(() => null),
     ])
-      .then(([, review, journey]) => {
-        setWeeklyReview(review);
+      .then(([, journey]) => {
         if (journey) setMilestoneJourney(journey);
       })
       .catch(() => undefined);
@@ -171,6 +173,7 @@ export default function ProfilePage() {
   useDidShow(() => {
     refreshFeedbackHistory();
     syncProfileFromAccount();
+    void refreshAndroidSmartReminders();
     void getProductWeeklyReview(date, { preferFast: true })
       .then(setWeeklyReview)
       .catch(() => undefined);
@@ -241,10 +244,21 @@ export default function ProfilePage() {
     setActiveModal("feedback");
   };
   const repliedFeedbackItems = feedbackItems.filter((item) => Boolean(item.adminReply));
-  const logout = () => {
+  const performLogout = () => {
     void logoutFlow
       .run()
       .catch(() => feedback.show({ message: "退出登录失败，请稍后重试", tone: "error" }));
+  };
+  const logout = () => {
+    feedback.showModal({
+      variant: "error",
+      title: "退出登录？",
+      description: "仅退出当前设备，不会删除你的饮食记录。",
+      primaryText: "退出登录",
+      secondaryText: "取消",
+      onPrimary: performLogout,
+      dismissible: true,
+    });
   };
   const openAchievement = (achievement: Achievement) => {
     if (achievement.unlocked) {
@@ -261,7 +275,7 @@ export default function ProfilePage() {
       hideNavigation
       refreshing={refreshing}
       scrollLocked={isPageScrollLocked}
-      className="page-layout--profile"
+      className={`page-layout--profile${isAndroidApp ? " page-layout--profile-android" : ""}`}
     >
       <View className="profile-rhythm">
         <View ariaLabel="编辑个人资料" onClick={() => openPage("/pages/profile-edit/index")}>
@@ -271,7 +285,7 @@ export default function ProfilePage() {
               src={profile.profile.avatarUrl}
               size="large"
             />
-            <View>
+            <View className="profile-hero__copy">
               <Text className="profile-hero__name">{profile.profile.nickname}</Text>
               <Text className="profile-hero__goal">
                 {profile.profile.goalLabel} · 当前 {profile.profile.weight} kg
@@ -344,69 +358,100 @@ export default function ProfilePage() {
           ariaLabel="查看本周总结"
           onClick={() => openPage("/pages/weekly-review/index")}
         >
-          <View>
-            <Text>本周回顾</Text>
-            <Text>保持记录，稳步靠近增肌目标。</Text>
+          <View className="profile-rhythm__weekly-copy">
+            <Text className="profile-rhythm__weekly-title">本周回顾</Text>
+            <Text className="profile-rhythm__weekly-description">保持记录，稳步靠近增肌目标。</Text>
           </View>
           <View className="profile-rhythm__weekly-score">
-            <Text>营养节奏</Text>
-            <Text>{weeklyReview?.score ?? proteinCompletion}</Text>
-            <Text>分 ›</Text>
+            <Text className="profile-rhythm__weekly-score-label">营养节奏</Text>
+            <Text className="profile-rhythm__weekly-score-value">{weeklyReview?.score ?? proteinCompletion}</Text>
+            <Text className="profile-rhythm__weekly-score-suffix">分 ›</Text>
           </View>
         </View>
 
-        <View className="profile-rhythm__settings-group">
-          <View onClick={() => openPage("/pages/body-profile/index?from=settings&entry=1")}>
-            <ListItem
-              icon={<NordicIcon name="ruler" size={20} ariaLabel="营养档案" />}
-              title="营养档案"
-              description="身体数据、饮食偏好与忌口"
-            />
-          </View>
-          <View onClick={() => openPage("/pages/privacy-policy/index")}>
-            <ListItem
-              icon={<NordicIcon name="check" size={20} ariaLabel="隐私政策与免责声明" />}
-              title="隐私政策与免责声明"
-              description="数据说明与账号注销"
-            />
-          </View>
-          <View onClick={openFeedback}>
-            <ListItem
-              icon={<NordicIcon name="pencil" size={20} ariaLabel="反馈与帮助" />}
-              title={
-                <View className="profile-feedback-title">
-                  <Text>反馈与帮助</Text>
-                  {unreadReplyCount > 0 ? (
-                    <View className="profile-feedback-title__bell">
-                      <NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" />
-                    </View>
-                  ) : null}
+        <View className="profile-rhythm__entry-sections">
+          <View className="profile-rhythm__settings-section">
+            <Text className="profile-rhythm__settings-label">饮食管理</Text>
+            <View className="profile-rhythm__settings-group">
+              {isAndroidApp ? (
+                <View onClick={() => openPage("/pages/smart-reminder-settings/index")}>
+                  <ListItem icon={<NordicIcon name="bell" size={20} ariaLabel="记录提醒" />} title="记录提醒" description="按餐次设置轻量的本地提醒" />
                 </View>
-              }
-              description="告诉我们你的想法"
-              trailing="›"
-            />
+              ) : null}
+              <View onClick={() => openPage("/pages/frequent-meals/index")}>
+                <ListItem icon={<NordicIcon name="bookmark" size={20} ariaLabel="我的常吃" />} title="我的常吃" description="保存熟悉的一餐，下次一键记录" />
+              </View>
+              <View onClick={() => openPage("/pages/body-profile/index?from=settings&entry=1")}>
+                <ListItem
+                  icon={<NordicIcon name="ruler" size={20} ariaLabel="营养档案" />}
+                  title="营养档案"
+                  description="身体数据、饮食偏好与忌口"
+                />
+              </View>
+            </View>
           </View>
-          <View onClick={() => setActiveModal("about")}>
-            <ListItem
-              icon={<NordicIcon name="nova" size={20} ariaLabel="关于我们" />}
-              title="关于我们"
-              description="产品介绍与使用说明"
-            />
+
+          <View className="profile-rhythm__settings-section">
+            <Text className="profile-rhythm__settings-label">帮助与信息</Text>
+            <View className="profile-rhythm__settings-group">
+              <View onClick={openFeedback}>
+                <ListItem
+                  icon={<NordicIcon name="message-circle" size={20} ariaLabel="反馈与帮助" />}
+                  title={
+                    <View className="profile-feedback-title">
+                      <Text>反馈与帮助</Text>
+                      {unreadReplyCount > 0 ? (
+                        <View className="profile-feedback-title__bell">
+                          <NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" />
+                        </View>
+                      ) : null}
+                    </View>
+                  }
+                  description="告诉我们你的想法"
+                  trailing="›"
+                />
+              </View>
+              <View onClick={() => setActiveModal("about")}>
+                <ListItem
+                  icon={<NordicIcon name="info" size={20} ariaLabel="关于我们" />}
+                  title="关于我们"
+                  description="产品介绍与使用说明"
+                />
+              </View>
+              <View onClick={() => openPage("/pages/privacy-policy/index")}>
+                <ListItem
+                  icon={<NordicIcon name="shield-check" size={20} ariaLabel="隐私政策与免责声明" />}
+                  title="隐私政策与免责声明"
+                  description="数据说明与账号注销"
+                />
+              </View>
+            </View>
           </View>
-          <View onClick={() => openPage("/pages/recommend-friends/index")}>
-            <ListItem
-              icon={<NordicIcon name="wechat" size={20} ariaLabel="推荐好友" />}
-              title="推荐好友"
-              description="分享海报，邀请朋友一起开始"
-            />
+
+          <View className="profile-rhythm__settings-section">
+            <Text className="profile-rhythm__settings-label">和朋友一起</Text>
+            <View
+              className="profile-rhythm__recommend-card"
+              ariaLabel="推荐好友"
+              onClick={() => openPage("/pages/recommend-friends/index")}
+            >
+              <View className="profile-rhythm__recommend-icon">
+                <NordicIcon name="share" size={22} ariaLabel="推荐好友" />
+              </View>
+              <View className="profile-rhythm__recommend-copy">
+                <Text className="profile-rhythm__recommend-title">推荐好友</Text>
+                <Text className="profile-rhythm__recommend-description">分享海报，邀请朋友一起开始</Text>
+              </View>
+              <Text className="profile-rhythm__recommend-trailing">›</Text>
+            </View>
           </View>
-          <View onClick={logout}>
-            <ListItem
-              icon={<NordicIcon name="x" size={20} ariaLabel="退出登录" />}
-              title="退出登录"
-              description="仅退出当前设备"
-            />
+
+          <View className="profile-rhythm__logout" ariaLabel="退出登录" onClick={logout}>
+            <NordicIcon name="log-out" size={20} ariaLabel="退出登录" />
+            <View className="profile-rhythm__logout-copy">
+              <Text className="profile-rhythm__logout-title">退出登录</Text>
+              <Text className="profile-rhythm__logout-description">仅退出当前设备</Text>
+            </View>
           </View>
         </View>
       </View>
@@ -457,7 +502,7 @@ export default function ProfilePage() {
                 className="profile-modal__input"
                 value={feedbackDraft}
                 placeholder="例如：我希望回顾中能看到每餐的蛋白变化"
-                maxlength={120}
+                maxlength={2000}
                 adjustPosition
                 cursorSpacing={20}
                 disableDefaultPadding

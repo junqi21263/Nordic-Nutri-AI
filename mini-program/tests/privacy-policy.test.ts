@@ -49,6 +49,18 @@ describe("privacy policy and disclaimer", () => {
     );
   });
 
+  it("keeps the account-cancellation card copy in a responsive, non-overlapping layout", () => {
+    const policy = read("pages/privacy-policy/index.tsx");
+    const styles = read("styles/page.scss");
+
+    expect(policy).toContain('className="privacy-policy-page__cancellation-copy"');
+    expect(policy).toContain('className="privacy-policy-page__cancellation-title"');
+    expect(policy).toContain('className="privacy-policy-page__cancellation-description"');
+    expect(styles).toContain("min-width: 0");
+    expect(styles).toContain("white-space: nowrap");
+    expect(styles).toContain("@media (max-width: 359px)");
+  });
+
   it("keeps a visible non-medical disclaimer in home, analysis and coach", () => {
     for (const page of ["home/index.tsx", "analysis-result/index.tsx", "coach/index.tsx"]) {
       expect(read(`pages/${page}`)).toContain("不构成医疗诊断或治疗建议");

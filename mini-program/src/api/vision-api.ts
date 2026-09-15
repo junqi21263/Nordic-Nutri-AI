@@ -1,4 +1,6 @@
 import Taro from "@tarojs/taro";
+import { productTransport } from "../platform/product-transport";
+import { readWebImageBase64, compressWebImage } from "../platform/food-media";
 import { useAuthStore } from "../auth/auth-store";
 import {
   formatImageTooLargeMessage,
@@ -58,6 +60,7 @@ interface PreparedVisionImage {
 type VisionStatusPayload = VisionAsyncResponse & { message?: string };
 
 function readBase64(filePath: string) {
+  if (process.env.TARO_ENV === "h5") return readWebImageBase64(filePath);
   const fileSystem = Taro.getFileSystemManager();
   return new Promise<string>((resolve, reject) => {
     fileSystem.readFile({
@@ -130,7 +133,7 @@ function readPendingVisionAnalysis(): PendingVisionAnalysis | null {
 export async function getVisionAnalysisStatus(analysisId: string): Promise<VisionStatusPayload> {
   const token = useAuthStore.getState().session?.accessToken;
   if (!token) throw new Error("登录状态已失效，请重新登录");
-  const response = await Taro.request<unknown>({
+  const response = await productTransport<unknown>({
     url: `${productApiEndpoint}/vision-analysis/${analysisId}`,
     method: "GET",
     header: { authorization: `Bearer ${token}` },
@@ -327,6 +330,7 @@ async function compressOnce(
   quality: number,
   compressedWidth?: number,
 ): Promise<string> {
+  if (process.env.TARO_ENV === "h5") return compressWebImage(src, quality, compressedWidth);
   try {
     const options = {
       src,
@@ -467,7 +471,7 @@ export async function analyzeProductImage(
   const clientRequestId = createClientRequestId();
   let response;
   try {
-    response = await Taro.request<unknown>({
+    response = await productTransport<unknown>({
       url: `${productApiEndpoint}/vision-analysis`,
       method: "POST",
       header: { authorization: `Bearer ${token}`, "content-type": "application/json" },

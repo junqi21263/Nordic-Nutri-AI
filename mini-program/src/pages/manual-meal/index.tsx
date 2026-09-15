@@ -1,5 +1,5 @@
 import { Input, Text, View } from "@tarojs/components";
-import Taro, { useDidShow } from "@tarojs/taro";
+import Taro, { useDidShow, useRouter } from "@tarojs/taro";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { FoodThumbnail } from "../../components/food-thumbnail";
@@ -20,6 +20,7 @@ import { useMealStore } from "../../stores/meal-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
 import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
 import type { ProductFoodCatalogItem } from "../../api/food-catalog-api";
+import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
 
 const nowTime = () => {
   const date = new Date();
@@ -33,6 +34,11 @@ const displayNumber = (value: unknown) => {
   return Number.isFinite(number) && number >= 0 ? String(Math.round(number * 10) / 10) : "";
 };
 
+const initialMealType = (value?: string): MealType =>
+  value === "breakfast" || value === "lunch" || value === "dinner" || value === "snack"
+    ? value
+    : inferMealTypeFromTime();
+
 function scaleNutrition(food: ProductFoodCatalogItem, grams: number) {
   const scale = grams / 100;
   return {
@@ -44,13 +50,14 @@ function scaleNutrition(food: ProductFoodCatalogItem, grams: number) {
 }
 
 export default function ManualMealPage() {
+  const { params } = useRouter();
   const meals = useMealStore();
   const feedback = useFeedbackStore();
   const consumeSelectedFood = useFoodSelectionStore((state) => state.consumeSelectedFood);
   const [title, setTitle] = useState("");
   const [recordDate, setRecordDate] = useState(getLocalDateString);
   const [recordTime, setRecordTime] = useState(nowTime);
-  const [mealType, setMealType] = useState<MealType>(() => inferMealTypeFromTime());
+  const [mealType, setMealType] = useState<MealType>(() => initialMealType(params.mealType));
   const [calories, setCalories] = useState("");
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
@@ -191,6 +198,7 @@ export default function ManualMealPage() {
       });
       const syncedMeals = await getProductMeals(date);
       meals.replaceRemoteMeals(syncedMeals, date);
+      void refreshAndroidSmartReminders();
       useMealSavedCelebrationStore.getState().show(
         toMealSavedCelebration({
           savedMeal: saved,
@@ -241,6 +249,9 @@ export default function ManualMealPage() {
               value={title}
               maxlength={24}
               placeholder="例如：鸡胸肉沙拉"
+              nativeProps={{
+                style: { boxSizing: "border-box", height: "100%", lineHeight: "normal", padding: 0 },
+              }}
               onInput={(event) => updateTitle(event.detail.value)}
             />
           </View>

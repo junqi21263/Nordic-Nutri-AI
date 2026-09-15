@@ -1,0 +1,487 @@
+/*postcss-pxtransform disable*/
+@use "../../styles/tokens" as *;
+
+.page-layout--smart-reminder .page-layout__content {
+  padding: 0;
+}
+
+.smart-reminder-settings__screen {
+  background: $color-background;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.smart-reminder-settings__header {
+  align-items: center;
+  background: rgba($color-background, 0.92);
+  border-bottom: 1px solid rgba(#edeeeb, 0.6);
+  box-sizing: border-box;
+  display: flex;
+  height: 50px;
+  justify-content: space-between;
+  padding: 12px 20px 8px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.smart-reminder-settings__back {
+  align-items: center;
+  border-radius: $radius-full;
+  display: flex;
+  flex: 0 0 32px;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.smart-reminder-settings__back:active {
+  background: rgba($color-forest-green, 0.06);
+}
+
+.smart-reminder-settings__brand {
+  color: #1c3f32;
+  display: block;
+  flex: 1;
+  font-size: 16px;
+  font-weight: $font-weight-medium;
+  letter-spacing: -0.2px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smart-reminder-settings__header-spacer {
+  flex: 0 0 32px;
+  height: 32px;
+  width: 32px;
+}
+
+.smart-reminder-settings {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 20px calc($safe-area-bottom + 48px);
+}
+
+.smart-reminder-settings__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.smart-reminder-settings__intro-title {
+  color: #1c3f32;
+  display: block;
+  font-size: 29px;
+  font-weight: $font-weight-medium;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.smart-reminder-settings__intro-subtitle {
+  color: $color-text-secondary;
+  display: block;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.smart-reminder-settings__master-card,
+.smart-reminder-settings__schedule-section,
+.smart-reminder-settings__footer {
+  animation: smart-reminder-settings-reveal 360ms $ease-emphasized both;
+}
+
+.smart-reminder-settings__master-card {
+  background: #eaf0eb;
+  border: 1px solid #e8ece6;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(28, 63, 50, 0.03);
+  padding: 16px;
+}
+
+.smart-reminder-settings__master-copy,
+.smart-reminder-settings__title-row,
+.smart-reminder-settings__section-heading,
+.smart-reminder-settings__meal-row,
+.smart-reminder-settings__meal-main,
+.smart-reminder-settings__meal-title-row,
+.smart-reminder-settings__time-row,
+.smart-reminder-settings__time-chip,
+.smart-reminder-settings__hint,
+.smart-reminder-settings__footer-line {
+  align-items: center;
+  display: flex;
+}
+
+.smart-reminder-settings__master-copy,
+.smart-reminder-settings__section-heading {
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.smart-reminder-settings__title-row,
+.smart-reminder-settings__meal-main {
+  gap: 14px;
+  min-width: 0;
+}
+
+.smart-reminder-settings__master-icon,
+.smart-reminder-settings__meal-icon {
+  align-items: center;
+  background: #eaf0eb;
+  border-radius: 12px;
+  display: flex;
+  flex: 0 0 40px;
+  height: 40px;
+  justify-content: center;
+}
+
+.smart-reminder-settings__master-icon .nordic-icon,
+.smart-reminder-settings__meal-icon .nordic-icon {
+  height: 20px;
+  width: 20px;
+}
+
+.smart-reminder-settings__meal-icon--breakfast,
+.smart-reminder-settings__meal-icon--lunch,
+.smart-reminder-settings__meal-icon--dinner {
+  background: #eaf0eb;
+}
+
+.reminder-toggle {
+  background: #d7ded9;
+  border: 0;
+  border-radius: $radius-full;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  padding: 2px;
+  transition: background-color 220ms $ease-emphasized;
+}
+
+.reminder-toggle--master {
+  height: 28px;
+  width: 48px;
+}
+
+.reminder-toggle--meal {
+  height: 24px;
+  width: 44px;
+}
+
+.reminder-toggle--checked {
+  background: #1c3f32;
+}
+
+.reminder-toggle__thumb {
+  background: $color-surface;
+  border-radius: $radius-full;
+  box-shadow: 0 1px 4px rgba($color-text-primary, 0.18);
+  transition: transform 240ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.reminder-toggle--master .reminder-toggle__thumb {
+  height: 24px;
+  transform: translateX(0);
+  width: 24px;
+}
+
+.reminder-toggle--meal .reminder-toggle__thumb {
+  height: 20px;
+  transform: translateX(0);
+  width: 20px;
+}
+
+.reminder-toggle--master.reminder-toggle--checked .reminder-toggle__thumb,
+.reminder-toggle--meal.reminder-toggle--checked .reminder-toggle__thumb {
+  transform: translateX(20px);
+}
+
+.smart-reminder-settings__title,
+.smart-reminder-settings__description,
+.smart-reminder-settings__section-title,
+.smart-reminder-settings__section-count,
+.smart-reminder-settings__meal-name,
+.smart-reminder-settings__window-chip,
+.smart-reminder-settings__time-label,
+.smart-reminder-settings__time-value,
+.smart-reminder-settings__time-action,
+.smart-reminder-settings__closed-text,
+.smart-reminder-settings__hint,
+.smart-reminder-settings__footer,
+.smart-reminder-settings__footer-note {
+  display: block;
+}
+
+.smart-reminder-settings__title {
+  color: $color-text-primary;
+  font-size: 16px;
+  font-weight: $font-weight-semibold;
+  line-height: 1.25;
+}
+
+.smart-reminder-settings__description {
+  color: $color-text-secondary;
+  font-size: 13px;
+  line-height: 1.55;
+  margin-top: 4px;
+}
+
+.smart-reminder-settings__hint {
+  border-top: 1px solid #f0f2ee;
+  color: $color-text-secondary;
+  font-size: 12px;
+  gap: 6px;
+  line-height: 1.45;
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.smart-reminder-settings__hint-icon {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  height: 16px;
+  justify-content: center;
+  width: 16px;
+}
+
+.smart-reminder-settings__hint-icon .nordic-icon {
+  display: block;
+  height: 16px;
+  width: 16px;
+}
+
+.smart-reminder-settings__schedule-section {
+  animation-delay: 70ms;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.smart-reminder-settings__section-heading {
+  padding: 0;
+}
+
+.smart-reminder-settings__section-title-group {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.smart-reminder-settings__schedule-info-toggle {
+  align-items: center;
+  color: $color-text-secondary;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+  min-height: 28px;
+  padding: 2px 8px 2px 0;
+}
+
+.smart-reminder-settings__schedule-info-label {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.smart-reminder-settings__schedule-info-chevron {
+  border-bottom: 1.5px solid $color-text-secondary;
+  border-right: 1.5px solid $color-text-secondary;
+  height: 7px;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 220ms $ease-emphasized;
+  width: 7px;
+}
+
+.smart-reminder-settings__schedule-info-chevron--expanded {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.smart-reminder-settings__schedule-info {
+  align-items: center;
+  color: $color-text-secondary;
+  display: flex;
+  font-size: 12px;
+  gap: 6px;
+  line-height: 1.45;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-4px);
+  transition: max-height 240ms $ease-emphasized, opacity 180ms ease-out, transform 240ms $ease-emphasized;
+  white-space: nowrap;
+}
+
+.smart-reminder-settings__schedule-info--expanded {
+  max-height: 28px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.smart-reminder-settings__section-title {
+  color: $color-text-secondary;
+  font-size: 12px;
+  font-weight: $font-weight-medium;
+  letter-spacing: 0.7px;
+  line-height: 1.35;
+}
+
+.smart-reminder-settings__section-count {
+  color: $color-text-secondary;
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.smart-reminder-settings__schedule-card {
+  background: $color-surface;
+  border: 1px solid #e8ece6;
+  border-radius: 22px;
+  box-shadow: 0 3px 18px rgba(28, 63, 50, 0.03);
+  overflow: hidden;
+  padding: 0;
+}
+
+.smart-reminder-settings__schedule-card--paused {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.smart-reminder-settings__meal-row {
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.smart-reminder-settings__meal-row + .smart-reminder-settings__meal-row {
+  border-top: 1px solid #f0f2ee;
+}
+
+.smart-reminder-settings__row-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.smart-reminder-settings__meal-main {
+  align-items: flex-start;
+}
+
+.smart-reminder-settings__meal-title-row {
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.smart-reminder-settings__meal-name {
+  color: $color-text-primary;
+  font-size: 16px;
+  font-weight: $font-weight-semibold;
+  line-height: 1.35;
+}
+
+.smart-reminder-settings__window-chip {
+  background: #f0f2ee;
+  border-radius: 6px;
+  color: $color-text-secondary;
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.smart-reminder-settings__time-row {
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.smart-reminder-settings__time-label {
+  color: $color-text-secondary;
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.smart-reminder-settings__time-chip {
+  background: #f4f6f3;
+  border: 1px solid rgba($color-forest-green, 0.1);
+  border-radius: 8px;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 2px 10px;
+}
+
+.smart-reminder-settings__time-value {
+  color: $color-text-secondary;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.smart-reminder-settings__time-row--active .smart-reminder-settings__time-value {
+  color: #1c3f32;
+  font-weight: $font-weight-semibold;
+}
+
+.smart-reminder-settings__time-action {
+  color: $color-text-secondary;
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.smart-reminder-settings__closed-text {
+  color: $color-text-secondary;
+  font-size: 12px;
+  line-height: 28px;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+.smart-reminder-settings__footer {
+  align-items: center;
+  animation-delay: 140ms;
+  color: $color-text-secondary;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 0 32px;
+  text-align: center;
+}
+
+.smart-reminder-settings__footer-line {
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.smart-reminder-settings__footer-note {
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+@keyframes smart-reminder-settings-reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smart-reminder-settings__master-card,
+  .smart-reminder-settings__schedule-section,
+  .smart-reminder-settings__footer,
+  .smart-reminder-settings__schedule-info,
+  .smart-reminder-settings__schedule-info-chevron,
+  .reminder-toggle,
+  .reminder-toggle__thumb {
+    animation: none;
+    transition: none;
+  }
+}

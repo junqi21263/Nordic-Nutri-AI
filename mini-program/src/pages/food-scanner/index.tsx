@@ -1,4 +1,5 @@
 import { Image, Text, View } from "@tarojs/components";
+import { chooseFoodImage } from "../../platform/food-media";
 import Taro, { useDidShow } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { getProductAccountUsage } from "../../api/product-data-api";
@@ -222,14 +223,7 @@ export default function FoodScannerPage() {
     suppressPreviewResetRef.current = true;
     try {
       const mediaAcquisitionStartedAt = Date.now();
-      const result = await Taro.chooseMedia({
-        count: 1,
-        mediaType: ["image"],
-        sourceType: [source],
-        sizeType: ["compressed"],
-      });
-      const picked = result.tempFiles[0];
-      const previewPath = picked?.tempFilePath;
+      const previewPath = await chooseFoodImage(source);
       if (!previewPath) throw new Error("没有获取到图片");
       const recognitionStartedAt = Date.now();
       const mediaAcquisitionMs = recognitionStartedAt - mediaAcquisitionStartedAt;
@@ -284,7 +278,7 @@ export default function FoodScannerPage() {
       activeTab="food-scanner"
       hideNavigation
       title="食物扫描"
-      className="page-layout--food-scanner"
+      className={`page-layout--food-scanner${process.env.TARO_APP_PLATFORM === "android" ? " page-layout--food-scanner-android" : ""}`}
     >
       <View className={`food-scanner-page${showScannerTip && !isScanning ? " food-scanner-page--with-tip" : ""}`}>
         <View className="food-scanner-page__header">

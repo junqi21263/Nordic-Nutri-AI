@@ -24,8 +24,56 @@ describe("coach stream request framing", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     useAuthStore.getState().clear();
+  });
+
+  it("reads Android UTF-8 NDJSON with split bytes and a final event without newline", async () => {
+    vi.stubEnv("TARO_ENV", "h5");
+    const bytes = encoder.encode('{"type":"delta","text":"早餐"}\n' + completeEvent());
+    const request = vi.fn(async () => new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, 25));
+        controller.enqueue(bytes.slice(25));
+        controller.close();
+      },
+    })));
+    vi.stubGlobal("fetch", request);
+    const events: unknown[] = [];
+    await streamProductCoachMessage("早餐", "2026-09-10", (event) => events.push(event), "request-1").promise;
+    expect(events).toEqual([{ type: "delta", text: "早餐" }, JSON.parse(completeEvent())]);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(request.mock.calls[0]?.[1]?.body as string)).toMatchObject({ clientRequestId: "request-1" });
+  });
+
+  it("does not retry an interrupted Android response", async () => {
+    vi.stubEnv("TARO_ENV", "h5");
+    const request = vi.fn(async () => new Response('{"type":"delta","text":"早餐"}\n'));
+    vi.stubGlobal("fetch", request);
+    await expect(streamProductCoachMessage("早餐", "2026-09-10", () => undefined).promise).rejects.toThrow("回复中断");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows pre-request fallback when streaming is unavailable", async () => {
+    vi.stubEnv("TARO_ENV", "h5");
+    vi.stubGlobal("ReadableStream", undefined);
+    const request = vi.fn();
+    vi.stubGlobal("fetch", request);
+    await expect(streamProductCoachMessage("早餐", "2026-09-10", () => undefined).promise).rejects.toMatchObject({ name: "COACH_STREAM_UNSUPPORTED" });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("aborts the Android request without emitting late events", async () => {
+    vi.stubEnv("TARO_ENV", "h5");
+    vi.stubGlobal("fetch", vi.fn((_url: string, options: RequestInit) => new Promise((_resolve, reject) => {
+      options.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+    })));
+    const onEvent = vi.fn();
+    const stream = streamProductCoachMessage("早餐", "2026-09-10", onEvent);
+    stream.abort();
+    await expect(stream.promise).rejects.toMatchObject({ name: "COACH_STREAM_ABORTED" });
+    expect(onEvent).not.toHaveBeenCalled();
   });
 
   it("preserves UTF-8 text when one character is split across chunks", async () => {

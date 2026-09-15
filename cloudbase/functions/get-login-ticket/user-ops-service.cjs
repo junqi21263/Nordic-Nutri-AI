@@ -104,7 +104,7 @@ function createUserOpsService({ db, isAdmin, hashUserId, listTraces } = {}) {
   }
 
   async function loadIdentity(userId) {
-    const userResult = await db.from("app_users").select("id,status,created_at,updated_at").eq("id", userId).maybeSingle();
+    const userResult = await db.from("app_users").select("id,status,registration_channel,created_at,updated_at").eq("id", userId).maybeSingle();
     if (userResult?.error) throw new UserOpsError("USER_DETAIL_FAILED");
     if (!userResult?.data) throw new UserOpsError("USER_NOT_FOUND");
     const profileResult = await db.from("profiles").select("id,nickname,last_login_at,onboarding_completed_at").eq("id", userId).maybeSingle();
@@ -128,6 +128,7 @@ function createUserOpsService({ db, isAdmin, hashUserId, listTraces } = {}) {
         lastActiveAt: profile?.last_login_at || user.updated_at || null,
         onboardingCompletedAt: profile?.onboarding_completed_at || null,
         status: user.status || null,
+        registrationChannel: user.registration_channel || null,
       },
       overview: {
         mealsCount: activeMeals.length,
@@ -203,4 +204,3 @@ function createUserOpsService({ db, isAdmin, hashUserId, listTraces } = {}) {
 }
 
 module.exports = { createUserOpsService, UserOpsError };
-

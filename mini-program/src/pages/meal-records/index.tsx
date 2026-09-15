@@ -34,8 +34,11 @@ import { useTabBarStore } from "../../stores/tab-bar-store";
 import bowlImage from "../../assets/meal-bowl.svg";
 import oatsImage from "../../assets/meal-oats.svg";
 import salmonImage from "../../assets/meal-salmon.svg";
+import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+import { pendingReminderStorage } from "../../features/smart-reminders/pending-reminder";
 
 const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
+const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
 const weekLabels = ["日", "一", "二", "三", "四", "五", "六"];
 const mealLabels: Record<MealType, string> = {
   breakfast: "早餐",
@@ -221,6 +224,12 @@ export default function MealRecordsPage() {
 
   useDidShow(() => {
     setRefreshVersion((version) => version + 1);
+    const pendingReminder = pendingReminderStorage.consume();
+    if (pendingReminder) {
+      void Taro.navigateTo({
+        url: `/pages/manual-meal/index?mealType=${pendingReminder.mealType}&reminder=1`,
+      });
+    }
     if (retireFirstRunTipsIfRecordedMeals(store.meals, store.dataSource)) {
       setShowRecordsTip(false);
     } else if (hasSeenFirstRunTip("meal-records-review")) {
@@ -256,6 +265,7 @@ export default function MealRecordsPage() {
         const remoteMeals = await getProductMeals(selectedDate);
         if (cancelled) return;
         store.replaceRemoteMeals(remoteMeals, selectedDate);
+        void refreshAndroidSmartReminders();
       })
       .catch(() => {
         if (cancelled) return;
@@ -288,6 +298,7 @@ export default function MealRecordsPage() {
         setRecordedDates(new Set(remoteMeals.map((meal) => meal.date)));
         if (searching) {
           store.replaceRemoteMeals(remoteMeals, store.selectedDate);
+          void refreshAndroidSmartReminders();
         }
       })
       .catch(() => {
@@ -302,9 +313,11 @@ export default function MealRecordsPage() {
     <PageLayout
       title="饮食记录"
       activeTab="meal-records"
+      topBarAction="我的常吃"
+      onTopBarAction={() => { void Taro.navigateTo({ url: "/pages/frequent-meals/index" }); }}
       hideNavigation
       refreshing={refreshing}
-      className="page-layout--meal-records"
+      className={`page-layout--meal-records${isAndroidApp ? " page-layout--meal-records-android" : ""}`}
     >
       <View className="meal-records-page">
         {showRecordsTip ? (

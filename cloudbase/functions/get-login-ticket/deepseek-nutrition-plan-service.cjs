@@ -87,8 +87,11 @@ function createDeepseekNutritionPlanService({
   if (typeof fetchImpl !== "function") return null;
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
 
-  return async (input) => {
+  return async (input, { signal } = {}) => {
+    signal?.throwIfAborted();
     const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
     const routeTimeoutMs = Number(route?.timeoutMs);
     const timeoutMs = Number.isInteger(routeTimeoutMs) && routeTimeoutMs > 0 ? routeTimeoutMs : 30_000;
     const timer = setTimeoutImpl(() => controller.abort(), timeoutMs);
@@ -158,6 +161,7 @@ function createDeepseekNutritionPlanService({
       return null;
     } finally {
       clearTimeoutImpl(timer);
+      signal?.removeEventListener("abort", abort);
     }
   };
 }

@@ -36,6 +36,11 @@ export function AppTopBar({
   children,
 }: AppTopBarProps) {
   const layout = useSystemLayout();
+  const nativeSideWidth = Math.max(
+    44 * (Number(showBack) + Number(showHome)),
+    rightAction ? 112 : 44,
+  );
+  const sideWidth = process.env.TARO_ENV === "weapp" ? layout.rightInset : nativeSideWidth;
 
   const statusBarStyle = { height: `${layout.statusBarHeight}px` };
   const navBarStyle = { height: `${layout.navigationBarHeight}px` };
@@ -49,7 +54,7 @@ export function AppTopBar({
       <View className="app-top-bar__nav-bar" style={navBarStyle}>
         <View
           className="app-top-bar__side app-top-bar__side--left"
-          style={{ width: `${layout.rightInset}px` }}
+          style={{ width: `${sideWidth}px`, flexShrink: 0 }}
         >
           {showBack ? (
             <View className="app-top-bar__btn" ariaLabel="返回" onClick={onBack}>
@@ -64,13 +69,13 @@ export function AppTopBar({
         </View>
         <View
           className="app-top-bar__brand"
-          style={{ maxWidth: `${layout.titleMaxWidth}px` }}
+          style={{ maxWidth: process.env.TARO_ENV === "weapp" ? `${layout.titleMaxWidth}px` : `calc(100% - ${sideWidth * 2}px)`, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}
         >
           {children ?? <Text className="app-top-bar__brand-text">Nordic Nutri AI</Text>}
         </View>
         <View
           className="app-top-bar__side app-top-bar__side--right"
-          style={{ width: `${layout.rightInset}px` }}
+          style={{ width: `${sideWidth}px`, flexShrink: 0 }}
         >
           {rightAction ? (
             <View className="app-top-bar__right-action" ariaLabel={rightAction} onClick={onRightAction}>

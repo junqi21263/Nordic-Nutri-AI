@@ -23,22 +23,27 @@ function mealThumbSrc(meal: Meal) {
 export interface MealGroupProps {
   mealType: MealType;
   meals: Meal[];
+  expanded?: boolean;
+  onToggle?: () => void;
   onSelect: (meal: Meal) => void;
   onAdd: (mealType: MealType) => void;
 }
-export function MealGroup({ mealType, meals, onSelect, onAdd }: MealGroupProps) {
+export function MealGroup({ mealType, meals, expanded = true, onToggle, onSelect, onAdd }: MealGroupProps) {
   return (
     <View className="meal-group">
-      <View className="meal-group__head">
-        <Text className="section-title__title">{labels[mealType]}</Text>
-        <Text className="meal-group__count">{meals.length} 餐</Text>
+      <View className="meal-group__head" onClick={onToggle} ariaLabel={`${labels[mealType]}${expanded ? "已展开" : "已收起"}`}>
+        <View className="meal-group__head-copy">
+          <Text className="section-title__title">{labels[mealType]}</Text>
+          <Text className="meal-group__count">{meals.length} 餐</Text>
+        </View>
+        {onToggle ? <NordicIcon name="chevron-right" size={16} ariaLabel={expanded ? "收起" : "展开"} /> : null}
       </View>
-      {meals.length === 0 ? (
+      {expanded && meals.length === 0 ? (
         <View className="meal-group__empty" onClick={() => onAdd(mealType)}>
           <Text>＋</Text>
           <Text>新增{labels[mealType]}</Text>
         </View>
-      ) : (
+      ) : expanded ? (
         meals.map((meal) => {
           const nutrition = getMealNutrition(meal);
           const thumb = mealThumbSrc(meal);
@@ -71,7 +76,7 @@ export function MealGroup({ mealType, meals, onSelect, onAdd }: MealGroupProps) 
             </View>
           );
         })
-      )}
+      ) : null}
     </View>
   );
 }

@@ -7,6 +7,7 @@ import Taro, {
 } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
+import { RecentFrequentMeals } from "../../components/recent-frequent-meals";
 import { DailyNutritionSummary } from "../../components/daily-nutrition-summary";
 import { EmptyState } from "../../components/empty-state";
 import { FirstRunTip } from "../../components/first-run-tip";
@@ -31,6 +32,7 @@ import { useMealStore } from "../../stores/meal-store";
 import { getProductMeals, mapProductMeal } from "../../api/meal-data-api";
 import { getProductDailySummary, type ProductDailySummary } from "../../api/insight-api";
 import { useProfileStore } from "../../stores/profile-store";
+import { useAuthStore } from "../../auth/auth-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 import { usePlanSaveTransitionStore } from "../../stores/plan-save-transition-store";
 import { PlanSaveTransitionOverlay } from "../../components/plan-save-transition-overlay";
@@ -38,6 +40,9 @@ import { hasSeenWelcome } from "../../features/welcome/welcome-seen";
 import { useAppShare } from "../../hooks/use-app-share";
 import { isOnboardingCompleted } from "../../utils/local-experience";
 import { tryPresentPendingMilestone } from "../../features/milestones/presentation-flow";
+import { useAppTransitionStore } from "../../stores/app-transition-store";
+import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+import { DEFAULT_MEAL_GROUP_EXPANDED, mealGroupStateStorage, type MealGroupExpandedState } from "../../features/meals/meal-group-state";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -48,11 +53,14 @@ export default function HomePage() {
   useAppShare();
   const store = useMealStore();
   const profile = useProfileStore();
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const today = getLocalDateString();
   const [remoteSummary, setRemoteSummary] = useState<ProductDailySummary | null>(null);
+  const [homeDataReady, setHomeDataReady] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const hideWelcomeTransition = useAppTransitionStore((state) => state.hideWelcomeTransition);
   const planSaveHandoffActive = usePlanSaveTransitionStore((state) => state.handoffActive);
   const planSaveTransitionPhase = usePlanSaveTransitionStore((state) => state.phase);
   const revealPlanSaveTransition = usePlanSaveTransitionStore((state) => state.reveal);
@@ -60,6 +68,7 @@ export default function HomePage() {
   const planSaveEntranceStarted = useRef(false);
   const milestoneHomeCheckStarted = useRef(false);
   const [planSaveContentVisible, setPlanSaveContentVisible] = useState(false);
+  const [mealGroupExpanded, setMealGroupExpanded] = useState<MealGroupExpandedState>(DEFAULT_MEAL_GROUP_EXPANDED);
   const pullRefreshPending = useRef(false);
   const [guideFirstMeal, setGuideFirstMeal] = useState(
     () => !hasSeenFirstRunTip("home-first-meal"),
@@ -78,6 +87,16 @@ export default function HomePage() {
   const meals = store.getMealsByDate(today);
   const greeting = getCoachGreeting(remoteSummary?.serverTime ?? null);
   const remoteInsight = summary.staleRemote ? null : (remoteSummary?.insight ?? null);
+  useEffect(() => {
+    if (userId) setMealGroupExpanded(mealGroupStateStorage.load(userId));
+  }, [userId]);
+  const toggleMealGroup = (mealType: MealType) => {
+    setMealGroupExpanded((current) => {
+      const next = { ...current, [mealType]: !current[mealType] };
+      if (userId) mealGroupStateStorage.save(userId, next);
+      return next;
+    });
+  };
   usePullDownRefresh(() => {
     pullRefreshPending.current = true;
     setRefreshing(true);
@@ -91,6 +110,7 @@ export default function HomePage() {
       });
       return;
     }
+    setTimeout(hideWelcomeTransition, 180);
     const mealState = useMealStore.getState();
     if (retireFirstRunTipsIfRecordedMeals(mealState.meals, mealState.dataSource)) {
       setGuideFirstMeal(false);
@@ -126,10 +146,12 @@ export default function HomePage() {
         store.setDailyTargets(dailySummary.targets);
         if (Array.isArray(dailySummary.meals)) {
           store.replaceRemoteMeals(dailySummary.meals.map(mapProductMeal), today);
+          void refreshAndroidSmartReminders();
           return;
         }
         const remoteMeals = await getProductMeals(today);
         store.replaceRemoteMeals(remoteMeals, today);
+        void refreshAndroidSmartReminders();
       })
       .catch(() => {
         setRemoteSummary(null);
@@ -137,6 +159,8 @@ export default function HomePage() {
         store.setLoadingState(store.getMealsByDate(today).length ? "normal" : "empty");
       });
     void request.finally(() => {
+      if (cancelled) return;
+      setHomeDataReady(true);
       if (!cancelled && pullRefreshPending.current) {
         pullRefreshPending.current = false;
         setRefreshing(false);
@@ -173,7 +197,7 @@ export default function HomePage() {
     void Taro.switchTab({ url: "/pages/meal-records/index" });
   };
   const openManualMeal = () => Taro.navigateTo({ url: "/pages/manual-meal/index" });
-  if (store.loadingState === "loading" && !meals.length && !remoteSummary && !planSaveHandoffActive)
+  if (!homeDataReady && !planSaveHandoffActive)
     return (
       <PageLayout
         title="今天的营养"
@@ -191,7 +215,7 @@ export default function HomePage() {
       hideNavigation
       title="首页"
       refreshing={refreshing}
-      className="page-layout--home"
+      className={`page-layout--home${process.env.TARO_APP_PLATFORM === "android" ? " page-layout--home-android" : ""}`}
     >
       <View className={`home-page ${planSaveContentVisible ? "home-page--plan-save-entered" : ""}`}>
         <View className="home-page__header">
@@ -264,6 +288,7 @@ export default function HomePage() {
             <Text>记录饮食</Text>
           </View>
         </View>
+        <RecentFrequentMeals refreshVersion={refreshVersion} />
         <View className="home-page__meal-list">
           <SectionTitle
             eyebrow="今日饮食"
@@ -286,6 +311,8 @@ export default function HomePage() {
                   key={mealType}
                   mealType={mealType}
                   meals={meals.filter((meal) => meal.mealType === mealType)}
+                  expanded={mealGroupExpanded[mealType]}
+                  onToggle={() => toggleMealGroup(mealType)}
                   onSelect={(meal) => openDetail(meal.id)}
                   onAdd={openScanner}
                 />

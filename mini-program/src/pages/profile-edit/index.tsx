@@ -253,6 +253,9 @@ export default function ProfileEditPage() {
               value={nickname}
               maxlength={16}
               placeholder="输入你的昵称"
+              nativeProps={{
+                style: { boxSizing: "border-box", height: "100%", lineHeight: "normal", padding: 0 },
+              }}
               onInput={(event) => setNickname(event.detail.value)}
               onBlur={(event) => setNickname(event.detail.value)}
             />
@@ -264,6 +267,9 @@ export default function ProfileEditPage() {
                 type="digit"
                 value={weight}
                 placeholder="70"
+                nativeProps={{
+                  style: { boxSizing: "border-box", height: "100%", lineHeight: "normal", padding: 0 },
+                }}
                 onInput={(event) => setWeight(event.detail.value)}
               />
               <Text>kg</Text>

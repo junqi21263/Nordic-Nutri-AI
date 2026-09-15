@@ -139,9 +139,23 @@ describe("meal recognition result reveal motion", () => {
     expect(styles).toContain("align-items: center;");
     expect(styles).toContain("touch-action: none;");
     expect(styles).toContain(".page-layout--analysis-result .confirm-dialog__actions .app-button");
+    expect(styles).toMatch(/\.confirm-dialog__actions \.app-button\s*\{[^}]*margin:\s*0;/);
+    expect(styles).toContain("box-sizing: border-box;");
+    expect(styles).toContain("height: 80px;");
+    expect(styles).toContain("min-height: 80px;");
     expect(styles).toContain("white-space: nowrap;");
     expect(layout).toContain("page-layout--scroll-locked .page-layout__scroll");
     expect(layout).toContain("overflow: hidden;");
+  });
+
+  it("keeps completed result layers visible and mounts its dialog outside the animated scroller", () => {
+    const page = read("pages/analysis-result/index.tsx");
+
+    expect(page).toContain('data-base-revealed={isBaseVisible ? "true" : undefined}');
+    expect(page).toContain('data-nutrition-revealed={isNutritionVisible ? "true" : undefined}');
+    expect(page).toContain('data-content-revealed={isContentVisible ? "true" : undefined}');
+    expect(page).toContain("overlay={exitConfirmDialog}");
+    expect(page).not.toContain('data-base-revealed={motion.isRevealing && isBaseVisible ? "true" : undefined}');
   });
 
   it("collapses only ingredient rows while keeping nutrition progress visible", () => {

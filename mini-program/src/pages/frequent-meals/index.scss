@@ -1,0 +1,60 @@
+@use "../../styles/tokens" as *;
+
+.frequent-meals {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 32px;
+  &__intro { display: flex; flex-direction: column; gap: 12px; }
+  &__title { color: $color-forest-green; font-size: $font-h2; font-weight: 600; line-height: 1.3; }
+  &__subtitle { color: $color-text-secondary; font-size: $font-caption; line-height: 1.55; }
+  &__filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
+  &__filter { margin: 0; padding: 0; min-width: 0; border-radius: $radius-full; background: $color-sage-light; color: $color-text-secondary; font-size: $font-caption; line-height: 64px; font-weight: 600; &::after { border: 0; } }
+  &__filter--active { background: $color-forest-green; color: $color-warm-white; }
+  &__scope, &__date { color: $color-neutral-gray; font-size: $font-overline; line-height: 1.5; }
+  &__status { padding: 64px 0; color: $color-text-secondary; text-align: center; }
+  &__loading { display: flex; flex-direction: column; gap: 24px; }
+  &__loading-status { min-height: 80px; }
+  &__skeleton-card { padding: 28px; background: $color-surface; border-radius: $radius-24; box-shadow: $shadow-subtle; }
+  &__skeleton-main { display: flex; align-items: flex-start; gap: 20px; }
+  &__skeleton-image { flex: 0 0 136px; height: 136px; border-radius: $radius-16; }
+  &__skeleton-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 14px; padding-top: 4px; }
+  &__skeleton-line { height: 24px; }
+  &__skeleton-line--title { width: 62%; height: 32px; }
+  &__skeleton-line--ingredients { width: 84%; }
+  &__skeleton-metrics { display: flex; gap: 8px; }
+  &__skeleton-metric { width: 88px; height: 28px; border-radius: $radius-4; }
+  &__skeleton-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 32px; }
+  &__skeleton-date { flex: 1; max-width: 48%; height: 22px; }
+  &__skeleton-button { flex: 0 0 148px; height: 56px; border-radius: $radius-12; }
+  &__card { position: relative; padding: 28px; background: $color-surface; border-radius: $radius-24; box-shadow: $shadow-subtle; }
+  &__card--menu-open { z-index: 10; }
+  &__main { display: flex; align-items: flex-start; gap: 20px; width: 100%; min-width: 0; }
+  &__image { display: flex; align-items: center; justify-content: center; flex: 0 0 136px; height: 136px; background: $color-soft-beige; border-radius: $radius-16; overflow: hidden; image, taro-image-core { width: 100%; height: 100%; } }
+  &__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  &__name { font-size: $font-h3; font-weight: 600; color: $color-forest-green; line-height: 1.35; overflow-wrap: anywhere; }
+  &__ingredients { font-size: $font-overline; color: $color-text-secondary; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  &__metrics { display: flex; flex-wrap: wrap; gap: 8px; text, taro-text-core { padding: 4px 10px; background: $color-sage-light; border-radius: $radius-4; font-size: 20px; color: $color-forest-green; font-weight: 600; } }
+  &__more { display: flex; align-items: center; justify-content: center; flex: 0 0 48px; height: 64px; padding: 0; margin: -12px -12px 0 0; background: transparent; color: $color-neutral-gray; transition: background $duration-fast $ease-standard, color $duration-fast $ease-standard; &::after { border: 0; } }
+  &__more--active { background: $color-sage-light; border-radius: $radius-full; color: $color-forest-green; }
+  &__menu { position: absolute; top: 84px; right: 24px; z-index: 2; width: 280px; padding: 12px; background: $color-surface; border: 1px solid rgba($color-forest-green, 0.08); border-radius: $radius-16; box-shadow: $shadow-floating; transform-origin: top right; animation: frequent-meals-menu-enter $duration-fast $ease-emphasized both; &::before { content: ""; position: absolute; top: -8px; right: 24px; width: 16px; height: 16px; background: $color-surface; border-top: 1px solid rgba($color-forest-green, 0.08); border-left: 1px solid rgba($color-forest-green, 0.08); transform: rotate(45deg); } }
+  &__menu-title { display: block; padding: 8px 16px 12px; color: $color-neutral-gray; font-size: $font-overline; line-height: 1.4; }
+  &__menu-item { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 16px; border-radius: $radius-12; color: $color-text-primary; font-size: $font-caption; line-height: 1.4; opacity: 0; animation: frequent-meals-menu-item-enter $duration-base $ease-standard both; transition: background $duration-fast $ease-standard, color $duration-fast $ease-standard; &:active { background: $color-sage-light; } .nordic-icon { flex: 0 0 auto; color: $color-forest-green; } &:nth-of-type(2) { animation-delay: 40ms; } &:nth-of-type(3) { animation-delay: 80ms; } &:nth-of-type(4) { animation-delay: 120ms; } &:nth-of-type(5) { animation-delay: 160ms; } }
+  &__menu-item--danger { color: $color-error; .nordic-icon { color: $color-error; } }
+  &__footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 32px; width: 100%; min-width: 0; .frequent-meals__date { display: block; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; } .app-button { flex: 0 0 auto; width: auto; max-width: 50%; min-width: 0; margin: 0; padding: 0 16px; border-radius: $radius-12; gap: 8px; font-size: $font-overline; white-space: nowrap; } .app-button .nordic-icon { filter: brightness(0) invert(1); } }
+  @media (max-width: 359px) { &__image, &__skeleton-image { flex-basis: 112px; height: 112px; } &__card, &__skeleton-card { padding: 20px; } &__footer, &__skeleton-footer { flex-wrap: wrap; } &__skeleton-button { flex-basis: 132px; } }
+}
+
+@keyframes frequent-meals-menu-enter {
+  from { opacity: 0; transform: translateY(-12px) scale(0.9); }
+  70% { opacity: 1; transform: translateY(2px) scale(1.015); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes frequent-meals-menu-item-enter {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+[data-reduced-motion="true"] .frequent-meals__menu,
+[data-reduced-motion="true"] .frequent-meals__menu-item { animation-duration: $reduced-motion-duration; }

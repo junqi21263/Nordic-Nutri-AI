@@ -23,8 +23,14 @@ import {
   refreshSession,
   restoreSession,
 } from "./session-manager";
+import { useAppTransitionStore } from "../stores/app-transition-store";
 
 const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
+
+function finishWelcomeTransition() {
+  if (!isAndroidApp) return;
+  setTimeout(() => useAppTransitionStore.getState().hideWelcomeTransition(), 180);
+}
 
 function openWelcomeIfNeeded() {
   const pages = Taro.getCurrentPages();
@@ -34,7 +40,12 @@ function openWelcomeIfNeeded() {
 }
 
 function openLoginPage() {
-  if (isAndroidApp) return Taro.reLaunch({ url: "/pages/android-auth/index" });
+  if (isAndroidApp) {
+    return Taro.reLaunch({ url: "/pages/android-auth/index" }).then((result) => {
+      finishWelcomeTransition();
+      return result;
+    });
+  }
   return Taro.reLaunch({ url: "/pages/auth-entry/index" });
 }
 
@@ -103,6 +114,7 @@ function isAppAuthUser(value: unknown): value is AppAuthUser {
 }
 
 const authBootstrap = createAuthBootstrap({
+  preserveSessionOnError: isAndroidApp,
   restore: restoreSession,
   getUser: async () => {
     if (!isAndroidApp) return getCurrentUser();
@@ -128,7 +140,10 @@ const applicationLaunch = createRuntimeApplicationLaunch(
     isOnboardingCompleted,
     hasSeenWelcome,
     openHome: () => Taro.switchTab({ url: "/pages/home/index" }),
-    openOnboarding: () => Taro.reLaunch({ url: "/pages/onboarding/index" }),
+    openOnboarding: () => Taro.reLaunch({ url: "/pages/onboarding/index" }).then((result) => {
+      finishWelcomeTransition();
+      return result;
+    }),
     openLogin: openLoginPage,
     openWelcome: () => openWelcomeIfNeeded(),
   },

@@ -5,6 +5,7 @@ export interface AuthBootstrapState {
 }
 
 export interface AuthBootstrapDependencies<Session = unknown, User = unknown> {
+  preserveSessionOnError?: boolean;
   restore: () => Promise<Session | null>;
   getUser: () => Promise<User | null>;
   refresh: () => Promise<Session | null>;
@@ -91,6 +92,7 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
         });
       } catch (error) {
         if (id !== runId) return;
+        if (dependencies.preserveSessionOnError && !isUnauthorized(error)) throw error;
         if (!isUnauthorized(error) || !(await dependencies.refresh())) {
           await clear();
           return;
@@ -100,8 +102,9 @@ export function createAuthBootstrap<Session = unknown, User = unknown>(
           retryLogin: allowSilentLogin,
         });
       }
-    } catch {
+    } catch (error) {
       if (id !== runId) return;
+      if (dependencies.preserveSessionOnError && !isUnauthorized(error)) throw error;
       await clear();
     }
   };

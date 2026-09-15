@@ -1,5 +1,27 @@
 @use "../../styles/tokens" as *;
 
+.plan-transition-overlay.plan-transition-overlay--android {
+  background: rgba($stitch-page-bg, 0.97);
+  .plan-transition-overlay__center { gap: 18PX; text-align: center; }
+  .nordic-icon { text-align: left; }
+}
+.plan-transition-overlay__android-spinner {
+  width: 64PX;
+  height: 64PX;
+  border: 5PX solid #dce5dd;
+  border-top-color: $color-forest-green;
+  border-right-color: #78917d;
+  border-radius: 50%;
+  animation: plan-android-spin 1.2s linear infinite;
+}
+.plan-transition-overlay__android-title { color: $color-forest-green; font-size: 20PX; font-weight: 600; }
+.plan-transition-overlay__android-copy { color: #59645b; font-size: 14PX; line-height: 1.6; }
+@keyframes plan-android-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .plan-transition-overlay__android-spinner { animation: none; }
+}
+[data-reduced-motion="true"] .plan-transition-overlay__android-spinner { animation: none; }
+
 .plan-transition-overlay {
   background: rgba($stitch-page-bg, 0.5);
   bottom: 0;

@@ -137,6 +137,7 @@ export function streamProductCoachMessage(
   clientRequestId = createClientRequestId(),
 ): ProductCoachStreamRequest {
   const token = useAuthStore.getState().session?.accessToken;
+  if (process.env.TARO_ENV === "h5") return streamWebCoachMessage(token, prompt, date, onEvent, clientRequestId);
   const runtime = (globalThis as unknown as { wx?: WechatRequestRuntime }).wx;
   if (!token || !runtime?.request) {
     return {
@@ -220,6 +221,69 @@ export function streamProductCoachMessage(
     }
   });
   return { promise, abort: () => abortRequest() };
+}
+
+function streamWebCoachMessage(
+  token: string | undefined,
+  prompt: string,
+  date: string,
+  onEvent: (event: ProductCoachStreamEvent) => void,
+  clientRequestId: string,
+): ProductCoachStreamRequest {
+  if (typeof ReadableStream === "undefined" || typeof AbortController === "undefined" || typeof TextDecoder === "undefined") {
+    return { promise: Promise.reject(Object.assign(new Error("流式能力暂不可用"), { name: "COACH_STREAM_UNSUPPORTED" })), abort: () => undefined };
+  }
+  const controller = new AbortController();
+  let cancelled = false;
+  const timer = setTimeout(() => controller.abort(), 90_000);
+  const promise = (async () => {
+    if (!token) throw new Error("登录已失效，请重新登录");
+    const response = await fetch(productApiEndpoint + "/coach-answer/stream", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: JSON.stringify({ clientRequestId, prompt, date }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({})) as { code?: string; message?: string };
+      throw Object.assign(new Error(data.message || "营养教练暂时无法回答，请稍后重试"), { name: data.code || "COACH_REQUEST_FAILED" });
+    }
+    if (!response.body) throw new Error("未收到问答数据，请稍后重试");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffered = "";
+    let completed = false;
+    function consume(flush = false) {
+      const lines = buffered.split("\n");
+      buffered = lines.pop() ?? "";
+      if (flush && buffered.trim()) { lines.push(buffered); buffered = ""; }
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event: unknown = JSON.parse(line);
+        if (!isCoachStreamEvent(event)) throw new Error("流式事件无效");
+        if (event.type === "error") throw Object.assign(new Error("营养教练暂时无法回答，请稍后重试"), { name: event.code });
+        if (event.type === "complete") completed = true;
+        onEvent(event);
+      }
+    }
+    try {
+      while (!completed) {
+        const { done, value } = await reader.read();
+        if (cancelled) throw new Error("cancelled");
+        buffered += done ? decoder.decode() : decoder.decode(value, { stream: true });
+        consume(done);
+        if (done) break;
+      }
+      if (!completed) throw new Error("回复中断，请稍后重试");
+    } finally {
+      await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
+    }
+  })().catch((error: unknown) => {
+    if (cancelled) throw Object.assign(new Error("流式请求已取消"), { name: "COACH_STREAM_ABORTED" });
+    throw error;
+  }).finally(() => clearTimeout(timer));
+  return { promise, abort: () => { cancelled = true; controller.abort(); } };
 }
 
 export function getProductCoachMessages() {
