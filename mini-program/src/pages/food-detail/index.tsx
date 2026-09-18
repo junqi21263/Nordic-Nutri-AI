@@ -10,6 +10,7 @@ import { getFoodCategory, getFoodTags } from "../../features/food-catalog/food-l
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
+import { useRecognitionFeedbackStore } from "../../stores/recognition-feedback-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 const portionOptions = [100, 150, 200];
@@ -39,6 +40,9 @@ export default function FoodDetailPage() {
   const inspectFood = useFoodSelectionStore((state) => state.inspectFood);
   const selectFood = useFoodSelectionStore((state) => state.selectFood);
   const fromManualMeal = router.params.mode === "select";
+  const recognitionMode = router.params.mode === "recognition-replace" || router.params.mode === "recognition-add"
+    ? router.params.mode
+    : null;
   const [portionG, setPortionG] = useState(150);
   const [activeFood, setActiveFood] = useState<ProductFoodCatalogItem | null>(food);
   const [variants, setVariants] = useState<ProductFoodCatalogItem[]>([]);
@@ -174,6 +178,9 @@ export default function FoodDetailPage() {
   }
 
   const addToManualMeal = () => {
+    if (recognitionMode) {
+      useRecognitionFeedbackStore.getState().setSelectedQuantityG(portionG);
+    }
     selectFood(displayedFood);
     void Taro.navigateBack({ delta: 2 });
   };
@@ -295,14 +302,15 @@ export default function FoodDetailPage() {
                 key={option}
                 onClick={() => setPortionG(option)}
               >
-                <Text>{option}g</Text>
+                <Text className="food-detail-page__portion-chip-label">{option}g</Text>
               </View>
             ))}
           </View>
           <View className="food-detail-page__portion-custom">
-            <Text>自定义</Text>
+            <Text className="food-detail-page__portion-custom-label">自定义</Text>
             <View className="food-detail-page__portion-input">
               <Input
+                className="food-detail-page__portion-value"
                 type="number"
                 value={String(portionG)}
                 onInput={(event) => {
@@ -310,7 +318,7 @@ export default function FoodDetailPage() {
                   if (Number.isFinite(next) && next > 0 && next <= 2000) setPortionG(next);
                 }}
               />
-              <Text>g</Text>
+              <Text className="food-detail-page__portion-unit">g</Text>
             </View>
           </View>
         </View>
@@ -346,8 +354,14 @@ export default function FoodDetailPage() {
       </View>
 
       <View className="food-detail-page__action">
-        <AppButton size="large" onClick={fromManualMeal ? addToManualMeal : returnToCatalog}>
-          {fromManualMeal ? "添加到本餐" : "知道了"}
+        <AppButton size="large" onClick={fromManualMeal || recognitionMode ? addToManualMeal : returnToCatalog}>
+          {recognitionMode === "recognition-replace"
+            ? "替换当前食物"
+            : recognitionMode === "recognition-add"
+              ? `添加 ${portionG}g 到本次识别`
+              : fromManualMeal
+                ? "添加到本餐"
+                : "知道了"}
         </AppButton>
       </View>
     </PageLayout>

@@ -35,17 +35,21 @@ test("rejects empty or oversized feedback before persistence", async () => {
   await assert.rejects(() => service.submitFeedback("user-1", { content: "x".repeat(2001) }), /无效/);
 });
 
-test("lists only replied feedback for the current user with reply read state", async () => {
+test("lists written Other and ordinary feedback, but not recognition corrections", async () => {
   const calls = [];
   const db = {
     from(table) {
       const api = {
         select() { return api; },
         eq(column, value) { calls.push(["eq", table, column, value]); return api; },
+        in(column, value) { calls.push(["in", table, column, value]); return api; },
         not(column, operator, value) { calls.push(["not", table, column, operator, value]); return api; },
         order() { return api; },
         limit() { return Promise.resolve({
-          data: [{
+          data: table === "recognition_feedback" ? [
+            { id: "22222222-2222-4222-8222-222222222222", feedback_type: "wrong_food" },
+            { id: "33333333-3333-4333-8333-333333333333", feedback_type: "other", corrected_result: { note: "寿司名字不对" } },
+          ] : [{
             id: "11111111-1111-4111-8111-111111111111",
             category: "product",
             content: "希望增加趋势",
@@ -54,6 +58,18 @@ test("lists only replied feedback for the current user with reply read state", a
             created_at: "2026-08-06T01:00:00Z",
             replied_at: "2026-08-06T02:00:00Z",
             reply_read_at: null,
+          }, {
+            id: "feedback-correction",
+            client_request_id: "22222222-2222-4222-8222-222222222222",
+            device_context: { source: "recognition_feedback" },
+            category: "bug", content: "食物识别错了", status: "new",
+            created_at: "2026-08-07T01:00:00Z", admin_reply: null,
+          }, {
+            id: "feedback-other",
+            client_request_id: "33333333-3333-4333-8333-333333333333",
+            device_context: { source: "recognition_feedback" },
+            category: "bug", content: "备注：寿司名字不对", status: "new",
+            created_at: "2026-08-08T01:00:00Z", admin_reply: null,
           }],
           error: null,
         }); },
@@ -67,9 +83,12 @@ test("lists only replied feedback for the current user with reply read state", a
 
   assert.deepEqual(calls, [
     ["eq", "user_feedback", "user_id", "user-a"],
-    ["not", "user_feedback", "admin_reply", "is", null],
+    ["eq", "recognition_feedback", "user_id", "user-a"],
+    ["in", "recognition_feedback", "id", ["22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"]],
   ]);
   assert.equal(result.unreadReplyCount, 1);
+  assert.equal(result.items.length, 2);
+  assert.equal(result.items[1].content, "备注：寿司名字不对");
   assert.deepEqual(result.items[0], {
     id: "11111111-1111-4111-8111-111111111111",
     category: "product",

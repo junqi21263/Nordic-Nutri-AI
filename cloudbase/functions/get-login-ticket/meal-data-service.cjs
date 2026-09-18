@@ -143,6 +143,7 @@ function createMealDataService({
   model = "deepseek-v4-flash",
   resolveImageUrl,
   generateMealInsight,
+  fallbackAnalyze,
   getNutritionPlan,
   onMealMutation,
 }) {
@@ -187,10 +188,16 @@ function createMealDataService({
   async function resolveInsight({ analysisId, userId, mealName, items, existingInsight, allowGenerate = true }) {
     if (typeof existingInsight === "string" && existingInsight.trim()) return existingInsight.trim().slice(0, 1000);
     if (analysisId) {
-      const analysis = await db.from("ai_analysis").select("advice").eq("id", analysisId).eq("user_id", userId).maybeSingle();
+      const analysis = await db.from("ai_analysis").select("advice,normalized_items").eq("id", analysisId).eq("user_id", userId).maybeSingle();
       if (analysis.error) throw new Error("Meal analysis read failed");
       const advice = typeof analysis.data?.advice === "string" ? analysis.data.advice.trim() : "";
-      if (advice) return advice.slice(0, 1000);
+      const analyzedNames = Array.isArray(analysis.data?.normalized_items)
+        ? analysis.data.normalized_items.map((item) => item?.name).filter(Boolean)
+        : [];
+      const namesUnchanged = !analyzedNames.length || (
+        analyzedNames.length === items.length && analyzedNames.every((name, index) => name === items[index]?.name)
+      );
+      if (advice && namesUnchanged) return advice.slice(0, 1000);
     }
     if (!allowGenerate || typeof generateMealInsight !== "function") return null;
     try {
@@ -303,7 +310,13 @@ function createMealDataService({
     async createAnalysis(userId, input) {
       if (typeof analyze !== "function") throw new PublicMealDataError("MEAL_ANALYSIS_UNAVAILABLE", "餐食分析暂不可用");
       const clientRequestId = assertUuid(input?.clientRequestId, "请求 ID");
-      const result = await analyze({ items: input?.items, userId });
+      let result;
+      try {
+        result = await analyze({ items: input?.items, userId });
+      } catch (error) {
+        if (typeof fallbackAnalyze !== "function") throw error;
+        result = await fallbackAnalyze({ items: input?.items, userId });
+      }
       const saved = await db.from("ai_analysis").insert({
         user_id: userId,
         provider: result.provider || result.source || "deepseek",

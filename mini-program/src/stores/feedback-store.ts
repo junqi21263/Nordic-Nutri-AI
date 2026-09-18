@@ -13,6 +13,7 @@ export interface FeedbackMessage {
 
 export interface FeedbackModalOptions {
   variant: FeedbackModalVariant;
+  presentation?: "recognition";
   title: string;
   description?: string;
   primaryText: string;

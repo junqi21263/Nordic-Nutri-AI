@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { createVitaVisionService } from "./vita-vision-service.cjs";
+
+test("prompt distinguishes multi-food photos without inventing hidden ingredients", () => {
+  const source = readFileSync(new URL("./vita-vision-service.cjs", import.meta.url), "utf8");
+  assert.match(source, /明显包含两个或以上/);
+  assert.match(source, /组合菜/);
+  assert.match(source, /不得.*凑数量|不要.*凑数量/);
+});
 
 test("validates a structured food-image recognition response", async () => {
   const analyze = createVitaVisionService({

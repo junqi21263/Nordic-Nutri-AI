@@ -1,5 +1,5 @@
 import { Input, ScrollView, Text, View } from "@tarojs/components";
-import Taro, { useDidShow, useReachBottom } from "@tarojs/taro";
+import Taro, { useDidShow, useReachBottom, useRouter } from "@tarojs/taro";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   discoverProductFoodCatalog,
@@ -95,8 +95,12 @@ function suggestionLabel(item: ProductFoodSuggestion) {
 
 export default function FoodCatalogPage() {
   useAppShare();
+  const router = useRouter();
   const feedback = useFeedbackStore();
   const inspectFood = useFoodSelectionStore((state) => state.inspectFood);
+  const recognitionMode = router.params.mode === "recognition-replace" || router.params.mode === "recognition-add"
+    ? router.params.mode
+    : null;
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<ProductFoodCatalogItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -378,9 +382,8 @@ export default function FoodCatalogPage() {
     const pages = Taro.getCurrentPages();
     const fromManualMeal =
       pages.length > 1 && ["pages/manual-meal/index", "pages/frequent-meal-edit/index"].includes(pages[pages.length - 2]?.route ?? "");
-    void Taro.navigateTo({
-      url: `/pages/food-detail/index${fromManualMeal ? "?mode=select" : ""}`,
-    });
+    const mode = recognitionMode ?? (fromManualMeal ? "select" : null);
+    void Taro.navigateTo({ url: `/pages/food-detail/index${mode ? `?mode=${mode}` : ""}` });
   };
 
   const refreshPopular = async () => {
@@ -405,6 +408,9 @@ export default function FoodCatalogPage() {
     <PageLayout
       title="食物库"
       activeTab="food-catalog"
+      showTabs={!recognitionMode}
+      showBack={Boolean(recognitionMode)}
+      onTopBarBack={() => Taro.navigateBack()}
       hideNavigation
       className="page-layout--food-catalog"
     >

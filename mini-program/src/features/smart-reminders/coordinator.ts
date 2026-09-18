@@ -1,7 +1,7 @@
 import type { ActionPerformed } from "@capacitor/local-notifications";
 import { useAuthStore } from "../../auth/auth-store";
 import { useMealStore } from "../../stores/meal-store";
-import { buildTodayReminderCandidates, getReminderNotificationId, type ReminderCandidate } from "./domain";
+import { buildNextReminderCandidates, getReminderNotificationId, type ReminderCandidate } from "./domain";
 import { smartReminderStorage, type SmartReminderStorage } from "./storage";
 import { androidSmartReminderAdapter, type AndroidSmartReminderAdapter } from "../../platform/android-smart-reminders";
 
@@ -50,7 +50,7 @@ export function createSmartReminderCoordinator(dependencies: CoordinatorDependen
       if (!userId) return true;
       const settings = dependencies.storage.load(userId);
       if (!settings.enabled || !(await requestPermission())) return true;
-      const candidates = buildTodayReminderCandidates(settings, dependencies.getMeals(), dependencies.now?.() ?? new Date());
+      const candidates = buildNextReminderCandidates(settings, dependencies.getMeals(), dependencies.now?.() ?? new Date());
       await dependencies.adapter.schedule(candidates);
       return true;
     } catch {

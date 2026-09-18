@@ -5,15 +5,14 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, "../", path), "utf8");
 
 describe("feedback reply flow", () => {
-  it("opens replied feedback in the processing tab and uses in-app tabs", () => {
+  it("opens prior submissions in my feedback and shows their replies", () => {
     expect(read("src/api/feedback-api.ts")).toContain("getMyFeedback");
     expect(read("src/api/feedback-api.ts")).toContain("markFeedbackRepliesRead");
     const page = read("src/pages/profile/index.tsx");
-    expect(page).toContain("反馈处理");
+    expect(page).toContain("我的反馈");
     expect(page).not.toContain("Picker");
-    expect(page).toContain('hasFeedbackReply ? "history" : "submit"');
-    expect(page).toContain("const repliedFeedbackItems = feedbackItems.filter");
-    expect(page).toContain("repliedFeedbackItems.length");
+    expect(page).toContain('feedbackItems.length ? "history" : "submit"');
+    expect(page).toContain("feedbackItems.map((item)");
     expect(page).toContain("useDidShow(() =>");
     expect(page).toContain('className="profile-feedback-title"');
     expect(page).toContain('className="profile-feedback-title__bell"');

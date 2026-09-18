@@ -56,6 +56,47 @@ async function withServer(server, run) {
   }
 }
 
+test("routes recognition feedback independently from vision analysis", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: () => ({ sub: "user-a" }),
+      productUserExists: async () => true,
+      recognitionFeedback: {
+        createFeedback: async (userId, body) => {
+          calls.push(["create", userId, body]);
+          return { feedbackId: "22222222-2222-4222-8222-222222222222" };
+        },
+        updateFeedback: async (userId, id, body) => {
+          calls.push(["update", userId, id, body]);
+          return { feedbackId: id };
+        },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const create = await fetch(`${baseUrl}/recognition-feedback`, {
+      method: "POST",
+      headers: { authorization: "Bearer token", "content-type": "application/json" },
+      body: JSON.stringify({ feedbackType: "other", originalResult: { items: [] } }),
+    });
+    assert.equal(create.status, 200);
+    assert.deepEqual(await create.json(), { feedbackId: "22222222-2222-4222-8222-222222222222" });
+
+    const patch = await fetch(`${baseUrl}/recognition-feedback/22222222-2222-4222-8222-222222222222`, {
+      method: "PATCH",
+      headers: { authorization: "Bearer token", "content-type": "application/json" },
+      body: JSON.stringify({ correctedResult: { items: [] } }),
+    });
+    assert.equal(patch.status, 200);
+  });
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0][0], "create");
+  assert.equal(calls[1][0], "update");
+});
+
 function createRuntimeDb() {
   return {
     from: () => ({}),
@@ -109,7 +150,7 @@ test("assembles every runtime service after the RDB client is available", () => 
   });
 
   for (const capability of ["issue", "verifySession"]) assert.equal(typeof service[capability], "function");
-  for (const capability of ["data", "meals", "insights", "coach", "feedback"]) assert.ok(service[capability]);
+  for (const capability of ["data", "meals", "insights", "coach", "feedback", "recognitionFeedback"]) assert.ok(service[capability]);
   assert.equal(typeof service.vision?.analyzeImage, "function");
   assert.equal(service.vision?.provider, null);
   assert.equal(service.vision?.model, null);

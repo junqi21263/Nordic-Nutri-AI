@@ -8,7 +8,6 @@ export interface FeedbackModalProps {
   onDismiss: () => void;
 }
 
-const exitDuration = 420;
 const variantClassName = {
   success: "feedback-modal--success",
   limit: "feedback-modal--limit",
@@ -29,7 +28,7 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
     setTimeout(() => {
       callback?.();
       onDismiss();
-    }, exitDuration);
+    }, modal.presentation === "recognition" ? 360 : 420);
   };
 
   const handleBackdropClick = () => {
@@ -38,11 +37,11 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
 
   return (
     <View
-      className={`feedback-modal-overlay ${closing ? "feedback-modal-overlay--closing" : ""}`}
+      className={`feedback-modal-overlay ${modal.presentation === "recognition" ? "feedback-modal-overlay--recognition" : ""} ${closing ? "feedback-modal-overlay--closing" : ""}`}
       onClick={handleBackdropClick}
     >
       <View
-        className={`feedback-modal ${variantClassName[modal.variant]} ${closing ? "feedback-modal--closing" : ""}`}
+        className={`feedback-modal ${variantClassName[modal.variant]} ${modal.presentation === "recognition" ? "feedback-modal--recognition" : ""} ${closing ? "feedback-modal--closing" : ""}`}
         onClick={(event) => event.stopPropagation()}
       >
         {modal.dismissible && !modal.primaryText ? (
@@ -51,6 +50,14 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
           </View>
         ) : null}
         <View className={`feedback-modal__icon feedback-modal__icon--${modal.variant}`}>
+          {modal.presentation === "recognition" ? (
+            <>
+              <View className="feedback-modal__recognition-ring" />
+              {[1, 2, 3, 4].map((index) => (
+                <View key={index} className={`feedback-modal__recognition-particle feedback-modal__recognition-particle--${index}`} />
+              ))}
+            </>
+          ) : null}
           {modal.variant === "success" ? (
             <NordicIcon name="check" size={52} ariaLabel="成功" />
           ) : modal.variant === "limit" ? (

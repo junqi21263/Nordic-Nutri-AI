@@ -60,7 +60,7 @@ function createVitaRequestCompletion({ apiKey, model, fetchImpl = globalThis.fet
             role: "user",
             content: [
               { type: "image_url", image_url: { url: imageUrl } },
-              { type: "text", text: "识别图片中的餐食。仅返回 JSON：mealName、mealType(breakfast/lunch/dinner/snack)、confidence(0到1)、advice、items；items 每项含 name、quantityG、caloriesPer100g、proteinPer100g、carbsPer100g、fatPer100g。营养数值为估算，不提供医疗诊断。" },
+              { type: "text", text: "识别图片中的餐食。先判断是单一食物主体，还是明显包含两个或以上视觉独立的食物、菜品、碗碟或餐盘区域。多食物照片要逐区识别，明显存在多个独立食物时 items 输出多个项目；混合后无法视觉区分原料的组合菜保留为一个项目，不要强拆隐藏原料，不得为了凑数量猜测不可见食材。仅返回 JSON：mealName、mealType(breakfast/lunch/dinner/snack)、confidence(0到1)、advice、items；items 每项含 name、quantityG、caloriesPer100g、proteinPer100g、carbsPer100g、fatPer100g。营养数值为估算，不提供医疗诊断。" },
             ],
           }],
         }),

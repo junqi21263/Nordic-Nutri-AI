@@ -9,7 +9,7 @@ export interface BottomSheetProps extends PropsWithChildren {
   onDismiss?: () => void;
   /** Keeps native inputs out of a transformed animation layer in WeChat. */
   nativeInput?: boolean;
-  /** Prevents touch moves from scrolling the sheet or the page underneath it. */
+  /** Prevents touch moves on the backdrop while allowing the sheet to scroll. */
   lockScroll?: boolean;
 }
 
@@ -43,12 +43,10 @@ export function BottomSheet({
   return isRendered ? (
     <View
       className={`bottom-sheet-backdrop ${lockScroll ? "bottom-sheet-backdrop--locked" : ""} ${isClosing ? "bottom-sheet-backdrop--closing" : ""}`}
-      catchMove={lockScroll || undefined}
       onTouchMove={
         lockScroll
           ? (event) => {
-              event.preventDefault();
-              event.stopPropagation();
+              if (event.target === event.currentTarget) event.preventDefault();
             }
           : undefined
       }
@@ -60,15 +58,6 @@ export function BottomSheet({
     >
       <View
         className={`bottom-sheet ${className} ${nativeInput ? "bottom-sheet--native-input" : ""} ${lockScroll ? "bottom-sheet--locked" : ""} ${isClosing ? "bottom-sheet--closing" : ""}`}
-        catchMove={lockScroll || undefined}
-        onTouchMove={
-          lockScroll
-            ? (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }
-            : undefined
-        }
         onClick={(event) => event.stopPropagation()}
         >
         <View className="bottom-sheet__handle" />

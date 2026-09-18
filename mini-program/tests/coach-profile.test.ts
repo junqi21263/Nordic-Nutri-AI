@@ -235,13 +235,14 @@ describe("local coach and profile", () => {
     );
 
     expect(source).toContain('title="个人中心"');
-    expect(source).toContain('className="page-layout--profile"');
+    expect(source).toContain('page-layout--profile-android profile-stitch');
     expect(source).not.toContain('className="profile-page-title"');
     expect(source).not.toContain('title="我的节奏"');
     expect(source).not.toContain('className="profile-rhythm__goal-progress"');
     expect(source).not.toContain("把目标、记录与改变放在同一张地图上。");
-    expect(source).toContain("蛋白完成度");
-    expect(source).toContain("本周回顾");
+    const androidOverview = readFileSync(resolve(import.meta.dirname, "../src/pages/profile/android-overview.tsx"), "utf8");
+    expect(androidOverview).toContain("蛋白完成度");
+    expect(androidOverview).toContain("本周回顾");
     expect(source).toContain('setActiveKey("coach")');
     expect(source).toContain('Taro.switchTab({ url: "/pages/coach/index" })');
     expect(source).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');

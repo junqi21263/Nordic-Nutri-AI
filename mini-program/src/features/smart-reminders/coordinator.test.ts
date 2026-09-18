@@ -38,7 +38,7 @@ describe("smart reminder coordinator", () => {
 
     await coordinator.refresh();
 
-    expect(calls).toEqual([`cancel:${getReminderNotificationId("breakfast")},${getReminderNotificationId("lunch")},${getReminderNotificationId("dinner")}`, "schedule:lunch,dinner"]);
+    expect(calls).toEqual([`cancel:${getReminderNotificationId("breakfast")},${getReminderNotificationId("lunch")},${getReminderNotificationId("dinner")}`, "schedule:breakfast,lunch,dinner"]);
   });
 
   it("cancels all reminder ids when the account signs out", async () => {

@@ -30,7 +30,8 @@ describe("profile information bottom sheets", () => {
     expect(styles).toContain(".profile-sheet--fixed");
     expect(styles).toContain("max-height: calc(100vh - 180px)");
     expect(readSource("../src/styles/components.scss")).toContain("position: fixed");
-    expect(readSource("../src/styles/components.scss")).toContain("touch-action: none");
+    expect(readSource("../src/styles/components.scss")).toContain("touch-action: pan-y");
+    expect(styles).toContain("overflow-y: auto");
   });
 
   it("keeps the sheet mounted for a downward exit animation and lowers compact actions", () => {
@@ -126,13 +127,13 @@ describe("profile information bottom sheets", () => {
     expect(styles).toContain("overflow: hidden");
   });
 
-  it("always reopens feedback in a fresh submit state", () => {
+  it("opens feedback history when the user has prior submissions", () => {
     const profile = readSource("../src/pages/profile/index.tsx");
     const openFeedbackStart = profile.indexOf("const openFeedback = () => {");
     const openFeedbackEnd = profile.indexOf("};", openFeedbackStart);
     const openFeedback = profile.slice(openFeedbackStart, openFeedbackEnd);
 
-    expect(openFeedback).toContain('setFeedbackMode(hasFeedbackReply ? "history" : "submit")');
+    expect(openFeedback).toContain('setFeedbackMode(feedbackItems.length ? "history" : "submit")');
     expect(openFeedback).not.toContain("setFeedbackSubmitted");
   });
 });

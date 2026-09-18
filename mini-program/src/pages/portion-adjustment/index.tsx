@@ -1,5 +1,5 @@
 import { Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
@@ -23,6 +23,9 @@ import { tryPresentPendingMilestone } from "../../features/milestones/presentati
 import { shouldClaimAfterMealSave } from "../../features/milestones/runtime";
 import { createClientRequestId } from "../../repositories/client-request-id";
 import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+import { snapshotForRecognition } from "../../features/recognition-feedback/domain";
+import { updateRecognitionFeedback } from "../../api/recognition-feedback-api";
+import { useRecognitionFeedbackStore } from "../../stores/recognition-feedback-store";
 
 const nowTime = () => {
   const date = new Date();
@@ -32,6 +35,7 @@ const nowTime = () => {
 const portionPresets = [25, 50, 75, 100, 125, 150, 175, 200];
 
 export default function PortionAdjustmentPage() {
+  const router = useRouter();
   const portion = usePortionDraftStore();
   const meals = useMealStore();
   const feedback = useFeedbackStore();
@@ -118,6 +122,18 @@ export default function PortionAdjustmentPage() {
         savedMeal = await createProductMeal({ ...input, templateId: portion.templateId, clientRequestId: requestId.current });
       }
       savedResult.current = savedMeal;
+      if (router.params.recognitionFeedback === "1") {
+        const recognitionState = useRecognitionFeedbackStore.getState();
+        const correctedResult = snapshotForRecognition(savedMeal);
+        recognitionState.setMealId(savedMeal.id);
+        recognitionState.setCorrectedResult(correctedResult);
+        if (recognitionState.feedbackId) {
+          void updateRecognitionFeedback(recognitionState.feedbackId, {
+            mealId: savedMeal.id,
+            correctedResult,
+          }).catch(() => undefined);
+        }
+      }
       const savedDate = savedMeal.date;
       const syncedMeals = await getProductMeals(savedDate);
       meals.replaceRemoteMeals(syncedMeals, savedDate);

@@ -35,7 +35,8 @@ export const androidSmartReminderAdapter: AndroidSmartReminderAdapter = {
         title: candidate.title,
         body: candidate.body,
         channelId,
-        schedule: { at: candidate.at },
+        schedule: { at: candidate.at, allowWhileIdle: true },
+        isExactNotification: true,
         extra: { mealType: candidate.mealType, reminder: true },
       })),
     });

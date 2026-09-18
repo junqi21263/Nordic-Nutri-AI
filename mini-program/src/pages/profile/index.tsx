@@ -34,6 +34,8 @@ import { useMealStore } from "../../stores/meal-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+import { AndroidProfileOverview } from "./android-overview";
+import "./android-profile.scss";
 
 const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
 const loginEntryPath = isAndroidApp ? "/pages/android-auth/index" : "/pages/auth-entry/index";
@@ -63,6 +65,10 @@ export default function ProfilePage() {
   const [weeklyReview, setWeeklyReview] = useState<ProductWeeklyReview | null>(null);
   const [milestoneJourney, setMilestoneJourney] = useState<ProductMilestoneJourney | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [profileMotion, setProfileMotion] = useState(false);
+  const [profileMotionOff, setProfileMotionOff] = useState(false);
+  const [accountError, setAccountError] = useState(false);
   const isPageScrollLocked = activeModal !== null
     || selectedAchievement !== null
     || achievements.manualAchievementCelebration !== null
@@ -88,6 +94,7 @@ export default function ProfilePage() {
   useEffect(() => () => setTabBarVisible(true), [setTabBarVisible]);
 
   useEffect(() => {
+    if (isAndroidApp) return;
     void Promise.all([
       refreshProductAchievements(date),
       getMilestoneJourney().catch(() => null),
@@ -107,6 +114,13 @@ export default function ProfilePage() {
       .catch(() => undefined);
 
   usePullDownRefresh(() => {
+    if (isAndroidApp) {
+      setRefreshVersion((version) => version + 1);
+      syncProfileFromAccount();
+      void refreshFeedbackHistory();
+      void Taro.stopPullDownRefresh();
+      return;
+    }
     setRefreshing(true);
     void Promise.all([
       refreshFeedbackHistory(),
@@ -127,6 +141,7 @@ export default function ProfilePage() {
   // A page can remain mounted under native back-navigation. The version guard
   // prevents an earlier account request from restoring an outdated goal.
   const syncProfileFromAccount = () => {
+    setAccountError(false);
     const requestVersion = profileSyncVersion.current + 1;
     profileSyncVersion.current = requestVersion;
     void getProductAccount()
@@ -167,14 +182,14 @@ export default function ProfilePage() {
           }
         }
       })
-      .catch(() => undefined);
+      .catch(() => { if (requestVersion === profileSyncVersion.current) setAccountError(true); });
   };
 
   useDidShow(() => {
     refreshFeedbackHistory();
     syncProfileFromAccount();
     void refreshAndroidSmartReminders();
-    void getProductWeeklyReview(date, { preferFast: true })
+    if (!isAndroidApp) void getProductWeeklyReview(date, { preferFast: true })
       .then(setWeeklyReview)
       .catch(() => undefined);
   });
@@ -238,12 +253,10 @@ export default function ProfilePage() {
       .catch(() => undefined);
   };
   const openFeedback = () => {
-    const hasFeedbackReply = feedbackItems.some((item) => Boolean(item.adminReply));
-    setFeedbackMode(hasFeedbackReply ? "history" : "submit");
+    setFeedbackMode(feedbackItems.length ? "history" : "submit");
     setFeedbackError(null);
     setActiveModal("feedback");
   };
-  const repliedFeedbackItems = feedbackItems.filter((item) => Boolean(item.adminReply));
   const performLogout = () => {
     void logoutFlow
       .run()
@@ -273,11 +286,26 @@ export default function ProfilePage() {
       title="个人中心"
       activeTab="profile"
       hideNavigation
+      showBrandHeader={!isAndroidApp}
+      disablePageEnterAnimation={isAndroidApp}
       refreshing={refreshing}
       scrollLocked={isPageScrollLocked}
-      className={`page-layout--profile${isAndroidApp ? " page-layout--profile-android" : ""}`}
+      className={`page-layout--profile${isAndroidApp ? ` page-layout--profile-android profile-stitch${profileMotion ? "" : " profile-stitch--reduced"}` : ""}`}
     >
       <View className="profile-rhythm">
+        {isAndroidApp ? <AndroidProfileOverview
+          key={profile.userId ?? "loading-profile"}
+          profile={profile}
+          refreshVersion={refreshVersion}
+          openPage={openPage}
+          openCoach={openCoach}
+          openMealRecords={openMealRecords}
+          openAchievement={openAchievement}
+          onMotionChange={setProfileMotion}
+          motionOff={profileMotionOff}
+          accountError={accountError}
+          retryAccount={syncProfileFromAccount}
+        /> : <>
         <View ariaLabel="编辑个人资料" onClick={() => openPage("/pages/profile-edit/index")}>
           <AppCard tone="dark" className="profile-hero profile-rhythm__identity">
             <Avatar
@@ -369,10 +397,16 @@ export default function ProfilePage() {
           </View>
         </View>
 
+        </>}
         <View className="profile-rhythm__entry-sections">
           <View className="profile-rhythm__settings-section">
             <Text className="profile-rhythm__settings-label">饮食管理</Text>
             <View className="profile-rhythm__settings-group">
+              {isAndroidApp ? (
+                <View onClick={() => setProfileMotionOff(!profileMotionOff)}>
+                  <ListItem icon={<NordicIcon name="sparkles" size={20} ariaLabel="页面动效" />} title="页面动效" description={profileMotionOff ? "已关闭，点击开启" : "已开启，点击关闭"} trailing={profileMotionOff ? "关" : "开"} />
+                </View>
+              ) : null}
               {isAndroidApp ? (
                 <View onClick={() => openPage("/pages/smart-reminder-settings/index")}>
                   <ListItem icon={<NordicIcon name="bell" size={20} ariaLabel="记录提醒" />} title="记录提醒" description="按餐次设置轻量的本地提醒" />
@@ -454,6 +488,7 @@ export default function ProfilePage() {
             </View>
           </View>
         </View>
+        {isAndroidApp && <Text className="profile-stitch__footer">Nordic Nutri AI · Mindful Eating Made Gentle</Text>}
       </View>
 
       <AchievementDetailSheet
@@ -490,7 +525,7 @@ export default function ProfilePage() {
               className={`profile-feedback-tab ${feedbackMode === "history" ? "profile-feedback-tab--active" : ""}`}
               onClick={() => changeFeedbackMode("history")}
             >
-              <Text>反馈处理</Text>
+              <Text>我的反馈</Text>
             </View>
           </View>
           {feedbackMode === "submit" ? (
@@ -525,8 +560,8 @@ export default function ProfilePage() {
             </>
           ) : (
             <View className="profile-feedback-list">
-              {repliedFeedbackItems.length ? (
-                repliedFeedbackItems.map((item) => (
+              {feedbackItems.length ? (
+                feedbackItems.map((item) => (
                   <View className="profile-feedback-card" key={item.id}>
                     <View className="profile-feedback-card__head">
                       <Text className="profile-feedback-status">
@@ -541,8 +576,8 @@ export default function ProfilePage() {
                       </Text>
                       <Text>{item.createdAt.slice(0, 10)}</Text>
                     </View>
-                    <Text className="profile-feedback-label">你的反馈</Text>
-                    <Text>{item.content}</Text>
+                    <Text className="profile-feedback-label">{item.category === "recognition" ? "识别纠错反馈" : "你的反馈"}</Text>
+                    <Text className="profile-feedback-card__content">{item.content}</Text>
                     {item.adminReply ? (
                       <View className="profile-feedback-reply">
                         <Text className="profile-feedback-label">我们的回复</Text>

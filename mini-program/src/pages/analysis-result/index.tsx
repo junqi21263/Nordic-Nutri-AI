@@ -1,6 +1,6 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
@@ -37,6 +37,15 @@ import { useCountUp } from "../../hooks/useCountUp";
 import { useBottomActionReveal } from "../../hooks/useBottomActionReveal";
 import { useMealRecognitionMotion, type MealRecognitionMotionPhase } from "../../hooks/useMealRecognitionMotion";
 import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+import { RecognitionFeedbackSheet, type RecognitionFeedbackSheetMode } from "../../components/recognition-feedback-sheet";
+import { createRecognitionFeedback, updateRecognitionFeedback } from "../../api/recognition-feedback-api";
+import {
+  mealItemFromAnalyzedFood,
+  snapshotForRecognition,
+  withCorrectedItems,
+  type RecognitionFeedbackReason,
+} from "../../features/recognition-feedback/domain";
+import { useRecognitionFeedbackStore } from "../../stores/recognition-feedback-store";
 
 const nowTime = () => {
   const date = new Date();
@@ -133,6 +142,11 @@ export default function AnalysisResultPage() {
   const [replayKey, setReplayKey] = useState(0);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
+  const [recognitionFeedbackSheetMode, setRecognitionFeedbackSheetMode] =
+    useState<RecognitionFeedbackSheetMode | null>(null);
+  const [recognitionFeedbackItemAction, setRecognitionFeedbackItemAction] =
+    useState<"replace" | "remove" | null>(null);
+  const recognitionFeedbackCreateRef = useRef<Promise<string> | null>(null);
   const isDev = process.env.NODE_ENV !== "production";
   const motion = useMealRecognitionMotion(revealOnMount || replayKey > 0, replayKey);
   const bottomAction = useBottomActionReveal(revealOnMount || replayKey > 0, replayKey, motion.phase);
@@ -151,6 +165,54 @@ export default function AnalysisResultPage() {
     if (!analysisStore.analysis) return;
     analysisStore.setAnalysis({ ...analysisStore.analysis, mealType });
   };
+  const syncRecognitionCorrection = (correctedMeal: typeof meal) => {
+    if (!correctedMeal) return;
+    if (portion.meal?.id === correctedMeal.id && portion.editingMealId === null) {
+      const multiplier = portion.multiplier;
+      portion.reset();
+      portion.start(correctedMeal);
+      portion.setMultiplier(multiplier);
+    }
+    const state = useRecognitionFeedbackStore.getState();
+    const correctedResult = snapshotForRecognition(correctedMeal);
+    state.setCorrectedResult(correctedResult);
+    if (!state.feedbackId) return;
+    void updateRecognitionFeedback(state.feedbackId, {
+      mealId: state.mealId,
+      correctedResult,
+    }).catch(() => undefined);
+  };
+
+  const recordRecognitionReason = (reason: RecognitionFeedbackReason, note?: string) => {
+    const currentMeal = useAnalysisStore.getState().analysis;
+    if (!currentMeal) return;
+    const originalResult = snapshotForRecognition(currentMeal);
+    useRecognitionFeedbackStore.getState().start({
+      analysisId: currentMeal.analysisId ?? null,
+      feedbackType: reason.type,
+      originalResult,
+    });
+    const creation = createRecognitionFeedback({
+      analysisId: currentMeal.analysisId ?? null,
+      feedbackType: reason.type,
+      originalResult,
+      note: note || null,
+    }).then(({ feedbackId }) => {
+      const state = useRecognitionFeedbackStore.getState();
+      state.setFeedbackId(feedbackId);
+      if (state.correctedResult || state.mealId || state.pendingNote) {
+        void updateRecognitionFeedback(feedbackId, {
+          mealId: state.mealId,
+          correctedResult: state.correctedResult,
+          note: state.pendingNote,
+        }).catch(() => undefined);
+      }
+      return feedbackId;
+    });
+    recognitionFeedbackCreateRef.current = creation;
+    void creation.catch(() => undefined);
+  };
+
   if (!meal)
     return (
       <PageLayout
@@ -177,6 +239,152 @@ export default function AnalysisResultPage() {
   const isContentVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "contentReveal");
   const shouldAnimateMetrics = isRecognitionMotion && isMetricsCounting;
   const shouldAnimateContentMetrics = isRecognitionMotion && isContentVisible;
+  const handleRecognitionReason = (reason: RecognitionFeedbackReason) => {
+    if (reason.type === "extra_food" && meal.items.length <= 1) {
+      feedback.show({ message: "至少需要保留一种食物", tone: "error" });
+      return;
+    }
+    recordRecognitionReason(reason);
+    if (reason.type === "wrong_food") {
+      setRecognitionFeedbackItemAction("replace");
+      setRecognitionFeedbackSheetMode("items");
+      return;
+    }
+    if (reason.type === "missing_food") {
+      setRecognitionFeedbackSheetMode("missing");
+      return;
+    }
+    if (reason.type === "extra_food") {
+      setRecognitionFeedbackItemAction("remove");
+      setRecognitionFeedbackSheetMode("items");
+      return;
+    }
+    if (reason.type === "portion_inaccurate") {
+      setRecognitionFeedbackSheetMode(null);
+      if (portion.meal?.id !== meal.id || portion.editingMealId !== null) portion.start(meal);
+      void Taro.navigateTo({ url: "/pages/portion-adjustment/index?recognitionFeedback=1" });
+      return;
+    }
+    setRecognitionFeedbackSheetMode("other");
+  };
+
+  const handleRecognitionItem = (item: (typeof adjusted.items)[number]) => {
+    const state = useRecognitionFeedbackStore.getState();
+    if (recognitionFeedbackItemAction === "remove") {
+      if (meal.items.length <= 1) {
+        feedback.show({ message: "至少需要保留一种食物", tone: "error" });
+        setRecognitionFeedbackSheetMode(null);
+        return;
+      }
+      const nextMeal = withCorrectedItems(meal, meal.items.filter((entry) => entry.id !== item.id));
+      analysisStore.setAnalysis(nextMeal);
+      setRecognitionFeedbackSheetMode(null);
+      state.setSelectionMode(null);
+      syncRecognitionCorrection(nextMeal);
+      return;
+    }
+    state.setReplacementItemId(item.id);
+    setRecognitionFeedbackSheetMode("replace");
+  };
+
+  const handleReplaceFood = async (name: string, quantityG: number) => {
+    const currentMeal = useAnalysisStore.getState().analysis;
+    const targetId = useRecognitionFeedbackStore.getState().replacementItemId;
+    if (!currentMeal || !targetId || !currentMeal.items.some((item) => item.id === targetId)) return false;
+    try {
+      const result = await analyzeProductMeal([{ name, quantityG }]);
+      const analyzedFood = result.items[0];
+      const nextItem = analyzedFood
+        ? mealItemFromAnalyzedFood({ ...analyzedFood, quantityG }, targetId)
+        : null;
+      if (!nextItem) return false;
+      const nextMeal = withCorrectedItems(currentMeal, currentMeal.items.map((item) => item.id === targetId ? nextItem : item));
+      analysisStore.setAnalysis(nextMeal);
+      syncRecognitionCorrection(nextMeal);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleMissingFood = async (name: string, quantityG: number) => {
+    try {
+      const result = await analyzeProductMeal([{ name, quantityG }]);
+      const analyzedFood = result.items[0];
+      const nextItem = analyzedFood
+        ? mealItemFromAnalyzedFood({ ...analyzedFood, quantityG }, `recognition-manual-${Date.now()}`)
+        : null;
+      if (!nextItem) return false;
+      const currentMeal = useAnalysisStore.getState().analysis;
+      if (!currentMeal) return false;
+      const nextMeal = withCorrectedItems(currentMeal, [...currentMeal.items, nextItem]);
+      analysisStore.setAnalysis(nextMeal);
+      syncRecognitionCorrection(nextMeal);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleMissingSuccess = (name: string, quantityG: number) => {
+    setRecognitionFeedbackSheetMode(null);
+    feedback.showModal({
+      variant: "success",
+      presentation: "recognition",
+      title: "已添加到本次识别",
+      description: `已补充：${name} · ${quantityG}g\n你可以继续核对这一餐，再决定是否保存`,
+      primaryText: "知道了",
+    });
+  };
+
+  const handleReplacementSuccess = (name: string, quantityG: number) => {
+    setRecognitionFeedbackSheetMode(null);
+    useRecognitionFeedbackStore.getState().setReplacementItemId(null);
+    feedback.showModal({
+      variant: "success",
+      presentation: "recognition",
+      title: "已更新本次识别",
+      description: `已替换为：${name} · ${quantityG}g\n你可以继续核对这一餐，再决定是否保存`,
+      primaryText: "知道了",
+    });
+  };
+
+  const handleNutritionAction = (action: "portion" | "food") => {
+    setRecognitionFeedbackSheetMode(null);
+    if (action === "portion") {
+      if (portion.meal?.id !== meal.id || portion.editingMealId !== null) portion.start(meal);
+      void Taro.navigateTo({ url: "/pages/portion-adjustment/index?recognitionFeedback=1" });
+      return;
+    }
+    const firstItem = adjusted.items[0];
+    if (firstItem) {
+      useRecognitionFeedbackStore.getState().setReplacementItemId(firstItem.id);
+      setRecognitionFeedbackSheetMode("replace");
+    }
+  };
+
+  const handleOtherNote = async (note: string) => {
+    const state = useRecognitionFeedbackStore.getState();
+    try {
+      const feedbackId = state.feedbackId ?? await recognitionFeedbackCreateRef.current;
+      if (!feedbackId) return false;
+      if (note) await updateRecognitionFeedback(feedbackId, { note });
+    } catch {
+      return false;
+    }
+    setRecognitionFeedbackSheetMode(null);
+    feedback.showModal({
+      variant: "success",
+      presentation: "recognition",
+      title: "反馈已提交",
+      description: note
+        ? `你提交的反馈：${note}\n我们会认真查看并持续优化体验。`
+        : "你选择了「其他」，未填写补充说明。我们会认真查看这次识别结果。",
+      primaryText: "知道了",
+    });
+    return true;
+  };
+
   const save = async () => {
     const localMeal = {
       date: getLocalDateString(),
@@ -204,6 +412,16 @@ export default function AnalysisResultPage() {
           ? { ...request, name: textAnalysis.mealName, items: textAnalysis.items }
           : request,
       );
+      const recognitionState = useRecognitionFeedbackStore.getState();
+      const correctedResult = snapshotForRecognition(saved);
+      recognitionState.setMealId(saved.id);
+      recognitionState.setCorrectedResult(correctedResult);
+      if (recognitionState.feedbackId) {
+        void updateRecognitionFeedback(recognitionState.feedbackId, {
+          mealId: saved.id,
+          correctedResult,
+        }).catch(() => undefined);
+      }
       const syncedMeals = await getProductMeals(localMeal.date);
       meals.replaceRemoteMeals(syncedMeals, localMeal.date);
       void refreshAndroidSmartReminders();
@@ -319,6 +537,14 @@ export default function AnalysisResultPage() {
                   </View>
                 </>
               )}
+              <View
+                className="analysis-result-page__recognition-feedback-link"
+                ariaLabel="识别不准确，提交纠错反馈"
+                onClick={() => setRecognitionFeedbackSheetMode("reasons")}
+              >
+                <NordicIcon name="pencil" size={16} ariaLabel="纠错" />
+                <Text>识别不准确？</Text>
+              </View>
             </View>
             <View className="analysis-result-page__meal-type-block">
               <Text className="analysis-result-page__meal-type-label">这是哪一餐？</Text>
@@ -500,6 +726,22 @@ export default function AnalysisResultPage() {
           </View>
         </View>
       </View>
+      <RecognitionFeedbackSheet
+        open={recognitionFeedbackSheetMode !== null}
+        mode={recognitionFeedbackSheetMode ?? "reasons"}
+        items={adjusted.items}
+        itemAction={recognitionFeedbackItemAction}
+        canRemoveItems={adjusted.items.length > 1}
+        onDismiss={() => setRecognitionFeedbackSheetMode(null)}
+        onSelectReason={handleRecognitionReason}
+        onSelectItem={handleRecognitionItem}
+        onSelectNutrition={handleNutritionAction}
+        onSubmitMissing={handleMissingFood}
+        onMissingSuccess={handleMissingSuccess}
+        onSubmitReplace={handleReplaceFood}
+        onReplacementSuccess={handleReplacementSuccess}
+        onSubmitOther={handleOtherNote}
+      />
     </PageLayout>
   );
 }

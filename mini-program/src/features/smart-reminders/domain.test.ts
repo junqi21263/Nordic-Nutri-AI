@@ -4,6 +4,7 @@ import {
   DEFAULT_SMART_REMINDER_SETTINGS,
   REMINDER_WINDOWS,
   buildTodayReminderCandidates,
+  buildNextReminderCandidates,
   getReminderCopy,
   getReminderNotificationId,
   isReminderTimeInWindow,
@@ -71,6 +72,19 @@ describe("smart reminder domain", () => {
       new Date("2026-09-11T11:00:00+08:00"),
     );
     expect(candidates.map((candidate) => candidate.mealType)).toEqual(["lunch", "dinner"]);
+  });
+
+  it("schedules the next occurrence tomorrow after today's time or meal has passed", () => {
+    const now = new Date(2026, 8, 16, 15, 0);
+    const candidates = buildNextReminderCandidates(
+      { ...DEFAULT_SMART_REMINDER_SETTINGS, enabled: true },
+      [meal("2026-09-16", "breakfast")],
+      now,
+    );
+    expect(candidates.map((candidate) => candidate.mealType)).toEqual(["breakfast", "lunch", "dinner"]);
+    expect(candidates[0]?.at).toEqual(new Date(2026, 8, 17, 8, 30));
+    expect(candidates[1]?.at).toEqual(new Date(2026, 8, 17, 12, 30));
+    expect(candidates[2]?.at).toEqual(new Date(2026, 8, 16, 19, 0));
   });
 
   it("prefers missed copy, then consistent copy, then ordinary copy", () => {

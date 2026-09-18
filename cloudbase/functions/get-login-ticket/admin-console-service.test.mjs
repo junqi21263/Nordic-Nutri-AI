@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createAdminConsoleService, AdminConsoleError } from "./admin-console-service.cjs";
 
-function makeDb({ users = [], profiles = [], feedback = [] } = {}) {
+function makeDb({ users = [], profiles = [], feedback = [], recognition = [] } = {}) {
   return {
     from(table) {
       const state = { table, filters: [], op: "select", payload: null, limitN: null, singleMode: null };
@@ -54,6 +54,13 @@ function makeDb({ users = [], profiles = [], feedback = [] } = {}) {
           if (state.singleMode === "maybe") return { data: rows[0] ?? null, error: null };
           if (state.singleMode === "single") {
             return rows[0] ? { data: rows[0], error: null } : { data: null, error: { message: "missing" } };
+          }
+          return { data: rows, error: null };
+        }
+        if (state.table === "recognition_feedback") {
+          let rows = [...recognition];
+          for (const [op, col, val] of state.filters) {
+            if (op === "in" && col === "id") rows = rows.filter((row) => val.includes(row.id));
           }
           return { data: rows, error: null };
         }
@@ -123,6 +130,26 @@ test("lists feedback and updates status", async () => {
   assert.equal(listed.items[0].nickname, "北欧");
   const updated = await svc.updateFeedbackStatus("admin", feedbackId, { status: "reviewing" });
   assert.equal(updated.status, "reviewing");
+});
+
+test("admin list excludes old correction mirrors but keeps written Other feedback", async () => {
+  const wrongId = "22222222-2222-4222-8222-222222222222";
+  const otherId = "33333333-3333-4333-8333-333333333333";
+  const svc = createAdminConsoleService({
+    db: makeDb({
+      feedback: [
+        { id: "wrong-ticket", user_id: "u1", client_request_id: wrongId, device_context: { source: "recognition_feedback" }, status: "new", content: "食物修正" },
+        { id: "other-ticket", user_id: "u1", client_request_id: otherId, device_context: { source: "recognition_feedback" }, status: "new", content: "备注：名字不对" },
+      ],
+      recognition: [
+        { id: wrongId, feedback_type: "wrong_food" },
+        { id: otherId, feedback_type: "other", corrected_result: { note: "名字不对" } },
+      ],
+    }),
+    isAdmin: async () => true,
+  });
+  const result = await svc.listFeedback("admin");
+  assert.deepEqual(result.items.map((item) => item.id), ["other-ticket"]);
 });
 
 test("replies to feedback, resets the read state, and marks it resolved", async () => {

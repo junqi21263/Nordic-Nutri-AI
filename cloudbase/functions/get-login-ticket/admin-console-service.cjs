@@ -112,7 +112,7 @@ function createAdminConsoleService({ db, isAdmin }) {
       const cap = Math.min(Math.max(Number(limit) || 50, 1), 100);
       let query = db
         .from("user_feedback")
-        .select("id,user_id,category,content,status,admin_reply,created_at,replied_at,reply_read_at,updated_at")
+        .select("id,user_id,category,content,status,admin_reply,created_at,replied_at,reply_read_at,updated_at,client_request_id,device_context")
         .order("created_at", { ascending: false })
         .limit(cap);
       if (status) {
@@ -121,7 +121,23 @@ function createAdminConsoleService({ db, isAdmin }) {
       }
       const result = await query;
       if (result.error) throw new AdminConsoleError("FEEDBACK_LIST_FAILED");
-      const rows = result.data || [];
+      const mirroredIds = (result.data || [])
+        .filter((row) => row.device_context?.source === "recognition_feedback" && row.client_request_id)
+        .map((row) => row.client_request_id);
+      const writtenOtherIds = new Set();
+      if (mirroredIds.length) {
+        const recognition = await db.from("recognition_feedback")
+          .select("id,feedback_type,corrected_result")
+          .in("id", mirroredIds);
+        if (recognition.error) throw new AdminConsoleError("FEEDBACK_LIST_FAILED");
+        for (const row of recognition.data || []) {
+          if (row.feedback_type === "other" && typeof row.corrected_result?.note === "string" && row.corrected_result.note.trim()) {
+            writtenOtherIds.add(row.id);
+          }
+        }
+      }
+      const rows = (result.data || []).filter((row) => row.device_context?.source !== "recognition_feedback"
+        || writtenOtherIds.has(row.client_request_id));
       const ids = [...new Set(rows.map((r) => r.user_id))];
       const profilesResult = ids.length
         ? await db.from("profiles").select("id,nickname").in("id", ids)

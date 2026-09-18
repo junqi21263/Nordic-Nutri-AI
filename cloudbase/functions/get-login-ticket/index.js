@@ -25,6 +25,7 @@ const { createDailyTipService } = require("./daily-tip-service.cjs");
 const { createProactiveDailyBriefService } = require("./proactive-daily-brief-service.cjs");
 const { createCoachDataService, PublicCoachDataError } = require("./coach-data-service.cjs");
 const { createFeedbackDataService, PublicFeedbackError } = require("./feedback-data-service.cjs");
+const { createRecognitionFeedbackDataService, PublicRecognitionFeedbackError } = require("./recognition-feedback-data-service.cjs");
 const { createVitaVisionService, PublicVisionError } = require("./vita-vision-service.cjs");
 const { createQwenVisionService, PublicQwenVisionError } = require("./qwen-vision-service.cjs");
 const { createDeepseekVisionService } = require("./deepseek-vision-service.cjs");
@@ -1077,6 +1078,23 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     model: deepseekModel,
     analyze: analyzeMeal,
+    fallbackAnalyze: async ({ items }) => {
+      if (!foodCatalog) throw new Error("MEAL_ANALYSIS_FALLBACK_UNAVAILABLE");
+      const requested = Array.isArray(items) ? items : [];
+      const resolved = await Promise.all(requested.map(async (item) => {
+        const match = await foodCatalog.lookupNutrition(item?.name);
+        if (!match) throw new Error("MEAL_ANALYSIS_FALLBACK_NO_MATCH");
+        return {
+          name: item.name,
+          quantityG: item.quantityG,
+          caloriesPer100g: Number(match.caloriesKcalPer100g),
+          proteinPer100g: Number(match.proteinGPer100g ?? 0),
+          carbsPer100g: Number(match.carbsGPer100g ?? 0),
+          fatPer100g: Number(match.fatGPer100g ?? 0),
+        };
+      }));
+      return { mealName: resolved.map((item) => item.name).join("、"), advice: "营养数据来自食物库参考。", items: resolved, source: "food_catalog_fallback", model: null };
+    },
     generateMealInsight,
     resolveImageUrl: getTemporaryUrl,
     getNutritionPlan: data.getNutritionPlan,
@@ -1768,6 +1786,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       proactiveDailyBrief,
     }),
     feedback: createFeedbackDataService({ db }),
+    recognitionFeedback: createRecognitionFeedbackDataService({ db }),
     foodCatalog,
     foodRepository,
     foodInsight,
@@ -2194,6 +2213,13 @@ function getFeedbackRoute(pathname) {
   return null;
 }
 
+function getRecognitionFeedbackRoute(pathname) {
+  const path = pathname.replace(/^\/get-login-ticket/, "");
+  if (path === "/recognition-feedback") return { operation: "create" };
+  const match = path.match(/^\/recognition-feedback\/([0-9a-f-]{36})$/i);
+  return match ? { operation: "update", feedbackId: match[1] } : null;
+}
+
 function isVisionRoute(pathname) {
   return pathname.replace(/^\/get-login-ticket/, "") === "/vision-analysis";
 }
@@ -2217,7 +2243,7 @@ function getGenericTraceFeature(routes) {
   if (routes.mealRoute) return "meals";
   if (routes.insightOperation || routes.dataOperation) return "nutrition";
   if (routes.foodRoute) return "foods";
-  if (routes.feedbackRoute) return "feedback";
+  if (routes.feedbackRoute || routes.recognitionFeedbackRoute) return "feedback";
   if (routes.achievementCelebrationRoute || routes.milestoneRoute) return "milestones";
   if (routes.avatarRoute) return "profile";
   return "system";
@@ -2267,11 +2293,12 @@ function createHttpServer({ service }) {
     const internalVisionAnalysisRoute = getInternalVisionAnalysisRoute(url.pathname);
     const internalReminderRoute = getInternalReminderRoute(url.pathname);
     const feedbackRoute = getFeedbackRoute(url.pathname);
+    const recognitionFeedbackRoute = getRecognitionFeedbackRoute(url.pathname);
     const visionRoute = isVisionRoute(url.pathname);
     const visionAnalysisStatusRoute = getVisionAnalysisStatusRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
     const authRoute = getAuthRoute(url.pathname);
-    const traceRoutes = { authRoute, dataOperation, mealRoute, pushRoute, insightOperation, achievementCelebrationRoute, milestoneRoute, coachOperation, foodRoute, adminFoodRoute, internalFoodImageRoute, internalVisionAnalysisRoute, internalReminderRoute, feedbackRoute, visionRoute, visionAnalysisStatusRoute, avatarRoute };
+    const traceRoutes = { authRoute, dataOperation, mealRoute, pushRoute, insightOperation, achievementCelebrationRoute, milestoneRoute, coachOperation, foodRoute, adminFoodRoute, internalFoodImageRoute, internalVisionAnalysisRoute, internalReminderRoute, feedbackRoute, recognitionFeedbackRoute, visionRoute, visionAnalysisStatusRoute, avatarRoute };
     const genericTrace = service?.observability?.startTrace && !visionRoute
       ? service.observability.startTrace({
         feature: getGenericTraceFeature(traceRoutes),
@@ -2307,7 +2334,7 @@ function createHttpServer({ service }) {
       await handleAuthRoute({ req, res, route: authRoute, service });
       return;
     }
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !authRoute && !dataOperation && !mealRoute && !pushRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !internalVisionAnalysisRoute && !internalReminderRoute && !feedbackRoute && !visionRoute && !visionAnalysisStatusRoute && !avatarRoute) {
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !authRoute && !dataOperation && !mealRoute && !pushRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !internalVisionAnalysisRoute && !internalReminderRoute && !feedbackRoute && !recognitionFeedbackRoute && !visionRoute && !visionAnalysisStatusRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
     }
@@ -3763,6 +3790,36 @@ function createHttpServer({ service }) {
         }
         console.error("[coach] failed:", error?.message || error);
         return sendJson(res, 503, { code: "COACH_SERVICE_UNAVAILABLE", message: error?.message || "COACH_SERVICE_UNAVAILABLE" });
+      }
+    }
+    if (recognitionFeedbackRoute) {
+      const session = await authorizeProductRequest(service, req, res);
+      if (!session) return;
+      if (!service.recognitionFeedback) return sendJson(res, 503, { code: "RECOGNITION_FEEDBACK_UNAVAILABLE" });
+      if (recognitionFeedbackRoute.operation === "create") {
+        if (req.method !== "POST") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        try {
+          return sendJson(res, 200, await service.recognitionFeedback.createFeedback(
+            session.sub,
+            await readJsonBody(req, 16 * 1024),
+          ));
+        } catch (error) {
+          if (error instanceof PublicRecognitionFeedbackError) return sendJson(res, 400, { code: error.code });
+          console.error("[recognition-feedback] create failed:", error?.code || error?.message || error);
+          return sendJson(res, 503, { code: "RECOGNITION_FEEDBACK_SAVE_FAILED" });
+        }
+      }
+      if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      try {
+        return sendJson(res, 200, await service.recognitionFeedback.updateFeedback(
+          session.sub,
+          recognitionFeedbackRoute.feedbackId,
+          await readJsonBody(req, 16 * 1024),
+        ));
+      } catch (error) {
+        if (error instanceof PublicRecognitionFeedbackError) return sendJson(res, 400, { code: error.code });
+        console.error("[recognition-feedback] update failed:", error?.code || error?.message || error);
+        return sendJson(res, 503, { code: "RECOGNITION_FEEDBACK_UPDATE_FAILED" });
       }
     }
     if (feedbackRoute) {

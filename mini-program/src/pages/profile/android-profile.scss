@@ -1,0 +1,134 @@
+// Android CSS pixels: do not run this layout through the shared 2x Taro scale.
+.page-layout.profile-stitch {
+  --profile-forest: #18352a;
+  --profile-muted: #6c7a72;
+  --profile-border: rgba(24, 53, 42, .08);
+  background: #f9f8f4;
+  color: #26332e;
+  .page-layout__scroll, .page-layout__content { background: #f9f8f4; }
+  .page-layout__content { max-width: 460PX; margin: 0 auto; padding: 0 20PX calc(var(--app-tab-bar-height) + var(--app-safe-bottom) + 36PX); }
+  .profile-rhythm { gap: 22PX; }
+  .content-stack { gap: 0; }
+  taro-button-core { font-family: inherit; }
+  .profile-stitch__overview taro-button-core {
+    appearance: none; border: 0; margin: 0; color: inherit; font-size: inherit; line-height: inherit; padding: 0; border-radius: 0; background: none; text-align: left; overflow: visible;
+    &::after { border: 0; }
+    &:focus-visible { outline: 2PX solid #a9c1ae; outline-offset: 3PX; }
+  }
+  .profile-stitch__overview taro-button-core, .profile-rhythm__settings-group > *, .profile-rhythm__recommend-card, .profile-rhythm__logout {
+    transition: transform 120ms ease-out, background-color 120ms ease-out;
+    &:active { transform: scale(.985); }
+  }
+  .profile-stitch__overview { font-size: 12PX; line-height: 1.5; }
+  .profile-stitch__header { display: flex; align-items: center; justify-content: space-between; padding: max(24PX, env(safe-area-inset-top)) 0 20PX; min-height: 36PX; gap: 12PX; }
+  .profile-stitch__brand { font-family: Georgia, serif; font-size: 14PX; letter-spacing: 3PX; color: #10241d; }
+  .profile-stitch__space { font-size: 10PX; letter-spacing: 1.5PX; color: var(--profile-muted); }
+  .profile-stitch__hero { border-radius: 24PX; padding: 20PX; color: #f9f8f4; background: radial-gradient(ellipse at right bottom, #154332, transparent 70%), #18352a; box-shadow: 0 12PX 30PX -4PX rgba(24,53,42,.07); }
+  taro-button-core.profile-stitch__identity { display: flex; align-items: flex-start; gap: 16PX; width: 100%; }
+  .profile-stitch__avatar { position: relative; flex: 0 0 72PX; }
+  .profile-stitch__avatar .avatar { width: 72PX; height: 72PX; border-radius: 26PX; border: 1PX solid #ffffff40; box-sizing: border-box; background: #eee9df; }
+  .profile-stitch__status-dot { position: absolute; width: 18PX; height: 18PX; box-sizing: border-box; border-radius: 50%; background: #a9c1ae; border: 2PX solid #18352a; right: -3PX; bottom: -3PX; box-shadow: 0 0 0 2PX #a9c1ae33; }
+  .profile-stitch__overview--animated .profile-stitch__status-dot { animation: profile-stitch-status-pulse 2.8s ease-in-out infinite; }
+  .profile-stitch__identity-copy { flex: 1; min-width: 0; }
+  .profile-stitch__name-row { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8PX; justify-content: space-between; }
+  .profile-stitch__name { font-size: 20PX; font-weight: 700; overflow-wrap: anywhere; }
+  .profile-stitch__edit { font-size: 10PX; color: #a9c1ae; white-space: nowrap; }
+  .profile-stitch__goal { display: block; font-size: 12PX; color: #e8efe9; margin: 4PX 0 10PX; }
+  .profile-stitch__badge { display: inline-block; background: #ffffff18; border: 1PX solid #ffffff26; border-radius: 20PX; padding: 2PX 10PX; font-size: 10PX; &::before { content: ''; display: inline-block; width: 5PX; height: 5PX; border-radius: 50%; background: #78c7a2; margin-right: 6PX; } }
+  .profile-stitch__quote { display: block; border-top: 1PX solid #ffffff18; padding-top: 14PX; margin-top: 16PX; font-size: 11.5PX; font-style: italic; line-height: 1.6; color: #ffffffbf; }
+  .profile-stitch__load-state { display: flex; justify-content: space-between; align-items: center; font-size: 11PX; color: var(--profile-muted); padding-top: 12PX; taro-button-core { padding: 8PX 12PX; text-decoration: underline; } }
+  .profile-stitch__daily, .profile-stitch__journey { margin-top: 24PX; }
+  .profile-stitch__section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4PX 8PX; margin-bottom: 10PX; font-size: 10PX; color: var(--profile-muted); letter-spacing: .5PX; taro-button-core { display: inline-flex; align-items: center; justify-content: flex-end; width: auto; min-height: 32PX; font-size: 10PX; } }
+  .profile-stitch__daily .profile-stitch__section-head { flex-wrap: nowrap; }
+  .profile-stitch__daily .profile-stitch__section-head > :first-child { min-width: 0; white-space: nowrap; }
+  .profile-stitch__daily .profile-stitch__section-head > taro-button-core { flex: 0 0 auto; width: auto; margin-left: auto; white-space: nowrap; }
+  .profile-stitch__daily .profile-stitch__section-head taro-button-core { color: #94664f; }
+  .profile-stitch__metrics { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 12PX; }
+  .profile-stitch__card { background: #fff; border: 1PX solid var(--profile-border); border-radius: 16PX; box-shadow: 0 4PX 20PX -2PX rgba(24,53,42,.04); }
+  .profile-stitch__overview taro-button-core.profile-stitch__card { border: 1PX solid var(--profile-border); border-radius: 16PX; overflow: hidden; }
+  taro-button-core.profile-stitch__calories { padding: 14PX; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; background: #fff; }
+  .profile-stitch__metric-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4PX; color: var(--profile-muted); font-size: 10PX; }
+  .profile-stitch__tag { background: #eee9df; border-radius: 4PX; padding: 1PX 5PX; font-size: 9PX; }
+  .profile-stitch__tag--today { background: #f7efe9; color: #94664f; }
+  .profile-stitch__calorie-main { display: flex; align-items: center; flex-wrap: wrap; gap: 12PX; padding: 12PX 0; }
+  .profile-stitch__ring { width: 56PX; height: 56PX; border-radius: 50%; padding: 4PX; box-sizing: border-box; flex-shrink: 0; > * { border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: var(--profile-forest); font-size: 9PX; } }
+  .profile-stitch__number { display: block; font-size: 28PX; line-height: 1.15; font-weight: 650; font-variant-numeric: tabular-nums; color: #10241d; overflow-wrap: anywhere; }
+  .profile-stitch__muted { display: block; font-size: 10PX; line-height: 1.6; color: var(--profile-muted); }
+  .profile-stitch__calorie-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6PX; border-top: 1PX solid var(--profile-border); padding-top: 10PX; color: var(--profile-muted); font-size: 10PX; > :last-child { color: var(--profile-forest); } }
+  .profile-stitch__metric-side { display: flex; flex-direction: column; gap: 8PX; min-width: 0; }
+  taro-button-core.profile-stitch__protein { padding: 12PX; flex: 1; width: 100%; background: #fff; }
+  .profile-stitch__protein .profile-stitch__number { margin: 5PX 0 8PX; }
+  .profile-stitch__track { height: 6PX; background: #eee9df; border-radius: 10PX; overflow: hidden; margin-bottom: 6PX; > * { height: 100%; background: #6d947b; transform-origin: left; transition: transform 760ms ease-out; } }
+  .profile-stitch__mini-stats { display: flex; border-radius: 16PX; background: #f6f3ed; border: 1PX solid var(--profile-border); padding: 6PX 0; taro-button-core { flex: 1; text-align: center; min-width: 0; padding: 0 4PX; color: var(--profile-muted); font-size: 9PX; > * { display: block; } + taro-button-core { border-left: 1PX solid var(--profile-border); } } }
+  .profile-stitch__small-number { font-size: 20PX; font-variant-numeric: tabular-nums; color: #10241d; }
+  .profile-stitch__unit { font-size: 10PX; margin-left: 3PX; }
+  .profile-stitch__journal { padding: 16PX 16PX 0; }
+  .profile-stitch__journal-head { display: flex; align-items: center; gap: 8PX; }
+  .profile-stitch__sprout { display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #e8efe9; width: 28PX; height: 28PX; flex-shrink: 0; }
+  .profile-stitch__title { display: block; font-size: 12PX; font-weight: 650; color: var(--profile-forest); }
+  .profile-stitch__day { margin-left: auto; white-space: nowrap; color: #94664f; font: italic 12PX Georgia, serif; }
+  .profile-stitch__week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6PX; margin: 16PX 0; > .profile-stitch__muted { grid-column: 1 / -1; min-height: 46PX; } }
+  .profile-stitch__week-day { display: flex; align-items: center; flex-direction: column; gap: 6PX; color: var(--profile-muted); font-size: 9PX; }
+  .profile-stitch__seed { display: flex; align-items: center; justify-content: center; width: 28PX; height: 28PX; box-sizing: border-box; border: 1PX dashed #18352a4d; border-radius: 50%; background: #f6f3ec; > :not(.nordic-icon) { width: 4PX; height: 4PX; background: #18352a33; border-radius: 50%; } }
+  .profile-stitch__seed--recorded { background: #18352a; border: 0; box-shadow: 0 0 0 2PX #18352a26; }
+  taro-button-core.profile-stitch__journey-link { border-top: 1PX solid var(--profile-border); display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 36PX; box-sizing: border-box; max-width: 100%; margin-left: 0; margin-right: 0; font-size: 11PX; color: var(--profile-forest); }
+  .profile-stitch__achievements { margin-top: 18PX; }
+  .profile-stitch__achievements .profile-stitch__section-head { flex-wrap: nowrap; }
+  .profile-stitch__achievements .profile-stitch__section-head > taro-view-core { display: flex; align-items: baseline; min-width: 0; gap: 6PX; white-space: nowrap; }
+  .profile-stitch__achievements .profile-stitch__section-head > taro-button-core { flex: 0 0 auto; width: auto; margin-left: auto; white-space: nowrap; }
+  .profile-stitch__section-head .profile-stitch__title { display: inline; }
+  .profile-stitch__english { font-size: 8PX; letter-spacing: 1.3PX; color: var(--profile-muted); }
+  .profile-stitch__gallery { display: flex; gap: 12PX; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2PX 1PX 5PX; -webkit-overflow-scrolling: touch; &::-webkit-scrollbar { display: none; } }
+  taro-button-core.profile-stitch__achievement { display: flex; flex: 0 0 112PX; flex-direction: column; align-items: center; gap: 8PX; padding: 12PX; box-sizing: border-box; border: 1PX solid var(--profile-border); border-radius: 16PX; background: white; font-size: 11PX; text-align: center; }
+  .profile-stitch__achievement-icon { display: flex; align-items: center; justify-content: center; width: 48PX; height: 48PX; border-radius: 16PX; background: #eee9df; }
+  .profile-stitch__achievement:nth-child(3n + 2) .profile-stitch__achievement-icon { background: #e8efe9; }
+  .profile-stitch__achievement-status { color: #256a4c; background: #edf8f2; border-radius: 10PX; padding: 1PX 6PX; font-size: 9PX; }
+  taro-button-core.profile-stitch__achievement--locked { background: #f6f3ec; border-style: dashed; color: var(--profile-muted); .profile-stitch__achievement-icon { opacity: .55; } .profile-stitch__achievement-status { background: transparent; color: var(--profile-muted); } }
+  taro-button-core.profile-stitch__weekly { display: flex; justify-content: space-between; align-items: center; gap: 12PX; width: 100%; border: 1PX solid #a9c1ae4d; border-radius: 16PX; padding: 16PX; margin-top: 20PX; background: linear-gradient(100deg,#e2ece4,#e9f0eb); .profile-stitch__title { font-size: 14PX; margin: 6PX 0 3PX; } }
+  .profile-stitch__weekly-score { flex-shrink: 0; text-align: right; color: var(--profile-muted); font-size: 10PX; > * { display: block; } .profile-stitch__number { display: inline; font-family: Georgia, serif; font-style: italic; } }
+  .profile-rhythm__entry-sections { gap: 20PX; }
+  .profile-rhythm__settings-section { gap: 8PX; }
+  .profile-rhythm__settings-label { font-size: 11PX; letter-spacing: 1.5PX; color: var(--profile-muted); padding-left: 2PX; }
+  .profile-rhythm__settings-group { border-radius: 16PX; border: 1PX solid var(--profile-border); box-shadow: 0 4PX 20PX -2PX #18352a0a; overflow: hidden; background: white; padding: 0; }
+  .profile-rhythm__settings-group > * + * { border-top: 1PX solid #18352a0a; }
+  .profile-rhythm__settings-group > *:active { background: #f6f3ec; }
+  .list-item, .profile-rhythm__settings-group > taro-view-core + taro-view-core .list-item { padding: 14PX; gap: 14PX; min-height: 46PX; border: 0; }
+  .list-item__leading { width: 36PX; height: 36PX; border-radius: 12PX; background: #eee9df; flex: 0 0 36PX; .nordic-icon { width: 18PX !important; height: 18PX !important; } }
+  .profile-rhythm__settings-section:first-child .profile-rhythm__settings-group > :nth-child(2) .list-item__leading { background: #e8efe9; }
+  .profile-rhythm__settings-section:first-child .profile-rhythm__settings-group > :nth-child(3) .list-item__leading { background: #f7efe9; }
+  .list-item__content { min-width: 0; }
+  .list-item__title { font-size: 13PX; line-height: 1.5; }
+  .list-item__description { font-size: 11PX; line-height: 1.6; margin-top: 2PX; white-space: normal; }
+  .list-item__trailing { font-size: 22PX; color: #89988f; }
+  .profile-rhythm__recommend-card { border: 1PX solid #be8f7433; background: #f4efe6; border-radius: 16PX; padding: 16PX; gap: 14PX; }
+  .profile-rhythm__recommend-icon { width: 40PX; height: 40PX; border-radius: 12PX; flex: 0 0 40PX; background: white; }
+  .profile-rhythm__recommend-title { font-size: 13PX; }
+  .profile-rhythm__recommend-description { font-size: 11PX; line-height: 1.5; }
+  .profile-rhythm__recommend-trailing { font-size: 22PX; }
+  .profile-rhythm__logout { justify-content: center; gap: 8PX; padding: 12PX 0 0; .nordic-icon { width: 16PX !important; height: 16PX !important; } }
+  .profile-rhythm__logout-copy { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8PX; }
+  .profile-rhythm__logout-title { font-size: 12PX; color: #9b3a48; }
+  .profile-rhythm__logout-description { font-size: 10PX; color: var(--profile-muted); }
+  .profile-stitch__footer { display: block; text-align: center; font: italic 10PX/1.6 Georgia, serif; letter-spacing: .5PX; color: #7a8980; }
+  .bottom-tab-bar { background: #fffffff2; backdrop-filter: blur(12PX); border-top: 1PX solid var(--profile-border); }
+  .bottom-tab-bar__item { transition: color 180ms ease-out; }
+  .bottom-tab-bar__item--active .bottom-tab-bar__icon { position: relative; background: transparent; &::after { content: ''; position: absolute; right: 1PX; top: 1PX; width: 5PX; height: 5PX; border-radius: 50%; background: #18352a; } }
+  .profile-stitch__overview--motion .profile-stitch__reveal { animation: profile-stitch-enter 350ms ease-out both; }
+  .profile-stitch__daily { animation-delay: 70ms !important; }
+  .profile-stitch__journey { animation-delay: 140ms !important; }
+  .profile-stitch__achievements { animation-delay: 210ms !important; }
+  .profile-stitch__weekly { animation-delay: 280ms !important; }
+}
+@keyframes profile-stitch-enter { from { opacity: 0; transform: translateY(12PX); } to { opacity: 1; transform: translateY(0); } }
+@keyframes profile-stitch-status-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 2PX #a9c1ae33; } 50% { opacity: .6; box-shadow: 0 0 0 5PX #a9c1ae1a; } }
+.page-layout.profile-stitch--reduced { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .page-layout.profile-stitch { *, *::before, *::after { animation: none !important; transition: none !important; } } }
+@media (max-width: 360px) {
+  .page-layout.profile-stitch {
+    .page-layout__content { padding-left: 14PX; padding-right: 14PX; }
+    .profile-stitch__hero { padding: 16PX; }
+    .profile-stitch__identity { gap: 12PX; }
+    .profile-stitch__avatar { flex-basis: 58PX; .avatar { width: 58PX; height: 58PX; border-radius: 20PX; } }
+    .profile-stitch__english { letter-spacing: .5PX; }
+  }
+}

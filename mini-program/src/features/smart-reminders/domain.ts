@@ -115,3 +115,25 @@ export function buildTodayReminderCandidates(
   }
   return candidates;
 }
+
+export function buildNextReminderCandidates(
+  settings: SmartReminderSettings,
+  meals: Meal[],
+  now = new Date(),
+): ReminderCandidate[] {
+  if (!settings.enabled) return [];
+  const today = localDateString(now);
+  return reminderTypes.flatMap((mealType) => {
+    const mealSettings = settings.meals[mealType];
+    if (!mealSettings.enabled || !isReminderTimeInWindow(mealType, mealSettings.time)) return [];
+    const [hours, minutes] = mealSettings.time.split(":").map(Number);
+    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+    if (at <= now || hasMeal(meals, today, mealType)) at.setDate(at.getDate() + 1);
+    const copy = getReminderCopy(
+      mealType,
+      consecutiveDays(meals, today, mealType, false),
+      consecutiveDays(meals, today, mealType, true),
+    );
+    return [{ id: getReminderNotificationId(mealType), mealType, ...copy, at }];
+  });
+}

@@ -103,7 +103,7 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "h
           model: typeof requestModel === "string" && requestModel.trim() ? requestModel.trim() : selectedModel,
           temperature: 0,
           messages: [{ role: "user", content: [
-            { type: "text", text: "你是专业营养分析视觉模型。仅返回 JSON，不要 Markdown。第一步判断图片是否为食物或饮品；若是风景、文字、物品、人物或截图，返回 {\"isFood\": false}。对食物图从左到右、前到后按餐盘区域逐区观察，枚举所有清晰可见的独立菜品；主动区分主食、蛋白质、蔬菜、配菜、酱汁和饮品，不能因为一个区域遮挡就遗漏其他区域。只报告图中可见或有充分视觉依据的食物，不猜测完全不可见的食材；对遮挡、混合、火锅、便当和多拼盘场景，在 uncertaintyReasons 中写明不确定项，并给出合理份量估算，不要为了追求绝对确定而持续重试。字段必须为 mealName、mealType(breakfast/lunch/dinner/snack)、confidence(0到1)、portionConfidence(0到1)、needsEscalation(boolean)、uncertaintyReasons(string数组)、advice、items。advice 必须用中文撰写，简明扼要，不超过100字。items 每项含 name、quantityG、caloriesPer100g、proteinPer100g、carbsPer100g、fatPer100g；营养值是估算，不作医疗诊断。" },
+            { type: "text", text: "你是专业营养分析视觉模型。仅返回 JSON，不要 Markdown。第一步判断图片是否为食物或饮品；若是风景、文字、物品、人物或截图，返回 {\"isFood\": false}。先判断图片是单一食物主体，还是明显包含两个或以上视觉独立的食物、菜品、碗碟或餐盘区域。对多食物照片从左到右、前到后逐区观察，分别枚举清晰可见的主食、蛋白质、蔬菜、配菜、酱汁和饮品，明显存在多个独立食物时 items 应输出多个项目。混合后无法视觉区分原料的组合菜可以保留为一个项目，不要强拆隐藏原料；只报告图中可见或有充分视觉依据的食物，不得为了凑数量猜测完全不可见的食材。对遮挡、混合、火锅、便当和多拼盘场景，在 uncertaintyReasons 中写明不确定项，并给出合理份量估算，不要为了追求绝对确定而持续重试。字段必须为 mealName、mealType(breakfast/lunch/dinner/snack)、confidence(0到1)、portionConfidence(0到1)、needsEscalation(boolean)、uncertaintyReasons(string数组)、advice、items。advice 必须用中文撰写，简明扼要，不超过100字。items 每项含 name、quantityG、caloriesPer100g、proteinPer100g、carbsPer100g、fatPer100g；营养值是估算，不作医疗诊断。" },
             { type: "image_url", image_url: { url: imageUrl, ...(provider === "deepseek" ? { detail: "low" } : {}) } },
           ] }],
         }),
