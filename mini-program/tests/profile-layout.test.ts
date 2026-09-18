@@ -23,10 +23,10 @@ describe("Android profile Stitch layout", () => {
     expect(source).toContain(".profile-stitch__mini-stats { display: flex; border-radius: 16PX; background: #f6f3ed;");
   });
 
-  it("removes the header gear while retaining the motion preference in the settings list", () => {
+  it("removes the header gear and hides the motion preference row", () => {
     expect(overview()).not.toContain("profile-stitch__motion-toggle");
     expect(profilePage()).not.toContain('open={activeModal === "settings"}');
-    expect(profilePage()).toContain("页面动效");
+    expect(profilePage()).not.toContain("页面动效");
   });
 
   it("keeps the journey action inside the journal card and aligns the status dot to the avatar edge", () => {

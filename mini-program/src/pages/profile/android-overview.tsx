@@ -38,12 +38,11 @@ interface Props {
   openMealRecords: () => void;
   openAchievement: (achievement: Achievement) => void;
   onMotionChange: (enabled: boolean) => void;
-  motionOff: boolean;
   accountError: boolean;
   retryAccount: () => void;
 }
 
-export function AndroidProfileOverview({ profile, refreshVersion, openPage, openCoach, openMealRecords, openAchievement, onMotionChange, motionOff, accountError, retryAccount }: Props) {
+export function AndroidProfileOverview({ profile, refreshVersion, openPage, openCoach, openMealRecords, openAchievement, onMotionChange, accountError, retryAccount }: Props) {
   const [daily, setDaily] = useState<ProductDailySummary | null>(null);
   const [weekly, setWeekly] = useState<ProductWeeklyReview | null>(null);
   const [journey, setJourney] = useState<ProductMilestoneJourney | null>(null);
@@ -55,7 +54,7 @@ export function AndroidProfileOverview({ profile, refreshVersion, openPage, open
   const [reduceMotion, setReduceMotion] = useState(() => typeof window === "undefined" || !window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const generation = useRef(0);
   const inFlight = useRef(false);
-  const animate = visible && !reduceMotion && !motionOff;
+  const animate = visible && !reduceMotion;
   const identityReady = profile.dataStatus === "ready";
 
   const refresh = async () => {
@@ -102,7 +101,7 @@ export function AndroidProfileOverview({ profile, refreshVersion, openPage, open
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);
-  useEffect(() => { onMotionChange(!reduceMotion && !motionOff); }, [reduceMotion, motionOff, onMotionChange]);
+  useEffect(() => { onMotionChange(!reduceMotion); }, [reduceMotion, onMotionChange]);
 
   const protein = daily ? Math.max(0, Math.min(100, daily.targets.protein > 0 ? Math.round(daily.consumed.protein / daily.targets.protein * 100) : 0)) : undefined;
   const calories = daily?.targets.calories;

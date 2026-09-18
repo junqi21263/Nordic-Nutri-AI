@@ -67,7 +67,6 @@ export default function ProfilePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [profileMotion, setProfileMotion] = useState(false);
-  const [profileMotionOff, setProfileMotionOff] = useState(false);
   const [accountError, setAccountError] = useState(false);
   const isPageScrollLocked = activeModal !== null
     || selectedAchievement !== null
@@ -302,7 +301,6 @@ export default function ProfilePage() {
           openMealRecords={openMealRecords}
           openAchievement={openAchievement}
           onMotionChange={setProfileMotion}
-          motionOff={profileMotionOff}
           accountError={accountError}
           retryAccount={syncProfileFromAccount}
         /> : <>
@@ -402,11 +400,6 @@ export default function ProfilePage() {
           <View className="profile-rhythm__settings-section">
             <Text className="profile-rhythm__settings-label">饮食管理</Text>
             <View className="profile-rhythm__settings-group">
-              {isAndroidApp ? (
-                <View onClick={() => setProfileMotionOff(!profileMotionOff)}>
-                  <ListItem icon={<NordicIcon name="sparkles" size={20} ariaLabel="页面动效" />} title="页面动效" description={profileMotionOff ? "已关闭，点击开启" : "已开启，点击关闭"} trailing={profileMotionOff ? "关" : "开"} />
-                </View>
-              ) : null}
               {isAndroidApp ? (
                 <View onClick={() => openPage("/pages/smart-reminder-settings/index")}>
                   <ListItem icon={<NordicIcon name="bell" size={20} ariaLabel="记录提醒" />} title="记录提醒" description="按餐次设置轻量的本地提醒" />
