@@ -37,4 +37,16 @@ describe("Android profile Stitch layout", () => {
     expect(source).toContain("right: -3PX; bottom: -3PX;");
     expect(source).toContain("@keyframes profile-stitch-status-pulse");
   });
+
+  it("does not add a decorative dot to the active bottom tab", () => {
+    const source = styles();
+    expect(source).not.toContain(".bottom-tab-bar__item--active .bottom-tab-bar__icon { position: relative;");
+    expect(source).not.toContain(".bottom-tab-bar__item--active .bottom-tab-bar__icon { position: relative; background: transparent; &::after");
+  });
+
+  it("marks the current weekday in the sprout cycle", () => {
+    expect(overview()).toContain("profile-stitch__week-day--today");
+    expect(overview()).toContain('className="profile-stitch__today-dot"');
+    expect(styles()).toContain(".profile-stitch__today-dot");
+  });
 });

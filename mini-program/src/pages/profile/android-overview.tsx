@@ -107,6 +107,7 @@ export function AndroidProfileOverview({ profile, refreshVersion, openPage, open
   const calories = daily?.targets.calories;
   const calorieProgress = daily && daily.targets.calories > 0 ? Math.max(0, Math.min(100, daily.consumed.calories / daily.targets.calories * 100)) : 0;
   const sorted = achievements ? sortAchievementsForProfilePreview(achievements) : [];
+  const today = getLocalDateString();
   const openJourney = () => openPage("/pages/milestone-journey/index");
 
   return <View className={`profile-stitch__overview${animate ? " profile-stitch__overview--animated" : ""}${animate && reveal ? " profile-stitch__overview--motion" : ""}`}>
@@ -148,7 +149,7 @@ export function AndroidProfileOverview({ profile, refreshVersion, openPage, open
       <View className="profile-stitch__section-head"><Text>02 / YOUR JOURNEY · 成长手账</Text><Text>连续记录 {journey?.currentStreakDays ?? "—"} 天</Text></View>
       <View className="profile-stitch__card profile-stitch__journal">
         <View className="profile-stitch__journal-head"><View className="profile-stitch__sprout"><NordicIcon name="reminder-leaf" size={16} /></View><View><Text className="profile-stitch__title">本周萌芽周期</Text><Text className="profile-stitch__muted">坚持每日打卡，滋养健康种子</Text></View><Text className="profile-stitch__day">Day {journey?.currentStreakDays ?? "—"}</Text></View>
-        <View className="profile-stitch__week">{weekly ? weekly.rhythm.map((day) => <View key={day.date} className="profile-stitch__week-day" ariaLabel={`${day.date} ${day.recorded ? "已记录" : "未记录"}`}><Text>{profileWeekday(day.date)}</Text><View className={`profile-stitch__seed${day.recorded ? " profile-stitch__seed--recorded" : ""}`}>{day.recorded ? <NordicIcon name="check-inverse" size={14} /> : <View />}</View></View>) : <Text className="profile-stitch__muted">记录日历尚未加载</Text>}</View>
+        <View className="profile-stitch__week">{weekly ? weekly.rhythm.map((day) => <View key={day.date} className={`profile-stitch__week-day${day.date === today ? " profile-stitch__week-day--today" : ""}`} ariaLabel={`${day.date} ${day.recorded ? "已记录" : "未记录"}`}><Text>{profileWeekday(day.date)}</Text>{day.date === today && <View className="profile-stitch__today-dot" ariaLabel="今天" />}<View className={`profile-stitch__seed${day.recorded ? " profile-stitch__seed--recorded" : ""}`}>{day.recorded ? <NordicIcon name="check-inverse" size={14} /> : <View />}</View></View>) : <Text className="profile-stitch__muted">记录日历尚未加载</Text>}</View>
         <Button className="profile-stitch__journey-link" onClick={openJourney}><Text>查看完整健康旅程</Text><Text>→</Text></Button>
       </View>
     </View>
