@@ -68,8 +68,7 @@
   .profile-stitch__title { display: block; font-size: 12PX; font-weight: 650; color: var(--profile-forest); }
   .profile-stitch__day { margin-left: auto; white-space: nowrap; color: #94664f; font: italic 12PX Georgia, serif; }
   .profile-stitch__week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6PX; margin: 16PX 0; > .profile-stitch__muted { grid-column: 1 / -1; min-height: 46PX; } }
-  .profile-stitch__week-day { position: relative; display: flex; align-items: center; flex-direction: column; gap: 6PX; color: var(--profile-muted); font-size: 9PX; }
-  .profile-stitch__today-dot { position: absolute; top: 14PX; width: 4PX; height: 4PX; border-radius: 50%; background: #18352a; }
+  .profile-stitch__week-day { display: flex; align-items: center; flex-direction: column; gap: 6PX; color: var(--profile-muted); font-size: 9PX; }
   .profile-stitch__seed { display: flex; align-items: center; justify-content: center; width: 28PX; height: 28PX; box-sizing: border-box; border: 1PX dashed #18352a4d; border-radius: 50%; background: #f6f3ec; > :not(.nordic-icon) { width: 4PX; height: 4PX; background: #18352a33; border-radius: 50%; } }
   .profile-stitch__seed--recorded { background: #18352a; border: 0; box-shadow: 0 0 0 2PX #18352a26; }
   taro-button-core.profile-stitch__journey-link { border-top: 1PX solid var(--profile-border); display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 36PX; box-sizing: border-box; max-width: 100%; margin-left: 0; margin-right: 0; font-size: 11PX; color: var(--profile-forest); }

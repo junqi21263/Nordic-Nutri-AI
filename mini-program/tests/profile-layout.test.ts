@@ -44,9 +44,4 @@ describe("Android profile Stitch layout", () => {
     expect(source).not.toContain(".bottom-tab-bar__item--active .bottom-tab-bar__icon { position: relative; background: transparent; &::after");
   });
 
-  it("marks the current weekday in the sprout cycle", () => {
-    expect(overview()).toContain("profile-stitch__week-day--today");
-    expect(overview()).toContain('className="profile-stitch__today-dot"');
-    expect(styles()).toContain(".profile-stitch__today-dot");
-  });
 });
