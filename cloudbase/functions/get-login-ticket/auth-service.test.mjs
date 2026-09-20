@@ -7,6 +7,7 @@ function createRepo(clock = () => 1_700_000_000_000) {
   const repo = {
     users: [],
     verification: [],
+    refreshSessions: [],
     async insertVerification(row) { const created = { id: `verification-${this.verification.length + 1}`, ...row }; this.verification.push(created); return created; },
     async updateVerification(id, patch) { const row = this.verification.find((item) => item.id === id); if (row) Object.assign(row, patch); },
     async invalidateVerification({ target, targetType, purpose }) {
@@ -24,6 +25,22 @@ function createRepo(clock = () => 1_700_000_000_000) {
     async findUserById(id) { return this.users.find((user) => user.id === id) ?? null; },
     async insertUser(user) { const created = { id: `user-${this.users.length + 1}`, status: "active", token_version: 1, ...user }; this.users.push(created); return created; },
     async updatePassword(userId, passwordHash) { const user = this.users.find((item) => item.id === userId); user.password_hash = passwordHash; user.token_version += 1; return user; },
+    async insertRefreshSession(row) { const created = { id: `refresh-${this.refreshSessions.length + 1}`, ...row }; this.refreshSessions.push(created); return created; },
+    async findRefreshSessionByHash(tokenHash) { return this.refreshSessions.find((item) => item.token_hash === tokenHash) ?? null; },
+    async rotateRefreshSession({ oldTokenHash, newTokenHash, userId, tokenVersion, expiresAt, now }) {
+      const old = this.refreshSessions.find((item) => item.token_hash === oldTokenHash && !item.revoked_at);
+      if (!old || old.user_id !== userId || old.token_version !== tokenVersion || new Date(old.expires_at).getTime() <= now) return null;
+      const created = { id: `refresh-${this.refreshSessions.length + 1}`, user_id: userId, token_hash: newTokenHash, token_version: tokenVersion, expires_at: expiresAt };
+      this.refreshSessions.push(created);
+      old.revoked_at = new Date(now).toISOString();
+      old.replaced_by = created.id;
+      return created.id;
+    },
+    async revokeRefreshSession(tokenHash, revokedAt) {
+      const row = this.refreshSessions.find((item) => item.token_hash === tokenHash && !item.revoked_at);
+      if (row) row.revoked_at = new Date(revokedAt).toISOString();
+      return Boolean(row);
+    },
   };
   return repo;
 }
@@ -315,6 +332,58 @@ test("/auth/me returns only the minimal email account identity", async () => {
       createdPlatform: "android_app",
     },
   });
+});
+
+test("issues only a hashed 30-day refresh session beside the seven-day access token", async () => {
+  const repo = createRepo();
+  repo.users.push({ id: "user-1", email_normalized: "user@example.com", password_hash: "argon2id:password", status: "active", token_version: 1 });
+  const service = createService(repo);
+
+  const result = await service.loginEmail({ email: "user@example.com", password: "password" });
+
+  assert.equal(result.session.expiresIn, 60 * 60 * 24 * 7);
+  assert.equal(result.session.refreshExpiresIn, 60 * 60 * 24 * 30);
+  assert.equal(typeof result.session.refreshToken, "string");
+  assert.equal(repo.refreshSessions[0].token_hash.length, 64);
+  assert.notEqual(repo.refreshSessions[0].token_hash, result.session.refreshToken);
+  assert.equal(repo.refreshSessions[0].user_id, "user-1");
+});
+
+test("rotates refresh tokens once and rejects replay", async () => {
+  const repo = createRepo();
+  repo.users.push({ id: "user-1", email_normalized: "user@example.com", password_hash: "argon2id:password", status: "active", token_version: 1 });
+  const service = createService(repo);
+  const login = await service.loginEmail({ email: "user@example.com", password: "password" });
+
+  const rotated = await service.refresh(login.session.refreshToken);
+
+  assert.notEqual(rotated.session.refreshToken, login.session.refreshToken);
+  assert.equal(repo.refreshSessions[0].replaced_by, repo.refreshSessions[1].id);
+  await assert.rejects(
+    () => service.refresh(login.session.refreshToken),
+    (error) => error.code === "AUTH_REFRESH_INVALID",
+  );
+});
+
+test("rejects refresh after token-version change and revokes one device on logout", async () => {
+  const repo = createRepo();
+  const user = { id: "user-1", email_normalized: "user@example.com", password_hash: "argon2id:password", status: "active", token_version: 1 };
+  repo.users.push(user);
+  const service = createService(repo);
+  const first = await service.loginEmail({ email: "user@example.com", password: "password" });
+  const second = await service.loginEmail({ email: "user@example.com", password: "password" });
+
+  await service.logout(first.session.refreshToken);
+  assert.ok(repo.refreshSessions[0].revoked_at);
+  assert.equal(repo.refreshSessions[1].revoked_at, undefined);
+  await assert.doesNotReject(() => service.refresh(second.session.refreshToken));
+
+  const third = await service.loginEmail({ email: "user@example.com", password: "password" });
+  user.token_version = 2;
+  await assert.rejects(
+    () => service.refresh(third.session.refreshToken),
+    (error) => error.code === "AUTH_REFRESH_INVALID",
+  );
 });
 
 test("reports an expired OTP separately from an invalid OTP", async () => {

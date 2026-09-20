@@ -1,4 +1,4 @@
-const { createHmac, randomInt, timingSafeEqual } = require("node:crypto");
+const { createHmac, randomBytes, randomInt, timingSafeEqual } = require("node:crypto");
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
@@ -229,6 +229,41 @@ function createAuthRepository(db) {
       });
       if (result.error || !rpcBoolean(result.data, "update_app_user_password")) throw new Error("Password update failed");
     },
+    async insertRefreshSession(row) {
+      const result = await db.from("auth_refresh_sessions").insert(row).select("id").single();
+      if (result.error || !result.data?.id) throw new Error("Refresh session creation failed");
+      return result.data;
+    },
+    async findRefreshSessionByHash(tokenHash) {
+      const result = await db.from("auth_refresh_sessions")
+        .select("id,user_id,token_hash,token_version,expires_at,revoked_at,replaced_by")
+        .eq("token_hash", tokenHash)
+        .maybeSingle();
+      if (result.error) throw new Error("Refresh session lookup failed");
+      return result.data ?? null;
+    },
+    async rotateRefreshSession({ oldTokenHash, newTokenHash, userId, tokenVersion, expiresAt, now }) {
+      const result = await db.rpc("rotate_auth_refresh_session", {
+        p_old_token_hash: oldTokenHash,
+        p_new_token_hash: newTokenHash,
+        p_user_id: userId,
+        p_token_version: tokenVersion,
+        p_new_expires_at: expiresAt,
+        p_now: new Date(now).toISOString(),
+      });
+      if (result.error) throw new Error("Refresh session rotation failed");
+      const value = Array.isArray(result.data) ? result.data[0] : result.data;
+      if (typeof value === "string") return value;
+      return value?.rotate_auth_refresh_session ?? null;
+    },
+    async revokeRefreshSession(tokenHash, revokedAt) {
+      const result = await db.from("auth_refresh_sessions")
+        .update({ revoked_at: new Date(revokedAt).toISOString(), last_used_at: new Date(revokedAt).toISOString() })
+        .eq("token_hash", tokenHash)
+        .is("revoked_at", null);
+      if (result.error) throw new Error("Refresh session revocation failed");
+      return true;
+    },
   };
 }
 
@@ -275,6 +310,7 @@ function createAuthService({
   verifyPassword = async () => false,
   now = Date.now,
   random,
+  generateRefreshToken = () => randomBytes(32).toString("base64url"),
   debugOtpCode = null,
 } = {}) {
   if (!repo) throw new Error("Auth repository is unavailable");
@@ -315,13 +351,43 @@ function createAuthService({
     for (const key of keys) loginFailures.delete(key);
   }
 
-  function issueSession(user) {
-    const token = createAccessToken({ userId: user.id, tokenVersion: user.token_version ?? 1, secret: sessionSecret, now });
+  const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
+  const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+  function sessionResult(user, refreshToken) {
+    const accessToken = createAccessToken({ userId: user.id, tokenVersion: user.token_version ?? 1, secret: sessionSecret, now });
     return {
       user: publicUser(user),
-      session: { accessToken: token, expiresIn: 60 * 60 * 24 * 7 },
+      session: {
+        accessToken,
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+        refreshToken,
+        refreshExpiresIn: REFRESH_TOKEN_TTL_SECONDS,
+      },
       onboardingRequired: user.onboarding_required !== false,
     };
+  }
+
+  function refreshTokenHash(refreshToken) {
+    return hashAuthValue(refreshToken, authHmacSecret, "refresh-token");
+  }
+
+  function invalidRefresh() {
+    return new AuthError("AUTH_REFRESH_INVALID", "登录状态已失效");
+  }
+
+  async function issueSession(user) {
+    const refreshToken = generateRefreshToken();
+    if (typeof refreshToken !== "string" || refreshToken.length < 32 || refreshToken.length > 256) {
+      throw new Error("Refresh token generator returned an invalid value");
+    }
+    await repo.insertRefreshSession({
+      user_id: user.id,
+      token_hash: refreshTokenHash(refreshToken),
+      token_version: user.token_version ?? 1,
+      expires_at: new Date(now() + REFRESH_TOKEN_TTL_SECONDS * 1000).toISOString(),
+    });
+    return sessionResult(user, refreshToken);
   }
 
   function normalizeTarget(targetType, target) {
@@ -581,6 +647,33 @@ function createAuthService({
     return { user: publicUser(user) };
   }
 
+  async function refresh(refreshToken) {
+    if (typeof refreshToken !== "string" || refreshToken.length < 32 || refreshToken.length > 256) throw invalidRefresh();
+    const oldTokenHash = refreshTokenHash(refreshToken);
+    const stored = await repo.findRefreshSessionByHash(oldTokenHash);
+    if (!stored || stored.revoked_at || new Date(stored.expires_at).getTime() <= now()) throw invalidRefresh();
+    const user = await repo.findUserById(stored.user_id);
+    if (!user || user.status !== "active" || Number(user.token_version) !== Number(stored.token_version)) throw invalidRefresh();
+    const nextRefreshToken = generateRefreshToken();
+    const rotated = await repo.rotateRefreshSession({
+      oldTokenHash,
+      newTokenHash: refreshTokenHash(nextRefreshToken),
+      userId: user.id,
+      tokenVersion: user.token_version,
+      expiresAt: new Date(now() + REFRESH_TOKEN_TTL_SECONDS * 1000).toISOString(),
+      now: now(),
+    });
+    if (!rotated) throw invalidRefresh();
+    return sessionResult(user, nextRefreshToken);
+  }
+
+  async function logout(refreshToken) {
+    if (typeof refreshToken === "string" && refreshToken.length >= 32 && refreshToken.length <= 256) {
+      await repo.revokeRefreshSession(refreshTokenHash(refreshToken), now());
+    }
+    return { signedOut: true };
+  }
+
   return {
     loginEmail,
     loginPhone,
@@ -591,6 +684,8 @@ function createAuthService({
     sendVerificationCode,
     resendVerificationCode,
     getMe,
+    refresh,
+    logout,
   };
 }
 
