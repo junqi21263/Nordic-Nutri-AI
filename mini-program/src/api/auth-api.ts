@@ -69,7 +69,7 @@ export async function loginWithWechat(observer?: WechatLoginObserver) {
       try {
         const login = await requestWechatHttpsLogin(wxLoginResult.code);
         const user = login.user;
-        setNativeSession(user, login.session.accessToken);
+        setNativeSession({ user, accessToken: login.session.accessToken });
         syncOnboardingCompletedFromServer(login.onboardingRequired);
         observer?.({ stage: "functionInvokeResponse", status: "success" });
         logFunctionEvent("completed");

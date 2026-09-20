@@ -54,14 +54,18 @@ describe("Android auth API", () => {
     expect(networkItem).not.toHaveProperty("requestHeader.authorization");
   });
 
-  it("records the full response body for subsequent native auth requests", async () => {
+  it("redacts access and refresh credentials from native auth diagnostics", async () => {
     networkAdd.mockClear();
     networkUpdate.mockClear();
     const originalWindow = globalThis.window;
     globalThis.window = {
       __VCONSOLE_INSTANCE: { network: { add: networkAdd, update: networkUpdate } },
     } as unknown as Window & typeof globalThis;
-    const response = { user: { id: "u1" }, session: { accessToken: "token" }, onboardingRequired: false };
+    const response = {
+      user: { id: "u1" },
+      session: { accessToken: "access-secret", refreshToken: "refresh-secret" },
+      onboardingRequired: false,
+    };
     nativeRequest.mockResolvedValueOnce({ status: 200, data: response });
 
     try {
@@ -72,8 +76,14 @@ describe("Android auth API", () => {
 
     expect(networkUpdate).toHaveBeenCalledWith("vc-auth-1", expect.objectContaining({
       status: 200,
-      response,
+      response: {
+        user: { id: "u1" },
+        session: { accessToken: "[redacted]", refreshToken: "[redacted]" },
+        onboardingRequired: false,
+      },
     }));
+    expect(JSON.stringify(networkUpdate.mock.calls)).not.toContain("access-secret");
+    expect(JSON.stringify(networkUpdate.mock.calls)).not.toContain("refresh-secret");
   });
 
   it("uses password login without an OTP request", async () => {

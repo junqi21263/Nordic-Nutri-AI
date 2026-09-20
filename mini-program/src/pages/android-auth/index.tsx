@@ -9,6 +9,7 @@ import {
 import { googleServerClientId } from "../../api/product-api-config";
 import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
 import { setNativeSession } from "../../auth/session-manager";
+import { toAppSession } from "../../api/android-auth-api";
 import { NordicIcon } from "../../components/nordic-icon";
 import { PageLayout } from "../../layouts/page-layout";
 import { getNativeGoogleIdToken, summarizeGoogleIdToken } from "../../platform/google-auth";
@@ -206,7 +207,7 @@ export default function AndroidAuthPage() {
   };
 
   const finishLogin = async (result: AndroidAuthSessionResult, kind: SuccessKind) => {
-    setNativeSession(result.user, result.session.accessToken);
+    setNativeSession(toAppSession(result));
     setSuccessKind(kind);
     setView("success");
     await delay(400);

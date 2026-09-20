@@ -1,6 +1,7 @@
 import { type AppAuthSession, type AppAuthUser, useAuthStore } from "./auth-store";
 import { useAchievementStore } from "../stores/achievement-store";
 import { createSecureTokenStorage } from "../platform/secure-token-storage";
+import { AndroidAuthApiError, androidAuthApi, toAppSession, type AndroidAuthSessionResult } from "../api/android-auth-api";
 
 let refreshInFlight: Promise<AppAuthSession | null> | null = null;
 
@@ -74,7 +75,19 @@ export async function restoreSession(): Promise<AppAuthSession | null> {
 
 export async function refreshSession(): Promise<AppAuthSession | null> {
   if (!refreshInFlight) {
-    refreshInFlight = restoreSession().finally(() => {
+    refreshInFlight = (async () => {
+      const current = await restoreSession();
+      if (!current?.refreshToken) return null;
+      try {
+        const result = await androidAuthApi.refresh(current.refreshToken) as AndroidAuthSessionResult;
+        return setNativeSession(toAppSession(result));
+      } catch (error) {
+        if (error instanceof AndroidAuthApiError && (error.status === 401 || error.code === "AUTH_REFRESH_INVALID")) {
+          return null;
+        }
+        throw error;
+      }
+    })().finally(() => {
       refreshInFlight = null;
     });
   }
@@ -93,8 +106,7 @@ export async function signOut() {
   await clearInvalidSession();
 }
 
-export function setNativeSession(user: AppAuthUser, accessToken?: string): AppAuthSession {
-  const session: AppAuthSession = { user, accessToken };
+export function setNativeSession(session: AppAuthSession): AppAuthSession {
   persistSession(session);
   useAuthStore.getState().setSession(session);
   void import("../features/smart-reminders/coordinator").then(({ refreshAndroidSmartReminders }) => refreshAndroidSmartReminders()).catch(() => undefined);

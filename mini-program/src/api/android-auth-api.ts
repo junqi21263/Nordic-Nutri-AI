@@ -4,7 +4,12 @@ import { useAuthStore } from "../auth/auth-store";
 
 export type AndroidAuthSessionResult = {
   user: AppAuthUser;
-  session: { accessToken: string; expiresIn: number };
+  session: {
+    accessToken: string;
+    expiresIn: number;
+    refreshToken: string;
+    refreshExpiresIn: number;
+  };
   onboardingRequired?: boolean;
 };
 
@@ -67,6 +72,15 @@ function stringCode(data: unknown) {
 function responseDetail(data: unknown) {
   const code = stringCode(data);
   return code ? { code } : {};
+}
+
+function redactAuthCredentials(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactAuthCredentials);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+    key,
+    /^(accessToken|refreshToken|idToken)$/i.test(key) ? "[redacted]" : redactAuthCredentials(item),
+  ]));
 }
 
 function beginNativeNetworkRecord(options: { method: string; url: string }, startTime: number) {
@@ -132,7 +146,7 @@ async function defaultRequest(
       updateNativeNetworkRecord(nativeNetworkRecord, {
         status: nativeResponse.status,
         statusText: nativeResponse.status >= 200 && nativeResponse.status < 300 ? "OK" : "HTTP Error",
-        response: nativeResponse.data,
+        response: redactAuthCredentials(nativeResponse.data),
         readyState: 4,
         endTime: Date.now(),
         costTime: Date.now() - startedAt,
@@ -212,6 +226,8 @@ function createApi(request: AndroidAuthRequest) {
       request("/auth/password/forgot/phone", input),
     resetPassword: (input: { targetType?: "email" | "phone"; email?: string; phone?: string; code: string; password: string }) =>
       request("/auth/password/reset", input),
+    refresh: (refreshToken: string) => request("/auth/refresh", { refreshToken }),
+    logout: (refreshToken: string) => request("/auth/logout", { refreshToken }),
     getMe: () => request("/auth/me", undefined, "GET"),
   };
 }
@@ -225,5 +241,9 @@ export function createAndroidAuthApi({
 export const androidAuthApi = createAndroidAuthApi();
 
 export function toAppSession(result: AndroidAuthSessionResult): AppAuthSession {
-  return { user: result.user, accessToken: result.session.accessToken };
+  return {
+    user: result.user,
+    accessToken: result.session.accessToken,
+    refreshToken: result.session.refreshToken,
+  };
 }

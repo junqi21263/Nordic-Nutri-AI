@@ -12,6 +12,7 @@ export interface AppAuthUser {
 export interface AppAuthSession {
   user: AppAuthUser;
   accessToken?: string;
+  refreshToken?: string;
 }
 
 export interface AuthState {
