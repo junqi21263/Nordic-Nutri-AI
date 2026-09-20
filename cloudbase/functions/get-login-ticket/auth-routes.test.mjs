@@ -14,6 +14,8 @@ function createAuthStub() {
     async registerEmail(input) { return { route: "register-email", input }; },
     async registerPhone(input) { return { route: "register-phone", input }; },
     async resetPassword(input) { return { reset: true, input }; },
+    async refresh(refreshToken) { return { route: "refresh", refreshToken }; },
+    async logout(refreshToken) { return { route: "logout", refreshToken }; },
     async getMe() { return { id: "user-1" }; },
   };
 }
@@ -131,4 +133,27 @@ test("exposes the Android Email, Phone and Google auth routes", async () => {
   const response = await invoke("/auth/login/google", "POST", { idToken: "token" }, { "content-type": "application/json" });
   assert.equal(response.status, 200);
   assert.equal(response.body.route, "google");
+});
+
+test("routes refresh and logout without requiring an access bearer", async () => {
+  assert.equal(getAuthRoute("/get-login-ticket/auth/refresh"), "/auth/refresh");
+  assert.equal(getAuthRoute("/auth/logout"), "/auth/logout");
+
+  const refreshed = await invoke("/auth/refresh", "POST", { refreshToken: "refresh-token" }, { "content-type": "application/json" });
+  assert.deepEqual(refreshed.body, { route: "refresh", refreshToken: "refresh-token" });
+
+  const loggedOut = await invoke("/auth/logout", "POST", { refreshToken: "refresh-token" }, { "content-type": "application/json" });
+  assert.deepEqual(loggedOut.body, { route: "logout", refreshToken: "refresh-token" });
+});
+
+test("maps an invalid refresh token to unauthorized", async () => {
+  const response = await invoke(
+    "/auth/refresh",
+    "POST",
+    { refreshToken: "invalid" },
+    { "content-type": "application/json" },
+    { async refresh() { throw Object.assign(new Error("expired"), { code: "AUTH_REFRESH_INVALID" }); } },
+  );
+  assert.equal(response.status, 401);
+  assert.deepEqual(response.body, { code: "AUTH_REFRESH_INVALID" });
 });

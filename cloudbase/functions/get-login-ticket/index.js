@@ -41,6 +41,7 @@ const { createProfileAvatarService, PublicProfileAvatarError, pickDefaultAvatarS
 const { createAccountDeletionService, PublicAccountDeletionError } = require("./account-deletion-service.cjs");
 const { createProductUserExists, resolveProductSession } = require("./product-session-auth.cjs");
 const { createAuthRepository, createAuthService, createPasswordService } = require("./services/auth.cjs");
+const { createAppVersionService } = require("./app-version-service.cjs");
 const { createCaptchaService } = require("./services/captcha.cjs");
 const { createEmailService } = require("./services/email.cjs");
 const { createSmsService } = require("./services/sms.cjs");
@@ -691,6 +692,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     auth.getCaptcha = captcha.getCaptcha;
   }
   const observability = createObservabilityService({ db });
+  const appVersion = createAppVersionService({ db });
   opsRef.observability = observability;
   const push = createFcmPushService({ db, env });
   const scheduledReminders = createScheduledReminderService({ db, push });
@@ -1324,6 +1326,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     db,
     isAdmin: allowAdminConsole,
     auth,
+    appVersion,
     audit: adminAudit,
     debugOtpCode: config.debugOtpReveal ? "123456" : null,
   });
@@ -1897,12 +1900,15 @@ function getAuthRoute(pathname) {
     "/auth/password/forgot/email",
     "/auth/password/forgot/phone",
     "/auth/password/reset",
+    "/auth/refresh",
+    "/auth/logout",
     "/auth/me",
   ]).has(path) ? path : null;
 }
 
 function authErrorStatus(code) {
   if (code === "AUTH_INVALID_CREDENTIALS") return 401;
+  if (code === "AUTH_REFRESH_INVALID") return 401;
   if (code === "AUTH_RATE_LIMITED") return 429;
   if (code === "AUTH_EMAIL_ALREADY_REGISTERED") return 409;
   if (code === "AUTH_PHONE_ALREADY_REGISTERED") return 409;
@@ -1946,6 +1952,8 @@ async function handleAuthRoute({ req, res, route, service }) {
     else if (route === "/auth/password/forgot/email") result = await service.auth.sendVerificationCode({ targetType: "email", target: body.email, purpose: "reset_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer, traceId: res.__traceId });
     else if (route === "/auth/password/forgot/phone") result = await service.auth.sendVerificationCode({ targetType: "phone", target: body.phone, purpose: "reset_password", captchaId: body.captchaId, captchaAnswer: body.captchaAnswer, traceId: res.__traceId });
     else if (route === "/auth/password/reset") result = await service.auth.resetPassword(body);
+    else if (route === "/auth/refresh") result = await service.auth.refresh(body.refreshToken);
+    else if (route === "/auth/logout") result = await service.auth.logout(body.refreshToken);
     else result = await service.auth.getMe(readBearerToken(req));
     sendJson(res, 200, result);
   } catch (error) {
@@ -2298,6 +2306,7 @@ function createHttpServer({ service }) {
     const visionAnalysisStatusRoute = getVisionAnalysisStatusRoute(url.pathname);
     const avatarRoute = isAvatarRoute(url.pathname);
     const authRoute = getAuthRoute(url.pathname);
+    const appVersionRoute = url.pathname.replace(/^\/get-login-ticket/, "") === "/app/version";
     const traceRoutes = { authRoute, dataOperation, mealRoute, pushRoute, insightOperation, achievementCelebrationRoute, milestoneRoute, coachOperation, foodRoute, adminFoodRoute, internalFoodImageRoute, internalVisionAnalysisRoute, internalReminderRoute, feedbackRoute, recognitionFeedbackRoute, visionRoute, visionAnalysisStatusRoute, avatarRoute };
     const genericTrace = service?.observability?.startTrace && !visionRoute
       ? service.observability.startTrace({
@@ -2334,7 +2343,17 @@ function createHttpServer({ service }) {
       await handleAuthRoute({ req, res, route: authRoute, service });
       return;
     }
-    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !authRoute && !dataOperation && !mealRoute && !pushRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !internalVisionAnalysisRoute && !internalReminderRoute && !feedbackRoute && !recognitionFeedbackRoute && !visionRoute && !visionAnalysisStatusRoute && !avatarRoute) {
+    if (appVersionRoute) {
+      if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+      if (!service?.appVersion) return sendJson(res, 503, { code: "APP_VERSION_UNAVAILABLE" });
+      try {
+        return sendJson(res, 200, await service.appVersion.getLatest({ channel: url.searchParams.get("channel") || "direct" }));
+      } catch (error) {
+        captureTraceError(res, error);
+        return sendJson(res, 503, { code: "APP_VERSION_UNAVAILABLE" });
+      }
+    }
+    if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !authRoute && !appVersionRoute && !dataOperation && !mealRoute && !pushRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !internalVisionAnalysisRoute && !internalReminderRoute && !feedbackRoute && !recognitionFeedbackRoute && !visionRoute && !visionAnalysisStatusRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
     }
