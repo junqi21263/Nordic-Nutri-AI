@@ -7,6 +7,7 @@ import { startApplicationAuth } from "./auth/app-auth-bootstrap";
 import { initializeAndroidSmartReminders } from "./features/smart-reminders/coordinator";
 import { initializeAndroidPushNotifications } from "./features/smart-reminders/push-coordinator";
 import { AppTransitionOverlay } from "./components/app-transition-overlay";
+import { AppUpdateDialog } from "./components/app-update-dialog";
 import "./app.scss";
 
 let devConsoleStarted = false;
@@ -37,6 +38,7 @@ export default function App({ children }: PropsWithChildren) {
       <AppLayout>
         {children}
         <AppTransitionOverlay />
+        <AppUpdateDialog />
       </AppLayout>
     </QueryClientProvider>
   );

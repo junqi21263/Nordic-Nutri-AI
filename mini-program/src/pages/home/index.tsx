@@ -43,6 +43,7 @@ import { tryPresentPendingMilestone } from "../../features/milestones/presentati
 import { useAppTransitionStore } from "../../stores/app-transition-store";
 import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
 import { DEFAULT_MEAL_GROUP_EXPANDED, mealGroupStateStorage, type MealGroupExpandedState } from "../../features/meals/meal-group-state";
+import { checkAndroidAppUpdate } from "../../features/app-update/runtime";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -111,6 +112,7 @@ export default function HomePage() {
       return;
     }
     setTimeout(hideWelcomeTransition, 180);
+    void checkAndroidAppUpdate();
     const mealState = useMealStore.getState();
     if (retireFirstRunTipsIfRecordedMeals(mealState.meals, mealState.dataSource)) {
       setGuideFirstMeal(false);
