@@ -86,6 +86,7 @@ public class MainActivity extends BridgeActivity {
         getBridge().getWebView().addJavascriptInterface(new PushIntentBridge(), "NordicPushIntent");
         getBridge().getWebView().addJavascriptInterface(new SecureStorageBridge(this), "NordicSecureStorage");
         getBridge().getWebView().addJavascriptInterface(new GoogleAuthBridge(this, getBridge().getWebView()), "NordicGoogleAuth");
+        getBridge().getWebView().addJavascriptInterface(new AppUpdateBridge(this, getBridge().getWebView()), "NordicAppUpdate");
     }
 
     @Override
