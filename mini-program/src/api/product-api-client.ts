@@ -1,6 +1,6 @@
 import { productTransport } from "../platform/product-transport";
 import { useAuthStore } from "../auth/auth-store";
-import { clearInvalidSession } from "../auth/session-manager";
+import { clearInvalidSession, refreshSession } from "../auth/session-manager";
 import { clearProductLocalState } from "../features/account-cancellation/clear-local-state";
 import { productApiEndpoint } from "./product-api-config";
 
@@ -17,6 +17,10 @@ interface ProductApiRequest {
 const DEFAULT_PRODUCT_API_TIMEOUT_MS = 15_000;
 
 export async function requestProductApi<T>(path: string, request: ProductApiRequest): Promise<T> {
+  return requestProductApiAttempt<T>(path, request, true);
+}
+
+async function requestProductApiAttempt<T>(path: string, request: ProductApiRequest, allowRefresh: boolean): Promise<T> {
   const token = useAuthStore.getState().session?.accessToken;
   if (!token) throw new Error("登录状态已失效，请重新登录");
   const response = await productTransport<unknown>({
@@ -36,6 +40,10 @@ export async function requestProductApi<T>(path: string, request: ProductApiRequ
   if (response.statusCode !== 200) {
     const code = typeof data?.code === "string" ? data.code : "ProductApiRequestError";
     if (response.statusCode === 401 || code === "UNAUTHORIZED" || code === "SESSION_USER_MISSING") {
+      if (allowRefresh && code !== "SESSION_USER_MISSING") {
+        const refreshed = await refreshSession();
+        if (refreshed?.accessToken) return requestProductApiAttempt<T>(path, request, false);
+      }
       // Must wipe persisted storage too — memory-only clear lets restoreSession
       // revive a JWT whose app_users row is gone (SESSION_USER_MISSING loop).
       await clearInvalidSession();

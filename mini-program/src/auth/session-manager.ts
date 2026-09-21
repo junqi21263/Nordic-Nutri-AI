@@ -103,7 +103,14 @@ export async function clearInvalidSession() {
 }
 
 export async function signOut() {
-  await clearInvalidSession();
+  const refreshToken = (await restoreSession())?.refreshToken;
+  try {
+    if (refreshToken) await androidAuthApi.logout(refreshToken);
+  } catch {
+    // Local sign-out must always succeed even when the device is offline.
+  } finally {
+    await clearInvalidSession();
+  }
 }
 
 export function setNativeSession(session: AppAuthSession): AppAuthSession {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const persisted = new Map<string, string>();
 const refresh = vi.fn();
+const logout = vi.fn();
 
 vi.mock("../src/platform/secure-token-storage", () => ({
   createSecureTokenStorage: () => ({
@@ -12,7 +13,7 @@ vi.mock("../src/platform/secure-token-storage", () => ({
 }));
 
 vi.mock("../src/api/android-auth-api", () => ({
-  androidAuthApi: { refresh, logout: vi.fn() },
+  androidAuthApi: { refresh, logout },
   toAppSession: (result: { user: { id: string }; session: { accessToken: string; refreshToken: string } }) => ({
     user: result.user,
     accessToken: result.session.accessToken,
@@ -24,6 +25,7 @@ describe("Android session manager", () => {
   beforeEach(async () => {
     persisted.clear();
     refresh.mockReset();
+    logout.mockReset();
     const { clearInvalidSession } = await import("../src/auth/session-manager");
     await clearInvalidSession();
   });
@@ -69,5 +71,25 @@ describe("Android session manager", () => {
 
     await expect(refreshSession()).resolves.toBeNull();
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("revokes the current device refresh token before clearing local state", async () => {
+    const { setNativeSession, signOut, restoreSession } = await import("../src/auth/session-manager");
+    setNativeSession({ user: { id: "user-1" }, accessToken: "access", refreshToken: "refresh-current" });
+    logout.mockResolvedValue({ ok: true });
+
+    await signOut();
+
+    expect(logout).toHaveBeenCalledWith("refresh-current");
+    await expect(restoreSession()).resolves.toBeNull();
+  });
+
+  it("still clears local state when remote logout is unavailable", async () => {
+    const { setNativeSession, signOut, restoreSession } = await import("../src/auth/session-manager");
+    setNativeSession({ user: { id: "user-1" }, accessToken: "access", refreshToken: "refresh-current" });
+    logout.mockRejectedValue(new Error("offline"));
+
+    await expect(signOut()).resolves.toBeUndefined();
+    await expect(restoreSession()).resolves.toBeNull();
   });
 });
