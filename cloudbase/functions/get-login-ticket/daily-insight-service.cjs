@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { normalizeLocale, localeInstruction } = require("./locale.cjs");
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const insightFocuses = new Set(["protein", "calories", "carbs", "fat", "fiber", "logging", "regularity"]);
@@ -25,7 +26,7 @@ function safeNumber(value) {
   return Math.max(0, Math.round(Number(value) || 0));
 }
 
-function validateDailyInsight(payload) {
+function validateDailyInsight(payload, locale) {
   let value = payload;
   try {
     if (typeof value === "string") value = JSON.parse(value);
@@ -35,8 +36,9 @@ function validateDailyInsight(payload) {
   if (!value || typeof value !== "object" || Array.isArray(value) || !insightFocuses.has(value.focus)) {
     throw insightError();
   }
-  const headline = boundedText(value.headline, 24);
-  const content = boundedText(value.content, 140);
+  const factor = normalizeLocale(locale) === "en" ? 3 : 1;
+  const headline = boundedText(value.headline, 24 * factor);
+  const content = boundedText(value.content, 140 * factor);
   if (!headline || !content || unsafeInsightWording.test(`${headline}\n${content}`) || forbiddenPresentationWording.test(`${headline}\n${content}`)) throw insightError();
   return { focus: value.focus, headline, content };
 }
@@ -77,6 +79,13 @@ function preferenceHint(context) {
 }
 
 function createRuleInsight(context) {
+  const locale = normalizeLocale(context?.locale);
+  if (locale !== "zh-CN") {
+    const hasRecord = Number(context?.daily?.mealCount) > 0;
+    return locale === "en"
+      ? { focus: "logging", headline: hasRecord ? "Keep a steady record" : "Start with one meal", content: hasRecord ? "Your records show only what you logged. Continue logging meals to understand your routine." : "When you can, log a meal and its approximate portion. An unlogged meal does not mean you did not eat." }
+      : { focus: "logging", headline: hasRecord ? "持續記錄飲食" : "從一餐開始", content: hasRecord ? "目前只看到已記錄的餐食。繼續記錄，有助於了解自己的節奏。" : "有空時記錄一餐和大致份量。尚未記錄不代表沒有吃飯。" };
+  }
   const daily = context?.daily ?? {};
   const targets = daily.targets ?? {};
   const consumed = daily.consumed ?? {};
@@ -158,7 +167,7 @@ function createDeepseekDailyInsightCompletion({ apiKey, model, fetchImpl = globa
           temperature: 0.45,
           max_tokens: 180,
           messages: [
-            { role: "system", content: DAILY_INSIGHT_SYSTEM_PROMPT },
+            { role: "system", content: DAILY_INSIGHT_SYSTEM_PROMPT + localeInstruction(context?.locale) },
             { role: "user", content: JSON.stringify({ date, nutritionContext: context }) },
           ],
         }),
@@ -190,7 +199,7 @@ function createCloudbaseDailyInsightCompletion({ ai, model, groupName = "cloudba
         model: selectedModel,
         temperature: 0.45,
         messages: [
-          { role: "system", content: DAILY_INSIGHT_SYSTEM_PROMPT },
+          { role: "system", content: DAILY_INSIGHT_SYSTEM_PROMPT + localeInstruction(context?.locale) },
           { role: "user", content: JSON.stringify({ date, nutritionContext: context }) },
         ],
       });
@@ -217,7 +226,7 @@ function createDailyInsightService({ ai, apiKey, model, requestCompletion, sourc
       const raw = await complete({ date, context });
       const content = typeof raw === "string" ? raw : raw?.content;
       const usage = typeof raw === "object" && raw ? raw.usage : null;
-      const insight = validateDailyInsight(content);
+      const insight = validateDailyInsight(content, context?.locale);
       return { ...insight, source: resolvedSource, model: selectedModel, usage };
     } catch (error) {
       if (routeManaged) throw error;

@@ -9,7 +9,7 @@ describe("milestone presentation trigger wiring", () => {
     expect(source("src/pages/analysis-result/index.tsx")).toContain('tryPresentPendingMilestone("normal_record_success")');
     expect(source("src/pages/manual-meal/index.tsx")).toContain('shouldClaimAfterMealSave(recordedAt)');
     expect(source("src/pages/manual-meal/index.tsx")).toContain('tryPresentPendingMilestone("normal_record_success")');
-    expect(source("src/pages/portion-adjustment/index.tsx")).toContain('editingId ? undefined');
+    expect(source("src/pages/portion-adjustment/index.tsx")).toContain("isRepeating || editingId");
     expect(source("src/pages/portion-adjustment/index.tsx")).toContain('tryPresentPendingMilestone("normal_record_success")');
   });
 

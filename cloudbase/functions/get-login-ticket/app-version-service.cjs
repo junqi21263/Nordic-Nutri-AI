@@ -28,7 +28,11 @@ function createAppVersionService({ db } = {}) {
         .order("version_code", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (result.error) throw new Error("App release lookup failed");
+      if (result.error) {
+        const error = new Error("App release lookup failed");
+        if (typeof result.error.code === "string") error.code = result.error.code.slice(0, 64);
+        throw error;
+      }
       const row = result.data;
       if (!row) return { update: null };
       const apkUrl = safeHttpsUrl(row.apk_url);

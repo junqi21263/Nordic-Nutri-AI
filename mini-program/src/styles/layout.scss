@@ -57,7 +57,10 @@
   background: $color-background;
   box-sizing: border-box;
   min-height: 100vh;
+  padding: $space-16 $page-horizontal calc($tabbar-height + $safe-area-bottom + $section-gap);
+  /* #ifdef H5 */
   padding: $space-16 $page-horizontal calc(var(--app-tab-bar-height, #{$tabbar-height}) + var(--app-safe-bottom, 0px) + #{$section-gap});
+  /* #endif */
 }
 .page-layout--without-tabs .page-layout__content {
   padding-bottom: calc($safe-area-bottom + $section-gap);
@@ -91,7 +94,10 @@
 }
 .page-layout--coach-chat .page-layout__content {
   // Reserve scroll space for the fixed composer and tab bar.
+  padding-bottom: calc($tabbar-height + $safe-area-bottom + 112px);
+  /* #ifdef H5 */
   padding-bottom: calc(var(--app-tab-bar-height, #{$tabbar-height}) + var(--app-safe-bottom, 0px) + 112px);
+  /* #endif */
 }
 .page-layout--manual-meal .page-layout__content {
   padding-bottom: calc($safe-area-bottom + 176px);

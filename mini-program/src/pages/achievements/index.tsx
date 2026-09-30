@@ -1,10 +1,12 @@
 import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useState } from "react";
 import { AchievementDetailSheet } from "../../components/achievement-detail-sheet";
 import { NordicIcon } from "../../components/nordic-icon";
 import {
   getAchievementRequirement,
+  getAchievementTranslationSlug,
 } from "../../features/coach/achievement-catalog";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
 import { createAchievements, type Achievement } from "../../features/coach/domain";
@@ -25,6 +27,7 @@ function enrichAchievement(achievement: Achievement): Achievement {
 }
 
 export default function AchievementsPage() {
+  const { t } = useTranslation();
   const achievements = useAchievementStore();
   const meals = useMealStore();
   const date = getLocalDateString();
@@ -65,10 +68,14 @@ export default function AchievementsPage() {
     }
     openDetail(achievement);
   };
+  const achievementTitle = (achievement: Achievement) => {
+    const slug = getAchievementTranslationSlug(achievement.title);
+    return slug ? t(`achievements.items.${slug}.title`) : achievement.title;
+  };
 
   return (
     <PageLayout
-      title="全部成就"
+      title={t("achievements.title")}
       showTabs={false}
       hideNavigation
       showBack
@@ -77,18 +84,18 @@ export default function AchievementsPage() {
       className="page-layout--achievements"
     >
       <View className="profile-subpage__page-title">
-        <Text>全部成就</Text>
+        <Text>{t("achievements.title")}</Text>
       </View>
 
       <View className="achievement-center">
         <View className="achievement-center__hero">
           <View className="achievement-center__hero-mark">
-            <NordicIcon name="celebration" size={28} ariaLabel="成就" />
+            <NordicIcon name="celebration" size={28} ariaLabel={t("achievements.title")} />
           </View>
           <View className="achievement-center__hero-copy">
-            <Text className="achievement-center__hero-title">已收集 {unlockedCount} / {list.length}</Text>
+            <Text className="achievement-center__hero-title">{t("achievements.count", { unlocked: unlockedCount, total: list.length })}</Text>
             <Text className="achievement-center__hero-sub">
-              点按卡片查看目标或达成时间 · 依据云端记录计算
+              {t("achievements.hint")}
             </Text>
           </View>
           <View className="achievement-center__hero-meter" aria-hidden>
@@ -99,11 +106,11 @@ export default function AchievementsPage() {
           </View>
         </View>
 
-        <View className="achievement-center__filters" aria-label="成就筛选">
+        <View className="achievement-center__filters" aria-label={t("achievements.filterLabel")}>
           {([
-            ["all", `全部 ${list.length}`],
-            ["unlocked", `已解锁 ${unlockedCount}`],
-            ["progress", `进行中 ${inProgressCount}`],
+            ["all", t("achievements.filters.all", { count: list.length })],
+            ["unlocked", t("achievements.filters.unlocked", { count: unlockedCount })],
+            ["progress", t("achievements.filters.progress", { count: inProgressCount })],
           ] as Array<[AchievementFilter, string]>).map(([key, label]) => (
             <Text
               key={key}
@@ -129,16 +136,16 @@ export default function AchievementsPage() {
                   <NordicIcon
                     name={getAchievementIcon(achievement)}
                     size={20}
-                    ariaLabel={achievement.title}
+                    ariaLabel={achievementTitle(achievement)}
                   />
                 </View>
-                <Text className="achievement-center__item-title">{achievement.title}</Text>
+                <Text className="achievement-center__item-title">{achievementTitle(achievement)}</Text>
                 <Text className="achievement-center__item-status">
                   {comingSoon
-                    ? "即将上线"
+                    ? t("achievements.states.upcoming")
                     : achievement.unlocked
-                      ? "已解锁 · 查看时间"
-                      : `完成度 ${achievement.progress}%`}
+                      ? t("achievements.states.unlockedCard")
+                      : t("achievements.states.progress", { progress: achievement.progress })}
                 </Text>
                 {!achievement.unlocked && !comingSoon ? (
                   <View className="achievement-center__item-bar">

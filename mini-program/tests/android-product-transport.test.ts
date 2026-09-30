@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({ native: vi.fn(), taro: vi.fn(), photo: vi.fn()
 vi.mock("@tarojs/taro", () => ({ default: { request: mocks.taro } }));
 vi.mock("@capacitor/core", () => ({ Capacitor: { isNativePlatform: () => true }, CapacitorHttp: { request: mocks.native } }));
 vi.mock("@capacitor/camera", () => ({ Camera: { getPhoto: mocks.photo }, CameraResultType: { Uri: "uri" }, CameraSource: { Camera: "CAMERA", Photos: "PHOTOS", Prompt: "PROMPT" } }));
-afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 it("preserves native HTTP status, bearer and timeout without retrying errors", async () => {
   vi.stubEnv("TARO_APP_PLATFORM", "android");
@@ -14,6 +14,32 @@ it("preserves native HTTP status, bearer and timeout without retrying errors", a
   expect(await productTransport({ url: "https://example.test/vision-analysis", method: "POST", header: { authorization: "Bearer test" }, data: { imageBase64: "abc" }, timeout: 35000 })).toEqual({ statusCode: 429, data: { code: "LIMIT" } });
   expect(mocks.native).toHaveBeenCalledWith(expect.objectContaining({ headers: { authorization: "Bearer test" }, readTimeout: 35000 }));
   expect(mocks.taro).not.toHaveBeenCalled();
+});
+
+it("records native product requests in VConsole without exposing authorization", async () => {
+  vi.stubEnv("TARO_APP_PLATFORM", "android");
+  const add = vi.fn().mockReturnValue({ id: "request-1" });
+  const update = vi.fn();
+  vi.stubGlobal("window", { __VCONSOLE_INSTANCE: { network: { add, update } } });
+  mocks.native.mockResolvedValue({ status: 200, data: { ok: true, accessToken: "secret" } });
+
+  await productTransport({
+    url: "https://example.test/profile",
+    method: "GET",
+    header: { authorization: "Bearer secret", accept: "application/json" },
+  });
+
+  expect(add).toHaveBeenCalledWith(expect.objectContaining({
+    url: "https://example.test/profile",
+    method: "GET",
+    status: "Pending",
+    requestType: "custom",
+  }));
+  expect(update).toHaveBeenCalledWith("request-1", expect.objectContaining({
+    status: 200,
+    response: { ok: true, accessToken: "[redacted]" },
+  }));
+  expect(add.mock.calls[0][0].requestHeader).toEqual({ authorization: "[redacted]", accept: "application/json" });
 });
 
 it("retains Taro transport for Mini Program", async () => {

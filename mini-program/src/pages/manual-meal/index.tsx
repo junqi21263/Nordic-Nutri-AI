@@ -1,6 +1,7 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro, { useDidShow, useRouter } from "@tarojs/taro";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AppButton } from "../../components/app-button";
 import { FoodThumbnail } from "../../components/food-thumbnail";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -50,6 +51,7 @@ function scaleNutrition(food: ProductFoodCatalogItem, grams: number) {
 }
 
 export default function ManualMealPage() {
+  const { t } = useTranslation();
   const { params } = useRouter();
   const meals = useMealStore();
   const feedback = useFeedbackStore();
@@ -65,7 +67,7 @@ export default function ManualMealPage() {
   const [portionG, setPortionG] = useState("100");
   const [selectedFood, setSelectedFood] = useState<ProductFoodCatalogItem | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
-  const [estimateCopy, setEstimateCopy] = useState("填写餐食名称后可自动估算，也可手动修改");
+  const [estimateStatus, setEstimateStatus] = useState<"prompt" | "estimated" | "failed" | "portion" | "preparing">("prompt");
   const [isSaving, setIsSaving] = useState(false);
   const manuallyEdited = useRef<Record<NutritionField, boolean>>({
     calories: false,
@@ -88,9 +90,9 @@ export default function ManualMealPage() {
     try {
       const analysis = await analyzeProductMeal([{ name: normalizedTitle, quantityG: 100 }]);
       setNutrition(estimateNutritionFromAnalysis(analysis.items), force);
-      setEstimateCopy(`已按“${normalizedTitle}”自动估算，可继续手动修改`);
+      setEstimateStatus("estimated");
     } catch {
-      setEstimateCopy("暂未获得自动估算，请按包装或常见份量手动填写");
+      setEstimateStatus("failed");
     } finally {
       setIsEstimating(false);
     }
@@ -114,7 +116,7 @@ export default function ManualMealPage() {
     setCarbs(nutrition.carbs);
     setFat(nutrition.fat);
     manuallyEdited.current = { calories: false, protein: false, carbs: false, fat: false };
-    setEstimateCopy("已按当前份量自动计算，可继续手动修改");
+    setEstimateStatus("portion");
   });
 
   const updatePortion = (value: string) => {
@@ -132,7 +134,7 @@ export default function ManualMealPage() {
     setTitle(value);
     setSelectedFood(null);
     manuallyEdited.current = { calories: false, protein: false, carbs: false, fat: false };
-    setEstimateCopy(value.trim() ? "正在根据餐食名称准备估算…" : "填写餐食名称后可自动估算，也可手动修改");
+    setEstimateStatus(value.trim() ? "preparing" : "prompt");
   };
 
   const updateManualNutrition = (field: NutritionField, value: string) => {
@@ -146,11 +148,11 @@ export default function ManualMealPage() {
   const save = async () => {
     const nutrition = [calories, protein, carbs, fat].map(readNumber);
     if (!title.trim()) {
-      feedback.show({ message: "请填写这一餐的名称", tone: "error" });
+      feedback.show({ message: t("manualMeal.nameRequired"), tone: "error" });
       return;
     }
     if (!nutrition.every((value) => Number.isFinite(value) && value >= 0) || nutrition[0] === 0) {
-      feedback.show({ message: "请填写有效的热量与营养数据", tone: "error" });
+      feedback.show({ message: t("manualMeal.nutritionRequired"), tone: "error" });
       return;
     }
     const date = recordDate;
@@ -162,12 +164,12 @@ export default function ManualMealPage() {
       mealType,
       favorite: false,
       imageKey: null,
-      insight: "这是一条手动补充的本地饮食记录。",
+      insight: t("manualMeal.localInsight"),
       items: [
         {
           id: `manual-item-${Date.now()}`,
           name: title.trim(),
-          amount: "手动记录",
+          amount: t("manualMeal.title"),
           calories: nutrition[0]!,
           protein: nutrition[1]!,
           carbs: nutrition[2]!,
@@ -217,7 +219,7 @@ export default function ManualMealPage() {
         // The saved meal remains valid if achievement refresh is temporarily unavailable.
       }
     } catch {
-      feedback.show({ message: "保存失败，请检查网络后重试", tone: "error" });
+      feedback.show({ message: t("manualMeal.saveFailed"), tone: "error" });
     } finally {
       setIsSaving(false);
     }
@@ -225,7 +227,7 @@ export default function ManualMealPage() {
 
   return (
     <PageLayout
-      title="手动记录"
+      title={t("manualMeal.title")}
       showTabs={false}
       hideNavigation
       showBack
@@ -238,17 +240,17 @@ export default function ManualMealPage() {
             <View className="manual-meal__selected-food">
               <FoodThumbnail className="manual-meal__selected-food-image" food={selectedFood} />
               <View>
-                <Text>已从食物库选中</Text>
+                <Text>{t("manualMeal.selectedFood")}</Text>
                 <Text>{selectedFood.description}</Text>
               </View>
             </View>
           ) : null}
           <View className="manual-meal__field">
-            <Text>餐食名称</Text>
+            <Text>{t("manualMeal.name")}</Text>
             <Input
               value={title}
               maxlength={24}
-              placeholder="例如：鸡胸肉沙拉"
+              placeholder={t("manualMeal.namePlaceholder")}
               nativeProps={{
                 style: { boxSizing: "border-box", height: "100%", lineHeight: "normal", padding: 0 },
               }}
@@ -256,7 +258,7 @@ export default function ManualMealPage() {
             />
           </View>
           <View className="manual-meal__field">
-            <Text>记录时间</Text>
+            <Text>{t("manualMeal.time")}</Text>
             <RecordTimeEditor
               date={recordDate}
               time={recordTime}
@@ -265,7 +267,7 @@ export default function ManualMealPage() {
             />
           </View>
           <View className="manual-meal__field">
-            <Text>餐次类型</Text>
+            <Text>{t("manualMeal.type")}</Text>
             <View className="manual-meal__types">
               {mealTypeOptions.map((option) => (
                 <View
@@ -273,23 +275,23 @@ export default function ManualMealPage() {
                   key={option.value}
                   onClick={() => setMealType(option.value)}
                 >
-                  <Text>{option.label}</Text>
+                  <Text>{t(`meals.${option.value}`)}</Text>
                 </View>
               ))}
             </View>
           </View>
           <View className="manual-meal__nutrition-title">
-            <Text>营养估算</Text>
+            <Text>{t("manualMeal.estimate")}</Text>
             <View className="manual-meal__estimate-copy">
-              <Text>{isEstimating ? "正在自动估算…" : estimateCopy}</Text>
+              <Text>{isEstimating ? t("manualMeal.estimating") : t(`manualMeal.estimateStatus.${estimateStatus}`, { title })}</Text>
               {!selectedFood && title.trim() ? (
-                <Text className="manual-meal__estimate-action" onClick={() => void estimateFromTitle(true)}>重新估算</Text>
+                <Text className="manual-meal__estimate-action" onClick={() => void estimateFromTitle(true)}>{t("manualMeal.reestimate")}</Text>
               ) : null}
             </View>
           </View>
           {selectedFood ? (
             <View className="manual-meal__portion">
-              <Text>食用份量</Text>
+              <Text>{t("manualMeal.portion")}</Text>
               <View>
                 <Input
                   type="digit"
@@ -303,10 +305,10 @@ export default function ManualMealPage() {
           ) : null}
           <View className="manual-meal__nutrition-grid">
             {[
-              ["热量", "kcal", "calories", calories],
-              ["蛋白质", "g", "protein", protein],
-              ["碳水", "g", "carbs", carbs],
-              ["脂肪", "g", "fat", fat],
+              [t("nutrition.calories"), "kcal", "calories", calories],
+              [t("nutrition.protein"), "g", "protein", protein],
+              [t("nutrition.carbs"), "g", "carbs", carbs],
+              [t("nutrition.fat"), "g", "fat", fat],
             ].map(([label, unit, value, setter]) => (
               <View className="manual-meal__nutrition-field" key={label as string}>
                 <Text>{label as string}</Text>
@@ -324,13 +326,13 @@ export default function ManualMealPage() {
           </View>
         </View>
         <View className="manual-meal__notice">
-          <NordicIcon name="check" size={18} ariaLabel="本地保存" />
-          <Text>记录会保存在当前设备，并同步到今日汇总。</Text>
+          <NordicIcon name="check" size={18} ariaLabel={t("manualMeal.localSave")} />
+          <Text>{t("manualMeal.saveHint")}</Text>
         </View>
       </View>
       <View className="manual-meal__action">
         <AppButton size="large" loading={isSaving} onClick={() => void save()}>
-          保存这餐
+          {t("manualMeal.save")}
         </AppButton>
       </View>
     </PageLayout>

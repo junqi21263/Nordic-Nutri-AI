@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import { Image, Text, View } from "@tarojs/components";
 import Taro, { useDidShow, usePullDownRefresh } from "@tarojs/taro";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -17,11 +19,9 @@ import {
 } from "../../features/first-run-tips/first-run-tips";
 import {
   clampProgress,
-  formatTargetStatus,
   getMealNutrition,
   shiftDate,
   type Meal,
-  type MealType,
 } from "../../features/meals/domain";
 import { resolveHomeDailySummary } from "../../features/meals/home-daily-summary";
 import { getLocalDateString } from "../../features/onboarding/domain";
@@ -39,21 +39,8 @@ import { pendingReminderStorage } from "../../features/smart-reminders/pending-r
 
 const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
 const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
-const weekLabels = ["日", "一", "二", "三", "四", "五", "六"];
-const mealLabels: Record<MealType, string> = {
-  breakfast: "早餐",
-  lunch: "午餐",
-  dinner: "晚餐",
-  snack: "加餐",
-};
-const mealTypeFilters: Array<{ value: MealTypeFilter; label: string }> = [
-  { value: "all", label: "全部" },
-  { value: "breakfast", label: "早餐" },
-  { value: "lunch", label: "午餐" },
-  { value: "dinner", label: "晚餐" },
-  { value: "snack", label: "加餐" },
-  { value: "favorite", label: "仅看收藏" },
-];
+const weekLabels = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const mealTypeFilters: MealTypeFilter[] = ["all", "breakfast", "lunch", "dinner", "snack", "favorite"];
 
 function getWeekDays(date: string) {
   const [year, month, day] = date.split("-").map(Number);
@@ -106,6 +93,7 @@ function shiftMonth(date: string, offset: number) {
 }
 
 function TimelineMeal({ meal, onClick }: { meal: Meal; onClick: () => void }) {
+  useTranslation();
   const nutrition = getMealNutrition(meal);
   const hasPhoto = Boolean(meal.imageUrl || meal.imageKey);
   const fallback = getFoodVisualFallback({ description: meal.title });
@@ -131,15 +119,15 @@ function TimelineMeal({ meal, onClick }: { meal: Meal; onClick: () => void }) {
         <View className="meal-records-page__meal-copy">
           <View className="meal-records-page__meal-title-row">
             <Text className="meal-records-page__meal-title">{meal.title}</Text>
-            {meal.favorite ? <NordicIcon name="heart-filled" size={16} ariaLabel="已收藏" /> : null}
+            {meal.favorite ? <NordicIcon name="heart-filled" size={16} ariaLabel={t("records.favorite")} /> : null}
           </View>
           <Text className="meal-records-page__meal-meta">
-            {mealLabels[meal.mealType]} · {meal.time}
+            {t(`meals.${meal.mealType}`)} · {meal.time}
           </Text>
           <View className="meal-records-page__meal-tags">
-            <Text>{nutrition.protein}g 蛋白质</Text>
-            <Text>{nutrition.carbs}g 碳水</Text>
-            <Text>{nutrition.fat}g 脂肪</Text>
+            <Text>{nutrition.protein}g {t("nutrition.protein")}</Text>
+            <Text>{nutrition.carbs}g {t("nutrition.carbs")}</Text>
+            <Text>{nutrition.fat}g {t("nutrition.fat")}</Text>
           </View>
         </View>
         <Text className="meal-records-page__meal-kcal">
@@ -152,6 +140,7 @@ function TimelineMeal({ meal, onClick }: { meal: Meal; onClick: () => void }) {
 }
 
 export default function MealRecordsPage() {
+  useTranslation();
   useAppShare();
   const store = useMealStore();
   const setTabBarVisible = useTabBarStore((state) => state.setVisible);
@@ -271,7 +260,7 @@ export default function MealRecordsPage() {
         if (cancelled) return;
         setRemoteSummary(null);
         store.replaceRemoteMeals([], selectedDate);
-        store.setErrorState("饮食记录同步失败，请稍后重试");
+        store.setErrorState(t("records.syncFailed"));
       });
     void request.finally(() => {
       if (!cancelled && pullRefreshPending.current) {
@@ -311,9 +300,9 @@ export default function MealRecordsPage() {
 
   return (
     <PageLayout
-      title="饮食记录"
+      title={t("records.title")}
       activeTab="meal-records"
-      topBarAction="我的常吃"
+      topBarAction={t("profile.favorites")}
       onTopBarAction={() => { void Taro.navigateTo({ url: "/pages/frequent-meals/index" }); }}
       hideNavigation
       refreshing={refreshing}
@@ -324,9 +313,9 @@ export default function MealRecordsPage() {
           <FirstRunTip
             tipId="meal-records-review"
             step="3/3"
-            title="在这里回看今天的饮食"
-            body="拍完并保存后，每一餐都会出现在这里。也可以点「去添加」先手动补录。"
-            actionLabel="去添加"
+            title={t("records.firstRunTitle")}
+            body={t("records.firstRunBody")}
+            actionLabel={t("records.add")}
             onAction={() => {
               void Taro.navigateTo({ url: "/pages/manual-meal/index" });
             }}
@@ -339,16 +328,16 @@ export default function MealRecordsPage() {
         <View className="meal-records-page__toolbar">
           <SearchBar
             value={store.searchKeyword}
-            placeholder="搜索餐次或食材"
+            placeholder={t("records.searchPlaceholder")}
             onInput={store.setSearchKeyword}
             onClear={() => store.setSearchKeyword("")}
             trailing={
               <View
                 className={`meal-records-page__filter-trigger ${hasFilters ? "meal-records-page__filter-trigger--active" : ""}`}
-                ariaLabel="筛选记录"
+                ariaLabel={t("records.filter")}
                 onClick={() => setFilterOpen(true)}
               >
-                <NordicIcon name="list-checks" size={16} ariaLabel="筛选" />
+                <NordicIcon name="list-checks" size={16} ariaLabel={t("records.filter")} />
               </View>
             }
           />
@@ -361,37 +350,37 @@ export default function MealRecordsPage() {
             <View
               className="meal-records-page__calendar-button"
               onClick={() => changePeriod(-1)}
-              ariaLabel={monthExpanded ? "上一月" : "上一周"}
+              ariaLabel={monthExpanded ? t("records.previousMonth") : t("records.previousWeek")}
             >
               <NordicIcon name="back" size={18} />
             </View>
             <View className="meal-records-page__calendar-title-row">
               <Text className="meal-records-page__calendar-title">
-                {visibleMonthParts.year} 年 {visibleMonthParts.month} 月
+                {t("records.yearMonth", { year: visibleMonthParts.year, month: visibleMonthParts.month })}
               </Text>
               <View
                 className={`meal-records-page__calendar-expand ${monthExpanded ? "meal-records-page__calendar-expand--open" : ""}`}
-                ariaLabel={monthExpanded ? "收起月历" : "展开整月日历"}
+                ariaLabel={monthExpanded ? t("records.collapseCalendar") : t("records.expandCalendar")}
                 onClick={() => setMonthExpanded((current) => !current)}
               >
                 <NordicIcon
                   name="chevron-right"
                   size={16}
-                  ariaLabel={monthExpanded ? "收起" : "展开"}
+                  ariaLabel={monthExpanded ? t("records.collapse") : t("records.expand")}
                 />
               </View>
             </View>
             <View
               className="meal-records-page__calendar-button meal-records-page__calendar-button--next"
               onClick={() => changePeriod(1)}
-              ariaLabel={monthExpanded ? "下一月" : "下一周"}
+              ariaLabel={monthExpanded ? t("records.nextMonth") : t("records.nextWeek")}
             >
               <NordicIcon name="back" size={18} />
             </View>
           </View>
           <View className="meal-records-page__week-labels">
             {weekLabels.map((label) => (
-              <Text key={label}>{label}</Text>
+              <Text key={label}>{t(`records.weekdays.${label}`)}</Text>
             ))}
           </View>
           {monthExpanded ? (
@@ -412,7 +401,7 @@ export default function MealRecordsPage() {
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                    ariaLabel={hasRecord ? `${day}日，有饮食记录` : `${day}日`}
+                    ariaLabel={hasRecord ? t("records.dateWithRecord", { day }) : t("records.date", { day })}
                     onClick={() => {
                       if (cell.date <= maxDate) {
                         setVisibleMonthDate(cell.date);
@@ -441,7 +430,7 @@ export default function MealRecordsPage() {
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                    ariaLabel={hasRecord ? `${day}日，有饮食记录` : `${day}日`}
+                    ariaLabel={hasRecord ? t("records.dateWithRecord", { day }) : t("records.date", { day })}
                     onClick={() => { setVisibleMonthDate(date); store.setSelectedDate(date); }}
                   >
                     <Text>{day}</Text>
@@ -459,7 +448,7 @@ export default function MealRecordsPage() {
         >
           <View className="meal-records-page__summary-head">
             <View>
-              <Text className="meal-records-page__summary-label">当日汇总</Text>
+              <Text className="meal-records-page__summary-label">{t("records.dailySummary")}</Text>
               <Text className="meal-records-page__summary-kcal">
                 {summary.consumed.calories}
                 <Text> / {summary.calories} kcal</Text>
@@ -469,7 +458,9 @@ export default function MealRecordsPage() {
                   calorieProgress.exceeded ? "meal-records-page__summary-status--exceeded" : ""
                 }`}
               >
-                {formatTargetStatus(calorieProgress, " kcal")}
+                {calorieProgress.exceeded
+                  ? t("records.overTarget", { amount: calorieProgress.excess })
+                  : t("records.remaining", { amount: Math.max(0, calorieProgress.remaining) })}
               </Text>
             </View>
             <NordicIcon name="calendar-days" size={26} />
@@ -487,9 +478,9 @@ export default function MealRecordsPage() {
           <View className="meal-records-page__summary-macros">
             {(
               [
-                { label: "蛋白质", value: summary.consumed.protein, icon: "protein" },
-                { label: "碳水", value: summary.consumed.carbs, icon: "carbs" },
-                { label: "脂肪", value: summary.consumed.fat, icon: "fat" },
+                { label: t("nutrition.protein"), value: summary.consumed.protein, icon: "protein" },
+                { label: t("nutrition.carbs"), value: summary.consumed.carbs, icon: "carbs" },
+                { label: t("nutrition.fat"), value: summary.consumed.fat, icon: "fat" },
               ] as Array<{ label: string; value: number; icon: NordicIconName }>
             ).map((macro) => (
               <View className="meal-records-page__summary-macro" key={macro.label}>
@@ -504,26 +495,26 @@ export default function MealRecordsPage() {
         </View>
 
         <Text className="meal-records-page__section-title">
-          {store.searchKeyword.trim() ? "搜索结果" : "今日餐次"}
+          {store.searchKeyword.trim() ? t("records.searchResults") : t("records.todayMeals")}
         </Text>
         {store.loadingState === "error" ? (
           <ErrorState
-            title="无法读取云端餐次"
-            description={store.errorState ?? "请稍后再试。"}
+            title={t("records.loadFailed")}
+            description={store.errorState ?? t("common.requestFailed")}
             onRetry={() => store.setSelectedDate(store.selectedDate)}
           />
         ) : meals.length === 0 ? (
           <EmptyState
             title={
               hasFilters
-                ? "没有符合条件的餐次"
+                ? t("records.noMatches")
                 : store.selectedDate > today
-                  ? "未来日期还没有餐次"
-                  : "当天没有记录"
+                  ? t("records.futureEmpty")
+                  : t("records.dayEmpty")
             }
-            description={hasFilters ? "换个关键词或清除筛选再试试。" : null}
+            description={hasFilters ? t("records.tryOtherFilter") : null}
             showMark={hasFilters}
-            actionLabel={hasFilters ? "清除筛选" : "新增餐次"}
+            actionLabel={hasFilters ? t("records.clearFilters") : t("records.addMeal")}
             onAction={hasFilters ? clearFilters : addMeal}
           />
         ) : (
@@ -533,7 +524,7 @@ export default function MealRecordsPage() {
             ))}
           </View>
         )}
-        <View className="meal-records-page__fab" onClick={addMeal} ariaLabel="新增餐次">
+        <View className="meal-records-page__fab" onClick={addMeal} ariaLabel={t("records.addMeal")}>
           <NordicIcon name="circle-plus" size={30} />
         </View>
       </View>
@@ -544,20 +535,20 @@ export default function MealRecordsPage() {
       >
         <View className="records-filter-sheet__content">
           <View className="records-filter-sheet__header">
-            <Text className="records-filter-sheet__title">筛选记录</Text>
-            <Text className="records-filter-sheet__lead">按餐次类型或收藏查看当天的饮食记录。</Text>
+            <Text className="records-filter-sheet__title">{t("records.filter")}</Text>
+            <Text className="records-filter-sheet__lead">{t("records.filterHint")}</Text>
           </View>
 
           <View className="records-filter-sheet__section">
-            <Text className="records-filter-sheet__section-label">筛选</Text>
+            <Text className="records-filter-sheet__section-label">{t("records.filterSection")}</Text>
             <View className="records-filter-sheet__chips">
               {mealTypeFilters.map((option) => (
                 <View
-                  className={`records-filter-sheet__chip ${store.mealTypeFilter === option.value ? "records-filter-sheet__chip--active" : ""}`}
-                  key={option.value}
-                  onClick={() => store.setMealTypeFilter(option.value)}
+                  className={`records-filter-sheet__chip ${store.mealTypeFilter === option ? "records-filter-sheet__chip--active" : ""}`}
+                  key={option}
+                  onClick={() => store.setMealTypeFilter(option)}
                 >
-                  <Text>{option.label}</Text>
+                  <Text>{t(`meals.${option}`)}</Text>
                 </View>
               ))}
             </View>
@@ -565,24 +556,24 @@ export default function MealRecordsPage() {
 
           <View className="records-filter-sheet__actions">
             <AppButton variant="outline" size="medium" onClick={clearFilters}>
-              清除筛选
+              {t("records.clearFilters")}
             </AppButton>
             <AppButton size="medium" onClick={() => setFilterOpen(false)}>
-              完成
+              {t("records.done")}
             </AppButton>
           </View>
 
           <View className="records-filter-sheet__manual" onClick={openManualMeal}>
             <View className="records-filter-sheet__manual-icon">
-              <NordicIcon name="circle-plus" size={18} ariaLabel="手动记录" />
+              <NordicIcon name="circle-plus" size={18} ariaLabel={t("records.manualLog")} />
             </View>
             <View className="records-filter-sheet__manual-copy">
-              <Text className="records-filter-sheet__manual-title">手动记录一餐</Text>
+              <Text className="records-filter-sheet__manual-title">{t("records.manualMeal")}</Text>
               <Text className="records-filter-sheet__manual-meta">
-                不方便拍照时，直接录入食材与份量
+                {t("records.manualHint")}
               </Text>
             </View>
-            <NordicIcon name="chevron-right" size={16} ariaLabel="前往手动记录" />
+            <NordicIcon name="chevron-right" size={16} ariaLabel={t("records.manualLog")} />
           </View>
         </View>
       </BottomSheet>

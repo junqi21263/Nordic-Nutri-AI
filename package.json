@@ -10,6 +10,7 @@
   "scripts": {
     "check": "pnpm run test:initialization",
     "test:initialization": "node --test scripts/verify-initialization.test.mjs",
+    "deploy:cloudbase": "node scripts/deploy-cloudbase.mjs",
     "typecheck:mini-program": "tsc --project mini-program/tsconfig.json --noEmit"
   },
   "devDependencies": {

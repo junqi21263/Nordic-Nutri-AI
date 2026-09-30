@@ -25,7 +25,8 @@ describe("WXSS compatibility", () => {
     const styleFiles = ["components.scss", "layout.scss", "page.scss"];
 
     for (const file of styleFiles) {
-      const styles = readFileSync(resolve(import.meta.dirname, "..", "src", "styles", file), "utf8");
+      const styles = readFileSync(resolve(import.meta.dirname, "..", "src", "styles", file), "utf8")
+        .replace(/\/\* #ifdef H5 \*\/[\s\S]*?\/\* #endif \*\//g, "");
       expect(styles).not.toContain("var(--");
     }
   });

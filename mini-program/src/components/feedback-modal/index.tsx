@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Text } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import type { FeedbackModalOptions } from "../../stores/feedback-store";
 import { NordicIcon } from "../nordic-icon";
 
@@ -16,6 +17,7 @@ const variantClassName = {
 
 /** Shared Stitch-aligned feedback surface. The host owns its lifecycle; this component owns exit motion. */
 export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
+  const { t } = useTranslation();
   const [closing, setClosing] = useState(false);
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
       >
         {modal.dismissible && !modal.primaryText ? (
           <View className="feedback-modal__close" onClick={() => dismiss(modal.onClose)}>
-            <Text aria-label="关闭">×</Text>
+            <Text aria-label={t("common.close")}>×</Text>
           </View>
         ) : null}
         <View className={`feedback-modal__icon feedback-modal__icon--${modal.variant}`}>
@@ -59,11 +61,11 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
             </>
           ) : null}
           {modal.variant === "success" ? (
-            <NordicIcon name="check" size={52} ariaLabel="成功" />
+            <NordicIcon name="check" size={52} ariaLabel={t("sharedUi.success")} />
           ) : modal.variant === "limit" ? (
-            <NordicIcon name="hourglass" size={52} ariaLabel="额度提示" />
+            <NordicIcon name="hourglass" size={52} ariaLabel={t("sharedUi.limitReached")} />
           ) : (
-            <Text className="feedback-modal__icon-mark" aria-label="错误">
+            <Text className="feedback-modal__icon-mark" aria-label={t("sharedUi.failure")}>
               ×
             </Text>
           )}
@@ -72,7 +74,7 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
         {modal.description ? <Text className="feedback-modal__description">{modal.description}</Text> : null}
         <View className="feedback-modal__actions">
           <View
-            className={`feedback-modal__button feedback-modal__button--${modal.variant} ${modal.primaryText === "好的" ? "feedback-modal__button--short" : ""}`}
+            className={`feedback-modal__button feedback-modal__button--${modal.variant} ${modal.primaryText === t("feedback.okay") ? "feedback-modal__button--short" : ""}`}
             onClick={() => dismiss(modal.onPrimary)}
           >
             <Text>{modal.primaryText}</Text>

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { estimateNutritionFromAnalysis } from "../src/features/meals/manual-meal-estimate";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const manualMealPage = readFileSync(resolve(import.meta.dirname, "../src/pages/manual-meal/index.tsx"), "utf8");
 const recordTimeEditorPath = resolve(import.meta.dirname, "../src/components/record-time-editor/index.tsx");
@@ -25,19 +26,19 @@ describe("manual meal and food detail image layout", () => {
     expect(manualMealPage).toContain('const [recordTime, setRecordTime]');
     expect(manualMealPage).toContain('analyzeProductMeal([{ name: normalizedTitle, quantityG: 100 }])');
     expect(manualMealPage).toContain('recordedAt: recordedAtFromLocal(recordDate, recordTime)');
-    expect(manualMealPage).toContain("餐食名称");
-    expect(manualMealPage).toContain("记录时间");
-    expect(manualMealPage).toContain("重新估算");
+    expectLocalizedCopy(manualMealPage, "餐食名称");
+    expectLocalizedCopy(manualMealPage, "记录时间");
+    expectLocalizedCopy(manualMealPage, "重新估算");
   });
 
   it("uses a custom record-time editor with an explicit editable hint and time controls", () => {
     expect(recordTimeEditorPath).toBeTruthy();
     const recordTimeEditor = readFileSync(recordTimeEditorPath, "utf8");
 
-    expect(recordTimeEditor).toContain("可修改");
-    expect(recordTimeEditor).toContain("设置记录时间");
-    expect(recordTimeEditor).toContain("调整日期");
-    expect(recordTimeEditor).toContain("直接设置时间");
+    expectLocalizedCopy(recordTimeEditor, "可修改");
+    expect(recordTimeEditor).toContain('t("recordTime.title")');
+    expectLocalizedCopy(recordTimeEditor, "调整日期");
+    expectLocalizedCopy(recordTimeEditor, "直接设置时间");
     expect(recordTimeEditor).toContain('type="number"');
     expect(recordTimeEditor).toContain("onBlur");
   });

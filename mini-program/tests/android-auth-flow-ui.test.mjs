@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const root = resolve(import.meta.dirname, "../src");
 
@@ -20,25 +21,26 @@ describe("Android auth flow UI contract", () => {
     expect(page).toContain("auth-form-shell auth-form-shell--reset");
     expect(page).not.toContain("auth-landing__eyebrow-row");
     expect(page).toContain("auth-create-account__link");
-    expect(page).toContain("立即注册帐号");
+    expectLocalizedCopy(page, "立即注册帐号");
     expect(page).not.toContain("auth-create-account .app-button");
-    expect(page).toContain("Google 登录服务暂不可用，请稍后重试");
+    expectLocalizedCopy(page, "Google 登录服务暂不可用，请稍后重试");
     expect(page).toContain('code === "AUTH_RATE_LIMITED"');
-    expect(page).toContain('title: dailyLimit ? "今日验证码已达上限" : "验证码发送过于频繁"');
+    expect(page).toContain('t(dailyLimit ? "androidAuth.limit.dailyTitle" : "androidAuth.limit.frequentTitle")');
+    expect(page).toContain('t(dailyLimit ? "androidAuth.limit.dailyTitle" : "androidAuth.limit.frequentTitle")');
     expect(page).toContain('code === "AUTH_EMAIL_ALREADY_REGISTERED" || code === "AUTH_PHONE_ALREADY_REGISTERED"');
-    expect(page).toContain('primaryText: "去登录"');
+    expectLocalizedCopy(page, "去登录");
     expect(page).toContain('showFeedbackModal({');
     expect(page).not.toContain("if (isLogin) await refreshCaptcha()");
     expect(styles).toMatch(/\.auth-create-account \{[\s\S]*?align-items: center;[\s\S]*?justify-content: center;/);
     expect(styles).toContain(".auth-create-account__link { color: $color-forest-green; text-decoration: underline; }");
     expect(loginBlock).not.toContain("renderCaptcha()");
     expect(loginBlock).not.toContain('onClick={() => switchMethod(isPhone ? "email" : "phone")}');
-    expect(registerBlock).toContain("已有账号？");
-    expect(registerBlock).toContain(">去登录</Text>");
+    expectLocalizedCopy(registerBlock, "已有账号？");
+    expectLocalizedCopy(registerBlock, "去登录");
     expect(page).toContain("verifyRegisterCode");
     expect(page).not.toContain("返回修改验证码");
     expect(page).toContain('onClick={() => navigate("landing")}');
-    expect(page).toContain(">返回首页</AppButton>");
+    expectLocalizedCopy(page, "返回首页");
     expect(styles).toContain(".auth-landing__content { position: relative; margin-top: -24PX;");
     expect(styles).toContain(".auth-landing__intro { display: flex; flex-direction: column;");
     expect(styles).toContain(".auth-form-shell { display: flex; flex-direction: column; min-height:");

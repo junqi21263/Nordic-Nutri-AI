@@ -1,4 +1,3 @@
-import type { ActionPerformed } from "@capacitor/push-notifications";
 import { useAuthStore } from "../../auth/auth-store";
 import { acknowledgeAndroidPushDelivery, registerAndroidPushToken, unregisterAndroidPushToken as unregisterAndroidPushTokenApi } from "../../api/push-api";
 import { androidPushNotificationAdapter, type AndroidPushNotificationAdapter, type NativePushIntent } from "../../platform/android-push-notifications";

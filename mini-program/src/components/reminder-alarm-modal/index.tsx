@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NordicIcon } from "../nordic-icon";
 import "./index.scss";
 
@@ -14,6 +15,7 @@ export interface ReminderAlarmModalProps {
 const exitDuration = 300;
 
 export function ReminderAlarmModal({ open, title, mealName, time, onDismiss }: ReminderAlarmModalProps) {
+  const { t } = useTranslation();
   const [closing, setClosing] = useState(false);
   const [entered, setEntered] = useState(false);
 
@@ -48,7 +50,7 @@ export function ReminderAlarmModal({ open, title, mealName, time, onDismiss }: R
           <View className="reminder-alarm-modal__ripple reminder-alarm-modal__ripple--two animate-ripple-2" />
           <View className="reminder-alarm-modal__pedestal">
             <View className="animate-alarm-wobble">
-              <NordicIcon name="alarm-clock" size={40} ariaLabel="闹钟提醒" />
+              <NordicIcon name="alarm-clock" size={40} ariaLabel={t("reminderAlarm.icon")} />
             </View>
           </View>
         </View>
@@ -57,14 +59,14 @@ export function ReminderAlarmModal({ open, title, mealName, time, onDismiss }: R
           <Text className="reminder-alarm-modal__subtitle">
             {time && mealName ? (
               <>
-                每天 <Text className="reminder-alarm-modal__time">{time}</Text>，轻轻提醒你记录{mealName}
+                {t("reminderAlarm.daily", { time, meal: mealName })}
               </>
-            ) : "将在预设餐点时间轻轻唤醒记录"}
+            ) : t("reminderAlarm.fallback")}
           </Text>
-          <Text className="reminder-alarm-modal__note">温和守护你的每一餐日常节奏</Text>
+          <Text className="reminder-alarm-modal__note">{t("reminderAlarm.note")}</Text>
         </View>
         <View className="reminder-alarm-modal__button" onClick={dismiss}>
-          <Text>已设好，静候美味</Text>
+          <Text>{t("reminderAlarm.confirm")}</Text>
         </View>
       </View>
     </View>

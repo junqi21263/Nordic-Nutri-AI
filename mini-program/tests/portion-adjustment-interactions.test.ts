@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(process.cwd(), "src");
 const read = (path: string) => readFileSync(resolve(sourceRoot, path), "utf8");
@@ -14,13 +15,13 @@ describe("份量调整交互", () => {
     expect(source).toContain("portion.adjustBy(-0.25)");
     expect(source).toContain("portion.adjustBy(0.25)");
     expect(source).toContain("portion.setMultiplier(percent / 100)");
-    expect(source).toContain("恢复原始份量");
+    expectLocalizedCopy(source, "恢复原始份量");
   });
 
   it("编辑时可重选早午晚加餐次，并在保存时提交 mealType", () => {
     const source = read("pages/portion-adjustment/index.tsx");
     const store = read("stores/portion-draft-store.ts");
-    expect(source).toContain("这是哪一餐？");
+    expectLocalizedCopy(source, "这是哪一餐？");
     expect(source).toContain("mealTypeOptions");
     expect(source).toContain("portion.setMealType");
     expect(source).toContain("mealType: draftMeal.mealType");

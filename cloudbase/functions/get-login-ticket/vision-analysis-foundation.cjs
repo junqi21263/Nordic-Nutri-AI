@@ -99,6 +99,14 @@ function createVisionAnalysisService({ db, featureEnabled = false } = {}) {
       });
       const row = rpcRow(result);
       if (!row) throw new Error("VISION_ANALYSIS_CREATE_EMPTY");
+      if (!row.reused && input.locale && typeof db.from === "function") {
+        // Pending rows have no recognition output yet. Preserve request language
+        // in the existing JSON until completion replaces it with the result.
+        const saved = await db.from("ai_analysis").update({
+          raw_recognition: { requestLocale: require("./locale.cjs").normalizeLocale(input.locale) },
+        }).eq("id", row.analysis_id ?? row.id).eq("user_id", input.userId);
+        if (saved?.error) throw saved.error;
+      }
       return {
         analysisId: row.analysis_id ?? row.id,
         status: mapAnalysisStatus(row.status),

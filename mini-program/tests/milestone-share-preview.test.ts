@@ -34,9 +34,9 @@ describe("milestone share preview", () => {
   });
 
   it("uses Chinese stage labels instead of ambiguous English index copy", () => {
-    expect(posterSource).toContain("config.stageLabel");
-    expect(posterSource).toContain("config.stageNumber");
-    expect(posterSource).toContain("config.eyebrow");
+    expect(posterSource).toContain("getLocalizedMilestoneStage(props.milestone, \"label\", translate)");
+    expect(posterSource).toContain("getLocalizedMilestoneStage(props.milestone, \"number\", translate)");
+    expect(posterSource).toContain("getLocalizedMilestoneStage(props.milestone, \"eyebrow\", translate)");
     expect(posterSource).not.toContain("MILESTONE · {config.index}");
   });
 
@@ -48,8 +48,8 @@ describe("milestone share preview", () => {
   });
 
   it("exports the same compact 5:8 card ratio with a right-aligned brand footer", () => {
-    expect(canvasSource).toContain("每一次记录，都算数");
-    expect(canvasSource).toContain("扫码开始记录");
+    expect(canvasSource).toContain('translate("milestonePoster.footerTagline")');
+    expect(canvasSource).toContain('translate("milestonePoster.footerQr")');
     expect(canvasSource).toContain("nordic-nutri-logo.png");
     expect(canvasSource).toContain("miniprogram-code.jpg");
     expect(canvasSource).toContain("drawBrandFooter");

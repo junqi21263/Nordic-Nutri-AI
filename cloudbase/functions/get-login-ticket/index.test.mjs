@@ -12,6 +12,7 @@ import {
   createHttpServer,
   createHunyuanGenerationService,
   createRuntimeService,
+  createAppVersionOnlyService,
   readRuntimeConfig,
   selectDeepseekModel,
   signFoodImageDispatch,
@@ -150,12 +151,30 @@ test("assembles every runtime service after the RDB client is available", () => 
   });
 
   for (const capability of ["issue", "verifySession"]) assert.equal(typeof service[capability], "function");
+  assert.equal(typeof service.appVersion.getLatest, "function");
   for (const capability of ["data", "meals", "insights", "coach", "feedback", "recognitionFeedback"]) assert.ok(service[capability]);
   assert.equal(typeof service.vision?.analyzeImage, "function");
   assert.equal(service.vision?.provider, null);
   assert.equal(service.vision?.model, null);
   assert.equal(service.visionAnalysisFoundationEnabled, false);
   assert.equal(service.foodImageDispatchSecret, "");
+});
+
+test("can initialize the app-version endpoint without Android auth services", async () => {
+  const service = createAppVersionOnlyService({
+    WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
+    CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret",
+  }, {
+    cloudbaseSdk: { init: () => ({ rdb: () => ({ from: () => ({
+      select: () => ({
+        eq: () => ({ in: () => ({ eq: () => ({
+          order: () => ({ limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
+        }) }) }),
+      }),
+    }) }) }) },
+  });
+
+  assert.deepEqual(await service.appVersion.getLatest(), { update: null });
 });
 
 test("wires old-image audit through the configured vision route", () => {
@@ -2022,5 +2041,14 @@ test("omits Access-Control-Allow-Origin so CloudBase gateway does not duplicate 
     });
     assert.equal(response.status, 503);
     assert.equal(response.headers.get("access-control-allow-origin"), null);
+  });
+});
+
+test("distinguishes an unavailable app-version service from a failed release lookup", async () => {
+  const server = createHttpServer({ service: null });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/app/version`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { code: "APP_VERSION_SERVICE_NOT_CONFIGURED" });
   });
 });

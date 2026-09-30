@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(import.meta.dirname, "..", "src");
 const read = (relativePath: string) => readFileSync(resolve(sourceRoot, relativePath), "utf8");
@@ -117,7 +118,7 @@ describe("four-page Stitch visual contract", () => {
     expect(source).toContain("nutrition-plan__insight");
     expect(source).toContain("nutrition-plan__targets-card");
     expect(source).toContain("nutrition-plan__milestone-list");
-    expect(source).toContain("你的计划已准备好");
+    expect(source).toContain('t(fromSettings ? "nutritionPlan.updatedTitle" : "nutritionPlan.readyTitle")');
     expect(source).not.toContain('tone="dark"');
     expect(source).not.toContain("计算依据");
     expect(source).not.toContain("每周训练");
@@ -163,8 +164,8 @@ describe("four-page Stitch visual contract", () => {
     expect(appConfig).toContain('"pages/diet-preferences/index"');
     expect(bodyProfile).toContain('url: "/pages/diet-preferences/index"');
     expect(preferences).toMatch(/className=\{`diet-preferences-page/);
-    expect(preferences).toContain("第 3 步，共 4 步");
-    expect(preferences).toContain("饮食偏好与限制");
+    expect(preferences).toContain('step={t(fromSettings ? "dietPreferences.stepAdjust" : "dietPreferences.step")}');
+    expect(preferences).toContain('t("dietPreferences.title")');
     expect(preferences).toContain("diet-preferences-config");
     expect(preferences).toContain('"/pages/nutrition-plan/index" + settingsQuery(true)');
     expect(preferences).toContain('"/pages/nutrition-plan/index?initial=1"');
@@ -176,20 +177,20 @@ describe("four-page Stitch visual contract", () => {
     expect(preferenceConfig).toContain('value: "5"');
     expect(plan).toContain("OnboardingHeader");
     expect(plan).toContain('brand="Nordic Nutri AI"');
-    expect(plan).toContain("第 4 步，共 4 步");
+    expect(plan).toContain('"nutritionPlan.step"');
     expect(plan).toContain("progress={1}");
     expect(styles).toContain(".diet-preferences-page");
     expect(styles).toContain(".nutrition-plan-page .app-navbar__step");
   });
 
-  it("keeps Home Dashboard labels Chinese and uses the Stitch action hierarchy", () => {
+  it("keeps Home Dashboard copy localized and uses the Stitch action hierarchy", () => {
     const source = read("pages/home/index.tsx");
 
-    expect(source).toContain("{greeting}，{profile.profile.nickname}");
-    expect(source).toContain("今日目标");
-    expect(source).toContain("拍照识别");
-    expect(source).toContain("记录饮食");
-    expect(source).toContain("今日饮食");
+    expect(source).toContain('t("home.greetingWithName"');
+    expect(source).toContain('t("home.dailyTarget")');
+    expect(source).toContain('t("home.takePhoto")');
+    expect(source).toContain('t("home.logMeal")');
+    expect(source).toContain('t("home.todayMeals")');
     expect(source).not.toContain('eyebrow="Scan Meal"');
     expect(source).not.toContain(">Add Meal<");
     expect(source).not.toContain('name="ellipsis"');
@@ -324,7 +325,7 @@ describe("four-page Stitch visual contract", () => {
     expect(styles).toContain("margin: 0 auto;");
     expect(read("pages/food-scanner/index.config.ts")).toContain("disableScroll: true");
     expect(source).not.toContain('className="food-scanner-page__page-title"');
-    expect(source).toContain("拍摄并分析");
+    expect(source).toContain('"scannerPage.captureAnalyze"');
     expect(source).not.toContain("拍摄并本地分析");
     expect(styles).toContain(".food-scanner-page__page-title");
     expect(source).toContain('className="scanner-primary-action"');
@@ -381,13 +382,13 @@ describe("four-page Stitch visual contract", () => {
     expect(styles).toContain("width: 100%;");
     expect(source).toContain('className="analysis-result-page__confidence');
     expect(source).toContain("analysis-result-page__confidence-value");
-    expect(source).toContain("识别可信度");
-    expect(source).toContain("营养数据");
+    expect(source).toContain('t("analysisResult.confidence")');
+    expect(source).toContain('t("analysisResult.nutritionData")');
     expect(source).toContain('className="analysis-result-page__meal-type-block"');
     expect(styles).toContain(".analysis-result-page__confidence-divider");
     expect(styles).toContain(".analysis-result-page__confidence--high");
     expect(styles).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
-    expect(source).toContain('actionLabel="查看饮食记录"');
+    expect(source).toContain('actionLabel={t("analysisResult.viewRecords")}');
     expect(source).toContain('"/pages/meal-records/index"');
     expect(read("components/ai-insight-card/index.tsx")).toContain("onActionClick");
     expect(layoutStyles).toContain(".page-layout--analysis-result .page-layout__content");

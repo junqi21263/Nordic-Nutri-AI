@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import { useDeferredProgress } from "../../hooks/useAnimatedProgress";
 import { NordicIcon } from "../nordic-icon";
 import { useMenuButtonMetrics } from "../../utils/use-menu-button-metrics";
@@ -22,6 +23,7 @@ export function AppNavbar({
   onBack,
   variant = "default",
 }: AppNavbarProps) {
+  const { t } = useTranslation();
   const { navigationBarHeight, rightInset, statusBarHeight, titleMaxWidth, totalHeaderHeight } =
     useMenuButtonMetrics();
   const isOnboarding = variant === "onboarding";
@@ -79,7 +81,7 @@ export function AppNavbar({
             <Text className="onboarding-brand">{title}</Text>
           ) : (
             <View className="app-navbar__title-line">
-              {variant === "nova" ? <NordicIcon name="nova" size={18} ariaLabel="NOVA 洞察" /> : null}
+              {variant === "nova" ? <NordicIcon name="nova" size={18} ariaLabel={t("sharedUi.novaInsight")} /> : null}
               <Text className="app-navbar__title">{title}</Text>
             </View>
           )}

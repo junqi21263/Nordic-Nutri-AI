@@ -12,3 +12,10 @@ test("creates a server-only, date-versioned weekly nutrition review cache", asyn
   assert.match(migration, /alter table public\.weekly_nutrition_reviews enable row level security/i);
   assert.match(migration, /weekly reviews: server only/i);
 });
+
+test("V2 expands only the provider constraint without changing cache ownership", async () => {
+  const migration = await readFile(new URL("./0067_weekly_review_routed_provider.sql", import.meta.url), "utf8");
+  assert.match(migration, /drop constraint if exists weekly_nutrition_reviews_provider_check/i);
+  assert.match(migration, /char_length\(btrim\(provider\)\) between 1 and 80/i);
+  assert.doesNotMatch(migration, /drop table|delete from|disable row level security|grant /i);
+});

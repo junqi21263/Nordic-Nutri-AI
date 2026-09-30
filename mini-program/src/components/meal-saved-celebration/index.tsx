@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getMealSavedCelebrationMotion, getMealSavedProgress } from "../../features/meals/meal-saved-celebration-motion";
 import { useCountUp } from "../../hooks/useCountUp";
 import { NordicIcon } from "../nordic-icon";
@@ -35,6 +36,7 @@ export function MealSavedCelebration({
   onViewMeal,
   onContinue,
 }: MealSavedCelebrationProps) {
+  const { t } = useTranslation();
   const motion = getMealSavedCelebrationMotion(kind);
   const { from, to } = getMealSavedProgress({
     beforeCalories: previousCalories,
@@ -73,17 +75,17 @@ export function MealSavedCelebration({
 
   const nutrients = [
     { icon: "flame" as const, label: `${formatAmount(calorieCount)} kcal`, tone: "primary" },
-    { icon: "protein" as const, label: `蛋白质 ${formatAmount(proteinCount)}g`, tone: "secondary" },
-    { icon: "carbs" as const, label: `碳水 ${formatAmount(carbsCount)}g`, tone: "secondary" },
-    { icon: "fat" as const, label: `脂肪 ${formatAmount(fatCount)}g`, tone: "secondary" },
+    { icon: "protein" as const, label: `${t("mealSaved.nutrients.protein")} ${formatAmount(proteinCount)}g`, tone: "secondary" },
+    { icon: "carbs" as const, label: `${t("mealSaved.nutrients.carbs")} ${formatAmount(carbsCount)}g`, tone: "secondary" },
+    { icon: "fat" as const, label: `${t("mealSaved.nutrients.fat")} ${formatAmount(fatCount)}g`, tone: "secondary" },
   ];
   const isTemplate = kind === "template";
   const isReused = kind === "reused";
-  const title = isTemplate ? "已加入我的常吃！" : isReused ? "再吃一次已记录！" : kind === "updated" ? "本餐已更新！" : "本餐已保存！";
-  const subtitle = isTemplate ? "下次可以一键记录这餐。" : isReused ? "复制的餐食已同步到今日进度。" : kind === "updated" ? "更新后的营养数据已同步到今日进度。" : "营养数据已同步到今日进度。";
+  const title = t(`mealSaved.title.${kind}`);
+  const subtitle = t(`mealSaved.subtitle.${kind}`);
 
   return (
-    <View className={`meal-saved-celebration meal-saved-celebration--${kind}`} ariaLabel={isTemplate ? "已加入我的常吃" : "本餐已保存"}>
+    <View className={`meal-saved-celebration meal-saved-celebration--${kind}`} ariaLabel={title}>
       <View className="meal-saved-celebration__backdrop" />
       <View className="meal-saved-celebration__card">
         <View className="meal-saved-celebration__success-icon">
@@ -113,7 +115,7 @@ export function MealSavedCelebration({
         {!isTemplate && (
           <View className="meal-saved-celebration__progress">
             <View className="meal-saved-celebration__progress-head">
-              <Text>今日进度</Text>
+              <Text>{t("mealSaved.todayProgress")}</Text>
               <Text>{formatAmount(currentCalories)} / {formatAmount(targetCalories)} kcal</Text>
             </View>
             <View className="meal-saved-celebration__progress-track">
@@ -126,10 +128,10 @@ export function MealSavedCelebration({
         )}
         <View className="meal-saved-celebration__actions">
           <View className="meal-saved-celebration__view-meal" onClick={() => { if (actionsReady) onViewMeal(); }}>
-            <Text>{isTemplate || isReused ? "继续记录" : "查看本餐"}</Text>
+            <Text>{t(isTemplate || isReused ? "mealSaved.viewNext" : "mealSaved.viewMeal")}</Text>
           </View>
           <View className="meal-saved-celebration__continue" onClick={() => { if (actionsReady) onContinue(); }}>
-            <Text>{isTemplate || isReused ? "回到主页" : "继续记录"}</Text>
+            <Text>{t(isTemplate || isReused ? "mealSaved.backHome" : "mealSaved.continue")}</Text>
           </View>
         </View>
       </View>

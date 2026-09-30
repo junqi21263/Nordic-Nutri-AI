@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import { AppButton } from "../app-button";
 import { Modal } from "../modal";
 
@@ -16,11 +17,12 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "确认",
-  cancelLabel = "取消",
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   return (
     <Modal open={open} lockScroll>
       <View className="confirm-dialog">
@@ -28,10 +30,10 @@ export function ConfirmDialog({
         <Text className="confirm-dialog__description">{description}</Text>
         <View className="confirm-dialog__actions">
           <AppButton size="medium" onClick={onCancel}>
-            {cancelLabel}
+            {cancelLabel ?? t("common.cancel")}
           </AppButton>
           <AppButton variant="outline" size="medium" onClick={onConfirm}>
-            {confirmLabel}
+            {confirmLabel ?? t("common.confirm")}
           </AppButton>
         </View>
       </View>

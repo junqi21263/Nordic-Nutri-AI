@@ -1,12 +1,14 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import { getProductFoodInsight, getProductFoodVariants, type ProductFoodCatalogItem, type ProductFoodInsight } from "../../api/food-catalog-api";
 import { AppButton } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
 import { FoodThumbnail } from "../../components/food-thumbnail";
 import { resolveHorizontalSwipe, siblingIndex } from "../../features/food-catalog/detail-swipe";
-import { getFoodCategory, getFoodTags } from "../../features/food-catalog/food-labels";
+import { getFoodCategory, getFoodCategoryCode, getFoodTags, resolveTagCode } from "../../features/food-catalog/food-labels";
 import { PageLayout } from "../../layouts/page-layout";
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { useFoodSelectionStore } from "../../stores/food-selection-store";
@@ -33,6 +35,7 @@ const scaleNutrition = (value: number | null, grams: number) => {
 };
 
 export default function FoodDetailPage() {
+  const { i18n } = useTranslation();
   const router = useRouter();
   const feedback = useFeedbackStore();
   const food = useFoodSelectionStore((state) => state.detailFood);
@@ -109,25 +112,21 @@ export default function FoodDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [displayedFood?.id]);
-  const nutrition = useMemo(
-    () =>
-      displayedFood
-        ? [
-            { label: "热量", value: `${scaleNutrition(displayedFood.caloriesKcalPer100g, portionG)} kcal`, icon: "flame" as const },
-            { label: "蛋白质", value: `${scaleNutrition(displayedFood.proteinGPer100g, portionG)} g`, icon: "protein" as const },
-            { label: "碳水", value: `${scaleNutrition(displayedFood.carbsGPer100g, portionG)} g`, icon: "carbs" as const },
-            { label: "脂肪", value: `${scaleNutrition(displayedFood.fatGPer100g, portionG)} g`, icon: "fat" as const },
-          ]
-        : [],
-    [displayedFood, portionG],
-  );
+  }, [displayedFood?.id, i18n.language]);
+  const nutrition = displayedFood
+    ? [
+        { label: t("nutrition.calories"), value: `${scaleNutrition(displayedFood.caloriesKcalPer100g, portionG)} kcal`, icon: "flame" as const },
+        { label: t("nutrition.protein"), value: `${scaleNutrition(displayedFood.proteinGPer100g, portionG)} g`, icon: "protein" as const },
+        { label: t("nutrition.carbs"), value: `${scaleNutrition(displayedFood.carbsGPer100g, portionG)} g`, icon: "carbs" as const },
+        { label: t("nutrition.fat"), value: `${scaleNutrition(displayedFood.fatGPer100g, portionG)} g`, icon: "fat" as const },
+      ]
+    : [];
 
   const switchSibling = (delta: -1 | 1) => {
     const nextIndex = siblingIndex(queueIndex, delta, queue.length);
     if (nextIndex == null) {
       feedback.show({
-        message: delta < 0 ? "已经是第一个" : "已经是最后一个",
+        message: delta < 0 ? t("foodDetail.firstFood") : t("foodDetail.lastFood"),
         tone: "default",
       });
       return;
@@ -160,17 +159,17 @@ export default function FoodDetailPage() {
   if (!displayedFood) {
     return (
       <PageLayout
-        title="食物详情"
+        title={t("foodDetail.title")}
         showTabs={false}
         hideNavigation
         className="page-layout--food-detail"
       >
         <View className="food-detail-page food-detail-page--empty">
-          <NordicIcon name="food-bowl" size={32} ariaLabel="食物详情" />
-          <Text className="food-detail-page__empty-title">没有可展示的食物</Text>
-          <Text className="food-detail-page__empty-copy">请返回食物库重新选择。</Text>
+          <NordicIcon name="food-bowl" size={32} ariaLabel={t("foodDetail.title")} />
+          <Text className="food-detail-page__empty-title">{t("foodDetail.emptyTitle")}</Text>
+          <Text className="food-detail-page__empty-copy">{t("foodDetail.emptyHint")}</Text>
           <AppButton size="large" onClick={returnToCatalog}>
-            知道了
+            {t("foodDetail.gotIt")}
           </AppButton>
         </View>
       </PageLayout>
@@ -187,7 +186,7 @@ export default function FoodDetailPage() {
 
   return (
     <PageLayout
-      title="食物详情"
+      title={t("foodDetail.title")}
       showTabs={false}
       hideNavigation
       showBack
@@ -207,10 +206,10 @@ export default function FoodDetailPage() {
             </Text>
           </View>
           <View className="food-detail-page__labels">
-            <Text className="food-detail-page__category">{getFoodCategory(displayedFood)}</Text>
+            <Text className="food-detail-page__category">{t(`foodCatalog.categories.${getFoodCategoryCode(getFoodCategory(displayedFood))}`, { defaultValue: getFoodCategory(displayedFood) })}</Text>
             {tags.map((tag) => (
               <Text className="food-detail-page__tag" key={tag}>
-                {tag}
+                {t(`foodCatalog.tags.${resolveTagCode(tag)}`, { defaultValue: tag })}
               </Text>
             ))}
           </View>
@@ -241,7 +240,7 @@ export default function FoodDetailPage() {
                 onTouchEnd={(event) => {
                   event.stopPropagation?.();
                 }}
-                ariaLabel="上一个食物"
+                ariaLabel={t("foodDetail.previousFood")}
               >
                 <Text className="food-detail-page__nav-icon">‹</Text>
               </View>
@@ -260,7 +259,7 @@ export default function FoodDetailPage() {
                 onTouchEnd={(event) => {
                   event.stopPropagation?.();
                 }}
-                ariaLabel="下一个食物"
+                ariaLabel={t("foodDetail.nextFood")}
               >
                 <Text className="food-detail-page__nav-icon">›</Text>
               </View>
@@ -271,8 +270,8 @@ export default function FoodDetailPage() {
         {displayedFood && variantsForId === displayedFood.id && variants.length > 1 ? (
           <View className="food-detail-page__variants">
             <View className="food-detail-page__section-heading">
-              <Text>版本选择</Text>
-              <Text>{variants.length} 个营养版本</Text>
+              <Text>{t("foodDetail.variants")}</Text>
+              <Text>{t("foodDetail.variantCount", { count: variants.length })}</Text>
             </View>
             <View className="food-detail-page__variants-list">
               {variants.map((variant) => (
@@ -282,10 +281,10 @@ export default function FoodDetailPage() {
                   onClick={() => setActiveFood(variant)}
                 >
                   <Text className="food-detail-page__variant-title">
-                    {variant.variantLabelZh || (variant.isPrimaryVariant ? "推荐版本" : "其他营养版本")}
+                    {variant.variantLabelZh || (variant.isPrimaryVariant ? t("foodDetail.recommendedVariant") : t("foodDetail.otherVariant"))}
                   </Text>
                   <Text className="food-detail-page__variant-meta">
-                    {variant.caloriesKcalPer100g ?? "—"} kcal · 蛋白质 {variant.proteinGPer100g ?? "—"}g
+                    {t("foodDetail.variantNutrition", { calories: variant.caloriesKcalPer100g ?? "—", protein: variant.proteinGPer100g ?? "—" })}
                   </Text>
                 </View>
               ))}
@@ -294,7 +293,7 @@ export default function FoodDetailPage() {
         ) : null}
 
         <View className="food-detail-page__portion">
-          <Text className="food-detail-page__portion-title">份量选择</Text>
+          <Text className="food-detail-page__portion-title">{t("foodDetail.portion")}</Text>
           <View className="food-detail-page__portion-row">
             {portionOptions.map((option) => (
               <View
@@ -307,7 +306,7 @@ export default function FoodDetailPage() {
             ))}
           </View>
           <View className="food-detail-page__portion-custom">
-            <Text className="food-detail-page__portion-custom-label">自定义</Text>
+            <Text className="food-detail-page__portion-custom-label">{t("foodDetail.custom")}</Text>
             <View className="food-detail-page__portion-input">
               <Input
                 className="food-detail-page__portion-value"
@@ -324,7 +323,7 @@ export default function FoodDetailPage() {
         </View>
 
         <View className="food-detail-page__section-heading">
-          <Text>营养成分</Text>
+          <Text>{t("foodDetail.nutrition")}</Text>
           <Text>{portionG}g</Text>
         </View>
         <View className="food-detail-page__nutrition-grid">
@@ -341,13 +340,13 @@ export default function FoodDetailPage() {
 
         <View className="food-detail-page__insight">
           <View className="food-detail-page__insight-icon">
-            <NordicIcon name="nova" size={20} ariaLabel="营养洞察" />
+            <NordicIcon name="nova" size={20} ariaLabel={t("home.insightTitle")} />
           </View>
           <View>
-            <Text className="food-detail-page__insight-title">NOVA · 营养洞察</Text>
+            <Text className="food-detail-page__insight-title">{t("home.insightTitle")}</Text>
             {insight?.headline ? <Text className="food-detail-page__insight-headline">{insight.headline}</Text> : null}
             <Text className="food-detail-page__insight-copy">
-              {insightLoading ? "NOVA 正在根据这份食物的真实营养数据生成介绍…" : (insight?.content ?? "云端洞察暂时不可用，请稍后重试。")}
+              {insightLoading ? t("foodDetail.insightLoading") : (insight?.content ?? t("foodDetail.insightUnavailable"))}
             </Text>
           </View>
         </View>
@@ -356,12 +355,12 @@ export default function FoodDetailPage() {
       <View className="food-detail-page__action">
         <AppButton size="large" onClick={fromManualMeal || recognitionMode ? addToManualMeal : returnToCatalog}>
           {recognitionMode === "recognition-replace"
-            ? "替换当前食物"
+            ? t("foodDetail.replace")
             : recognitionMode === "recognition-add"
-              ? `添加 ${portionG}g 到本次识别`
+              ? t("foodDetail.addToRecognition", { grams: portionG })
               : fromManualMeal
-                ? "添加到本餐"
-                : "知道了"}
+                ? t("foodDetail.addToMeal")
+                : t("foodDetail.gotIt")}
         </AppButton>
       </View>
     </PageLayout>

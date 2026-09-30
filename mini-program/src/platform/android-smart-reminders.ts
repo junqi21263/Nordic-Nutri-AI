@@ -23,10 +23,11 @@ export const androidSmartReminderAdapter: AndroidSmartReminderAdapter = {
   },
   schedule: async (candidates) => {
     if (!androidSmartReminderAdapter.isAvailable() || !candidates.length) return;
+    const { t } = await import("../i18n");
     await LocalNotifications.createChannel({
       id: channelId,
-      name: "餐次记录提醒",
-      description: "在尚未记录早餐、午餐或晚餐时提醒你。",
+      name: t("smartReminders.title"),
+      description: t("smartReminders.description"),
       importance: 3,
     });
     await LocalNotifications.schedule({

@@ -123,10 +123,10 @@ describe("meal recognition result reveal motion", () => {
     expect(page).toContain("const [exitConfirmOpen, setExitConfirmOpen] = useState(false);");
     expect(page).toContain("onTopBarBack={() => setExitConfirmOpen(true)}");
     expect(page).toContain("<ConfirmDialog");
-    expect(page).toContain('title="放弃本次分析？"');
-    expect(page).toContain('description="返回后，本次未保存的分析结果将不再保留。"');
-    expect(page).toContain('confirmLabel="放弃并返回"');
-    expect(page).toContain('cancelLabel="继续分析"');
+    expect(page).toContain('title={t("analysisResult.discardQuestion")}');
+    expect(page).toContain('description={t("analysisResult.discardDescription")}');
+    expect(page).toContain('confirmLabel={t("analysisResult.discard")}');
+    expect(page).toContain('cancelLabel={t("analysisResult.continueAnalysis")}');
   });
 
   it("keeps the analysis exit dialog centered, fixed and single-line", () => {
@@ -164,8 +164,8 @@ describe("meal recognition result reveal motion", () => {
 
     expect(page).toContain("const [ingredientsExpanded, setIngredientsExpanded] = useState(false);");
     expect(page).toMatch(/ingredientsExpanded\s*\?\s*adjusted\.items\.map/);
-    expect(page).toContain('ariaLabel={ingredientsExpanded ? "收起识别食材" : "展开识别食材"}');
-    expect(page).toContain('ingredientsExpanded ? "收起" : "展开"');
+    expect(page).toContain('ariaLabel={t(ingredientsExpanded ? "analysisResult.collapseIngredients" : "analysisResult.expandIngredients")}');
+    expect(page).toContain('ingredientsExpanded ? "analysisResult.collapse" : "analysisResult.expand"');
     expect(page.indexOf("adjusted.items.map")).toBeLessThan(
       page.indexOf('className="analysis-result-page__macro-list"'),
     );

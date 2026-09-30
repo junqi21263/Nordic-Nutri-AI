@@ -1,4 +1,5 @@
 import { shiftDate, type Meal, type MealType } from "../meals/domain";
+import type { AppLocale } from "../../i18n/locale";
 
 export type MealReminderType = Exclude<MealType, "snack">;
 
@@ -82,20 +83,48 @@ export function getReminderNotificationId(mealType: MealReminderType) {
   return notificationIds[mealType];
 }
 
-export function getReminderCopy(mealType: MealReminderType, consecutiveMissedDays: number, consecutiveRecordedDays: number) {
+const REMINDER_COPY: Record<AppLocale, {
+  missed: { title: string; body: string };
+  recorded: { title: string; body: string };
+  ordinary: (meal: string) => { title: string; body: string };
+  mealLabels: Record<MealReminderType, string>;
+}> = {
+  "zh-CN": {
+    missed: { title: "最近有点忙？", body: "不用补齐，从这一餐重新开始就好。" },
+    recorded: { title: "今天也记一下这一餐 🌿", body: "你的记录节奏正在慢慢形成。" },
+    ordinary: (meal) => ({ title: `${meal}还没记录吗？`, body: "拍一下就好 📷" }),
+    mealLabels: { breakfast: "早餐", lunch: "午餐", dinner: "晚餐" },
+  },
+  "zh-TW": {
+    missed: { title: "最近是不是有點忙？", body: "不用補記，從這一餐重新開始就好。" },
+    recorded: { title: "今天也記得這一餐 🌿", body: "你的記錄節奏正在慢慢形成。" },
+    ordinary: (meal) => ({ title: `還沒記錄${meal}嗎？`, body: "拍張照片就好 📷" }),
+    mealLabels: { breakfast: "早餐", lunch: "午餐", dinner: "晚餐" },
+  },
+  en: {
+    missed: { title: "Been busy lately?", body: "No need to catch up—just start again with this meal." },
+    recorded: { title: "Log this meal today 🌿", body: "Your logging rhythm is taking shape." },
+    ordinary: (meal) => ({ title: `Haven't logged ${meal} yet?`, body: "A quick photo is all it takes 📷" }),
+    mealLabels: { breakfast: "breakfast", lunch: "lunch", dinner: "dinner" },
+  },
+};
+
+export function getReminderCopy(mealType: MealReminderType, consecutiveMissedDays: number, consecutiveRecordedDays: number, locale: AppLocale = "zh-CN") {
+  const copy = REMINDER_COPY[locale];
   if (consecutiveMissedDays >= 2) {
-    return { title: "最近有点忙？", body: "不用补齐，从这一餐重新开始就好。" };
+    return copy.missed;
   }
   if (consecutiveRecordedDays >= 2) {
-    return { title: "今天也记一下这一餐 🌿", body: "你的记录节奏正在慢慢形成。" };
+    return copy.recorded;
   }
-  return { title: `${REMINDER_WINDOWS[mealType].label}还没记录吗？`, body: "拍一下就好 📷" };
+  return copy.ordinary(copy.mealLabels[mealType]);
 }
 
 export function buildTodayReminderCandidates(
   settings: SmartReminderSettings,
   meals: Meal[],
   now = new Date(),
+  locale: AppLocale = "zh-CN",
 ): ReminderCandidate[] {
   if (!settings.enabled) return [];
   const today = localDateString(now);
@@ -110,6 +139,7 @@ export function buildTodayReminderCandidates(
       mealType,
       consecutiveDays(meals, today, mealType, false),
       consecutiveDays(meals, today, mealType, true),
+      locale,
     );
     candidates.push({ id: getReminderNotificationId(mealType), mealType, ...copy, at });
   }
@@ -120,6 +150,7 @@ export function buildNextReminderCandidates(
   settings: SmartReminderSettings,
   meals: Meal[],
   now = new Date(),
+  locale: AppLocale = "zh-CN",
 ): ReminderCandidate[] {
   if (!settings.enabled) return [];
   const today = localDateString(now);
@@ -133,6 +164,7 @@ export function buildNextReminderCandidates(
       mealType,
       consecutiveDays(meals, today, mealType, false),
       consecutiveDays(meals, today, mealType, true),
+      locale,
     );
     return [{ id: getReminderNotificationId(mealType), mealType, ...copy, at }];
   });

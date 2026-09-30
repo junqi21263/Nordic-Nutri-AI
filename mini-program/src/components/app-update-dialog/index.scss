@@ -1,16 +1,16 @@
 @use "../../styles/tokens" as *;
 
 .app-update-dialog {
-  background: $color-warm-white;
-  border: 1px solid $color-divider;
-  border-radius: 32px;
-  box-shadow: 0 24px 64px rgba(20, 40, 29, 0.16);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  max-width: 640px;
-  padding: 44px 40px 36px;
-  width: calc(100vw - 64px);
+  max-width: none;
+  padding: 0;
+  width: 100%;
 }
 
 .app-update-dialog__eyebrow { color: $color-sage; font-size: 22px; letter-spacing: 4px; }

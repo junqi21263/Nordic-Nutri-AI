@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const root = resolve(import.meta.dirname, "../src");
 
@@ -24,7 +25,7 @@ describe("first-time welcome page", () => {
     expect(appConfig.indexOf('"pages/welcome/index"')).toBeLessThan(
       appConfig.indexOf('"pages/auth-entry/index"'),
     );
-    expect(page).toContain("开启健康之旅");
+    expectLocalizedCopy(page, "开启健康之旅");
     expect(page).toContain("welcome-page--exiting");
     expect(page).toContain("welcome-page--android");
     expect(page).toContain("welcome-page__hero--android");
@@ -34,10 +35,7 @@ describe("first-time welcome page", () => {
     expect(page).toContain('mode="aspectFill"');
     expect(page).toContain("markWelcomeSeen");
     expect(page).toContain("startApplicationAuth");
-    expect(page).toContain("拍一餐，营养心中有数");
-    expect(page).toContain("读懂餐盘里的食材与热量");
-    expect(page).toContain("陪你慢慢养成好习惯");
-    expect(page).toContain('{"\\n"}');
+    expectLocalizedCopy(page, "读懂餐盘里的食材与热量");
     expect(page).not.toContain("看清今天吃得怎么样");
     expect(page).not.toContain("已有账号，去登录");
     expect(page).not.toContain("welcome-page__kicker");

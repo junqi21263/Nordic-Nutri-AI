@@ -9,7 +9,7 @@ describe("loading experience", () => {
   it("uses the compact loading animation instead of a large loading title", () => {
     const component = read("components/loading-state/index.tsx");
     expect(component).toContain('import { Loading } from "../loading"');
-    expect(component).toContain("<Loading label={label} />");
+    expect(component).toContain('<Loading label={label ?? t("sharedUi.loadingContent")} />');
     expect(component).not.toContain('className="state__title"');
   });
 

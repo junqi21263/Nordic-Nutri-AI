@@ -20,7 +20,7 @@ describe("profile information bottom sheets", () => {
     expect(source).toContain('from "../../components/bottom-sheet"');
     expect(source).toContain("onDismiss={() => setActiveModal(null)}");
     expect(source).toContain('className="profile-sheet__close"');
-    expect(source).toContain('ariaLabel="关闭反馈与帮助"');
+    expect(source).toContain('ariaLabel={t("profile.closeFeedback")}');
     expect(source).not.toContain('ariaLabel="关闭隐私与数据"');
     expect(source).not.toContain('ariaLabel="关闭关于我们"');
     expect(styles).toContain(".profile-sheet {");
@@ -32,6 +32,7 @@ describe("profile information bottom sheets", () => {
     expect(readSource("../src/styles/components.scss")).toContain("position: fixed");
     expect(readSource("../src/styles/components.scss")).toContain("touch-action: pan-y");
     expect(styles).toContain("overflow-y: auto");
+    expect(styles).toContain("resize: none");
   });
 
   it("keeps the sheet mounted for a downward exit animation and lowers compact actions", () => {
@@ -53,7 +54,7 @@ describe("profile information bottom sheets", () => {
     const profile = readSource("../src/pages/profile/index.tsx");
     const submitStart = profile.indexOf("const submitFeedback = async () => {");
     const submitEnd = profile.indexOf("} catch", submitStart);
-    const successStart = profile.indexOf('title: "感谢你的反馈"');
+    const successStart = profile.indexOf('title: t("feedback.thanks")');
     const successEnd = profile.indexOf("});", successStart);
     const successModal = profile.slice(successStart, successEnd);
     const submitFlow = profile.slice(submitStart, submitEnd);
@@ -66,7 +67,7 @@ describe("profile information bottom sheets", () => {
     expect(submitFlow).toContain("bottomSheetExitDuration");
     expect(successModal).toContain("dismissible: false");
     expect(successModal).not.toContain("onPrimary: () => setActiveModal(null)");
-    expect(successModal).toContain('description: "我们已收到，会用它持续改进体验。"');
+    expect(successModal).toContain('description: t("feedback.receivedDescription")');
     expect(profile).not.toContain("profile-feedback-submitted");
   });
 

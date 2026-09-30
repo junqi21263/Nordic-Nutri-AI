@@ -23,12 +23,12 @@ export function getAuthInputError(
 ) {
   const normalized = target.trim();
   if (type === "email" && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || normalized.length > 320)) {
-    return "请输入有效的邮箱地址，例如 name@example.com";
+    return "androidAuth.validation.email";
   }
-  if (type === "phone" && !/^\+[1-9]\d{7,14}$/.test(normalized)) return "请输入有效的手机号，并检查国家区号";
+  if (type === "phone" && !/^\+[1-9]\d{7,14}$/.test(normalized)) return "androidAuth.validation.phone";
   if (!requireCaptcha) return "";
-  if (!captchaId) return "请先加载图形验证码";
-  if (!answer.trim()) return "请输入图形验证码";
+  if (!captchaId) return "androidAuth.validation.captchaLoad";
+  if (!answer.trim()) return "androidAuth.validation.captchaRequired";
   return "";
 }
 

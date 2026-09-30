@@ -477,6 +477,7 @@ export async function analyzeProductImage(
       header: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       data: {
         clientRequestId,
+        locale: getLocale(),
         source: options.source,
         clientCapabilities: {
           supportsAsyncVision: true,
@@ -557,3 +558,4 @@ export async function analyzeProductImage(
   onTiming?.({ stage: "client_total", ms: Date.now() - recognitionStartedAt });
   return meal;
 }
+import { getLocale } from "../i18n";

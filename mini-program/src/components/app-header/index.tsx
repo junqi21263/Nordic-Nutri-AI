@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import { useMenuButtonMetrics } from "../../utils/use-menu-button-metrics";
 
 export interface AppHeaderProps {
@@ -20,6 +21,7 @@ export function AppHeader({
   onLeadingClick,
   onActionClick,
 }: AppHeaderProps) {
+  const { t } = useTranslation();
   const metrics = useMenuButtonMetrics();
   return (
     <View className="app-header top-navigation" style={{ paddingRight: `${metrics.rightInset}px` }}>
@@ -27,7 +29,7 @@ export function AppHeader({
         {leading ? (
           <View
             className="top-navigation__action"
-            ariaLabel={leading === "‹" ? "返回上一页" : leading}
+            ariaLabel={leading === "‹" ? t("common.back") : leading}
             onClick={onLeadingClick}
           >
             {leading}

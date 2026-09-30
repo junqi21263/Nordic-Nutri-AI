@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(process.cwd(), "src");
 const read = (path: string) => readFileSync(resolve(sourceRoot, path), "utf8");
@@ -16,12 +17,12 @@ describe("餐食详情评分与营养小结", () => {
     expect(hero).toContain("meal-detail-page__hero--data");
     expect(hero).toContain('className="meal-detail-page__score-badge"');
     expect(hero).toContain('className="meal-detail-page__score-footer"');
-    expect(hero).toContain("本餐评分");
-    expect(hero).toContain("依据");
+    expectLocalizedCopy(hero, "餐点评分");
+    expectLocalizedCopy(hero, "评分依据");
     expect(detail).toContain('useState<"score" | "insight" | null>(null)');
     expect(detail).toContain("<Modal open={detailModal !== null}>");
     expect(detail).toContain('setDetailModal("score")');
-    expect(detail).toContain("为什么是这个评分？");
+    expectLocalizedCopy(detail, "为什么是这个评分？");
     expect(detail).toContain("meal-detail-page__detail-modal");
     expect(detail).not.toContain('className="meal-detail-page__score-card"');
     expect(detail).not.toContain("查看评分依据");
@@ -37,9 +38,9 @@ describe("餐食详情评分与营养小结", () => {
     const styles = read("styles/page.scss");
 
     expect(detail).toContain('className="meal-detail-page__insight-card"');
-    expect(detail).toContain("查看建议依据");
+    expectLocalizedCopy(detail, "查看建议依据");
     expect(detail).toContain('setDetailModal("insight")');
-    expect(detail).toContain("这餐对今日目标的影响");
+    expectLocalizedCopy(detail, "这餐对今日目标的影响");
     expect(detail).not.toContain("isInsightExpanded");
     expect(styles).toContain(".meal-detail-page__score-footer");
     expect(styles).toContain(".meal-detail-page__insight-card");
@@ -49,7 +50,7 @@ describe("餐食详情评分与营养小结", () => {
     const detail = read("pages/meal-detail/index.tsx");
 
     expect(detail).toContain('<AppButton size="large" onClick={() => setDetailModal(null)}>');
-    expect(detail).toContain("知道了");
+    expectLocalizedCopy(detail, "知道了");
     expect(detail).not.toContain("meal-detail-page__detail-modal-close");
     expect(detail).not.toContain('ariaLabel="关闭弹窗"');
   });
@@ -60,7 +61,7 @@ describe("餐食详情评分与营养小结", () => {
 
     expect(hero).toContain('mode="aspectFill"');
     expect(hero).toContain("Taro.previewImage({ current: imageUrl, urls: [imageUrl] })");
-    expect(hero).toContain("查看原始餐食照片");
+    expectLocalizedCopy(read("pages/analysis-result/index.tsx"), "查看原始餐食照片");
     expect(hero).toContain("onError={() => setImageFailed(true)}");
     expect(hero).toContain("hasValidMealImage(imageUrl)");
     expect(hero).toContain("meal-detail-page__data-hero-arc");

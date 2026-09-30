@@ -46,7 +46,7 @@ function createVitaRequestCompletion({ apiKey, model, fetchImpl = globalThis.fet
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const { extractContentAndUsage } = require("./model-usage.cjs");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "vita-video-3.0";
-  return async ({ imageUrl, timeoutMs: requestTimeoutMs }) => {
+  return async ({ imageUrl, locale, timeoutMs: requestTimeoutMs }) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Math.max(1, Number(requestTimeoutMs) || 20_000));
     try {
@@ -56,7 +56,7 @@ function createVitaRequestCompletion({ apiKey, model, fetchImpl = globalThis.fet
         body: JSON.stringify({
           model: selectedModel,
           temperature: 0,
-          messages: [{
+          messages: [{ role: "system", content: require("./locale.cjs").localeInstruction(locale) }, {
             role: "user",
             content: [
               { type: "image_url", image_url: { url: imageUrl } },
@@ -90,7 +90,7 @@ function createVitaVisionService({ apiKey, model, requestCompletion, fetchImpl }
       ? input.budget.stageTimeout(VISION_BUDGETS.flashMaxMs, 0)
       : VISION_BUDGETS.flashMaxMs;
     if (!(flashTimeoutMs > 0)) throw new PublicVisionError("VISION_TIMEOUT", "识别时间有点久，请重新试一次");
-    const raw = await complete({ imageUrl: input.imageUrl, timeoutMs: flashTimeoutMs });
+    const raw = await complete({ imageUrl: input.imageUrl, locale: input.locale, timeoutMs: flashTimeoutMs });
     const content = typeof raw === "string"
       ? raw
       : (raw?.content ?? (raw && typeof raw === "object" && raw.mealName ? raw : null));

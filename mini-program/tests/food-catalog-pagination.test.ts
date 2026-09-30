@@ -8,6 +8,7 @@ import {
   shuffleCatalogItems,
 } from "../src/features/food-catalog/catalog-pagination";
 import type { ProductFoodCatalogItem } from "../src/api/food-catalog-api";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(import.meta.dirname, "../src");
 
@@ -83,7 +84,7 @@ describe("food catalog pagination and category presentation", () => {
     );
   });
 
-  it("removes recent records and places sticky tags before the result list", () => {
+  it("removes recent records and places the tag rail before the result list", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/food-catalog/index.tsx"), "utf8");
     const styles = readFileSync(resolve(sourceRoot, "styles/page.scss"), "utf8");
     const recentIndex = page.indexOf("最近记录");
@@ -95,8 +96,8 @@ describe("food catalog pagination and category presentation", () => {
     expect(page).not.toContain("addRecentFood");
     expect(tagsIndex).toBeGreaterThan(-1);
     expect(tagsIndex).toBeLessThan(resultsIndex);
-    expect(styles).toContain("position: sticky;");
-    expect(styles).toContain("top: 0;");
+    expect(styles).toContain("position: static;");
+    expect(styles).toContain("overflow: hidden;");
   });
 
   it("keeps all, Nordic, and North American category chips in the catalog", () => {
@@ -120,18 +121,18 @@ describe("food catalog pagination and category presentation", () => {
   it("uses food-name wording and only marks text searches as search results", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/food-catalog/index.tsx"), "utf8");
 
-    expect(page).toContain('placeholder="搜索食物名称"');
+    expectLocalizedCopy(page, "搜索食物名称");
     expect(page).not.toContain("搜索食物或扫码");
     expect(page).toContain('setHasSearched(searchQuery.trim().length > 0)');
   });
 
-  it("keeps the sticky tag rail opaque and clipped over scrolling content", () => {
+  it("keeps the tag rail opaque and clipped over scrolling content", () => {
     const styles = readFileSync(resolve(sourceRoot, "styles/page.scss"), "utf8");
     const tagRail = styles.match(/\.food-catalog-rail--tags\s*\{[^}]*\}/s)?.[0] ?? "";
 
-    expect(tagRail).toContain("background: $color-background;");
+    expect(tagRail).toContain("background: rgba($color-warm-white, 0.98);");
     expect(tagRail).toContain("overflow: hidden;");
-    expect(tagRail).toContain("position: sticky;");
+    expect(tagRail).toContain("position: static;");
   });
 
   it("shows an explicit loading state while the catalog is reloading after detail return", () => {

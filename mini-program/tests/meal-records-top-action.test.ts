@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(import.meta.dirname, "../src");
 
@@ -10,7 +11,7 @@ describe("meal records top action", () => {
     const topBar = readFileSync(resolve(sourceRoot, "components/app-top-bar/index.tsx"), "utf8");
     const styles = readFileSync(resolve(sourceRoot, "components/app-top-bar/index.scss"), "utf8");
 
-    expect(page).toContain('topBarAction="我的常吃"');
+    expectLocalizedCopy(page, "我的常吃");
     expect(page).toContain('url: "/pages/frequent-meals/index"');
     expect(topBar).toContain("rightAction ? 112 : 44");
     expect(styles).toContain("background: $color-soft-beige;");

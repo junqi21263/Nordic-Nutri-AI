@@ -53,3 +53,13 @@ test("returns no update for missing or unsafe release metadata", async () => {
   });
   await assert.deepEqual(await createAppVersionService({ db: unsafe.db }).getLatest({ channel: "direct" }), { update: null });
 });
+
+test("preserves only the database error code for safe diagnostics", async () => {
+  const { db } = createDb(null, { code: "42501", message: "sensitive database detail" });
+
+  await assert.rejects(createAppVersionService({ db }).getLatest(), (error) => {
+    assert.equal(error.message, "App release lookup failed");
+    assert.equal(error.code, "42501");
+    return true;
+  });
+});

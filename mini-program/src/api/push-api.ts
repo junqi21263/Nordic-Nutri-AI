@@ -1,5 +1,7 @@
 import { requestProductApi } from "./product-api-client";
 import type { SmartReminderSettings } from "../features/smart-reminders/domain";
+import { getLocale } from "../i18n";
+import type { AppLocale } from "../i18n/locale";
 
 export const ANDROID_PUSH_PACKAGE = "com.lewislee.nordicnutri.dev";
 
@@ -29,11 +31,11 @@ export function acknowledgeAndroidPushDelivery(deliveryId: string, event: PushDe
   });
 }
 
-export function syncSmartReminderSchedule(settings: SmartReminderSettings) {
+export function syncSmartReminderSchedule(settings: SmartReminderSettings, locale: AppLocale = getLocale()) {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai";
   return requestProductApi<{ synced: boolean }>("/smart-reminders", {
     method: "PUT",
-    data: { ...settings, timeZone },
+    data: { ...settings, timeZone, locale },
     fallbackMessage: "提醒排程同步失败，请稍后重试",
   });
 }

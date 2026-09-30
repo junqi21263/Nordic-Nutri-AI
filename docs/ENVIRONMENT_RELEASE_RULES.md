@@ -9,6 +9,17 @@
 
 分支名和 CloudBase 环境必须同时确认。Git merge 只改变代码，不会自动部署任何 CloudBase 环境。
 
+仓库中的 `cloudbaserc.json` 保持生产 EnvId，供生产发布包和既有发布流程使用。部署云函数时，通过统一入口显式选择目标；脚本从该清单生成临时目标配置，不修改仓库清单：
+
+```sh
+pnpm deploy:cloudbase test get-login-ticket --dry-run
+pnpm deploy:cloudbase test get-login-ticket
+pnpm deploy:cloudbase production get-login-ticket --dry-run
+pnpm deploy:cloudbase production get-login-ticket
+```
+
+将函数名替换为目标函数；仅在确实需要全量更新时，将函数名改为 `--all`。脚本会校验分支与环境映射，测试仅允许 `develop` / `feature/*`，生产仅允许 `main` / `release/*`。`--dry-run` 只展示目标，不执行部署。`cloudbaserc.json` 是唯一函数清单，因此测试与生产配置不会因复制清单而漂移。
+
 ## 2. 开发规则
 
 1. 新功能从 `develop` 创建 `feature/<short-name>`。
@@ -103,4 +114,3 @@ feature/*
   → 生产专用 Smoke Test
   → 发布生产前端/小程序
 ```
-

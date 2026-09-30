@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NordicIcon } from "../nordic-icon";
 import "./index.scss";
 
@@ -11,6 +12,7 @@ export interface ReminderPausedModalProps {
 const exitDuration = 260;
 
 export function ReminderPausedModal({ open, onDismiss }: ReminderPausedModalProps) {
+  const { t } = useTranslation();
   const [closing, setClosing] = useState(false);
   const [entered, setEntered] = useState(false);
 
@@ -48,17 +50,17 @@ export function ReminderPausedModal({ open, onDismiss }: ReminderPausedModalProp
           <View className="reminder-paused-modal__ring reminder-paused-modal__ring--inner animate-collapse-ring animate-collapse-ring--delayed" />
           <View className="reminder-paused-modal__pedestal">
             <View className="animate-quiet-bell">
-              <NordicIcon name="bell-off" size={38} ariaLabel="提醒已关闭" />
+              <NordicIcon name="bell-off" size={38} ariaLabel={t("reminderPaused.icon")} />
             </View>
           </View>
         </View>
         <View className="reminder-paused-modal__copy">
-          <Text className="reminder-paused-modal__title">已关闭就餐提醒</Text>
-          <Text className="reminder-paused-modal__restart">之后可以随时重新开启</Text>
-          <Text className="reminder-paused-modal__note">需要时，我们仍在这里。</Text>
+          <Text className="reminder-paused-modal__title">{t("reminderPaused.title")}</Text>
+          <Text className="reminder-paused-modal__restart">{t("reminderPaused.restart")}</Text>
+          <Text className="reminder-paused-modal__note">{t("reminderPaused.note")}</Text>
         </View>
         <View className="reminder-paused-modal__button" onClick={dismiss}>
-          <Text>知道了</Text>
+          <Text>{t("reminderPaused.okay")}</Text>
         </View>
       </View>
     </View>

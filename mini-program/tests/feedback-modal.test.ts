@@ -12,8 +12,8 @@ describe("FeedbackModal contract", () => {
 
     expect(source).toContain('variant: "success" | "limit" | "error"');
     expect(source).toContain('import { NordicIcon } from "../nordic-icon"');
-    expect(source).toContain('<NordicIcon name="check" size={52} ariaLabel="成功" />');
-    expect(source).toContain('<NordicIcon name="hourglass" size={52} ariaLabel="额度提示" />');
+    expect(source).toContain('<NordicIcon name="check" size={52} ariaLabel={t("sharedUi.success")} />');
+    expect(source).toContain('<NordicIcon name="hourglass" size={52} ariaLabel={t("sharedUi.limitReached")} />');
     expect(source).toContain("feedback-modal-overlay");
     expect(source).toContain("feedback-modal--success");
     expect(source).toContain("feedback-modal--limit");
@@ -32,7 +32,7 @@ describe("FeedbackModal contract", () => {
     expect(source).toContain("feedback-modal-error 520ms");
     expect(source).toContain("feedback-modal-overlay-exit 420ms");
     expect(source).toContain("feedback-modal-success-icon 700ms ease-out 180ms");
-    expect(componentSource).toContain('<NordicIcon name="check" size={52} ariaLabel="成功" />');
+    expect(componentSource).toContain('<NordicIcon name="check" size={52} ariaLabel={t("sharedUi.success")} />');
     expect(componentSource).toContain("modal.dismissible && !modal.primaryText");
     expect(source).toContain("translateX(-3px)");
     expect(source).toContain("translateX(3px)");
@@ -44,7 +44,7 @@ describe("FeedbackModal contract", () => {
     const source = styles();
     const componentSource = component();
 
-    expect(componentSource).toContain('modal.primaryText === "好的" ? "feedback-modal__button--short" : ""');
+    expect(componentSource).toContain('modal.primaryText === t("feedback.okay") ? "feedback-modal__button--short" : ""');
     expect(source).toContain("white-space: nowrap");
     expect(source).toContain("font-size: $font-caption");
     expect(source).toContain("align-items: center");

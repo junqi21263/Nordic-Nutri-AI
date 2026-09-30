@@ -1,4 +1,6 @@
 import { Image, Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
@@ -130,6 +132,7 @@ function RecognitionMacroProgress({
 }
 
 export default function AnalysisResultPage() {
+  useTranslation();
   const router = useRouter();
   const analysisStore = useAnalysisStore();
   const portion = usePortionDraftStore();
@@ -216,16 +219,16 @@ export default function AnalysisResultPage() {
   if (!meal)
     return (
       <PageLayout
-        title="营养分析"
-        subtitle="还没有本地分析结果。"
-        eyebrow="分析结果"
+        title={t("analysisResult.title")}
+        subtitle={t("analysisResult.missingSubtitle")}
+        eyebrow={t("analysisResult.eyebrow")}
         showTabs={false}
         leading="‹"
         onLeadingClick={() => navigateBackOrHome("/pages/food-scanner/index")}
       >
-        <ErrorState title="分析结果不存在" description="请返回扫描页重新拍摄餐盘。" />
+        <ErrorState title={t("analysisResult.missingTitle")} description={t("analysisResult.missingDescription")} />
         <AppButton size="large" onClick={() => navigateBackOrHome("/pages/food-scanner/index")}>
-          返回扫描
+          {t("analysisResult.backToScan")}
         </AppButton>
       </PageLayout>
     );
@@ -241,7 +244,7 @@ export default function AnalysisResultPage() {
   const shouldAnimateContentMetrics = isRecognitionMotion && isContentVisible;
   const handleRecognitionReason = (reason: RecognitionFeedbackReason) => {
     if (reason.type === "extra_food" && meal.items.length <= 1) {
-      feedback.show({ message: "至少需要保留一种食物", tone: "error" });
+      feedback.show({ message: t("analysisResult.keepFood"), tone: "error" });
       return;
     }
     recordRecognitionReason(reason);
@@ -272,7 +275,7 @@ export default function AnalysisResultPage() {
     const state = useRecognitionFeedbackStore.getState();
     if (recognitionFeedbackItemAction === "remove") {
       if (meal.items.length <= 1) {
-        feedback.show({ message: "至少需要保留一种食物", tone: "error" });
+        feedback.show({ message: t("analysisResult.keepFood"), tone: "error" });
         setRecognitionFeedbackSheetMode(null);
         return;
       }
@@ -331,9 +334,9 @@ export default function AnalysisResultPage() {
     feedback.showModal({
       variant: "success",
       presentation: "recognition",
-      title: "已添加到本次识别",
-      description: `已补充：${name} · ${quantityG}g\n你可以继续核对这一餐，再决定是否保存`,
-      primaryText: "知道了",
+      title: t("analysisResult.addedTitle"),
+      description: t("analysisResult.addedDescription", { name, grams: quantityG }),
+      primaryText: t("analysisResult.gotIt"),
     });
   };
 
@@ -343,9 +346,9 @@ export default function AnalysisResultPage() {
     feedback.showModal({
       variant: "success",
       presentation: "recognition",
-      title: "已更新本次识别",
-      description: `已替换为：${name} · ${quantityG}g\n你可以继续核对这一餐，再决定是否保存`,
-      primaryText: "知道了",
+      title: t("analysisResult.replacedTitle"),
+      description: t("analysisResult.replacedDescription", { name, grams: quantityG }),
+      primaryText: t("analysisResult.gotIt"),
     });
   };
 
@@ -376,11 +379,11 @@ export default function AnalysisResultPage() {
     feedback.showModal({
       variant: "success",
       presentation: "recognition",
-      title: "反馈已提交",
+      title: t("analysisResult.feedbackSubmitted"),
       description: note
-        ? `你提交的反馈：${note}\n我们会认真查看并持续优化体验。`
-        : "你选择了「其他」，未填写补充说明。我们会认真查看这次识别结果。",
-      primaryText: "知道了",
+        ? t("analysisResult.feedbackNote", { note })
+        : t("analysisResult.feedbackOther"),
+      primaryText: t("analysisResult.gotIt"),
     });
     return true;
   };
@@ -441,19 +444,19 @@ export default function AnalysisResultPage() {
         // The saved meal remains valid if achievement refresh is temporarily unavailable.
       }
     } catch {
-      feedback.show({ message: "分析或保存失败，请检查网络后重试", tone: "error" });
+      feedback.show({ message: t("analysisResult.saveFailed"), tone: "error" });
     }
   };
-  const evaluation = meal.evaluation || "这餐吃得不错";
+  const evaluation = meal.evaluation || t("analysisResult.defaultEvaluation");
   const heroImage = scanner.previewPath ?? imageByKey[meal.imageKey];
   const previewImage = () => Taro.previewImage({ current: heroImage, urls: [heroImage] });
   const exitConfirmDialog = (
     <ConfirmDialog
       open={exitConfirmOpen}
-      title="放弃本次分析？"
-      description="返回后，本次未保存的分析结果将不再保留。"
-      confirmLabel="放弃并返回"
-      cancelLabel="继续分析"
+      title={t("analysisResult.discardQuestion")}
+      description={t("analysisResult.discardDescription")}
+      confirmLabel={t("analysisResult.discard")}
+      cancelLabel={t("analysisResult.continueAnalysis")}
       onCancel={() => setExitConfirmOpen(false)}
       onConfirm={() => {
         setExitConfirmOpen(false);
@@ -485,26 +488,26 @@ export default function AnalysisResultPage() {
           <View className="analysis-result-page__heading">
             <Text className="analysis-result-page__title">{evaluation}</Text>
             <Text className="analysis-result-page__subtitle">
-              本地分析已完成，保存前可微调份量。
+              {t("analysisResult.completedSubtitle")}
             </Text>
           </View>
           <View className="analysis-result-page__ai-status">
-            <NordicIcon name="check" size={22} ariaLabel="分析完成" />
-            <Text>分析完成</Text>
+            <NordicIcon name="check" size={22} ariaLabel={t("analysisResult.completed")} />
+            <Text>{t("analysisResult.completed")}</Text>
           </View>
         </View>
 
         <AppCard tone="beige" className="analysis-result-page__summary" motionLayer="base">
           <View
             className="analysis-result-page__summary-visual"
-            ariaLabel="查看原始餐食照片"
+            ariaLabel={t("analysisResult.viewOriginal")}
             onClick={previewImage}
           >
             <Image className="analysis-result-page__summary-image" src={heroImage} mode="aspectFill" />
             <View className="analysis-result-page__summary-scrim" />
             <View className="analysis-result-page__summary-hero-copy">
               <Text className="analysis-result-page__summary-title">{meal.title}</Text>
-              <Text className="analysis-result-page__summary-caption">点按查看原图 · 云端视觉识别</Text>
+              <Text className="analysis-result-page__summary-caption">{t("analysisResult.photoCaption")}</Text>
             </View>
           </View>
           <View className="analysis-result-page__summary-body">
@@ -519,46 +522,46 @@ export default function AnalysisResultPage() {
             >
               <View className="analysis-result-page__confidence-main">
                 <View className="analysis-result-page__confidence-icon">
-                  <NordicIcon name="check" size={14} ariaLabel="识别可信度" />
+                  <NordicIcon name="check" size={14} ariaLabel={t("analysisResult.confidence")} />
                 </View>
                 <View className="analysis-result-page__confidence-copy">
                   <Text className="analysis-result-page__confidence-value">{meal.confidence}%</Text>
-                  <Text className="analysis-result-page__confidence-label">识别可信度</Text>
+                  <Text className="analysis-result-page__confidence-label">{t("analysisResult.confidence")}</Text>
                 </View>
               </View>
               {(meal.nutritionSource === "usda" || meal.nutritionSource === "mixed") && (
                 <>
                   <View className="analysis-result-page__confidence-divider" />
                   <View className="analysis-result-page__confidence-source">
-                    <Text className="analysis-result-page__confidence-source-label">营养数据</Text>
+                    <Text className="analysis-result-page__confidence-source-label">{t("analysisResult.nutritionData")}</Text>
                     <Text className="analysis-result-page__confidence-source-value">
-                      {meal.nutritionSource === "usda" ? "USDA" : "部分 USDA"}
+                      {meal.nutritionSource === "usda" ? "USDA" : t("analysisResult.partialUsda")}
                     </Text>
                   </View>
                 </>
               )}
               <View
                 className="analysis-result-page__recognition-feedback-link"
-                ariaLabel="识别不准确，提交纠错反馈"
+                ariaLabel={t("analysisResult.correctRecognition")}
                 onClick={() => setRecognitionFeedbackSheetMode("reasons")}
               >
-                <NordicIcon name="pencil" size={16} ariaLabel="纠错" />
-                <Text>识别不准确？</Text>
+                <NordicIcon name="pencil" size={16} ariaLabel={t("analysisResult.correct")} />
+                <Text>{t("analysisResult.notAccurate")}</Text>
               </View>
             </View>
             <View className="analysis-result-page__meal-type-block">
-              <Text className="analysis-result-page__meal-type-label">这是哪一餐？</Text>
-              <View className="analysis-result-page__meal-types" ariaLabel="选择餐次类型">
+              <Text className="analysis-result-page__meal-type-label">{t("analysisResult.mealTypeQuestion")}</Text>
+              <View className="analysis-result-page__meal-types" ariaLabel={t("analysisResult.chooseMealType")}>
                 {mealTypeOptions.map((option) => (
                   <View
                     key={option.value}
                     className={`analysis-result-page__meal-type ${
                       meal.mealType === option.value ? "analysis-result-page__meal-type--active" : ""
                     }`}
-                    ariaLabel={option.label}
+                    ariaLabel={t(`meals.${option.value}`)}
                     onClick={() => setMealType(option.value)}
                   >
-                    <Text>{option.label}</Text>
+                    <Text>{t(`meals.${option.value}`)}</Text>
                   </View>
                 ))}
               </View>
@@ -570,14 +573,14 @@ export default function AnalysisResultPage() {
           <CircularProgress
             value={adjusted.score === "A" ? 92 : adjusted.score === "B" ? 76 : 58}
             total={100}
-            label="餐点评分"
+            label={t("analysisResult.mealScore")}
             tone="score"
             reveal={isRecognitionMotion ? isMetricsCounting : true}
             revealDurationMs={mealRecognitionMotionConfig.countDurationMs}
             animateValue={isRecognitionMotion}
           />
           <View className="analysis-result-page__score-copy">
-            <Text className="analysis-result-page__score-grade">{adjusted.score} · 餐点评分</Text>
+            <Text className="analysis-result-page__score-grade">{t("analysisResult.scoreGrade", { grade: adjusted.score })}</Text>
             <RecognitionCountedText
               className="analysis-result-page__score-kcal"
               target={adjusted.calories}
@@ -589,14 +592,14 @@ export default function AnalysisResultPage() {
               <RecognitionCountedText
                 className="nutrition-tag nutrition-tag--protein"
                 target={adjusted.protein}
-                suffix="g 蛋白质"
+                suffix={`g ${t("nutrition.protein")}`}
                 enabled={shouldAnimateMetrics}
                 holdAtZero={isRecognitionMotion}
               />
               <RecognitionCountedText
                 className="nutrition-tag nutrition-tag--carbs"
                 target={adjusted.carbs}
-                suffix="g 碳水"
+                suffix={`g ${t("nutrition.carbs")}`}
                 enabled={shouldAnimateMetrics}
                 holdAtZero={isRecognitionMotion}
                 delayMs={mealRecognitionMotionConfig.macroStaggerMs}
@@ -604,7 +607,7 @@ export default function AnalysisResultPage() {
               <RecognitionCountedText
                 className="nutrition-tag nutrition-tag--fat"
                 target={adjusted.fat}
-                suffix="g 脂肪"
+                suffix={`g ${t("nutrition.fat")}`}
                 enabled={shouldAnimateMetrics}
                 holdAtZero={isRecognitionMotion}
                 delayMs={mealRecognitionMotionConfig.macroStaggerMs * 2}
@@ -616,12 +619,12 @@ export default function AnalysisResultPage() {
         <AppCard className="analysis-result-page__ingredients" motionLayer="content">
           <View
             className="analysis-result-page__ingredients-heading"
-            ariaLabel={ingredientsExpanded ? "收起识别食材" : "展开识别食材"}
+            ariaLabel={t(ingredientsExpanded ? "analysisResult.collapseIngredients" : "analysisResult.expandIngredients")}
             onClick={() => setIngredientsExpanded((current) => !current)}
           >
-            <Text className="analysis-result-page__section-title">识别食材</Text>
+            <Text className="analysis-result-page__section-title">{t("analysisResult.ingredients")}</Text>
             <View className="analysis-result-page__ingredients-toggle">
-              <Text>{ingredientsExpanded ? "收起" : "展开"}</Text>
+              <Text>{t(ingredientsExpanded ? "analysisResult.collapse" : "analysisResult.expand")}</Text>
               <View
                 className={
                   ingredientsExpanded
@@ -632,7 +635,7 @@ export default function AnalysisResultPage() {
                 <NordicIcon
                   name="chevron-right"
                   size={14}
-                  ariaLabel={ingredientsExpanded ? "收起" : "展开"}
+                  ariaLabel={t(ingredientsExpanded ? "analysisResult.collapse" : "analysisResult.expand")}
                 />
               </View>
             </View>
@@ -659,7 +662,7 @@ export default function AnalysisResultPage() {
             : null}
           <View className="analysis-result-page__macro-list">
             <RecognitionMacroProgress
-              label="蛋白质"
+              label={t("nutrition.protein")}
               value={adjusted.protein}
               target={60}
               enabled={shouldAnimateContentMetrics}
@@ -667,7 +670,7 @@ export default function AnalysisResultPage() {
               delayMs={motionSchedule.macroDelaysMs[0] ?? 0}
             />
             <RecognitionMacroProgress
-              label="碳水"
+              label={t("nutrition.carbs")}
               value={adjusted.carbs}
               target={90}
               tone="carbs"
@@ -676,7 +679,7 @@ export default function AnalysisResultPage() {
               delayMs={motionSchedule.macroDelaysMs[1] ?? 0}
             />
             <RecognitionMacroProgress
-              label="脂肪"
+              label={t("nutrition.fat")}
               value={adjusted.fat}
               target={25}
               tone="fat"
@@ -690,7 +693,7 @@ export default function AnalysisResultPage() {
         <AIInsightCard
           motionLayer="content"
           content={meal.insight}
-          actionLabel="查看饮食记录"
+          actionLabel={t("analysisResult.viewRecords")}
           onActionClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
         />
         <View
@@ -701,7 +704,7 @@ export default function AnalysisResultPage() {
         >
           <View animation={bottomAction.disclaimerAnimation}>
             <Text className="nutrition-disclaimer">
-              营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
+              {t("analysisResult.disclaimer")}
             </Text>
           </View>
           <View className="analysis-result-page__actions">
@@ -715,12 +718,12 @@ export default function AnalysisResultPage() {
                   Taro.navigateTo({ url: "/pages/portion-adjustment/index" });
                 }}
               >
-                调整份量
+                {t("analysisResult.adjustPortion")}
               </AppButton>
             </View>
             <View className="analysis-result-page__action-motion" animation={bottomAction.saveButtonAnimation}>
               <AppButton size="large" disabled={!bottomAction.isSaveInteractive} onClick={() => void save()}>
-                保存本餐
+                {t("analysisResult.saveMeal")}
               </AppButton>
             </View>
           </View>

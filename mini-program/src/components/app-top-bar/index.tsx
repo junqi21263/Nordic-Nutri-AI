@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import type { PropsWithChildren } from "react";
 import { NordicIcon } from "../nordic-icon";
 import { useSystemLayout } from "../../hooks/useSystemLayout";
@@ -35,6 +36,7 @@ export function AppTopBar({
   onRightAction,
   children,
 }: AppTopBarProps) {
+  const { t } = useTranslation();
   const layout = useSystemLayout();
   const nativeSideWidth = Math.max(
     44 * (Number(showBack) + Number(showHome)),
@@ -57,13 +59,13 @@ export function AppTopBar({
           style={{ width: `${sideWidth}px`, flexShrink: 0 }}
         >
           {showBack ? (
-            <View className="app-top-bar__btn" ariaLabel="返回" onClick={onBack}>
-              <NordicIcon name="back" size={24} ariaLabel="返回" />
+            <View className="app-top-bar__btn" ariaLabel={t("common.back")} onClick={onBack}>
+              <NordicIcon name="back" size={24} ariaLabel={t("common.back")} />
             </View>
           ) : null}
           {showHome ? (
-            <View className="app-top-bar__btn" ariaLabel="首页" onClick={onHome}>
-              <NordicIcon name="home" size={24} ariaLabel="首页" />
+            <View className="app-top-bar__btn" ariaLabel={t("tabs.home")} onClick={onHome}>
+              <NordicIcon name="home" size={24} ariaLabel={t("tabs.home")} />
             </View>
           ) : null}
         </View>

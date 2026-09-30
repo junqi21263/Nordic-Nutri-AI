@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import { Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
 import {
@@ -48,24 +50,24 @@ function maskTarget(value: string, type: "email" | "phone") {
 function userMessage(error: unknown, context: "default" | "google" = "default") {
   const code = error instanceof AndroidAuthApiError ? error.code : "";
   if (context === "google") {
-    if (code === "AUTH_PROVIDER_UNAVAILABLE" || code === "AUTH_NETWORK_ERROR") return "Google 登录服务暂不可用，请稍后重试";
-    if (code === "AUTH_INVALID_CREDENTIALS") return "Google 登录凭证无效，请重试";
+    if (code === "AUTH_PROVIDER_UNAVAILABLE" || code === "AUTH_NETWORK_ERROR") return t("androidAuth.errors.googleUnavailable");
+    if (code === "AUTH_INVALID_CREDENTIALS") return t("androidAuth.errors.googleCredential");
   }
   const messages: Record<string, string> = {
-    AUTH_INVALID_REQUEST: "输入信息有误，请检查邮箱或手机号格式后重试",
-    AUTH_INVALID_CREDENTIALS: "账号或密码不正确",
-    AUTH_CAPTCHA_INVALID: "图形验证码不正确，请重新输入",
-    AUTH_CAPTCHA_EXPIRED: "图形验证码已过期，请刷新",
-    AUTH_OTP_INVALID: "验证码不正确",
-    AUTH_OTP_EXPIRED: "验证码已过期，请重新获取",
-    AUTH_EMAIL_ALREADY_REGISTERED: "该邮箱已注册，请直接登录",
-    AUTH_PHONE_ALREADY_REGISTERED: "该手机号已注册，请直接登录",
-    AUTH_RATE_LIMITED: "操作过于频繁，请稍后重试",
-    AUTH_PROVIDER_UNAVAILABLE: "验证码发送失败，请稍后重试",
-    AUTH_NETWORK_ERROR: "连接失败，请检查网络后重试",
+    AUTH_INVALID_REQUEST: t("androidAuth.errors.invalidRequest"),
+    AUTH_INVALID_CREDENTIALS: t("androidAuth.errors.invalidCredentials"),
+    AUTH_CAPTCHA_INVALID: t("androidAuth.errors.captchaInvalid"),
+    AUTH_CAPTCHA_EXPIRED: t("androidAuth.errors.captchaExpired"),
+    AUTH_OTP_INVALID: t("androidAuth.errors.otpInvalid"),
+    AUTH_OTP_EXPIRED: t("androidAuth.errors.otpExpired"),
+    AUTH_EMAIL_ALREADY_REGISTERED: t("androidAuth.errors.emailRegistered"),
+    AUTH_PHONE_ALREADY_REGISTERED: t("androidAuth.errors.phoneRegistered"),
+    AUTH_RATE_LIMITED: t("androidAuth.errors.rateLimited"),
+    AUTH_PROVIDER_UNAVAILABLE: t("androidAuth.errors.codeUnavailable"),
+    AUTH_NETWORK_ERROR: t("androidAuth.errors.network"),
   };
   if (code && messages[code]) return messages[code];
-  return "操作失败，请稍后重试";
+  return t("androidAuth.errors.failed");
 }
 
 function logSendCode(level: "info" | "warn" | "error", event: string, detail: Record<string, unknown> = {}) {
@@ -87,6 +89,7 @@ function requiresCaptcha(view: AuthView) {
 }
 
 export default function AndroidAuthPage() {
+  useTranslation();
   const [view, setView] = useState<AuthView>("landing");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -142,9 +145,9 @@ export default function AndroidAuthPage() {
       const dailyLimit = requestError.message.includes("今日");
       showFeedbackModal({
         variant: "limit",
-        title: dailyLimit ? "今日验证码已达上限" : "验证码发送过于频繁",
-        description: dailyLimit ? "今日发送次数已用完，请明日再试。" : "请求间隔太短，请稍后再试。",
-        primaryText: "知道了",
+        title: t(dailyLimit ? "androidAuth.limit.dailyTitle" : "androidAuth.limit.frequentTitle"),
+        description: t(dailyLimit ? "androidAuth.limit.dailyDescription" : "androidAuth.limit.frequentDescription"),
+        primaryText: t("androidAuth.gotIt"),
       });
       return true;
     }
@@ -152,10 +155,10 @@ export default function AndroidAuthPage() {
       const registeredByPhone = code === "AUTH_PHONE_ALREADY_REGISTERED";
       showFeedbackModal({
         variant: "error",
-        title: registeredByPhone ? "该手机号已注册" : "该邮箱已注册",
-        description: `无需重复注册，请直接使用${registeredByPhone ? "手机号" : "邮箱"}和密码登录。`,
-        primaryText: "去登录",
-        secondaryText: "取消",
+        title: t(registeredByPhone ? "androidAuth.errors.phoneRegistered" : "androidAuth.errors.emailRegistered"),
+        description: t(registeredByPhone ? "androidAuth.registeredPhoneDescription" : "androidAuth.registeredEmailDescription"),
+        primaryText: t("androidAuth.goToLogin"),
+        secondaryText: t("common.cancel"),
         onPrimary: () => navigate(registeredByPhone ? "phone-login" : "email-login"),
       });
       return true;
@@ -202,7 +205,7 @@ export default function AndroidAuthPage() {
     try {
       await startApplicationAuth({ force: true, allowSilentLogin: false });
     } catch {
-      setError("连接暂不可用，登录状态已保留，请重试");
+      setError(t("androidAuth.errors.sessionLaunch"));
     }
   };
 
@@ -226,7 +229,7 @@ export default function AndroidAuthPage() {
     } catch (requestError) {
       setView("landing");
       const message = userMessage(requestError, "google");
-      setError(message === "操作失败，请稍后重试" ? "登录失败，请重试" : message);
+      setError(message === t("androidAuth.errors.failed") ? t("androidAuth.errors.googleLoginFailed") : message);
     } finally {
       setBusy(false);
     }
@@ -236,7 +239,7 @@ export default function AndroidAuthPage() {
     if (busy || cooldown > 0) return;
     if (isOtp || view === "reset-password") {
       navigate(view === "reset-password" ? successBackView : isPhone ? "phone-register" : "email-register");
-      setSuccess("请完成图形验证后重新获取验证码");
+      setSuccess(t("androidAuth.completeCaptchaRetry"));
       return;
     }
     logSendCode("info", "send-code:start", {
@@ -248,7 +251,7 @@ export default function AndroidAuthPage() {
     const inputError = getAuthInputError(targetType, isPhone ? phoneWithCountry(phone) : email, captcha?.captchaId, captchaAnswer);
     if (inputError) {
       logSendCode("warn", "send-code:blocked", { reason: inputError });
-      setError(inputError);
+      setError(t(inputError));
       return;
     }
     setBusy(true);
@@ -276,7 +279,7 @@ export default function AndroidAuthPage() {
         setSuccessBackView("forgot-email");
       }
       setCooldown(60);
-      setSuccess("验证码已发送");
+      setSuccess(t("androidAuth.codeSent"));
     } catch (requestError) {
       logSendCode("error", "send-code:error", {
         errorName: requestError instanceof Error ? requestError.name : "UnknownError",
@@ -293,15 +296,15 @@ export default function AndroidAuthPage() {
 
   const validatePassword = () => {
     if (password.length < 8) {
-      setError("密码至少需要 8 位");
+      setError(t("androidAuth.validation.passwordMin"));
       return false;
     }
     if (password.length > 128) {
-      setError("密码不能超过 128 位");
+      setError(t("androidAuth.validation.passwordMax"));
       return false;
     }
     if (password !== confirmPassword) {
-      setError("两次输入的密码不一致");
+      setError(t("androidAuth.validation.passwordMismatch"));
       return false;
     }
     return true;
@@ -311,8 +314,8 @@ export default function AndroidAuthPage() {
     if (busy) return;
     if (isLogin) {
       const inputError = getAuthInputError(targetType, isPhone ? phoneWithCountry(phone) : email, undefined, "", false);
-      if (inputError) { setError(inputError); return; }
-      if (!password) { setError("请输入密码"); return; }
+      if (inputError) { setError(t(inputError)); return; }
+      if (!password) { setError(t("androidAuth.validation.passwordRequired")); return; }
     }
     setBusy(true);
     setError("");
@@ -326,7 +329,7 @@ export default function AndroidAuthPage() {
         await finishLogin(result as AndroidAuthSessionResult, "login");
       } else if (isOtp) {
         if (code.length !== 6) {
-          setError("请输入 6 位验证码");
+          setError(t("androidAuth.validation.otp"));
           return;
         }
         setError("");
@@ -334,7 +337,7 @@ export default function AndroidAuthPage() {
         setView(isPhone ? "phone-register-password" : "email-register-password");
       } else if (isRegisterPassword) {
         if (code.length !== 6) {
-          setError("请输入 6 位验证码");
+          setError(t("androidAuth.validation.otp"));
           return;
         }
         if (!validatePassword()) return;
@@ -344,7 +347,7 @@ export default function AndroidAuthPage() {
         await finishLogin(result as AndroidAuthSessionResult, "register");
       } else if (view === "reset-password") {
         if (code.length !== 6) {
-          setError("请输入 6 位验证码");
+          setError(t("androidAuth.validation.otp"));
           return;
         }
         if (!validatePassword()) return;
@@ -363,7 +366,7 @@ export default function AndroidAuthPage() {
 
   const verifyRegisterCode = () => {
     if (code.length !== 6) {
-      setError("请输入 6 位验证码");
+      setError(t("androidAuth.validation.otp"));
       return;
     }
     setError("");
@@ -386,36 +389,36 @@ export default function AndroidAuthPage() {
       <AuthHero />
       <View className="auth-landing__content">
         <View className="auth-landing__intro">
-          <Text className="auth-landing__title">欢迎来到 Nordic Nutri</Text>
-          <Text className="auth-landing__subtitle">读懂每一餐，让健康生活更简单。</Text>
+          <Text className="auth-landing__title">{t("androidAuth.welcomeTitle")}</Text>
+          <Text className="auth-landing__subtitle">{t("androidAuth.welcomeSubtitle")}</Text>
         </View>
         <AppButton size="large" variant="primary" loading={view === "google-connecting" || busy} onClick={() => void signInWithGoogle()}>
           <View className="auth-provider-content">
             <NordicIcon name="google" size={32} ariaLabel="" />
-            <Text className="auth-provider-label">{view === "google-connecting" ? "连接中…" : "使用 Google 登录"}</Text>
+            <Text className="auth-provider-label">{view === "google-connecting" ? t("androidAuth.connecting") : t("androidAuth.googleLogin")}</Text>
           </View>
         </AppButton>
-        <View className="auth-divider"><View className="auth-divider__line" /><Text>或选择以下方式</Text><View className="auth-divider__line" /></View>
+        <View className="auth-divider"><View className="auth-divider__line" /><Text>{t("androidAuth.chooseMethod")}</Text><View className="auth-divider__line" /></View>
         <View className="auth-landing__providers">
           <AppButton variant="outline" onClick={() => navigate("email-login")}>
             <View className="auth-provider-content">
               <NordicIcon name="mail" size={32} ariaLabel="" />
-              <Text className="auth-provider-label">邮箱</Text>
+              <Text className="auth-provider-label">{t("androidAuth.email")}</Text>
             </View>
           </AppButton>
           <AppButton variant="outline" onClick={() => navigate("phone-login")}>
             <View className="auth-provider-content">
               <NordicIcon name="phone" size={32} ariaLabel="" />
-              <Text className="auth-provider-label">手机号</Text>
+              <Text className="auth-provider-label">{t("androidAuth.phone")}</Text>
             </View>
           </AppButton>
         </View>
         <View className="auth-create-account">
-          <Text>还没有账号？</Text>
-          <Text className="auth-create-account__link" onClick={() => navigate("email-register")}>立即注册帐号</Text>
+          <Text>{t("androidAuth.noAccount")}</Text>
+          <Text className="auth-create-account__link" onClick={() => navigate("email-register")}>{t("androidAuth.registerNow")}</Text>
         </View>
-        {error ? <InlineMessage message={error} kind="error" onRetry={error.includes("登录失败") ? () => void signInWithGoogle() : undefined} /> : null}
-        <Text className="auth-terms">继续即表示你同意 Nordic 的<Text>服务条款</Text>和<Text>隐私政策</Text>。</Text>
+        {error ? <InlineMessage message={error} kind="error" onRetry={error === t("androidAuth.errors.googleLoginFailed") ? () => void signInWithGoogle() : undefined} /> : null}
+        <Text className="auth-terms">{t("androidAuth.termsLead")}<Text>{t("androidAuth.termsOfService")}</Text>{t("androidAuth.termsJoin")}<Text>{t("androidAuth.privacyPolicy")}</Text>{t("androidAuth.termsTail")}</Text>
       </View>
     </View>
   );
@@ -423,13 +426,13 @@ export default function AndroidAuthPage() {
   const renderCaptcha = () => <CaptchaField captcha={captcha} value={captchaAnswer} error={captchaError} onChange={setCaptchaAnswer} onRefresh={() => void refreshCaptcha()} />;
   const renderTargetInput = () => isPhone
     ? <PhoneInput value={phone} onChange={setPhone} />
-    : <AuthInput label="邮箱地址" value={email} placeholder="请输入邮箱地址" onChange={setEmail} />;
+    : <AuthInput label={t("androidAuth.email")} value={email} placeholder={t("androidAuth.emailPlaceholder")} onChange={setEmail} />;
 
   const renderMethods = () => (
     <View className={`auth-methods ${isPhone ? "auth-methods--phone" : ""}`}>
       <View className="auth-methods__indicator" />
-      <AppButton variant="ghost" active={!isPhone} disabled={busy} ariaLabel="使用邮箱" onClick={() => switchMethod("email")}>邮箱</AppButton>
-      <AppButton variant="ghost" active={isPhone} disabled={busy} ariaLabel="使用手机号" onClick={() => switchMethod("phone")}>手机号</AppButton>
+      <AppButton variant="ghost" active={!isPhone} disabled={busy} ariaLabel={t("androidAuth.useEmail")} onClick={() => switchMethod("email")}>{t("androidAuth.email")}</AppButton>
+      <AppButton variant="ghost" active={isPhone} disabled={busy} ariaLabel={t("androidAuth.usePhone")} onClick={() => switchMethod("phone")}>{t("androidAuth.phone")}</AppButton>
     </View>
   );
 
@@ -438,9 +441,9 @@ export default function AndroidAuthPage() {
       {renderMethods()}
       {renderTargetInput()}
       <PasswordInput value={password} onChange={setPassword} />
-      <AppButton size="large" loading={busy} onClick={() => void submit()}>{busy ? "登录中…" : "登录"}</AppButton>
+      <AppButton size="large" loading={busy} onClick={() => void submit()}>{busy ? t("androidAuth.loggingIn") : t("androidAuth.login")}</AppButton>
       {error ? <InlineMessage message={error} kind="error" /> : null}
-      <View className="auth-form__links"><Text onClick={() => navigate(isPhone ? "forgot-phone" : "forgot-email")}>忘记密码？</Text><Text onClick={() => navigate(isPhone ? "phone-register" : "email-register")}>还没有账号？立即注册</Text></View>
+      <View className="auth-form__links"><Text onClick={() => navigate(isPhone ? "forgot-phone" : "forgot-email")}>{t("androidAuth.forgotPassword")}</Text><Text onClick={() => navigate(isPhone ? "phone-register" : "email-register")}>{t("androidAuth.registerPrompt")}</Text></View>
     </View>
   );
 
@@ -449,74 +452,74 @@ export default function AndroidAuthPage() {
       {renderMethods()}
       {renderTargetInput()}
       {renderCaptcha()}
-      <AppButton size="large" loading={busy} disabled={cooldown > 0} onClick={() => void sendCode()}>{busy ? "发送中…" : cooldown > 0 ? `${cooldown} 秒后重新获取` : "获取验证码"}</AppButton>
+      <AppButton size="large" loading={busy} disabled={cooldown > 0} onClick={() => void sendCode()}>{busy ? t("androidAuth.sending") : cooldown > 0 ? t("androidAuth.resendAfter", { count: cooldown }) : t("androidAuth.getCode")}</AppButton>
       {error ? <InlineMessage message={error} kind="error" /> : null}
-      <Text className="auth-switch">已有账号？<Text onClick={() => navigate(isPhone ? "phone-login" : "email-login")}>去登录</Text></Text>
+      <Text className="auth-switch">{t("androidAuth.haveAccount")}<Text onClick={() => navigate(isPhone ? "phone-login" : "email-login")}>{t("androidAuth.goToLogin")}</Text></Text>
     </View>
   );
 
   const renderOtp = () => (
     <View className="auth-form-shell auth-form-shell--otp">
       <View className="auth-form__step-row">
-        <Text className="auth-form__eyebrow">{isPhone ? "验证手机号" : "验证邮箱"}</Text>
+        <Text className="auth-form__eyebrow">{t(isPhone ? "androidAuth.verifyPhone" : "androidAuth.verifyEmail")}</Text>
         <Text className="auth-form__step">02 / 03</Text>
       </View>
-      <Text className="auth-form__title">{isPhone ? "输入短信验证码" : "输入邮箱验证码"}</Text>
-      <Text className="auth-form__copy">验证码已发送至 {maskTarget(isPhone ? phoneWithCountry(phone) : email, targetType)}</Text>
+      <Text className="auth-form__title">{t(isPhone ? "androidAuth.enterSmsCode" : "androidAuth.enterEmailCode")}</Text>
+      <Text className="auth-form__copy">{t("androidAuth.codeSentTo", { target: maskTarget(isPhone ? phoneWithCountry(phone) : email, targetType) })}</Text>
       <OtpInput value={code} onChange={setCode} />
-      <AppButton size="large" loading={busy} onClick={verifyRegisterCode}>下一步</AppButton>
+      <AppButton size="large" loading={busy} onClick={verifyRegisterCode}>{t("common.continue")}</AppButton>
       {success ? <InlineMessage message={success} kind="success" /> : null}
       {error ? <InlineMessage message={error} kind="error" /> : null}
-      <View className="auth-form__links"><Text className={cooldown > 0 ? "auth-muted" : ""} onClick={() => void sendCode()}>{cooldown > 0 ? `${cooldown} 秒后重新获取` : "重新获取"}</Text><Text onClick={() => navigate(isPhone ? "phone-register" : "email-register")}>更换{isPhone ? "手机号" : "邮箱"}</Text></View>
+      <View className="auth-form__links"><Text className={cooldown > 0 ? "auth-muted" : ""} onClick={() => void sendCode()}>{cooldown > 0 ? t("androidAuth.resendAfter", { count: cooldown }) : t("androidAuth.resend")}</Text><Text onClick={() => navigate(isPhone ? "phone-register" : "email-register")}>{t(isPhone ? "androidAuth.changePhone" : "androidAuth.changeEmail")}</Text></View>
     </View>
   );
 
   const renderRegisterPassword = () => (
     <View className="auth-form-shell auth-form-shell--register-password">
       <View className="auth-form__step-row">
-        <Text className="auth-form__eyebrow">设置密码</Text>
+        <Text className="auth-form__eyebrow">{t("androidAuth.setPassword")}</Text>
         <Text className="auth-form__step">03 / 03</Text>
       </View>
-      <Text className="auth-form__title">设置登录密码</Text>
+      <Text className="auth-form__title">{t("androidAuth.setLoginPassword")}</Text>
       <PasswordInput value={password} onChange={setPassword} />
-      <PasswordInput label="确认密码" value={confirmPassword} onChange={setConfirmPassword} />
-      <AppButton size="large" loading={busy} onClick={() => void submit()}>{busy ? "注册中…" : "注册账号"}</AppButton>
+      <PasswordInput label={t("androidAuth.confirmPassword")} value={confirmPassword} onChange={setConfirmPassword} />
+      <AppButton size="large" loading={busy} onClick={() => void submit()}>{busy ? t("androidAuth.registering") : t("androidAuth.register")}</AppButton>
       {error ? <InlineMessage message={error} kind="error" /> : null}
     </View>
   );
 
   const renderForgot = () => (
     <View className="auth-form-shell auth-form-shell--forgot">
-      <Text className="auth-form__eyebrow">找回账号</Text>
-      <Text className="auth-form__title">找回密码</Text>
+      <Text className="auth-form__eyebrow">{t("androidAuth.recoverAccount")}</Text>
+      <Text className="auth-form__title">{t("androidAuth.recoverPassword")}</Text>
       {renderTargetInput()}
       {renderCaptcha()}
-      <AppButton size="large" loading={busy} disabled={cooldown > 0} onClick={() => void sendCode()}>{busy ? "发送中…" : cooldown > 0 ? `${cooldown} 秒后重新获取` : "获取验证码"}</AppButton>
+      <AppButton size="large" loading={busy} disabled={cooldown > 0} onClick={() => void sendCode()}>{busy ? t("androidAuth.sending") : cooldown > 0 ? t("androidAuth.resendAfter", { count: cooldown }) : t("androidAuth.getCode")}</AppButton>
       {error ? <InlineMessage message={error} kind="error" /> : null}
     </View>
   );
 
   const renderReset = () => (
     <View className="auth-form-shell auth-form-shell--reset">
-      <Text className="auth-form__eyebrow">设置密码</Text>
-      <Text className="auth-form__title">设置新密码</Text>
-      <Text className="auth-form__copy">请输入发送至 {maskTarget(isPhone ? phoneWithCountry(phone) : email, targetType)} 的验证码</Text>
+      <Text className="auth-form__eyebrow">{t("androidAuth.setPassword")}</Text>
+      <Text className="auth-form__title">{t("androidAuth.setNewPassword")}</Text>
+      <Text className="auth-form__copy">{t("androidAuth.enterCodeSentTo", { target: maskTarget(isPhone ? phoneWithCountry(phone) : email, targetType) })}</Text>
       <OtpInput value={code} onChange={setCode} />
       <PasswordInput value={password} onChange={setPassword} />
-      <PasswordInput label="确认密码" value={confirmPassword} onChange={setConfirmPassword} />
-      <AppButton size="large" loading={busy} onClick={() => void submit()}>{busy ? "更新中…" : "重置密码"}</AppButton>
+      <PasswordInput label={t("androidAuth.confirmPassword")} value={confirmPassword} onChange={setConfirmPassword} />
+      <AppButton size="large" loading={busy} onClick={() => void submit()}>{busy ? t("androidAuth.updating") : t("androidAuth.resetPassword")}</AppButton>
       {error ? <InlineMessage message={error} kind="error" /> : null}
-      <View className="auth-form__links"><Text className={cooldown > 0 ? "auth-muted" : ""} onClick={() => void sendCode()}>{cooldown > 0 ? `${cooldown} 秒后重新获取` : "重新获取"}</Text><Text onClick={() => navigate(successBackView)}>返回</Text></View>
+      <View className="auth-form__links"><Text className={cooldown > 0 ? "auth-muted" : ""} onClick={() => void sendCode()}>{cooldown > 0 ? t("androidAuth.resendAfter", { count: cooldown }) : t("androidAuth.resend")}</Text><Text onClick={() => navigate(successBackView)}>{t("common.back")}</Text></View>
     </View>
   );
 
   const renderSuccess = () => (
     <View className="auth-success">
       <View className="auth-success__check" />
-      <Text className="auth-success__title">{successKind === "register" ? "注册成功" : successKind === "reset" ? "密码已更新" : "欢迎回来"}</Text>
-      <Text className="auth-success__copy">{successKind === "reset" ? "密码已更新，请使用新密码登录" : "开启你的健康生活"}</Text>
-      {error && successKind !== "reset" ? <><Text>{error}</Text><AppButton onClick={() => void retrySessionLaunch()}>重试连接</AppButton></> : null}
-      {successKind === "reset" ? <AppButton size="large" onClick={() => navigate("landing")}>返回首页</AppButton> : null}
+      <Text className="auth-success__title">{t(successKind === "register" ? "androidAuth.registerSuccess" : successKind === "reset" ? "androidAuth.passwordUpdated" : "androidAuth.welcomeBack")}</Text>
+      <Text className="auth-success__copy">{t(successKind === "reset" ? "androidAuth.passwordUpdatedHint" : "androidAuth.healthyLife")}</Text>
+      {error && successKind !== "reset" ? <><Text>{error}</Text><AppButton onClick={() => void retrySessionLaunch()}>{t("androidAuth.retryConnection")}</AppButton></> : null}
+      {successKind === "reset" ? <AppButton size="large" onClick={() => navigate("landing")}>{t("androidAuth.backHome")}</AppButton> : null}
     </View>
   );
 

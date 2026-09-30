@@ -6,7 +6,7 @@ const source = readFileSync(resolve(process.cwd(), "src/pages/milestone-journey/
 
 describe("Milestone journey error copy", () => {
   it("does not render a raw backend error to the user", () => {
-    expect(source).toContain('setError("我的旅程暂时无法读取，请稍后重试")');
+    expect(source).toContain('setError(t("milestoneJourney.loadFailed"))');
     expect(source).not.toContain("reason instanceof Error ? reason.message");
   });
 });

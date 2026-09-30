@@ -50,7 +50,8 @@ export function createSmartReminderCoordinator(dependencies: CoordinatorDependen
       if (!userId) return true;
       const settings = dependencies.storage.load(userId);
       if (!settings.enabled || !(await requestPermission())) return true;
-      const candidates = buildNextReminderCandidates(settings, dependencies.getMeals(), dependencies.now?.() ?? new Date());
+      const locale = await import("../../i18n").then(({ getLocale }) => getLocale()).catch(() => "zh-CN" as const);
+      const candidates = buildNextReminderCandidates(settings, dependencies.getMeals(), dependencies.now?.() ?? new Date(), locale);
       await dependencies.adapter.schedule(candidates);
       return true;
     } catch {

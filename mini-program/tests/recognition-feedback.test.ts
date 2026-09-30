@@ -159,7 +159,7 @@ describe("recognition feedback", () => {
 
   it("does not allow removing the only recognized food", () => {
     expect(source).toContain("meal.items.length <= 1");
-    expect(source).toContain("至少需要保留一种食物");
+    expect(source).toContain('t("analysisResult.keepFood")');
   });
 
   it("shows the missing-food success motion only after the add request succeeds", () => {
@@ -173,7 +173,7 @@ describe("recognition feedback", () => {
     expect(source).toContain('await recognitionFeedbackCreateRef.current');
     expect(source).toContain('await updateRecognitionFeedback(feedbackId, { note })');
     expect(source).toContain('presentation: "recognition"');
-    expect(source).toContain('title: "反馈已提交"');
+    expect(source).toContain('title: t("analysisResult.feedbackSubmitted")');
     expect(sheetSource).toContain('otherLoading');
   });
 });

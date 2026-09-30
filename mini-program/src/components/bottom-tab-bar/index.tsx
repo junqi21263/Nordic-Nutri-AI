@@ -1,7 +1,9 @@
 import { Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import Taro from "@tarojs/taro";
 import { NordicIcon, type NordicIconName } from "../nordic-icon";
 import { useTabBarStore } from "../../stores/tab-bar-store";
+import { useSystemLayout } from "../../hooks/useSystemLayout";
 
 export interface BottomTabItem {
   key: string;
@@ -14,12 +16,12 @@ export interface BottomTabBarProps {
 }
 
 const defaultItems: BottomTabItem[] = [
-  { key: "home", label: "首页", icon: "home" },
-  { key: "food-scanner", label: "扫描", icon: "scan-line" },
-  { key: "meal-records", label: "记录", icon: "list-checks" },
-  { key: "food-catalog", label: "食物库", icon: "food-bowl" },
-  { key: "coach", label: "教练", icon: "bot" },
-  { key: "profile", label: "我的", icon: "user-round" },
+  { key: "home", label: "", icon: "home" },
+  { key: "food-scanner", label: "", icon: "scan-line" },
+  { key: "meal-records", label: "", icon: "list-checks" },
+  { key: "food-catalog", label: "", icon: "food-bowl" },
+  { key: "coach", label: "", icon: "bot" },
+  { key: "profile", label: "", icon: "user-round" },
 ];
 
 const routeByKey: Record<string, string> = {
@@ -32,6 +34,9 @@ const routeByKey: Record<string, string> = {
 };
 
 export function BottomTabBar({ activeKey, items = defaultItems }: BottomTabBarProps) {
+  const { t } = useTranslation();
+  const layout = useSystemLayout();
+  const localizedItems = items === defaultItems ? items.map(item => ({ ...item, label: t(`tabs.${item.key}`) })) : items;
   const navigate = (key: string) => {
     const route = routeByKey[key];
     if (route && key !== activeKey) {
@@ -46,14 +51,20 @@ export function BottomTabBar({ activeKey, items = defaultItems }: BottomTabBarPr
     }
   };
   return (
-    <View className="bottom-tab-bar">
-      {items.map((item) => (
+    <View
+      className="bottom-tab-bar"
+      style={{
+        height: `calc(${layout.tabBarHeight}px + ${layout.safeBottom}px)`,
+        paddingBottom: `${layout.safeBottom}px`,
+      }}
+    >
+      {localizedItems.map((item) => (
         <View
           className={`bottom-tab-bar__item ${item.key === activeKey ? "bottom-tab-bar__item--active" : ""}`}
           hoverClass="pressable--active"
           hoverStayTime={70}
           key={item.key}
-          ariaLabel={`切换到${item.label}`}
+          ariaLabel={item.label}
           onClick={() => navigate(item.key)}
         >
           <View className="bottom-tab-bar__icon">

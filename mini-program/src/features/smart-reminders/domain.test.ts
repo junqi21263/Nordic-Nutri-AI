@@ -95,4 +95,18 @@ describe("smart reminder domain", () => {
       body: "拍一下就好 📷",
     });
   });
+
+  it.each([
+    ["zh-TW", "最近是不是有點忙？", "不用補記，從這一餐重新開始就好。"],
+    ["en", "Been busy lately?", "No need to catch up—just start again with this meal."],
+  ] as const)("localizes reminder copy for %s", (locale, title, body) => {
+    expect(getReminderCopy("lunch", 2, 0, locale)).toEqual({ title, body });
+  });
+
+  it("localizes ordinary meal names and reminder channel labels across all supported locales", () => {
+    expect(getReminderCopy("breakfast", 0, 0, "zh-CN").title).toBe("早餐还没记录吗？");
+    expect(getReminderCopy("breakfast", 0, 0, "zh-TW").title).toBe("還沒記錄早餐嗎？");
+    expect(getReminderCopy("breakfast", 0, 0, "en").title).toBe("Haven't logged breakfast yet?");
+    expect(getReminderCopy("lunch", 0, 2, "zh-TW").body).toBe("你的記錄節奏正在慢慢形成。");
+  });
 });

@@ -1131,7 +1131,9 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       };
     },
     getNutritionPlan: data.getNutritionPlan,
-    weeklyReviewModel: deepseekModel,
+    // The routed provider may differ from the default DeepSeek model. The V2
+    // context hash invalidates content; don't regenerate on every routed read.
+    weeklyReviewModel: null,
     generateDailyInsight: async (input) => {
       const result = await generateDailyInsight(input);
       recordModelUsage(opsRef.observability, {
@@ -1769,6 +1771,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     issue: session.issue,
     verifySession: (token) => verifyAccessToken(token, config.sessionSecret),
     auth,
+    appVersion,
     productUserExists,
     data,
     meals,
@@ -1854,6 +1857,18 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     }),
     calculateNutritionPlan: calculateNutritionPlanWithAi,
   };
+}
+
+function createAppVersionOnlyService(env = process.env, dependencies = {}) {
+  const config = readRuntimeConfig(env);
+  const cloudbase = dependencies.cloudbaseSdk ?? require("@cloudbase/js-sdk");
+  const app = cloudbase.init({
+    env: config.cloudbaseEnvId,
+    accessKey: config.cloudbaseApiKey,
+    auth: { detectSessionInUrl: false },
+  });
+  const db = typeof app.rdb === "function" ? app.rdb() : app.rdb;
+  return { appVersionOnly: true, appVersion: createAppVersionService({ db }) };
 }
 
 function buildVisionDataUrl({ content, contentType }) {
@@ -2345,14 +2360,19 @@ function createHttpServer({ service }) {
     }
     if (appVersionRoute) {
       if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
-      if (!service?.appVersion) return sendJson(res, 503, { code: "APP_VERSION_UNAVAILABLE" });
+      if (!service?.appVersion) return sendJson(res, 503, { code: "APP_VERSION_SERVICE_NOT_CONFIGURED" });
       try {
         return sendJson(res, 200, await service.appVersion.getLatest({ channel: url.searchParams.get("channel") || "direct" }));
       } catch (error) {
+        console.error("[app-version] release lookup failed", {
+          name: typeof error?.name === "string" ? error.name.slice(0, 64) : "Error",
+          code: typeof error?.code === "string" ? error.code.slice(0, 64) : null,
+        });
         captureTraceError(res, error);
-        return sendJson(res, 503, { code: "APP_VERSION_UNAVAILABLE" });
+        return sendJson(res, 503, { code: "APP_VERSION_LOOKUP_FAILED" });
       }
     }
+    if (service?.appVersionOnly) return sendJson(res, 503, { code: "SERVICE_UNAVAILABLE" });
     if (url.pathname !== "/" && url.pathname !== "/get-login-ticket" && !authRoute && !appVersionRoute && !dataOperation && !mealRoute && !pushRoute && !insightOperation && !achievementCelebrationRoute && !milestoneRoute && !coachOperation && !foodRoute && !adminFoodRoute && !internalFoodImageRoute && !internalVisionAnalysisRoute && !internalReminderRoute && !feedbackRoute && !recognitionFeedbackRoute && !visionRoute && !visionAnalysisStatusRoute && !avatarRoute) {
       sendJson(res, 404, { code: "NOT_FOUND" });
       return;
@@ -3628,10 +3648,11 @@ function createHttpServer({ service }) {
           return sendJson(res, 200, await service.insights.getDailySummaryWithInsight(session.sub, date, {
             preferFast: true,
             resolveImages: !light,
+            locale: req.headers["accept-language"],
           }));
         }
         if (insightOperation === "getWeeklyReview") {
-          return sendJson(res, 200, await service.insights.getWeeklyReview(session.sub, date, { preferFast }));
+          return sendJson(res, 200, await service.insights.getWeeklyReview(session.sub, date, { preferFast, locale: req.headers["accept-language"] }));
         }
         if (insightOperation === "getMilestoneStats") {
           const milestone = Number(url.searchParams.get("milestone"));
@@ -3657,13 +3678,13 @@ function createHttpServer({ service }) {
         if (coachOperation === "getBrief" && req.method === "GET") {
           const date = url.searchParams.get("date");
           if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
-          return sendJson(res, 200, await service.coach.getBrief(session.sub, date));
+          return sendJson(res, 200, await service.coach.getBrief(session.sub, date, { locale: req.headers["accept-language"] }));
         }
         if (coachOperation === "getDailyTip" && req.method === "GET") {
           const date = url.searchParams.get("date");
           if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
           const refresh = url.searchParams.get("refresh") === "1" || url.searchParams.get("refresh") === "true";
-          const tip = await service.coach.getDailyTip(session.sub, date, { refresh });
+          const tip = await service.coach.getDailyTip(session.sub, date, { refresh, locale: req.headers["accept-language"] });
           if (!tip?.cached && tip?.model && tip?.source && tip.source !== "rule_v2") {
             recordModelUsage(service.observability, {
               model: tip.model,
@@ -3678,7 +3699,7 @@ function createHttpServer({ service }) {
         if (coachOperation === "getDailyBrief" && req.method === "GET") {
           const date = url.searchParams.get("date");
           if (!date) return sendJson(res, 400, { code: "COACH_INPUT_INVALID" });
-          const brief = await service.coach.getDailyBrief(session.sub, date);
+          const brief = await service.coach.getDailyBrief(session.sub, date, { locale: req.headers["accept-language"] });
           if (!brief?.cached && brief?.model && brief?.source !== "rule_v2") {
             recordModelUsage(service.observability, {
               model: brief.model,
@@ -3993,6 +4014,7 @@ function createHttpServer({ service }) {
             createAnalysis: async () => {
               const created = await service.visionAnalysisFoundation.createVisionAnalysis({
                 userId: session.sub,
+                locale: body.locale,
                 clientRequestId,
                 provider: service.vision?.provider || null,
                 model: service.vision?.model || null,
@@ -4515,6 +4537,11 @@ if (require.main === module) {
     // signal in CloudBase logs. This makes a configuration/dependency outage
     // diagnosable without ever printing credential values.
     console.error("[startup] get-login-ticket service initialization failed:", error?.message || error);
+    try {
+      service = createAppVersionOnlyService();
+    } catch (fallbackError) {
+      console.error("[startup] app-version service initialization failed:", fallbackError?.message || fallbackError);
+    }
   }
   createHttpServer({ service }).listen(9000);
 }
@@ -4529,6 +4556,7 @@ module.exports = {
   getAuthRoute,
   createHunyuanGenerationService,
   createRuntimeService,
+  createAppVersionOnlyService,
   readRuntimeConfig,
   selectDeepseekModel,
   requestWechatSession,

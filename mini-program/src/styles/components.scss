@@ -43,6 +43,10 @@
 }
 
 .app-button {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -353,8 +357,14 @@
   bottom: 0;
   display: flex;
   height: calc($bottom-tab-height + $safe-area-bottom);
+  /* #ifdef H5 */
+  height: calc(var(--app-tab-bar-height, #{$bottom-tab-height}) + var(--app-safe-bottom, 0px));
+  /* #endif */
   left: 0;
   padding-bottom: $safe-area-bottom;
+  /* #ifdef H5 */
+  padding-bottom: var(--app-safe-bottom, 0px);
+  /* #endif */
   position: fixed;
   right: 0;
   z-index: 20;
@@ -946,14 +956,17 @@
   bottom: 0;
   display: flex;
   box-sizing: border-box;
-  height: calc(var(--app-tab-bar-height, #{$bottom-tab-height}) + var(--app-safe-bottom, 0px));
+  height: calc($bottom-tab-height + $safe-area-bottom);
   left: 0;
-  padding-bottom: var(--app-safe-bottom, 0px);
+  padding-bottom: $safe-area-bottom;
   position: fixed;
   right: 0;
   z-index: 20;
 }
 .bottom-tab-bar__item {
+  min-width: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
   align-items: center;
   color: $color-neutral-gray;
   display: flex;
@@ -1901,10 +1914,10 @@
   top: calc(50% - 3px);
   width: 6px;
 }
-.feedback-modal__recognition-particle--1 { --particle-x: -36px; --particle-y: -36px; animation-delay: 495ms; }
-.feedback-modal__recognition-particle--2 { --particle-x: 36px; --particle-y: -30px; animation-delay: 565ms; }
-.feedback-modal__recognition-particle--3 { --particle-x: 32px; --particle-y: 34px; animation-delay: 630ms; }
-.feedback-modal__recognition-particle--4 { --particle-x: -36px; --particle-y: 30px; animation-delay: 540ms; }
+.feedback-modal__recognition-particle--1 { left: calc(50% - 36px); top: calc(50% - 36px); animation-delay: 495ms; }
+.feedback-modal__recognition-particle--2 { left: calc(50% + 30px); top: calc(50% - 30px); animation-delay: 565ms; }
+.feedback-modal__recognition-particle--3 { left: calc(50% + 28px); top: calc(50% + 30px); animation-delay: 630ms; }
+.feedback-modal__recognition-particle--4 { left: calc(50% - 36px); top: calc(50% + 26px); animation-delay: 540ms; }
 .feedback-modal--recognition .feedback-modal__title {
   color: #14281d;
 }
@@ -1938,7 +1951,7 @@
 @keyframes feedback-recognition-particle {
   0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
   40% { opacity: 0.9; }
-  100% { opacity: 0; transform: translate(var(--particle-x), var(--particle-y)) scale(1); }
+  100% { opacity: 0; transform: scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   .feedback-modal--recognition,

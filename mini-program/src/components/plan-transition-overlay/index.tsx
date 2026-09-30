@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NordicIcon } from "../nordic-icon";
 import { StitchPlanProcessingCanvas } from "../stitch-plan-processing-canvas";
 import "./index.scss";
@@ -13,16 +14,12 @@ export interface PlanTransitionOverlayProps {
   variant: PlanTransitionOverlayVariant;
 }
 
-const copyByVariant: Record<PlanTransitionOverlayVariant, string> = {
-  regenerate: "正在生成营养计划",
-  initial: "正在生成营养计划",
-};
-
 export function PlanTransitionOverlay({
   visible,
   phase,
   variant,
 }: PlanTransitionOverlayProps) {
+  const { t } = useTranslation();
   const android = process.env.TARO_APP_PLATFORM === "android";
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -33,23 +30,23 @@ export function PlanTransitionOverlay({
     return () => clearInterval(timer);
   }, [android, visible, phase]);
   if (!visible) return null;
-  const label = copyByVariant[variant];
+  const label = t(variant === "initial" ? "nutritionPlan.generating" : "nutritionPlan.regenerating");
   if (android) {
     return (
       <View className="plan-transition-overlay plan-transition-overlay--android" ariaLabel={label}>
         <View className="plan-transition-overlay__center">
           {phase === "completing" ? (
             <View className="plan-transition-overlay__initial-completion-mark">
-              <NordicIcon name="check-inverse" size={28} ariaLabel="计划生成完成" />
+              <NordicIcon name="check-inverse" size={28} ariaLabel={t("nutritionPlan.generationComplete")} />
             </View>
           ) : <View className="plan-transition-overlay__android-spinner" />}
           <Text className="plan-transition-overlay__android-title">
-            {phase === "completing" ? "计划已生成" : label}
+            {phase === "completing" ? t("nutritionPlan.generationComplete") : label}
           </Text>
           <Text className="plan-transition-overlay__android-copy">
-            {phase === "completing" ? "正在打开你的计划" : elapsed >= 10
-              ? `已等待 ${elapsed} 秒，服务仍在处理中，请稍候`
-              : "正在根据你的资料与饮食偏好生成，请稍候"}
+            {phase === "completing" ? t("nutritionPlan.openingPlan") : elapsed >= 10
+              ? t("nutritionPlan.waiting", { seconds: elapsed })
+              : t("nutritionPlan.generatingDescription")}
           </Text>
         </View>
       </View>
@@ -68,7 +65,7 @@ export function PlanTransitionOverlay({
         {initial ? (
           phase === "completing" ? (
             <View className="plan-transition-overlay__initial-completion-mark">
-              <NordicIcon name="check-inverse" size={48} ariaLabel="计划生成完成" />
+              <NordicIcon name="check-inverse" size={48} ariaLabel={t("nutritionPlan.generationComplete")} />
             </View>
           ) : null
         ) : phase === "completing" ? (
@@ -80,7 +77,7 @@ export function PlanTransitionOverlay({
             </View>
             <Text className="plan-transition-overlay__label">{label}</Text>
             <View className="plan-transition-overlay__initial-completion-mark plan-transition-overlay__completion-mark">
-              <NordicIcon name="check-inverse" size={48} ariaLabel="计划生成完成" />
+              <NordicIcon name="check-inverse" size={48} ariaLabel={t("nutritionPlan.generationComplete")} />
             </View>
           </>
         ) : (

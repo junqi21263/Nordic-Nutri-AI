@@ -1736,9 +1736,9 @@
   font-weight: $font-weight-semibold;
   line-height: 1.2;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: normal;
 }
 .profile-hero {
   align-items: center;
@@ -2012,34 +2012,6 @@
 .profile-rhythm__settings-group > View + View .list-item {
   border-top: 1px solid $color-divider;
 }
-.profile-rhythm__recommend-card {
-  align-items: center;
-  background: $color-soft-beige;
-  border: 1px solid rgba($color-forest-green, 0.06);
-  border-radius: $radius-16;
-  display: flex;
-  gap: $space-12;
-  min-height: 96px;
-  padding: $space-12 $space-16;
-  transition:
-    transform $duration-press $ease-standard,
-    opacity $duration-press $ease-standard;
-}
-.profile-rhythm__recommend-card:active {
-  opacity: 0.9;
-  transform: scale(0.98);
-}
-.profile-rhythm__recommend-icon {
-  align-items: center;
-  background: rgba($color-surface, 0.82);
-  border-radius: $radius-12;
-  display: flex;
-  flex: 0 0 auto;
-  height: 64px;
-  justify-content: center;
-  width: 64px;
-}
-.profile-rhythm__recommend-copy,
 .profile-rhythm__logout-copy {
   display: flex;
   flex: 1;
@@ -2047,22 +2019,10 @@
   gap: $space-4;
   min-width: 0;
 }
-.profile-rhythm__recommend-title {
-  color: $color-forest-green;
-  font-size: $font-body;
-  font-weight: $font-weight-semibold;
-}
-.profile-rhythm__recommend-description,
 .profile-rhythm__logout-description {
   color: $color-text-secondary;
   font-size: $font-overline;
   line-height: $line-caption;
-}
-.profile-rhythm__recommend-trailing {
-  color: $color-forest-green;
-  flex: 0 0 auto;
-  font-size: $font-h3;
-  font-weight: $font-weight-semibold;
 }
 .profile-rhythm__logout {
   align-items: center;
@@ -2156,6 +2116,7 @@
   min-height: 416px;
   overflow-y: auto;
   padding: $space-12;
+  resize: none;
   white-space: pre-wrap;
   word-break: break-all;
   width: 100%;
@@ -2557,6 +2518,10 @@
   flex-wrap: nowrap;
   gap: $space-4;
   width: 100%;
+}
+.profile-choice-group--multiline {
+  flex-wrap: wrap;
+  > .profile-choice { flex: 1 1 calc(50% - 4px); white-space: normal; }
 }
 .profile-choice {
   align-items: center;
@@ -5885,7 +5850,9 @@
   justify-content: center;
   min-width: 0;
   padding: $space-8 $space-8;
-  white-space: nowrap;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .manual-meal__type--active,
 .analysis-result-page__meal-type--active,
@@ -5929,6 +5896,7 @@
 .analysis-result-page__meal-type taro-text-core,
 .portion-adjustment-page__meal-type text ,
 .portion-adjustment-page__meal-type taro-text-core {
+  overflow-wrap: anywhere;
   text-align: center;
 }
 .manual-meal__nutrition-title {
@@ -6227,7 +6195,7 @@
   overflow: visible;
   text-align: center;
   white-space: normal;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .food-catalog-category--active .food-catalog-category__label {
   color: $color-forest-green;
@@ -9193,6 +9161,29 @@
 
 .milestone-share-preview__close .nordic-icon {
   filter: brightness(0) invert(1);
+}
+
+.milestone-share-preview__refresh {
+  align-items: center;
+  background: rgba(249, 250, 247, 0.96);
+  border: 1px solid rgba(28, 63, 50, 0.14);
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(14, 31, 24, 0.18);
+  box-sizing: border-box;
+  color: #1c3f32;
+  display: flex;
+  height: 40px;
+  justify-content: center;
+  position: absolute;
+  right: 10%;
+  top: 12%;
+  width: 40px;
+  z-index: 2;
+}
+
+.milestone-share-preview__refresh--busy {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .milestone-share-preview__image {

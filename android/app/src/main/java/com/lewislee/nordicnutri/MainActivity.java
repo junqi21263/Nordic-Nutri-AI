@@ -84,6 +84,7 @@ public class MainActivity extends BridgeActivity {
         getBridge().getWebView().setBackgroundColor(Color.rgb(91, 58, 41));
         getBridge().getWebView().addJavascriptInterface(new WelcomeInsetsBridge(), "NordicWelcomeInsets");
         getBridge().getWebView().addJavascriptInterface(new PushIntentBridge(), "NordicPushIntent");
+        getBridge().getWebView().addJavascriptInterface(new PosterBridge(this), "NordicPoster");
         getBridge().getWebView().addJavascriptInterface(new SecureStorageBridge(this), "NordicSecureStorage");
         getBridge().getWebView().addJavascriptInterface(new GoogleAuthBridge(this, getBridge().getWebView()), "NordicGoogleAuth");
         getBridge().getWebView().addJavascriptInterface(new AppUpdateBridge(this, getBridge().getWebView()), "NordicAppUpdate");

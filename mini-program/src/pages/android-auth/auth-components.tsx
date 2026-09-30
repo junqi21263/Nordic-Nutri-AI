@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AppButton, type AppButtonProps } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
 import heroImage from "../../assets/images/welcome-hero.jpg";
+import { t } from "../../i18n";
 
 // Keep Stencil's button slot stable while React changes the busy label.
 export function AuthButton({ loading = false, disabled, children, ...props }: AppButtonProps) {
@@ -25,9 +26,9 @@ export function AuthHero({ compact = false, muted = false }: { compact?: boolean
 export function AuthNav({ onBack }: { onBack: () => void }) {
   return (
     <View className="auth-nav">
-      <View className="auth-nav__back" onClick={onBack} ariaLabel="返回">
-        <NordicIcon name="back" size={18} ariaLabel="返回" />
-        <Text>返回</Text>
+      <View className="auth-nav__back" onClick={onBack} ariaLabel={t("androidAuth.back")}>
+        <NordicIcon name="back" size={18} ariaLabel={t("androidAuth.back")} />
+        <Text>{t("androidAuth.back")}</Text>
       </View>
       <Text className="auth-nav__title">NORDIC-NUTRI</Text>
       <View className="auth-nav__spacer" />
@@ -68,16 +69,16 @@ export function AuthInput({
 export function PhoneInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
     <View className="auth-field">
-      <Text className="auth-field__label">手机号</Text>
+      <Text className="auth-field__label">{t("androidAuth.phone")}</Text>
       <View className="auth-phone-input">
         <View className="auth-phone-input__country">
-          <NordicIcon name="china" size={18} ariaLabel="中国" />
+          <NordicIcon name="china" size={18} ariaLabel={t("androidAuth.china")} />
           <Text>+86</Text>
         </View>
         <Input
           className="auth-phone-input__control"
           value={value}
-          placeholder="请输入手机号"
+          placeholder={t("androidAuth.phonePlaceholder")}
           type="number"
           maxlength={11}
           onInput={(event) => onChange(event.detail?.value ?? "")}
@@ -90,7 +91,7 @@ export function PhoneInput({ value, onChange }: { value: string; onChange: (valu
 export function PasswordInput({
   value,
   onChange,
-  label = "密码",
+  label = t("androidAuth.password"),
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -105,12 +106,12 @@ export function PasswordInput({
           className="auth-field__input auth-password__input"
           value={value}
           password={!visible}
-          placeholder="请输入密码"
+          placeholder={t("androidAuth.passwordPlaceholder")}
           maxlength={128}
           onInput={(event) => onChange(event.detail?.value ?? "")}
         />
         <Text className="auth-password__toggle" onClick={() => setVisible((current) => !current)}>
-          {visible ? "隐藏" : "显示"}
+          {visible ? t("androidAuth.hidePassword") : t("androidAuth.showPassword")}
         </Text>
       </View>
     </View>
@@ -137,25 +138,25 @@ export function CaptchaField({
   return (
     <View className={`auth-captcha ${error ? "auth-captcha--error" : ""}`}>
       <View className="auth-captcha__heading">
-        <Text className="auth-field__label">图形验证码</Text>
-        <Text className="auth-field__label">输入图形验证码</Text>
+        <Text className="auth-field__label">{t("androidAuth.captcha")}</Text>
+        <Text className="auth-field__label">{t("androidAuth.enterCaptcha")}</Text>
       </View>
       <View className="auth-captcha__row">
         <View className="auth-captcha__image-wrap">
-          {captcha ? <Image className="auth-captcha__image" src={captchaImage(captcha)} mode="aspectFit" /> : <Text className="auth-captcha__placeholder" onClick={onRefresh}>点击加载验证码</Text>}
-          <View className="auth-captcha__refresh" onClick={onRefresh} ariaLabel="刷新图形验证码">
-            <NordicIcon name="refresh-cw" size={18} ariaLabel="刷新" />
+          {captcha ? <Image className="auth-captcha__image" src={captchaImage(captcha)} mode="aspectFit" /> : <Text className="auth-captcha__placeholder" onClick={onRefresh}>{t("androidAuth.loadCaptcha")}</Text>}
+          <View className="auth-captcha__refresh" onClick={onRefresh} ariaLabel={t("androidAuth.refreshCaptcha")}>
+            <NordicIcon name="refresh-cw" size={18} ariaLabel={t("androidAuth.refresh")} />
           </View>
         </View>
         <Input
           className="auth-field__input auth-captcha__input"
           value={value}
-          placeholder="输入图形验证码"
+          placeholder={t("androidAuth.enterCaptcha")}
           maxlength={8}
           onInput={(event) => onChange(event.detail?.value ?? "")}
         />
       </View>
-      {error ? <Text className="auth-inline-error">图形验证码不正确，请重新输入</Text> : null}
+      {error ? <Text className="auth-inline-error">{t("androidAuth.captchaIncorrect")}</Text> : null}
     </View>
   );
 }
@@ -178,7 +179,7 @@ export function OtpInput({ value, onChange }: { value: string; onChange: (value:
   };
 
   return (
-    <View className="auth-otp" ariaLabel="6 位验证码">
+    <View className="auth-otp" ariaLabel={t("androidAuth.otpAria")}>
       {Array.from({ length: 6 }, (_, index) => (
         <Input
           key={index}
@@ -206,7 +207,7 @@ export function InlineMessage({
   return (
     <View className={`auth-message auth-message--${kind}`}>
       <Text>{message}</Text>
-      {onRetry ? <Text className="auth-message__retry" onClick={onRetry}>重试</Text> : null}
+      {onRetry ? <Text className="auth-message__retry" onClick={onRetry}>{t("common.retry")}</Text> : null}
     </View>
   );
 }

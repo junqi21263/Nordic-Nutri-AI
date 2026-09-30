@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import en from "../src/i18n/locales/en.json";
+import zhCN from "../src/i18n/locales/zh-CN.json";
+import zhTW from "../src/i18n/locales/zh-TW.json";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (file: string) => readFileSync(resolve(root, file), "utf8");
@@ -11,7 +14,7 @@ describe("Android smart reminder settings", () => {
     const page = read("src/pages/smart-reminder-settings/index.tsx");
     expect(page).toContain('title="Nordic Nutri AI"');
     expect(page).toContain("smart-reminder-settings__intro-title");
-    expect(page).toContain("记录提醒");
+    expect(page).toContain('t("smartReminders.title")');
     expect(page).toContain("REMINDER_WINDOWS");
     expect(page).toContain('type: "breakfast"');
     expect(page).toContain('type: "lunch"');
@@ -39,7 +42,8 @@ describe("Android smart reminder settings", () => {
     const styles = read("src/components/reminder-alarm-modal/index.scss");
     expect(component).toContain('<NordicIcon name="alarm-clock"');
     expect(component).not.toContain("mealIcons");
-    expect(component).toContain("轻轻提醒你记录");
+    expect(component).toContain('t("reminderAlarm.daily"');
+    expect(en.reminderAlarm.daily).toBeTruthy();
     expect(component).toContain("animate-alarm-wobble");
     expect(component).toContain("animate-ripple-1");
     expect(component).toContain("animate-ripple-2");
@@ -55,9 +59,9 @@ describe("Android smart reminder settings", () => {
     const styles = read("src/components/reminder-paused-modal/index.scss");
     const page = read("src/pages/smart-reminder-settings/index.tsx");
     expect(component).toContain('<NordicIcon name="bell-off"');
-    expect(component).toContain("已关闭就餐提醒");
-    expect(component).toContain("之后可以随时重新开启");
-    expect(component).toContain("需要时，我们仍在这里。");
+    expect(component).toContain('t("reminderPaused.title")');
+    expect(component).toContain('t("reminderPaused.restart")');
+    expect(component).toContain('t("reminderPaused.note")');
     expect(component).toContain("reminder-paused-modal__restart");
     expect(component).toContain("animate-quiet-bell");
     expect(component).toContain("animate-collapse-ring");
@@ -73,7 +77,7 @@ describe("Android smart reminder settings", () => {
     const page = read("src/pages/smart-reminder-settings/index.tsx");
     const styles = read("src/pages/smart-reminder-settings/index.scss");
     expect(page).toContain("row?.enabled && settings?.enabled");
-    expect(page).toContain("该餐次已关闭提醒");
+    expect(page).toContain('t("smartReminders.closed")');
     expect(page).toContain("smart-reminder-settings__closed-text");
     expect(styles).toMatch(/smart-reminder-settings__closed-text[\s\S]*?white-space: nowrap;/);
   });
@@ -84,9 +88,9 @@ describe("Android smart reminder settings", () => {
     expect(page).toContain("scheduleInfoExpanded");
     expect(page).toContain("setScheduleInfoExpanded");
     expect(page).toContain("smart-reminder-settings__schedule-info-toggle");
-    expect(page).toContain("ariaLabel={scheduleInfoExpanded ?");
+    expect(page).toContain('t(scheduleInfoExpanded ? "smartReminders.collapse"');
     expect(page).toContain("smart-reminder-settings__schedule-info");
-    expect(page).toContain("记录完成后，当天对应提醒会自动跳过。");
+    expect(page).toContain('t("smartReminders.scheduleHint")');
     expect(styles).toContain(".smart-reminder-settings__schedule-info--expanded");
     expect(styles).toContain("transform: rotate(225deg)");
   });
@@ -107,14 +111,16 @@ describe("Android smart reminder settings", () => {
     const profile = read("src/pages/profile/index.tsx");
     expect(config).toContain('"pages/smart-reminder-settings/index"');
     expect(profile).toContain('process.env.TARO_APP_PLATFORM === "android"');
-    expect(profile).toContain("记录提醒");
+    expect(profile).toContain('t("profile.reminders")');
+    for (const locale of [en, zhCN, zhTW]) expect(locale.profile.reminders).toBeTruthy();
   });
 
   it("uses the Stitch-inspired light roller time picker contract", () => {
     const component = read("src/components/reminder-time-sheet/index.tsx");
     const styles = read("src/components/reminder-time-sheet/index.scss");
-    expect(component).toContain("提醒时间");
-    expect(component).toContain("适宜记录时间");
+    expect(component).toContain('t("reminderTime.title"');
+    expect(component).toContain('t("reminderTime.subtitle"');
+    for (const locale of [en, zhCN, zhTW]) expect(locale.reminderTime.title).toBeTruthy();
     expect(component).toContain("reminder-time-sheet__selector-card");
     expect(component).toContain("reminder-time-sheet__actions");
     expect(component).not.toContain("ScrollView");

@@ -18,6 +18,7 @@ const pages = [
   "pages/frequent-meals/index",
   "pages/frequent-meal-edit/index",
   "pages/smart-reminder-settings/index",
+  "pages/language-settings/index",
   "pages/coach/index",
   "pages/profile/index",
   "pages/privacy-policy/index",

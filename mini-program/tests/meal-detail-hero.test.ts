@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { hasValidMealImage } from "../src/components/meal-detail-hero/logic";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(process.cwd(), "src");
 const read = (path: string) => readFileSync(resolve(sourceRoot, path), "utf8");
@@ -23,7 +24,7 @@ describe("MealDetailHero", () => {
     const styles = read("styles/page.scss");
 
     expect(hero).toContain("meal-detail-page__data-hero-arc");
-    expect(hero).toContain(">千卡<");
+    expectLocalizedCopy(hero, "千卡");
     expect(hero).toContain("meal-detail-page__hero-macro-dot");
     expect(hero).toContain("<HeroMacros nutrition={nutrition} dataPoint />");
     expect(styles).toContain(".meal-detail-page__data-hero-arc");

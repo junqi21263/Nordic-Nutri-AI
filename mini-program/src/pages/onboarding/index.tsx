@@ -5,6 +5,7 @@ import { BottomActionLayout } from "../../components/bottom-action-layout";
 import { NordicIcon, type NordicIconName } from "../../components/nordic-icon";
 import { OnboardingHeader } from "../../components/onboarding-header";
 import { getLocaleMessages } from "../../locales";
+import { useTranslation } from "react-i18next";
 import { PageLayout } from "../../layouts/page-layout";
 import { type GoalType } from "../../features/onboarding/domain";
 import { queueOnboardingDraftSync } from "../../features/onboarding/onboarding-draft-cloud-sync";
@@ -12,7 +13,6 @@ import { useOnboardingDraftStore } from "../../stores/onboarding-draft-store";
 import { useEffect } from "react";
 import { navigateBackOrHome } from "../../utils/navigation";
 
-const onboardingCopy = getLocaleMessages().onboarding;
 const goals: Array<{ key: GoalType; icon: NordicIconName }> = [
   { key: "muscle_gain", icon: "goal-muscle" },
   { key: "fat_loss", icon: "goal-fat-loss" },
@@ -21,6 +21,8 @@ const goals: Array<{ key: GoalType; icon: NordicIconName }> = [
 ];
 
 export default function OnboardingPage() {
+  useTranslation();
+  const onboardingCopy = getLocaleMessages().onboarding;
   const { draft, setField } = useOnboardingDraftStore();
   const canContinue = Boolean(draft.goalType);
 
@@ -73,7 +75,7 @@ export default function OnboardingPage() {
                 </View>
                 <View className="onboarding-goal-card__indicator">
                   {selected ? (
-                    <NordicIcon name="check-inverse" size={15} ariaLabel="已选择" />
+                    <NordicIcon name="check-inverse" size={15} ariaLabel={onboardingCopy.selected} />
                   ) : null}
                 </View>
               </View>

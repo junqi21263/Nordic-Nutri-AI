@@ -1,191 +1,266 @@
-import { Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
+import { Button, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useState } from "react";
 import { getProductWeeklyReview, type ProductWeeklyReview } from "../../api/insight-api";
-import { AppCard } from "../../components/app-card";
+import { getMilestoneJourney } from "../../api/milestone-api";
+import { AppButton } from "../../components/app-button";
 import { NordicIcon } from "../../components/nordic-icon";
-import { getMondayBasedWeekDates } from "../../features/meals/domain";
+import { Modal } from "../../components/modal";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { PageLayout } from "../../layouts/page-layout";
 import { useMealStore } from "../../stores/meal-store";
-import { useProfileStore } from "../../stores/profile-store";
-const weekdayLabels = ["日", "一", "二", "三", "四", "五", "六"];
-
-function getRhythmHeroAside(score: number, recordedDays: number) {
-  const detail = `${recordedDays}/7 天已记录`;
-  if (recordedDays <= 1) return { title: "节奏刚起步", detail };
-  if (score < 40) return { title: "节奏待建立", detail };
-  if (score < 70) return { title: "节奏在成形", detail };
-  return { title: "节奏较稳定", detail };
-}
+import { navigateBackOrHome } from "../../utils/navigation";
+import { formatWeeklyComparison } from "./comparison-copy";
+import { WeeklyShare } from "./weekly-share";
+import "./index.scss";
 
 export default function WeeklyReviewPage() {
+  useTranslation();
   const meals = useMealStore();
-  const profile = useProfileStore();
+  const [review, setReview] = useState<ProductWeeklyReview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const [details, setDetails] = useState(false);
+  const [selected, setSelected] = useState<ProductWeeklyReview["rhythm"][number] | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [streak, setStreak] = useState<number | null>(null);
   const date = getLocalDateString();
-  const [remoteReview, setRemoteReview] = useState<ProductWeeklyReview | null>(null);
-  const summary = meals.getDailySummary(date);
-  const todayMeals = meals.getMealsByDate(date);
-  const localProteinCompletion = summary.protein
-    ? Math.min(100, Math.round((summary.consumed.protein / summary.protein) * 100))
-    : 0;
-  const rhythmScore =
-    remoteReview?.score ??
-    Math.round(
-      (summary.completion + localProteinCompletion + Math.min(100, todayMeals.length * 25)) / 3,
-    );
-  const proteinCompletion = remoteReview?.proteinCompletion ?? localProteinCompletion;
-  const proteinLeft = remoteReview?.progress?.protein
-    ? remoteReview.progress.protein.remaining
-    : Math.max(0, summary.protein - summary.consumed.protein);
-  const localRhythm = getMondayBasedWeekDates(date).map((dateKey) => ({
-    date: dateKey,
-    recorded: meals.getMealsByDate(dateKey).length > 0,
-  }));
-  const displayedRhythm = (remoteReview?.rhythm?.length ? remoteReview.rhythm : localRhythm).map((item) => {
-    const dateKey = item.date;
-    const [itemYear, itemMonth, itemDay] = dateKey.split("-").map(Number);
-    const current = new Date(itemYear, itemMonth - 1, itemDay);
-    return {
-      date: dateKey,
-      label: weekdayLabels[current.getDay()]!,
-      recorded: Boolean(item.recorded),
-      today: dateKey === date,
-    };
-  });
-  const recordedDays = remoteReview?.recordedDays ?? displayedRhythm.filter((item) => item.recorded).length;
-  const recordedMeals = remoteReview?.recordedMeals ?? todayMeals.length;
-  const targetCalories = remoteReview?.calorieTarget ?? profile.profile.targetCalories;
-  const weeklyInsight = remoteReview?.insight;
-  const rhythmAside = getRhythmHeroAside(rhythmScore, recordedDays);
-  const calorieCompletion = remoteReview?.calorieCompletion ?? summary.completion;
-  const nextGoalPrimary = weeklyInsight?.nextSteps?.[0]
-    ?? (recordedDays < 5 ? "连续记录 5 天" : "保持每天至少一餐记录");
-  const nextGoalSecondary = weeklyInsight?.nextSteps?.[1]
-    ?? (proteinLeft ? "安排 3 次蛋白补充" : "保持 3 天蛋白达标");
-
   useEffect(() => {
-    void getProductWeeklyReview(date)
-      .then(setRemoteReview)
-      .catch(() => setRemoteReview(null));
-  }, [date]);
-
+    let active = true;
+    setLoading(true);
+    setError(false);
+    setReview(null);
+    setStreak(null);
+    void getMilestoneJourney()
+      .then((journey) => {
+        if (active) setStreak(journey.currentStreakDays);
+      })
+      .catch(() => {
+        /* A missing journey must not hide the weekly report. */
+      });
+    void getProductWeeklyReview(date, { preferFast: true })
+      .then((base) => {
+        if (!active) return;
+        setReview(base);
+        setLoading(false);
+        if (!base.insight.cached && base.recordedDays >= 3) {
+          void getProductWeeklyReview(date)
+            .then((full) => {
+              if (active) setReview(full);
+            })
+            .catch(() => {
+              /* Keep the independently loaded base review. */
+            });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError(true);
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [date, retry, t("settings.language")]);
+  const nutrients = details
+    ? (["calories", "protein", "carbs", "fat"] as const)
+    : (["calories", "protein"] as const);
+  const labels = {
+    calories: t("weekly.calories"),
+    protein: t("weekly.protein"),
+    carbs: t("weekly.carbs"),
+    fat: t("weekly.fat"),
+  };
+  const comparisonCopy = {
+    prefix: t("weekly.comparison.prefix"), recordedDays: t("weekly.comparison.recordedDays"),
+    recordedMeals: t("weekly.comparison.recordedMeals"), more: t("weekly.comparison.more"),
+    fewer: t("weekly.comparison.fewer"), same: t("weekly.comparison.same"),
+    dayUnit: t("weekly.comparison.dayUnit"), mealUnit: t("weekly.comparison.mealUnit"),
+    colon: t("weekly.comparison.colon"), separator: t("weekly.comparison.separator"),
+  };
+  const openRecords = () => {
+    if (!selected) return;
+    meals.setSelectedDate(selected.date);
+    setSelected(null);
+    void Taro.switchTab({ url: "/pages/meal-records/index" });
+  };
   return (
     <PageLayout
-      title="本周回顾"
+      title={t("weekly.title")}
       showTabs={false}
       hideNavigation
       showBack
-      onTopBarBack={() => Taro.navigateBack()}
-      className="page-layout--weekly-review"
+      onTopBarBack={() => navigateBackOrHome("/pages/profile/index")}
+      className="page-layout--weekly-v2"
+      scrollLocked={Boolean(selected) || sharing}
+      overlay={
+        sharing && review ? (
+          <WeeklyShare
+            review={review}
+            streak={streak}
+            onClose={() => setSharing(false)}
+          />
+        ) : undefined
+      }
     >
-      <View className="weekly-review">
-        <AppCard tone="dark" className="weekly-review__hero">
-          <View className="weekly-review__hero-score">
-            <Text className="weekly-review__hero-score-label">营养节奏分</Text>
-            <Text className="weekly-review__hero-score-value">{rhythmScore}</Text>
+      <View className="weekly-v2">
+        {loading && <Text>{t("weekly.loading")}</Text>}
+        {error && (
+          <View className="weekly-v2__card">
+            <Text>{t("weekly.loadFailed")}</Text>
+            <Button onClick={() => setRetry(retry + 1)}>{t("common.retry")}</Button>
           </View>
-          <View className="weekly-review__hero-aside">
-            <Text className="weekly-review__hero-aside-title">{rhythmAside.title}</Text>
-            <Text className="weekly-review__hero-aside-detail">{rhythmAside.detail}</Text>
-          </View>
-        </AppCard>
-
-        <View className="weekly-review__metrics">
-          <View className="weekly-review__metric">
-            <Text className="weekly-review__metric-label">已记录餐次</Text>
-            <Text className="weekly-review__metric-value">{recordedMeals}</Text>
-            <Text className="weekly-review__metric-detail">本周</Text>
-          </View>
-          <View className="weekly-review__metric">
-            <Text className="weekly-review__metric-label">蛋白完成度</Text>
-            <Text className="weekly-review__metric-value">{proteinCompletion}%</Text>
-            <Text className="weekly-review__metric-detail">
-              {summary.consumed.protein}/{summary.protein} g
-            </Text>
-          </View>
-          <View className="weekly-review__metric">
-            <Text className="weekly-review__metric-label">目标热量</Text>
-            <Text className="weekly-review__metric-value">{targetCalories}</Text>
-            <Text className="weekly-review__metric-detail">kcal</Text>
-          </View>
-        </View>
-
-        <View className="weekly-review__section">
-          <Text>本周观察</Text>
-          <View className="weekly-review__insights">
-            <View className="weekly-review__insight">
-              <NordicIcon name="check" size={18} ariaLabel="记录" />
-              <Text className="weekly-review__insight-copy">{weeklyInsight?.strengths?.[0] ?? `本周已记录 ${recordedMeals} 餐，持续记录会让建议更贴近你的节奏。`}</Text>
-            </View>
-            <View className="weekly-review__insight">
-              <NordicIcon name="protein" size={18} ariaLabel="蛋白" />
-              <Text className="weekly-review__insight-copy">{weeklyInsight?.summary ?? (proteinLeft
-                ? `距离本周蛋白目标还差 ${proteinLeft} g，可优先补充一份高蛋白食物。`
-                : "本周蛋白目标已完成，恢复节奏很好。")}</Text>
-            </View>
-            <View className="weekly-review__insight">
-              <NordicIcon name="zap" size={18} ariaLabel="能量" />
-              <Text className="weekly-review__insight-copy">营养节奏分为 {rhythmScore}，本周热量完成度 {calorieCompletion}%。</Text>
-            </View>
-          </View>
-        </View>
-
-        <View className="weekly-review__advice">
-          <NordicIcon name="milestone" size={22} ariaLabel="本周建议" />
-          <View className="weekly-review__advice-copy">
-            <Text className="weekly-review__advice-title">{weeklyInsight?.headline ?? "本周建议"}</Text>
-            <Text className="weekly-review__advice-description">{weeklyInsight?.nextSteps?.[0] ?? (proteinLeft
-              ? "下一周优先安排瘦肉、鸡蛋或高蛋白酸奶，让目标更容易完成。"
-              : "维持当前的记录频率，并留意睡眠和补水，让恢复同样跟上。")}</Text>
-          </View>
-        </View>
-
-        <View className="weekly-review__section">
-          <View className="weekly-review__section-head">
-            <Text>本周节奏</Text>
-            <Text>{recordedDays}/7 天已记录</Text>
-          </View>
-          <View className="weekly-review__rhythm">
-            {displayedRhythm.map((item) => (
-              <View
-                className={`weekly-review__rhythm-day ${item.today ? "weekly-review__rhythm-day--today" : ""}`}
-                key={item.date}
-              >
-                <View
-                  className={`weekly-review__rhythm-dot ${item.recorded ? "weekly-review__rhythm-dot--recorded" : ""}`}
-                />
-                <Text>{item.label}</Text>
+        )}
+        {review && (
+          <>
+            <View className="weekly-v2__hero">
+              <Text className="weekly-v2__eyebrow">WEEKLY RHYTHM</Text>
+              <View className="weekly-v2__score-row">
+                <Text className="weekly-v2__score">{review.score}</Text>
+                <Text className="weekly-v2__score-caption">{t("weekly.scoreCaption")}</Text>
               </View>
-            ))}
-          </View>
-        </View>
-
-        <View className="weekly-review__next-goals">
-          <View className="weekly-review__next-goals-head">
-            <NordicIcon name="zap" size={20} ariaLabel="下周小目标" />
-            <View className="weekly-review__next-goals-copy">
-              <Text className="weekly-review__next-goals-title">下周小目标</Text>
-              <Text className="weekly-review__next-goals-description">不求完美，先把节奏保持下来。</Text>
+              <Text className="weekly-v2__dates">
+                {review.startDate} — {review.rhythm.at(-1)?.date}
+              </Text>
+              <View className="weekly-v2__stats">
+                <View>
+                  <Text>{t("weekly.recorded")}</Text>
+                  <Text className="weekly-v2__value">{t("weekly.daysOutOfSeven", { days: review.recordedDays })}</Text>
+                </View>
+                <View>
+                  <Text>{t("weekly.mealsTotal")}</Text>
+                  <Text className="weekly-v2__value">{t("weekly.mealsCount", { count: review.recordedMeals })}</Text>
+                </View>
+                <View>
+                  <Text>{t("weekly.streak")}</Text>
+                  <Text className="weekly-v2__value">{t("weekly.streakDays", { days: streak ?? "—" })}</Text>
+                </View>
+              </View>
+              {review.comparison && (
+                <Text className="weekly-v2__dates">
+                  {formatWeeklyComparison(review.comparison, comparisonCopy)}
+                </Text>
+              )}
             </View>
-          </View>
-          <View className="weekly-review__next-goal-row">
-            <NordicIcon name="check" size={18} ariaLabel="下周动作" />
-            <View className="weekly-review__next-goal-copy">
-              <Text className="weekly-review__next-goal-title">{nextGoalPrimary}</Text>
-              <Text className="weekly-review__next-goal-description">优先完成这一步，节奏会更清楚</Text>
+            <View className="weekly-v2__card">
+              <View className="weekly-v2__heading">
+                <NordicIcon name="sparkles" size={20} />
+                <Text>{t("weekly.nutrition")}</Text>
+              </View>
+              {nutrients.map((key) => {
+                const percent = review.averageCompletion?.[key];
+                return (
+                  <View className="weekly-v2__nutrient" key={key}>
+                    <View className="weekly-v2__row">
+                      <Text>{labels[key]}</Text>
+                      <Text>{percent == null ? "—" : `${percent}%`}</Text>
+                    </View>
+                    <View className="weekly-v2__track">
+                      <View
+                        style={{ width: `${percent ?? 0}%` }}
+                        className={
+                          key === "protein"
+                            ? "weekly-v2__fill weekly-v2__fill--protein"
+                            : "weekly-v2__fill"
+                        }
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+              <Button className="weekly-v2__link" onClick={() => setDetails(!details)}>
+                {details ? t("common.collapse") : t("common.details")}
+              </Button>
+              <Text className="weekly-v2__muted">
+                {t("weekly.nutritionNote")}
+                {review.recordedDays < 3 ? t("weekly.insufficientRecords") : t("weekly.missingNotZero")}
+              </Text>
             </View>
-          </View>
-          <View className="weekly-review__next-goal-row">
-            <NordicIcon name="protein" size={18} ariaLabel="蛋白目标" />
-            <View className="weekly-review__next-goal-copy">
-              <Text className="weekly-review__next-goal-title">{nextGoalSecondary}</Text>
-              <Text className="weekly-review__next-goal-description">让每日目标更容易完成</Text>
+            <View className="weekly-v2__card">
+              <View className="weekly-v2__heading">
+                <NordicIcon name="nova" size={20} />
+                <Text>{t("weekly.observations")}</Text>
+              </View>
+              {[
+                [t("weekly.good"), review.insight.strengths[0] || t("weekly.goodFallback")],
+                [t("weekly.attention"), review.insight.summary],
+                [t("weekly.nextStep"), review.insight.nextSteps[0] || t("weekly.nextStepFallback")],
+              ].map(([title, copy]) => (
+                <View className="weekly-v2__observation" key={title}>
+                  <Text className="weekly-v2__label">{title}</Text>
+                  <Text className="weekly-v2__copy">{copy}</Text>
+                </View>
+              ))}
             </View>
-          </View>
-        </View>
-        <Text className="weekly-review__source">基于已同步到云端的饮食记录生成</Text>
+            <View className="weekly-v2__card">
+              <View className="weekly-v2__heading">
+                <NordicIcon name="calendar-days" size={20} />
+                <Text>{t("weekly.rhythm")}</Text>
+              </View>
+              <View className="weekly-v2__week">
+                {review.rhythm.map((day, index) => {
+                  const future = day.future ?? day.date > date;
+                  return (
+                    <Button
+                      key={day.date}
+                      disabled={future}
+                      className={`weekly-v2__day${day.recorded ? " weekly-v2__day--recorded" : ""}`}
+                      onClick={() => setSelected(day)}
+                      ariaLabel={`${day.date} ${future ? t("weekly.future") : day.recorded ? t("weekly.recorded") : t("weekly.notRecorded")}`}
+                    >
+                      <Text>{t(`weekly.weekdays.${index}`)}</Text>
+                      <View className="weekly-v2__dot" />
+                      <Text>{future ? t("weekly.future") : day.recorded ? t("weekly.recorded") : t("weekly.notRecorded")}</Text>
+                    </Button>
+                  );
+                })}
+              </View>
+            </View>
+            <View className="weekly-v2__goal">
+              <Text className="weekly-v2__heading">{t("weekly.goal")}</Text>
+              <Text>{review.insight.nextSteps[0] || t("weekly.nextStepFallback")}</Text>
+              <Text className="weekly-v2__muted">{t("weekly.goalHint")}</Text>
+            </View>
+            <Button className="weekly-v2__primary" onClick={() => setSharing(true)}>
+              {t("weekly.share")}</Button>
+            <Button
+              className="weekly-v2__link"
+              onClick={() => Taro.navigateTo({ url: "/pages/milestone-journey/index" })}
+            >
+              {t("weekly.journey")} →
+            </Button>
+          </>
+        )}
       </View>
+      <Modal
+        open={Boolean(selected)}
+        lockScroll
+        onBackdropClick={() => setSelected(null)}
+      >
+        <View className="confirm-dialog weekly-review-summary__content">
+          <Text className="confirm-dialog__title">{t("weekly.daySummary", { date: selected?.date })}</Text>
+          <Text className="confirm-dialog__description">
+            {selected?.recorded
+              ? t("weekly.mealsLogged", { count: selected.mealCount ?? "—" })
+              : t("weekly.noRecords")}
+          </Text>
+          {selected?.recorded && selected.consumed && (
+            <Text className="confirm-dialog__description">
+              {t("weekly.dayNutrition", { calories: Math.round(selected.consumed.calories), protein: Math.round(selected.consumed.protein) })}
+            </Text>
+          )}
+          <View className="weekly-review-summary__actions">
+            <AppButton size="medium" onClick={openRecords}>
+              {t("weekly.viewRecords")}</AppButton>
+            <AppButton variant="ghost" size="small" onClick={() => setSelected(null)}>
+              {t("common.close")}</AppButton>
+          </View>
+        </View>
+      </Modal>
     </PageLayout>
   );
 }

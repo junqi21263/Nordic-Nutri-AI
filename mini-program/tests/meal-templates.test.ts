@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { createPortionDraftStore } from "../src/stores/portion-draft-store";
 import { mapProductMeal } from "../src/features/meals/product-meal-mapper";
 import { toProductMealInput } from "../src/features/meals/product-meal-input";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 describe("independent frequent meal templates", () => {
   it("retains template identity across repeat confirmation and clears it for ordinary repeat", () => {
@@ -27,15 +28,15 @@ describe("independent frequent meal templates", () => {
     expect(page).toContain("setOpenMenuId");
     expect(page).toContain("frequent-meals__menu");
     expect(page).toContain("frequent-meals__skeleton-card");
-    expect(page).toContain("正在加载你的常吃");
+    expectLocalizedCopy(page, "正在加载你的常吃");
     expect(page).toContain("FrequentMealsSkeleton");
     expect(page).toContain("ConfirmDialog");
     expect(page).not.toContain('Taro.showModal({ title: "删除常吃？"');
     expect(page).not.toContain('itemList: ["编辑"');
-    expect(page).toContain('>编辑</Text>');
-    expect(page).toContain('>删除</Text>');
-    expect(page).not.toContain('>重命名</Text>');
-    expect(page).not.toContain('>调整默认餐次</Text>');
+    expectLocalizedCopy(page, "编辑");
+    expectLocalizedCopy(page, "删除");
+    expect(page).not.toContain('t("frequentMeals.rename")');
+    expect(page).not.toContain('t("frequentMeals.changeDefaultMeal")');
     expect(page).not.toContain("renameTarget");
     expect(page).not.toContain('name="sparkles"');
     const homeStyles = readFileSync(new URL("../src/components/recent-frequent-meals/index.scss", import.meta.url), "utf8");
@@ -64,7 +65,7 @@ describe("independent frequent meal templates", () => {
     const detailStyles = readFileSync(new URL("../src/styles/page.scss", import.meta.url), "utf8");
     expect(detailStyles).toContain("meal-detail-page__template-action");
     expect(detailStyles).toContain("margin: $space-12 0 $space-48");
-    expect(readFileSync(new URL("../src/pages/meal-detail/index.tsx", import.meta.url), "utf8")).toContain("保存到我的常吃");
-    expect(readFileSync(new URL("../src/pages/profile/index.tsx", import.meta.url), "utf8")).toContain("我的常吃");
+    expect(readFileSync(new URL("../src/pages/meal-detail/index.tsx", import.meta.url), "utf8")).toContain('t(templateSaved ? "mealDetail.savedTemplate" : "mealDetail.saveTemplate")');
+    expectLocalizedCopy(readFileSync(new URL("../src/pages/profile/index.tsx", import.meta.url), "utf8"), "我的常吃");
   });
 });

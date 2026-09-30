@@ -8,6 +8,7 @@ const clearInvalidSession = vi.fn();
 vi.mock("../src/platform/product-transport", () => ({ productTransport }));
 vi.mock("../src/auth/session-manager", () => ({ refreshSession, clearInvalidSession }));
 vi.mock("../src/features/account-cancellation/clear-local-state", () => ({ clearProductLocalState: vi.fn() }));
+vi.mock("../src/i18n", () => ({ getLocale: () => "zh-CN", t: (key: string) => key }));
 
 describe("product API session renewal", () => {
   beforeEach(() => {

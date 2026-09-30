@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const read = (relativePath: string) => readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
@@ -18,9 +19,11 @@ describe("NOVA proactive daily reminder", () => {
   it("renders the daily reminder as the single action-first Coach entry", () => {
     const page = read("src/pages/coach/index.tsx");
 
-    expect(page).toContain("NOVA · 今日提醒");
+    expectLocalizedCopy(page, "NOVA · 今日提醒");
     expect(page).toContain("getCoachGreeting(serverTime)");
-    expect(page).toContain("{greeting}，{profile.profile.nickname || \"你\"} 👋");
+    expect(page).toContain("localizeGreeting(greeting)");
+    expect(page).toContain("localizeCoachContext(heroContext.summary)");
+    expect(page).toContain("localizeCoachContext(heroContext.suggestion)");
     expect(page).not.toContain("{dailyBrief.greeting}");
     expect(page).not.toContain("getProductCoachDailyBrief");
     expect(page).not.toContain("loadDailyBrief");
@@ -31,19 +34,19 @@ describe("NOVA proactive daily reminder", () => {
     expect(page).not.toContain("dailyBrief.suggestion");
     expect(page).toContain("heroContext.ctaLabel");
     expect(page).toContain("heroContext.ctaAction");
-    expect(page).toContain("今日进度");
-    expect(page).toContain("蛋白质");
-    expect(page).toContain("热量");
+    expectLocalizedCopy(page, "今日进度");
+    expectLocalizedCopy(page, "蛋白质");
+    expectLocalizedCopy(page, "热量");
     expect(page).not.toContain("dailyBrief.reason");
     expect(page).not.toContain("dailyBrief.action");
     expect(page).not.toContain("coach-chat__status-badge");
-    expect(page).toContain("NOVA 小贴士");
-    expect(page).toContain("换一个建议");
-    expect(page).toContain("推荐原因：");
-    expect(page).toContain("新对话");
-    expect(page).toContain("我今天吃什么？");
-    expect(page).toContain("我的蛋白够吗？");
-    expect(page).toContain("下一餐怎么搭配？");
+    expectLocalizedCopy(page, "NOVA 小贴士");
+    expectLocalizedCopy(page, "换一个建议");
+    expectLocalizedCopy(page, "推荐原因：");
+    expectLocalizedCopy(page, "新对话");
+    expectLocalizedCopy(page, "我今天吃什么？");
+    expectLocalizedCopy(page, "我的蛋白够吗？");
+    expectLocalizedCopy(page, "下一餐怎么搭配？");
     expect(page).not.toContain("重启对话");
   });
 

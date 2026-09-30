@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const storage = new Map<string, unknown>();
 
@@ -109,23 +110,23 @@ describe("first-run tips", () => {
     );
 
     expect(home).toContain('tipId="home-first-meal"');
-    expect(home).toContain("去拍照");
-    expect(home).toContain("识别后还能改餐次和份量再保存");
+    expectLocalizedCopy(home, "去拍照");
+    expectLocalizedCopy(home, "识别后还能改餐次和份量再保存");
     expect(home).not.toContain("AI 识别后还能改餐次和份量再保存");
     expect(home).toContain('markFirstRunTipSeen("home-first-meal")');
     expect(scanner).toContain('tipId="scanner-capture"');
-    expect(scanner).toContain("开始拍摄");
+    expectLocalizedCopy(scanner, "开始拍摄");
     expect(scanner).toContain("dismissScannerTip");
     expect(scanner).toContain("retireFirstRunTipsIfRecordedMeals");
     expect(scanner).toContain("food-scanner-page--with-tip");
     expect(records).toContain('tipId="meal-records-review"');
     expect(records).toContain("3/3");
-    expect(records).toContain("去添加");
+    expect(records).toContain('t("records.add")');
     expect(records).toContain("/pages/manual-meal/index");
     expect(result).not.toContain("FirstRunTip");
     expect(clearLocal).toContain("clearFirstRunTips");
     expect(
       readFileSync(resolve(import.meta.dirname, "../src/components/first-run-tip/index.tsx"), "utf8"),
-    ).toContain('dismissLabel = "知道了"');
+    ).toContain('dismissLabel ?? t("coachPage.gotIt")');
   });
 });

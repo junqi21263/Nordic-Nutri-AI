@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { BottomSheet } from "../bottom-sheet";
 import { REMINDER_WINDOWS, type MealReminderType } from "../../features/smart-reminders/domain";
 import { clampReminderTime, getReminderTimeOptions } from "../../features/smart-reminders/time-options";
@@ -24,6 +25,7 @@ function ReminderWheel({
   selectedIndex: number;
   onSelect: (index: number) => void;
 }) {
+  const { t } = useTranslation();
   const selectNext = () => onSelect(Math.min(values.length - 1, selectedIndex + 1));
   const selectPrevious = () => onSelect(Math.max(0, selectedIndex - 1));
 
@@ -31,16 +33,17 @@ function ReminderWheel({
     <View className="reminder-time-sheet__column">
       <Text className="reminder-time-sheet__label">{label}</Text>
       <View className="reminder-time-sheet__wheel">
-        <View className="reminder-time-sheet__arrow" ariaLabel={`增加${label}`} onClick={selectNext} />
+        <View className="reminder-time-sheet__arrow" ariaLabel={t("reminderTime.increase", { label })} onClick={selectNext} />
         <Text className="reminder-time-sheet__value">{String(values[selectedIndex] ?? values[0] ?? 0).padStart(2, "0")}</Text>
-        <View className="reminder-time-sheet__arrow reminder-time-sheet__arrow--down" ariaLabel={`减少${label}`} onClick={selectPrevious} />
+        <View className="reminder-time-sheet__arrow reminder-time-sheet__arrow--down" ariaLabel={t("reminderTime.decrease", { label })} onClick={selectPrevious} />
       </View>
-      <Text className="reminder-time-sheet__unit">{label === "小时" ? "时" : "分"}</Text>
+      <Text className="reminder-time-sheet__unit">{t(label === t("reminderTime.hours") ? "reminderTime.hourUnit" : "reminderTime.minuteUnit")}</Text>
     </View>
   );
 }
 
 export function ReminderTimeSheet({ open, mealType, time, onDismiss, onConfirm }: ReminderTimeSheetProps) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(time);
   const activeMealType = mealType ?? "breakfast";
   const options = getReminderTimeOptions(activeMealType);
@@ -72,22 +75,22 @@ export function ReminderTimeSheet({ open, mealType, time, onDismiss, onConfirm }
   return (
     <BottomSheet open={open} className="reminder-time-sheet" lockScroll onDismiss={onDismiss}>
       <View className="reminder-time-sheet__header">
-        <Text className="reminder-time-sheet__title">{REMINDER_WINDOWS[mealType].label}提醒时间</Text>
+        <Text className="reminder-time-sheet__title">{t("reminderTime.title", { meal: t(`meals.${mealType}`) })}</Text>
         <Text className="reminder-time-sheet__subtitle">
-          {REMINDER_WINDOWS[mealType].label}适宜记录时间 {REMINDER_WINDOWS[mealType].start} – {REMINDER_WINDOWS[mealType].end}
+          {t("reminderTime.subtitle", { meal: t(`meals.${mealType}`), start: REMINDER_WINDOWS[mealType].start, end: REMINDER_WINDOWS[mealType].end })}
         </Text>
       </View>
       <View className="reminder-time-sheet__selector-card">
         <View className="reminder-time-sheet__selectors">
           <ReminderWheel
-            label="小时"
+            label={t("reminderTime.hours")}
             values={options.hours}
             selectedIndex={selectedHourIndex}
             onSelect={selectHour}
           />
           <Text className="reminder-time-sheet__colon">:</Text>
           <ReminderWheel
-            label="分钟"
+            label={t("reminderTime.minutes")}
             values={options.minutes}
             selectedIndex={selectedMinuteIndex}
             onSelect={selectMinute}
@@ -96,10 +99,10 @@ export function ReminderTimeSheet({ open, mealType, time, onDismiss, onConfirm }
       </View>
       <View className="reminder-time-sheet__actions">
         <View className="reminder-time-sheet__action reminder-time-sheet__action--cancel" onClick={onDismiss}>
-          <Text>取消</Text>
+          <Text>{t("reminderTime.cancel")}</Text>
         </View>
         <View className="reminder-time-sheet__action reminder-time-sheet__action--confirm" onClick={save}>
-          <Text>保存</Text>
+          <Text>{t("reminderTime.save")}</Text>
         </View>
       </View>
     </BottomSheet>

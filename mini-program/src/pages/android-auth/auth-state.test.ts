@@ -4,12 +4,12 @@ import { getAuthBackState, getAuthInputError, type AuthView } from "./auth-state
 describe("Android auth navigation", () => {
   it("rejects malformed targets before a verification request", () => {
     for (const email of ["", "name.example.com", "name@example", "name＠example.com", "name @example.com"]) {
-      expect(getAuthInputError("email", email, "captcha", "abcd")).toContain("邮箱地址");
+      expect(getAuthInputError("email", email, "captcha", "abcd")).toBe("androidAuth.validation.email");
     }
     expect(getAuthInputError("email", " name@example.com ", "captcha", "abcd")).toBe("");
-    expect(getAuthInputError("phone", "+", "captcha", "abcd")).toContain("手机号");
-    expect(getAuthInputError("email", "name@example.com")).toContain("加载");
-    expect(getAuthInputError("email", "name@example.com", "captcha", " ")).toBe("请输入图形验证码");
+    expect(getAuthInputError("phone", "+", "captcha", "abcd")).toBe("androidAuth.validation.phone");
+    expect(getAuthInputError("email", "name@example.com")).toBe("androidAuth.validation.captchaLoad");
+    expect(getAuthInputError("email", "name@example.com", "captcha", " ")).toBe("androidAuth.validation.captchaRequired");
     expect(getAuthInputError("email", "name@example.com", undefined, "", false)).toBe("");
     expect(getAuthInputError("phone", "+8613800138000", undefined, "", false)).toBe("");
   });

@@ -1,4 +1,5 @@
 import { Image, Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import { getFoodVisualFallback } from "../../features/food-catalog/food-visuals";
 import { getMealNutrition, type Meal, type MealType } from "../../features/meals/domain";
 import { NordicIcon } from "../nordic-icon";
@@ -6,12 +7,6 @@ import bowlImage from "../../assets/meal-bowl.svg";
 import oatsImage from "../../assets/meal-oats.svg";
 import salmonImage from "../../assets/meal-salmon.svg";
 
-const labels: Record<MealType, string> = {
-  breakfast: "早餐",
-  lunch: "午餐",
-  dinner: "晚餐",
-  snack: "加餐",
-};
 const imageByKey = { bowl: bowlImage, oats: oatsImage, salmon: salmonImage };
 
 function mealThumbSrc(meal: Meal) {
@@ -29,19 +24,21 @@ export interface MealGroupProps {
   onAdd: (mealType: MealType) => void;
 }
 export function MealGroup({ mealType, meals, expanded = true, onToggle, onSelect, onAdd }: MealGroupProps) {
+  const { t } = useTranslation();
+  const mealLabel = t(`meals.${mealType}`);
   return (
     <View className="meal-group">
-      <View className="meal-group__head" onClick={onToggle} ariaLabel={`${labels[mealType]}${expanded ? "已展开" : "已收起"}`}>
+      <View className="meal-group__head" onClick={onToggle} ariaLabel={t(expanded ? "sharedUi.mealGroupExpanded" : "sharedUi.mealGroupCollapsed", { meal: mealLabel })}>
         <View className="meal-group__head-copy">
-          <Text className="section-title__title">{labels[mealType]}</Text>
-          <Text className="meal-group__count">{meals.length} 餐</Text>
+          <Text className="section-title__title">{mealLabel}</Text>
+          <Text className="meal-group__count">{t("sharedUi.mealCount", { count: meals.length })}</Text>
         </View>
-        {onToggle ? <NordicIcon name="chevron-right" size={16} ariaLabel={expanded ? "收起" : "展开"} /> : null}
+        {onToggle ? <NordicIcon name="chevron-right" size={16} ariaLabel={t(expanded ? "common.collapse" : "coachPage.expand")} /> : null}
       </View>
       {expanded && meals.length === 0 ? (
         <View className="meal-group__empty" onClick={() => onAdd(mealType)}>
           <Text>＋</Text>
-          <Text>新增{labels[mealType]}</Text>
+          <Text>{t("sharedUi.addMealType", { meal: mealLabel })}</Text>
         </View>
       ) : expanded ? (
         meals.map((meal) => {
@@ -66,12 +63,12 @@ export function MealGroup({ mealType, meals, expanded = true, onToggle, onSelect
               <View className="meal-group__content">
                 <Text className="meal-group__title">{meal.title}</Text>
                 <Text className="meal-group__meta">
-                  {meal.time} · {nutrition.protein}g 蛋白质
+                  {meal.time} · {nutrition.protein}g {t("nutrition.protein")}
                 </Text>
               </View>
               <View className="meal-group__right">
                 <Text className="meal-group__kcal">{nutrition.calories} kcal</Text>
-                <NordicIcon name="pencil" size={16} ariaLabel="编辑餐次" />
+                <NordicIcon name="pencil" size={16} ariaLabel={t("sharedUi.editMealType", { meal: mealLabel })} />
               </View>
             </View>
           );

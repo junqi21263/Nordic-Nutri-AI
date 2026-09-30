@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const srcRoot = resolve(import.meta.dirname, "../src");
 const read = (path: string) => readFileSync(resolve(srcRoot, path), "utf8");
@@ -9,7 +10,7 @@ describe("privacy policy and disclaimer", () => {
   it("routes the only privacy card to the combined policy page", () => {
     expect(read("app.config.ts")).toContain('"pages/privacy-policy/index"');
     const profile = read("pages/profile/index.tsx");
-    expect(profile).toContain('title="隐私政策与免责声明"');
+    expectLocalizedCopy(profile, "隐私政策与免责声明");
     expect(profile).toContain('openPage("/pages/privacy-policy/index")');
     expect(profile).not.toContain('title="隐私与数据"');
   });
@@ -27,7 +28,7 @@ describe("privacy policy and disclaimer", () => {
       "不构成医疗诊断、治疗或处方",
       "反馈与帮助",
     ]) {
-      expect(policy).toContain(copy);
+      expectLocalizedCopy(policy, copy);
     }
   });
 
@@ -38,14 +39,14 @@ describe("privacy policy and disclaimer", () => {
       "政策版本号：1.0.0",
       "生效日期：2026-08-16",
     ]) {
-      expect(policy).toContain(copy);
+      expectLocalizedCopy(policy, copy);
     }
   });
 
   it("places policy metadata after the disclaimer section", () => {
     const policy = read("pages/privacy-policy/index.tsx");
-    expect(policy.indexOf('title: "免责声明"')).toBeLessThan(
-      policy.indexOf(">政策信息</Text>"),
+    expect(policy.indexOf('t(`privacyPolicy.sections.${index}.title`)')).toBeLessThan(
+      policy.indexOf('t("privacyPolicy.metadata")'),
     );
   });
 
@@ -63,7 +64,7 @@ describe("privacy policy and disclaimer", () => {
 
   it("keeps a visible non-medical disclaimer in home, analysis and coach", () => {
     for (const page of ["home/index.tsx", "analysis-result/index.tsx", "coach/index.tsx"]) {
-      expect(read(`pages/${page}`)).toContain("不构成医疗诊断或治疗建议");
+      expectLocalizedCopy(read(`pages/${page}`), "不构成医疗诊断或治疗建议");
     }
   });
 });

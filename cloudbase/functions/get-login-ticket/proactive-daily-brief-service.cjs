@@ -1,4 +1,5 @@
 const { extractContentAndUsage } = require("./model-usage.cjs");
+const { normalizeLocale, localeInstruction } = require("./locale.cjs");
 
 const themes = new Set([
   "starter",
@@ -12,7 +13,7 @@ const themes = new Set([
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const unsafeWording = /诊断|治疗|处方|药物|吃药|用药|孕期|怀孕|哺乳|厌食|暴食|替代医疗/i;
 const presentationWording = /```|[`*#]|^\s*(?:回复|答复|回答|建议|说明)\s*[:：]/m;
-const staleNoMealClaim = /没有餐次|没有.*记录|第一餐|首餐/i;
+const staleNoMealClaim = /没有餐次|没有.*记录|第一餐|首餐|沒有.*紀錄|第一餐|no meals?|no.*logged|first meal/i;
 
 const PROACTIVE_DAILY_BRIEF_SYSTEM_PROMPT = `你是 Nordic Nutri AI 的 NOVA，长期陪伴用户管理饮食目标的 AI 营养教练。用户打开 App 时，你主动给出当天最有价值的提醒；不是长篇报告。只使用 dailyContext 提供的事实，绝不编造饮食、体重、训练或运动表现。按 userJourneyStage 调整重点：new_user 帮助开始第一餐记录；habit_building 强化连续记录习惯；regular_user 优先依据 recentTrend 反馈近期变化或当前最重要缺口。每日从行动提醒、数据反馈、鼓励反馈、习惯培养中选择唯一主题；结合目标语言：muscle_gain=增益增肌、fat_loss=轻盈减脂、maintain=保持状态、performance=健康饮食。避免连续重复：recentThemes 的第一个主题是昨天主题，今天绝不能输出同一主题。只围绕饮食营养，不讨论训练、恢复或运动表现；不得诊断、治疗、开药、承诺减重或增肌效果。输出只能是 JSON，不要 Markdown 或额外解释。首卡只负责一个今日最重要行动，绝不能包含具体食物、食材、搭配或“早餐建议”等饮食推荐；具体饮食优化会由另一张卡片展示。必须恰好 3 段短句：greeting 为按当前时段和姓名的问候；summary 为一句有数据的观察、鼓励或启动提醒；suggestion 必须以“今日行动：”开头，给出一个可执行动作。不要使用“欢迎开启营养之旅”。JSON：{"greeting":"不超过18字","summary":"不超过40字","suggestion":"不超过50字","theme":"starter|protein_gap|energy_gap|meal_rhythm|dietary_balance|progress|consistency"}`;
 
@@ -26,7 +27,7 @@ function text(value, maxLength) {
   return result && result.length <= maxLength ? result : null;
 }
 
-function validateProactiveDailyBrief(payload) {
+function validateProactiveDailyBrief(payload, locale) {
   let value = payload;
   try {
     if (typeof value === "string") value = JSON.parse(value);
@@ -34,12 +35,15 @@ function validateProactiveDailyBrief(payload) {
     throw error();
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw error();
-  const greeting = text(value.greeting, 18);
-  const summary = text(value.summary, 40);
-  const suggestion = text(value.suggestion, 50);
+  const language = normalizeLocale(locale);
+  const factor = language === "en" ? 3 : 1;
+  const greeting = text(value.greeting, 18 * factor);
+  const summary = text(value.summary, 40 * factor);
+  const suggestion = text(value.suggestion, 50 * factor);
   const theme = text(value.theme, 24);
   const combined = [greeting, summary, suggestion].filter(Boolean).join("\n");
-  if (!greeting || !summary || !suggestion || !/^今日行动：/.test(suggestion) || !theme || !themes.has(theme) || unsafeWording.test(combined) || presentationWording.test(combined)) {
+  const actionPrefix = language === "en" ? /^Today:\s*/i : language === "zh-TW" ? /^今日行動：/ : /^今日行动：/;
+  if (!greeting || !summary || !suggestion || !actionPrefix.test(suggestion) || !theme || !themes.has(theme) || unsafeWording.test(combined) || presentationWording.test(combined)) {
     throw error();
   }
   return { greeting, summary, suggestion, theme };
@@ -75,6 +79,14 @@ function actionForTheme(theme, period) {
 }
 
 function fallbackForContext(context = {}) {
+  const locale = normalizeLocale(context?.locale);
+  if (locale !== "zh-CN") {
+    const hasRecord = Boolean(context?.today?.hasMealRecord) || Number(context?.today?.recordedMeals) > 0;
+    const theme = selectTheme(hasRecord ? "meal_rhythm" : "starter", ["dietary_balance", "consistency"], context?.recentThemes);
+    return locale === "en"
+      ? { greeting: "Hello 👋", summary: hasRecord ? "Keep building on today's food record." : "A food record can help you understand your routine.", suggestion: "Today: Log your next meal when you can.", theme }
+      : { greeting: "你好 👋", summary: hasRecord ? "繼續保持今天的飲食紀錄。" : "記錄餐食，慢慢了解自己的節奏。", suggestion: "今日行動：有空時記錄下一餐。", theme };
+  }
   const name = text(context?.user?.name, 12) || "你";
   const period = context?.today?.period || "morning";
   const proteinRate = Number(context?.yesterday?.proteinRate);
@@ -140,7 +152,7 @@ function createDeepseekCompletion({ apiKey, model, fetchImpl = globalThis.fetch 
           temperature: 0.55,
           max_tokens: 120,
           messages: [
-            { role: "system", content: PROACTIVE_DAILY_BRIEF_SYSTEM_PROMPT },
+            { role: "system", content: PROACTIVE_DAILY_BRIEF_SYSTEM_PROMPT + localeInstruction(context?.locale) },
             { role: "user", content: JSON.stringify({ dailyContext: context }) },
           ],
         }),
@@ -164,7 +176,7 @@ function createProactiveDailyBriefService({ apiKey, model = "deepseek-v4-flash",
     try {
       const raw = await complete({ date, context });
       const payload = raw && typeof raw === "object" && "content" in raw ? raw.content : raw;
-      const brief = validateProactiveDailyBrief(payload);
+      const brief = validateProactiveDailyBrief(payload, context?.locale);
       const recentThemes = Array.isArray(context?.recentThemes) ? context.recentThemes : [];
       if (recentThemes[0] === brief.theme) throw error();
       const consistentBrief = enforceBriefFacts(context, brief);

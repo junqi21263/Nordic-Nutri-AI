@@ -10,3 +10,9 @@ test("meal reminder schedules are indexed and server-owned", async () => {
   assert.match(sql, /revoke all .* anon, authenticated/i);
   assert.match(sql, /grant all .* service_role/i);
 });
+
+test("scheduled reminders persist the locale used for notification copy", async () => {
+  const sql = await readFile(new URL("./0068_meal_reminder_locale.sql", import.meta.url), "utf8");
+  assert.match(sql, /add column if not exists locale text not null default 'zh-CN'/i);
+  assert.match(sql, /locale in \('zh-CN', 'zh-TW', 'en'\)/i);
+});

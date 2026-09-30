@@ -1,6 +1,8 @@
 import { Input, ScrollView, Text, View } from "@tarojs/components";
 import Taro, { useDidShow, useReachBottom, useRouter } from "@tarojs/taro";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import {
   discoverProductFoodCatalog,
   getProductFoodCategories,
@@ -19,6 +21,7 @@ import {
   FOOD_TAGS,
   STANDARD_FOOD_CATEGORY_ROOT_CODES,
   getFoodCategory,
+  getFoodCategoryCode,
   getFoodTags,
   resolveTagCode,
   type FoodCategory,
@@ -90,10 +93,11 @@ const FALLBACK_CATEGORY_CHIPS: Array<{
 ];
 
 function suggestionLabel(item: ProductFoodSuggestion) {
-  return item.nameZh || item.nameEn || item.brandName || "未命名食物";
+  return item.nameZh || item.nameEn || item.brandName || t("foodCatalog.unnamed");
 }
 
 export default function FoodCatalogPage() {
+  useTranslation();
   useAppShare();
   const router = useRouter();
   const feedback = useFeedbackStore();
@@ -151,7 +155,7 @@ export default function FoodCatalogPage() {
       }));
     }
     return [
-      { label: "全部", code: "" },
+      { label: t("foodCatalog.all"), code: "" },
       ...serverTags.filter((tag) => tag.isActive).map((tag) => ({
         label: tag.nameZh,
         code: tag.code,
@@ -179,7 +183,7 @@ export default function FoodCatalogPage() {
         catalogTagCodesRef.current = [];
       }
     } catch {
-      feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
+      feedback.show({ message: t("foodCatalog.unavailable"), tone: "error" });
     } finally {
       setIsSearching(false);
       if (replacingPage) setIsPageLoading(false);
@@ -244,7 +248,7 @@ export default function FoodCatalogPage() {
       catalogCategoryCodesRef.current = nextCategoryCodes;
       catalogTagCodesRef.current = nextTagCodes;
     } catch {
-      feedback.show({ message: "食物库暂时不可用，请稍后重试", tone: "error" });
+      feedback.show({ message: t("foodCatalog.unavailable"), tone: "error" });
     } finally {
       setIsSearching(false);
       if (replace) setIsPageLoading(false);
@@ -326,7 +330,7 @@ export default function FoodCatalogPage() {
 
   const updateTag = async (tagLabel: string, tagCode?: string) => {
     setShowSuggestions(false);
-    if (!tagCode || tagLabel === "全部") {
+    if (!tagCode) {
       if (!activeCategoryCodes.length) {
         setSelectedTagCodes([]);
         await discover(20, 1);
@@ -361,7 +365,7 @@ export default function FoodCatalogPage() {
   const search = async (forcedQuery?: string) => {
     const keyword = (forcedQuery ?? query).trim();
     if (keyword.length < 2) {
-      feedback.show({ message: "请输入至少两个字母或汉字", tone: "error" });
+      feedback.show({ message: t("foodCatalog.searchTooShort"), tone: "error" });
       return;
     }
     setShowSuggestions(false);
@@ -406,7 +410,7 @@ export default function FoodCatalogPage() {
 
   return (
     <PageLayout
-      title="食物库"
+      title={t("tabs.food-catalog")}
       activeTab="food-catalog"
       showTabs={!recognitionMode}
       showBack={Boolean(recognitionMode)}
@@ -416,12 +420,12 @@ export default function FoodCatalogPage() {
     >
       <View className="food-catalog-page">
         <View className="food-catalog-search food-catalog-search--pill">
-          <NordicIcon name="search" size={20} ariaLabel="搜索食物" />
+          <NordicIcon name="search" size={20} ariaLabel={t("foodCatalog.search")} />
           <Input
             value={query}
             maxlength={80}
             confirmType="search"
-            placeholder="搜索食物名称"
+            placeholder={t("foodCatalog.searchPlaceholder")}
             onConfirm={() => void search()}
             onFocus={() => {
               if (suggestions.length) setShowSuggestions(true);
@@ -434,10 +438,10 @@ export default function FoodCatalogPage() {
           />
           <View
             className="food-catalog-search__action"
-            ariaLabel="搜索"
+            ariaLabel={t("foodCatalog.search")}
             onClick={() => void search()}
           >
-            <Text>{isSearching ? "查询中" : "搜索"}</Text>
+            <Text>{isSearching ? t("foodCatalog.searching") : t("foodCatalog.search")}</Text>
           </View>
         </View>
 
@@ -451,7 +455,7 @@ export default function FoodCatalogPage() {
               >
                 <Text className="food-catalog-suggestions__name">{suggestionLabel(item)}</Text>
                 <Text className="food-catalog-suggestions__meta">
-                  {Math.round(item.calories)} kcal · {Math.round(item.protein)}g 蛋白
+                  {Math.round(item.calories)} kcal · {Math.round(item.protein)}g {t("nutrition.protein")}
                 </Text>
               </View>
             ))}
@@ -477,9 +481,9 @@ export default function FoodCatalogPage() {
                     onClick={() => void updateCategory(chip.category, chip.code)}
                   >
                     <View className={`food-catalog-category__icon ${active ? "food-catalog-category__icon--active" : ""}`}>
-                      <NordicIcon name={chip.icon} size={22} ariaLabel={chip.label} />
+                      <NordicIcon name={chip.icon} size={22} ariaLabel={t(`foodCatalog.categories.${chip.code}`, { defaultValue: chip.label })} />
                     </View>
-                    <Text className="food-catalog-category__label">{chip.label}</Text>
+                    <Text className="food-catalog-category__label">{t(`foodCatalog.categories.${chip.code}`, { defaultValue: chip.label })}</Text>
                   </View>
                 );
               })}
@@ -506,7 +510,7 @@ export default function FoodCatalogPage() {
                     key={tag.code || tag.label}
                     onClick={() => void updateTag(tag.label, tag.code)}
                   >
-                    <Text>{tag.label}</Text>
+                    <Text>{tag.code ? t(`foodCatalog.tags.${tag.code}`, { defaultValue: tag.label }) : t("foodCatalog.all")}</Text>
                   </View>
                 );
               })}
@@ -516,20 +520,20 @@ export default function FoodCatalogPage() {
         </View>
 
         <View className="food-catalog-section">
-          {isPageLoading ? <LoadingState label="正在加载食物库…" /> : (
+          {isPageLoading ? <LoadingState label={t("foodCatalog.loading")} /> : (
             <>
               <View className="food-catalog-section__header">
                 <Text className="food-catalog-section__title">
-                  {hasSearched ? "搜索结果" : "热门推荐"}
+                  {hasSearched ? t("foodCatalog.searchResults") : t("foodCatalog.popular")}
                 </Text>
                 {!hasSearched ? (
                   <View
                     className={`food-catalog-section__refresh ${isSearching ? "food-catalog-section__refresh--loading" : ""}`}
-                    ariaLabel="换一批热门推荐"
+                    ariaLabel={t("foodCatalog.refreshPopular")}
                     onClick={() => void refreshPopular()}
                   >
-                    <NordicIcon name="refresh-cw" size={16} ariaLabel="换一批" />
-                    <Text>换一批</Text>
+                    <NordicIcon name="refresh-cw" size={16} ariaLabel={t("foodCatalog.refresh")} />
+                    <Text>{t("foodCatalog.refresh")}</Text>
                   </View>
                 ) : null}
               </View>
@@ -542,36 +546,36 @@ export default function FoodCatalogPage() {
                         <Text className="food-catalog-popular-card__name">{food.description}</Text>
                         <View className="food-catalog-popular-card__meta">
                           <Text>{numberText(food.caloriesKcalPer100g, " kcal")}</Text>
-                          <Text>{numberText(food.proteinGPer100g, "g 蛋白")}</Text>
-                          <Text>{numberText(food.carbsGPer100g, "g 碳水")}</Text>
+                          <Text>{numberText(food.proteinGPer100g, `g ${t("nutrition.protein")}`)}</Text>
+                          <Text>{numberText(food.carbsGPer100g, `g ${t("nutrition.carbs")}`)}</Text>
                         </View>
                         <View className="food-catalog-item__labels">
-                          <Text className="food-catalog-item__category">{getFoodCategory(food)}</Text>
+                          <Text className="food-catalog-item__category">{t(`foodCatalog.categories.${getFoodCategoryCode(getFoodCategory(food))}`, { defaultValue: getFoodCategory(food) })}</Text>
                           {getFoodTags(food).slice(0, 2).map((tag) => (
                             <Text className="food-catalog-item__tag" key={tag}>
-                              {tag}
+                              {t(`foodCatalog.tags.${resolveTagCode(tag)}`, { defaultValue: tag })}
                             </Text>
                           ))}
                         </View>
                       </View>
                       <View
                         className="food-catalog-popular-card__add"
-                        ariaLabel="查看食物详情"
+                        ariaLabel={t("foodCatalog.viewDetails")}
                         onClick={() => inspect(food)}
                       >
-                        <NordicIcon name="chevron-right" size={20} ariaLabel="查看食物详情" />
+                        <NordicIcon name="chevron-right" size={20} ariaLabel={t("foodCatalog.viewDetails")} />
                       </View>
                     </View>
                   ))}
                 </View>
               ) : (
                 <View className="food-catalog-empty">
-                  <NordicIcon name="food-bowl" size={30} ariaLabel="食物库提示" />
+                  <NordicIcon name="food-bowl" size={30} ariaLabel={t("foodCatalog.emptyTitle")} />
                   <Text className="food-catalog-empty__title">
-                    {isSearching ? "正在加载食物库" : "暂未找到匹配食物"}
+                    {isSearching ? t("foodCatalog.loading") : t("foodCatalog.emptyTitle")}
                   </Text>
                   <Text className="food-catalog-empty__copy">
-                    可尝试中文或英文食物名，例如 beef、鸡胸肉、salmon。
+                    {t("foodCatalog.emptyHint")}
                   </Text>
                 </View>
               )}

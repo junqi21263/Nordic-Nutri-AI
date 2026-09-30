@@ -1,5 +1,24 @@
 const MEAL_TYPES = ["breakfast", "lunch", "dinner"];
 const MEAL_LABELS = { breakfast: "早餐", lunch: "午餐", dinner: "晚餐" };
+const PUSH_COPY = {
+  "zh-CN": {
+    missed: ["最近有点忙？", "不用补齐，从这一餐重新开始就好。"],
+    recorded: ["今天也记一下这一餐 🌿", "你的记录节奏正在慢慢形成。"],
+    ordinary: (meal) => [`${meal}还没记录吗？`, "拍一下就好 📷"],
+  },
+  "zh-TW": {
+    missed: ["最近是不是有點忙？", "不用補記，從這一餐重新開始就好。"],
+    recorded: ["今天也記得這一餐 🌿", "你的記錄節奏正在慢慢形成。"],
+    ordinary: (meal) => [`還沒記錄${meal}嗎？`, "拍張照片就好 📷"],
+  },
+  en: {
+    missed: ["Been busy lately?", "No need to catch up—just start again with this meal."],
+    recorded: ["Log this meal today 🌿", "Your logging rhythm is taking shape."],
+    ordinary: (meal) => [`Haven't logged ${meal} yet?`, "A quick photo is all it takes 📷"],
+  },
+};
+const EN_MEAL_LABELS = { breakfast: "breakfast", lunch: "lunch", dinner: "dinner" };
+const TW_MEAL_LABELS = { breakfast: "早餐", lunch: "午餐", dinner: "晚餐" };
 
 function requiredTime(value) {
   const text = typeof value === "string" ? value.trim() : "";
@@ -51,7 +70,7 @@ function localDate(value, timeZone) {
   return `${part.year}-${String(part.month).padStart(2, "0")}-${String(part.day).padStart(2, "0")}`;
 }
 
-function reminderCopy(mealType, records, today) {
+function reminderCopy(mealType, records, today, locale = "zh-CN") {
   const days = new Set((records || []).map((row) => localDate(new Date(row.recorded_at), row.time_zone || "UTC")));
   let missed = 0;
   let recorded = 0;
@@ -63,20 +82,25 @@ function reminderCopy(mealType, records, today) {
     else if (!days.has(key) && recorded === 0) missed += 1;
     else break;
   }
-  if (missed >= 2) return { title: "最近有点忙？", body: "不用补齐，从这一餐重新开始就好。" };
-  if (recorded >= 2) return { title: "今天也记一下这一餐 🌿", body: "你的记录节奏正在慢慢形成。" };
-  return { title: `${MEAL_LABELS[mealType]}还没记录吗？`, body: "拍一下就好 📷" };
+  const language = PUSH_COPY[locale] ? locale : "zh-CN";
+  const copy = PUSH_COPY[language];
+  if (missed >= 2) return { title: copy.missed[0], body: copy.missed[1] };
+  if (recorded >= 2) return { title: copy.recorded[0], body: copy.recorded[1] };
+  const mealLabels = language === "en" ? EN_MEAL_LABELS : language === "zh-TW" ? TW_MEAL_LABELS : MEAL_LABELS;
+  const [title, body] = copy.ordinary(mealLabels[mealType]);
+  return { title, body };
 }
 
 function createScheduledReminderService({ db, push, now = () => new Date() }) {
   async function sync(userId, input) {
     const timeZone = safeTimeZone(input?.timeZone);
+    const locale = ["zh-CN", "zh-TW", "en"].includes(input?.locale) ? input.locale : "zh-CN";
     const enabled = input?.enabled === true;
     const rows = MEAL_TYPES.map((mealType) => {
       const meal = input?.meals?.[mealType] || {};
       const time = requiredTime(meal.time);
       return {
-        user_id: userId, meal_type: mealType, reminder_time: `${time}:00`, time_zone: timeZone,
+        user_id: userId, meal_type: mealType, reminder_time: `${time}:00`, time_zone: timeZone, locale,
         enabled: enabled && meal.enabled === true,
         next_run_at: nextRunAt(time, timeZone, now()).toISOString(), updated_at: now().toISOString(),
       };
@@ -88,7 +112,7 @@ function createScheduledReminderService({ db, push, now = () => new Date() }) {
 
   async function dispatch({ limit = 100 } = {}) {
     const instant = now();
-    const due = await db.from("meal_reminder_schedules").select("id,user_id,meal_type,reminder_time,time_zone,next_run_at").eq("enabled", true).lte("next_run_at", instant.toISOString()).order("next_run_at", { ascending: true }).limit(Math.min(Math.max(Number(limit) || 100, 1), 500));
+    const due = await db.from("meal_reminder_schedules").select("id,user_id,meal_type,reminder_time,time_zone,locale,next_run_at").eq("enabled", true).lte("next_run_at", instant.toISOString()).order("next_run_at", { ascending: true }).limit(Math.min(Math.max(Number(limit) || 100, 1), 500));
     if (due?.error) throw Object.assign(new Error("提醒排程读取失败"), { code: "REMINDER_DISPATCH_FAILED" });
     let sent = 0; let skipped = 0;
     for (const schedule of due.data || []) {
@@ -103,7 +127,7 @@ function createScheduledReminderService({ db, push, now = () => new Date() }) {
       if (records?.error) continue;
       const decorated = (records.data || []).map((row) => ({ ...row, time_zone: schedule.time_zone }));
       if (decorated.some((row) => localDate(new Date(row.recorded_at), schedule.time_zone) === today)) { skipped += 1; continue; }
-      const result = await push.sendReminder({ userId: schedule.user_id, mealType: schedule.meal_type, copy: reminderCopy(schedule.meal_type, decorated, today), source: "scheduled" });
+      const result = await push.sendReminder({ userId: schedule.user_id, mealType: schedule.meal_type, copy: reminderCopy(schedule.meal_type, decorated, today, schedule.locale), source: "scheduled" });
       sent += result.sent || 0;
     }
     return { due: due.data?.length || 0, sent, skipped };

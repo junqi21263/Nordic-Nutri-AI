@@ -1,6 +1,7 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro, { useShareAppMessage, useShareTimeline } from "@tarojs/taro";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
 import { clearInvalidSession } from "../../auth/session-manager";
 import { NordicIcon } from "../../components/nordic-icon";
@@ -20,6 +21,7 @@ function isStillOnWelcome() {
 }
 
 export default function WelcomePage() {
+  const { t } = useTranslation();
   useShareAppMessage(() => buildAppShareMessage());
   useShareTimeline(() => buildAppTimelineShare());
   useAppShare();
@@ -104,11 +106,11 @@ export default function WelcomePage() {
           <View className="welcome-page__copy">
             <View className="welcome-page__brand-lockup">
               <Text className="welcome-page__brand">Nordic Nutri</Text>
-              <Text className="welcome-page__brand-caption">营养记录 · 从每一餐开始</Text>
+              <Text className="welcome-page__brand-caption">{t("welcome.caption")}</Text>
             </View>
-            <Text className="welcome-page__title">拍一餐，营养心中有数</Text>
+            <Text className="welcome-page__title">{t("welcome.title")}</Text>
             <Text className="welcome-page__subtitle">
-              读懂餐盘里的食材与热量，{"\n"}陪你慢慢养成好习惯
+              {t("welcome.subtitle")}
             </Text>
           </View>
           <View className="welcome-page__actions" style={isAndroidApp && !retryNeeded ? { display: "none" } : undefined}>
@@ -116,8 +118,8 @@ export default function WelcomePage() {
               className={`welcome-page__cta ${busy ? "welcome-page__cta--busy" : ""}`}
               onClick={() => void continueJourney()}
             >
-              <Text className="welcome-page__cta-label">{retryNeeded ? (busy ? "正在重试…" : "连接暂不可用，点击重试") : "开启健康之旅"}</Text>
-              <NordicIcon name="chevron-right" size={18} ariaLabel="继续" />
+              <Text className="welcome-page__cta-label">{retryNeeded ? (busy ? t("welcome.retrying") : t("welcome.retry")) : t("welcome.start")}</Text>
+              <NordicIcon name="chevron-right" size={18} ariaLabel={t("common.continue")} />
             </View>
           </View>
         </View>

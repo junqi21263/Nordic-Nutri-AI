@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(import.meta.dirname, "../src");
 
@@ -21,7 +22,7 @@ describe("account usage HTTPS boundary", () => {
 
     expect(page).toContain("getProductAccountUsage");
     expect(page).toContain("visionRemaining");
-    expect(page).toContain("今日识别剩余");
+    expectLocalizedCopy(page, "今日识别剩余");
     expect(page).toContain("usage-quota-tip");
   });
 
@@ -30,12 +31,12 @@ describe("account usage HTTPS boundary", () => {
     const button = readFileSync(resolve(sourceRoot, "components/app-button/index.tsx"), "utf8");
 
     expect(page).toContain("visionQuotaExhausted");
-    expect(page).toContain("今日图片识别次数已用完");
-    expect(page).toContain("请明天再试或手动记录");
+    expectLocalizedCopy(page, "今日图片识别次数已用完");
+    expectLocalizedCopy(page, "请明天再试或手动记录");
     expect(page).toContain("visualDisabled={visionQuotaExhausted}");
     expect(page).toContain('variant: "limit"');
-    expect(page).toContain('title: "今日识别次数已用完"');
-    expect(page).toContain('secondaryText: "手动记录"');
+    expectLocalizedCopy(page, "今日识别次数已用完");
+    expectLocalizedCopy(page, "手动记录");
     expect(page).toContain("showVisionQuotaModal");
     expect(page).toContain("RATE_LIMITED");
     expect(button).toContain("visualDisabled");
@@ -60,7 +61,7 @@ describe("account usage HTTPS boundary", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/coach/index.tsx"), "utf8");
 
     expect(page).toContain("dailyUsage.remaining <= 3");
-    expect(page).toContain("今日教练对话剩余");
+    expectLocalizedCopy(page, "今日教练对话剩余");
     expect(page).toContain("usage-quota-tip");
   });
 

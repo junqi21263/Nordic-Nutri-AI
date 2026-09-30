@@ -15,7 +15,7 @@
     &::after { border: 0; }
     &:focus-visible { outline: 2PX solid #a9c1ae; outline-offset: 3PX; }
   }
-  .profile-stitch__overview taro-button-core, .profile-rhythm__settings-group > *, .profile-rhythm__recommend-card, .profile-rhythm__logout {
+  .profile-stitch__overview taro-button-core, .profile-rhythm__settings-group > *, .profile-rhythm__logout {
     transition: transform 120ms ease-out, background-color 120ms ease-out;
     &:active { transform: scale(.985); }
   }
@@ -100,11 +100,6 @@
   .list-item__title { font-size: 13PX; line-height: 1.5; }
   .list-item__description { font-size: 11PX; line-height: 1.6; margin-top: 2PX; white-space: normal; }
   .list-item__trailing { font-size: 22PX; color: #89988f; }
-  .profile-rhythm__recommend-card { border: 1PX solid #be8f7433; background: #f4efe6; border-radius: 16PX; padding: 16PX; gap: 14PX; }
-  .profile-rhythm__recommend-icon { width: 40PX; height: 40PX; border-radius: 12PX; flex: 0 0 40PX; background: white; }
-  .profile-rhythm__recommend-title { font-size: 13PX; }
-  .profile-rhythm__recommend-description { font-size: 11PX; line-height: 1.5; }
-  .profile-rhythm__recommend-trailing { font-size: 22PX; }
   .profile-rhythm__logout { justify-content: center; gap: 8PX; padding: 12PX 0 0; .nordic-icon { width: 16PX !important; height: 16PX !important; } }
   .profile-rhythm__logout-copy { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8PX; }
   .profile-rhythm__logout-title { font-size: 12PX; color: #9b3a48; }

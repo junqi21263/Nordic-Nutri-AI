@@ -80,6 +80,7 @@ import reminderTray from "../../assets/icons/reminder-tray.svg";
 import reminderLeaf from "../../assets/icons/reminder-leaf.svg";
 import alarmClock from "../../assets/icons/alarm-clock.svg";
 import bellOff from "../../assets/icons/bell-off.svg";
+import languages from "../../assets/icons/languages.svg";
 
 export type NordicIconName =
   | "back"
@@ -162,7 +163,8 @@ export type NordicIconName =
   | "reminder-tray"
   | "reminder-leaf"
   | "alarm-clock"
-  | "bell-off";
+  | "bell-off"
+  | "languages";
 
 export interface NordicIconProps {
   name: NordicIconName;
@@ -254,6 +256,7 @@ const iconSources: Record<NordicIconName, string> = {
   "reminder-leaf": reminderLeaf,
   "alarm-clock": alarmClock,
   "bell-off": bellOff,
+  languages,
 };
 
 /** Renderable local SVG asset for WeChat targets that do not expose Svg/Path components. */

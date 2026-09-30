@@ -180,6 +180,7 @@ function createVisionDataService({
       const result = input.providerCheckpoint && typeof input.providerCheckpoint === "object"
         ? input.providerCheckpoint
         : await analyze({
+          locale: input.locale,
           imageUrl: uploaded.imageUrl,
           imageDataUrl,
           budget,

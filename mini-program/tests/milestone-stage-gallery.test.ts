@@ -14,7 +14,7 @@ describe("presented milestone illustration gallery", () => {
     expect(page).toContain("frozenAsset={poster.illustrationAsset}");
     expect(poster).toContain("onViewIllustrations");
     expect(gallery).toContain("MILESTONE_ASSET_IDS");
-    expect(gallery).toContain("本次解锁");
+    expect(gallery).toContain('t("milestoneGallery.frozen")');
   });
 
   it("locks the page and uses the shared cached illustration renderer while the gallery is open", () => {

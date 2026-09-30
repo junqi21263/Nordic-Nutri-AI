@@ -1,10 +1,11 @@
 import { Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import { AppButton } from "../app-button";
 export function ErrorState({
-  title = "暂时无法显示",
-  description = "本地内容暂时无法显示，请稍后重试。",
+  title,
+  description,
   offline = false,
-  retryLabel = "重试",
+  retryLabel,
   onRetry,
 }: {
   title?: string;
@@ -13,14 +14,15 @@ export function ErrorState({
   retryLabel?: string;
   onRetry?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View className="error-state">
       <View className="error-state__mark">{offline ? "⌁" : "!"}</View>
-      <Text className="error-state__title">{title}</Text>
-      <Text className="error-state__description">{description}</Text>
+      <Text className="error-state__title">{title ?? t("sharedUi.errorTitle")}</Text>
+      <Text className="error-state__description">{description ?? t("sharedUi.errorDescription")}</Text>
       {onRetry ? (
         <AppButton variant="secondary" size="small" onClick={onRetry}>
-          {retryLabel}
+          {retryLabel ?? t("common.retry")}
         </AppButton>
       ) : null}
     </View>

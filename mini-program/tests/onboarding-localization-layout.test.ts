@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("@tarojs/taro", () => ({ default: { getStorageSync: () => "", getAppBaseInfo: () => ({ language: "en-US" }) } }));
 import { defaultLocale, getLocaleMessages } from "../src/locales";
 import { getOnboardingNavigationMetrics } from "../src/utils/onboarding-navigation";
 
@@ -9,12 +10,11 @@ const sourcePath = (relativePath: string) => resolve(projectRoot, relativePath);
 const readSource = (relativePath: string) => readFileSync(sourcePath(relativePath), "utf8");
 
 describe("Onboarding localization and WeChat layout contract", () => {
-  it("defaults copy to the supplied Simplified Chinese content", () => {
-    const messages = getLocaleMessages(defaultLocale);
-    expect(defaultLocale).toBe("zh-CN");
-    expect(messages.onboarding.title).toBe("你的目标是什么？");
-    expect(messages.onboarding.goals.muscle_gain.title).toBe("增益增肌");
-    expect(messages.onboarding.continue).toBe("继续");
+  it("uses English fallback while retaining all onboarding translations", () => {
+    expect(defaultLocale).toBe("en");
+    expect(getLocaleMessages("zh-CN").onboarding.title).toBe("你的目标是什么？");
+    expect(getLocaleMessages("zh-TW").onboarding.title).not.toBe(getLocaleMessages("zh-CN").onboarding.title);
+    expect(getLocaleMessages("en").onboarding.title).toBeTruthy();
   });
 
   it("reserves header space from the actual menu-button rectangle", () => {
@@ -31,11 +31,11 @@ describe("Onboarding localization and WeChat layout contract", () => {
     expect(metrics.rightInset).toBe(95);
   });
 
-  it("provides zh-CN as the default local locale with typed future locale slots", () => {
+  it("provides three locale resources", () => {
     expect(existsSync(sourcePath("src/locales/index.ts"))).toBe(true);
-    expect(existsSync(sourcePath("src/locales/zh-CN.ts"))).toBe(true);
-    expect(existsSync(sourcePath("src/locales/zh-TW.ts"))).toBe(true);
-    expect(existsSync(sourcePath("src/locales/en-US.ts"))).toBe(true);
+    for (const locale of ["zh-CN", "zh-TW", "en"]) {
+      expect(existsSync(sourcePath(`src/i18n/locales/${locale}.json`))).toBe(true);
+    }
   });
 
   it("keeps Onboarding copy out of JSX and renders local SVG goal icons", () => {

@@ -1,5 +1,6 @@
 import { Input, Text, View } from "@tarojs/components";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AppButton } from "../app-button";
 import { BottomSheet } from "../bottom-sheet";
 import { NordicIcon } from "../nordic-icon";
@@ -45,6 +46,7 @@ export function RecognitionFeedbackSheet({
   onReplacementSuccess,
   onSubmitOther,
 }: RecognitionFeedbackSheetProps) {
+  const { t } = useTranslation();
   const [note, setNote] = useState("");
   const [missingName, setMissingName] = useState("");
   const [missingQuantity, setMissingQuantity] = useState("100");
@@ -73,20 +75,9 @@ export function RecognitionFeedbackSheet({
   useEffect(() => {
     if (!open && successTimer.current) clearTimeout(successTimer.current);
   }, [open]);
-  const heading =
-    mode === "reasons"
-      ? "识别不准确？"
-      : mode === "items"
-        ? itemAction === "remove"
-          ? "选择要移除的食物"
-          : "选择要替换的食物"
-        : mode === "nutrition"
-          ? "怎么修正营养数据？"
-          : mode === "missing"
-            ? "补充遗漏的食物"
-          : mode === "replace"
-            ? "替换识别错误的食物"
-          : "告诉我们哪里不准确";
+  const heading = mode === "items"
+    ? t(itemAction === "remove" ? "recognitionFeedback.title.removeItem" : "recognitionFeedback.title.replaceItem")
+    : t(`recognitionFeedback.title.${mode}`);
 
   const selectReason = (reason: RecognitionFeedbackReason) => {
     if (reason.type === "extra_food" && !canRemoveItems) return;
@@ -141,10 +132,10 @@ export function RecognitionFeedbackSheet({
         <Text className="recognition-feedback-sheet__title">{heading}</Text>
         <Text className="recognition-feedback-sheet__subtitle">
           {mode === "reasons"
-            ? "请选择原因，我们会帮你直接修正这次识别。"
+            ? t("recognitionFeedback.subtitle.reasons")
             : mode === "missing" || mode === "replace"
-              ? "输入食物和大致份量，我们会更新本次识别。"
-            : "这次修改会同步到当前识别结果。"}
+              ? t("recognitionFeedback.subtitle.food")
+            : t("recognitionFeedback.subtitle.sync")}
         </Text>
       </View>
 
@@ -154,21 +145,21 @@ export function RecognitionFeedbackSheet({
             <View
               className={`recognition-feedback-sheet__reason ${reason.type === "extra_food" && !canRemoveItems ? "recognition-feedback-sheet__reason--disabled" : ""}`}
               key={reason.type}
-              ariaLabel={reason.label}
+              ariaLabel={t(`recognitionFeedback.reasons.${reason.type}.label`)}
               onClick={() => selectReason(reason)}
             >
               <View className="recognition-feedback-sheet__reason-icon">
-                <NordicIcon name="chevron-right" size={18} ariaLabel="选择" />
+                <NordicIcon name="chevron-right" size={18} ariaLabel={t("recognitionFeedback.choose")} />
               </View>
               <View className="recognition-feedback-sheet__reason-copy">
-                <Text className="recognition-feedback-sheet__reason-label">{reason.label}</Text>
+                <Text className="recognition-feedback-sheet__reason-label">{t(`recognitionFeedback.reasons.${reason.type}.label`)}</Text>
                 <Text className="recognition-feedback-sheet__reason-description">
                   {reason.type === "extra_food" && !canRemoveItems
-                    ? "至少需要保留一种食物"
-                    : reason.description}
+                    ? t("recognitionFeedback.remainingRequired")
+                    : t(`recognitionFeedback.reasons.${reason.type}.description`)}
                 </Text>
               </View>
-              <NordicIcon name="chevron-right" size={18} ariaLabel="进入" />
+              <NordicIcon name="chevron-right" size={18} ariaLabel={t("recognitionFeedback.enter")} />
             </View>
           ))}
         </View>
@@ -181,7 +172,7 @@ export function RecognitionFeedbackSheet({
               <View
                 className="recognition-feedback-sheet__item"
                 key={item.id}
-                ariaLabel={itemAction === "remove" ? `移除${item.name}` : `替换${item.name}`}
+                ariaLabel={t(itemAction === "remove" ? "recognitionFeedback.item.remove" : "recognitionFeedback.item.replace", { name: item.name })}
                 onClick={() => onSelectItem(item)}
               >
                 <View className="recognition-feedback-sheet__item-copy">
@@ -190,11 +181,11 @@ export function RecognitionFeedbackSheet({
                     {item.amount} · {item.calories} kcal
                   </Text>
                 </View>
-                <NordicIcon name="chevron-right" size={18} ariaLabel="选择" />
+                <NordicIcon name="chevron-right" size={18} ariaLabel={t("recognitionFeedback.choose")} />
               </View>
             ))
           ) : (
-            <Text className="recognition-feedback-sheet__empty">当前没有可调整的食物。</Text>
+            <Text className="recognition-feedback-sheet__empty">{t("recognitionFeedback.noItems")}</Text>
           )}
         </View>
       ) : null}
@@ -206,30 +197,30 @@ export function RecognitionFeedbackSheet({
             onClick={() => onSelectNutrition("portion")}
           >
             <View className="recognition-feedback-sheet__action-icon">
-              <NordicIcon name="weight" size={20} ariaLabel="份量" />
+              <NordicIcon name="weight" size={20} ariaLabel={t("recognitionFeedback.portion")} />
             </View>
             <View>
-              <Text className="recognition-feedback-sheet__action-title">调整份量</Text>
+              <Text className="recognition-feedback-sheet__action-title">{t("recognitionFeedback.adjustPortion")}</Text>
               <Text className="recognition-feedback-sheet__action-copy">
-                修改这餐的整体份量比例
+                {t("recognitionFeedback.portionDescription")}
               </Text>
             </View>
-            <NordicIcon name="chevron-right" size={18} ariaLabel="进入" />
+            <NordicIcon name="chevron-right" size={18} ariaLabel={t("recognitionFeedback.enter")} />
           </View>
           <View
             className="recognition-feedback-sheet__action"
             onClick={() => onSelectNutrition("food")}
           >
             <View className="recognition-feedback-sheet__action-icon">
-              <NordicIcon name="food-bowl" size={20} ariaLabel="食物" />
+              <NordicIcon name="food-bowl" size={20} ariaLabel={t("recognitionFeedback.food")} />
             </View>
             <View>
-              <Text className="recognition-feedback-sheet__action-title">修改食物</Text>
+              <Text className="recognition-feedback-sheet__action-title">{t("recognitionFeedback.editFood")}</Text>
               <Text className="recognition-feedback-sheet__action-copy">
-                重新选择对应的食物数据
+                {t("recognitionFeedback.foodDescription")}
               </Text>
             </View>
-            <NordicIcon name="chevron-right" size={18} ariaLabel="进入" />
+            <NordicIcon name="chevron-right" size={18} ariaLabel={t("recognitionFeedback.enter")} />
           </View>
         </View>
       ) : null}
@@ -237,14 +228,14 @@ export function RecognitionFeedbackSheet({
       {mode === "missing" || mode === "replace" ? (
         <View className="recognition-feedback-sheet__missing">
           <View className="recognition-feedback-sheet__field">
-            <Text className="recognition-feedback-sheet__field-label">食物名称</Text>
+            <Text className="recognition-feedback-sheet__field-label">{t("recognitionFeedback.foodName")}</Text>
             <View className={`recognition-feedback-sheet__field-shell ${missingError ? "recognition-feedback-sheet__field-shell--error" : ""}`}>
               <Input
                 className="recognition-feedback-sheet__field-input"
                 disabled={missingLoading || missingSuccess}
                 value={missingName}
                 maxlength={60}
-                placeholder="例如：西兰花、鸡蛋、米饭"
+                placeholder={t("recognitionFeedback.missing.placeholder")}
                 onInput={(event) => {
                   setMissingName(event.detail.value);
                   setMissingError(false);
@@ -252,16 +243,16 @@ export function RecognitionFeedbackSheet({
               />
               {missingName ? (
                 <View className="recognition-feedback-sheet__clear" onClick={() => { if (!missingLoading && !missingSuccess) setMissingName(""); }}>
-                  <NordicIcon name="x" size={12} ariaLabel="清空食物名称" />
+                  <NordicIcon name="x" size={12} ariaLabel={t("recognitionFeedback.clearFoodName")} />
                 </View>
               ) : null}
             </View>
             {missingError ? (
-              <Text className="recognition-feedback-sheet__field-error">暂时无法匹配，请尝试更具体的名称</Text>
+              <Text className="recognition-feedback-sheet__field-error">{t("recognitionFeedback.missing.unmatched")}</Text>
             ) : null}
           </View>
           <View className="recognition-feedback-sheet__field">
-            <Text className="recognition-feedback-sheet__field-label">大约吃了多少？</Text>
+            <Text className="recognition-feedback-sheet__field-label">{t("recognitionFeedback.missing.quantity")}</Text>
             <View className="recognition-feedback-sheet__field-shell">
               <Input
                 className="recognition-feedback-sheet__field-input"
@@ -286,8 +277,8 @@ export function RecognitionFeedbackSheet({
             </View>
           </View>
           <View className="recognition-feedback-sheet__estimate-note">
-            <NordicIcon name="check" size={14} ariaLabel="自动估算" />
-            <Text>营养数据将根据食物名称和克重自动估算。</Text>
+            <NordicIcon name="check" size={14} ariaLabel={t("recognitionFeedback.missing.estimateAria")} />
+            <Text>{t("recognitionFeedback.missing.estimateNote")}</Text>
           </View>
           <AppButton
             size="large"
@@ -297,15 +288,15 @@ export function RecognitionFeedbackSheet({
           >
             {missingSuccess ? (
               <View className="recognition-feedback-sheet__submit-success">
-                <NordicIcon name="check-inverse" size={20} ariaLabel="已添加" />
-                <Text>{mode === "replace" ? "已替换本次识别" : "已加入本次识别"}</Text>
+                <NordicIcon name="check-inverse" size={20} ariaLabel={t("recognitionFeedback.missing.successAria")} />
+                <Text>{t(mode === "replace" ? "recognitionFeedback.missing.replaced" : "recognitionFeedback.missing.added")}</Text>
               </View>
             ) : missingLoading ? (
               <View className="recognition-feedback-sheet__analyzing">
                 <View className="recognition-feedback-sheet__spinner" />
-                <Text>正在分析食物…</Text>
+                <Text>{t("recognitionFeedback.missing.analyzing")}</Text>
               </View>
-            ) : mode === "replace" ? "替换当前食物" : "添加到本次识别"}
+            ) : t(mode === "replace" ? "recognitionFeedback.missing.replace" : "recognitionFeedback.missing.add")}
           </AppButton>
         </View>
       ) : null}
@@ -316,15 +307,15 @@ export function RecognitionFeedbackSheet({
             className="recognition-feedback-sheet__input"
             value={note}
             maxlength={300}
-            placeholder="请简单描述一下问题"
+            placeholder={t("recognitionFeedback.other.placeholder")}
             onInput={(event) => {
               setNote(event.detail.value);
               setOtherError(false);
             }}
           />
-          {otherError ? <Text className="recognition-feedback-sheet__field-error">提交失败，请重试</Text> : null}
+          {otherError ? <Text className="recognition-feedback-sheet__field-error">{t("recognitionFeedback.other.failed")}</Text> : null}
           <AppButton size="large" disabled={!note.trim()} loading={otherLoading} onClick={() => void submitOther()}>
-            {otherLoading ? "正在提交…" : "提交反馈"}
+            {otherLoading ? t("recognitionFeedback.other.submitting") : t("recognitionFeedback.other.submit")}
           </AppButton>
         </View>
       ) : null}

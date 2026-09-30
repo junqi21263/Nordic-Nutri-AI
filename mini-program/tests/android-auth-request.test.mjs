@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const worktreeRoot = resolve(import.meta.dirname, "../..");
 const authPage = readFileSync(resolve(worktreeRoot, "mini-program/src/pages/android-auth/index.tsx"), "utf8");
@@ -16,7 +17,7 @@ describe("Android auth visual request", () => {
     expect(authPage).toContain("<PhoneInput value={phone} onChange={setPhone} />");
     expect(authPage).not.toContain("CountryPicker");
     expect(authPage).not.toContain("pickerOpen");
-    expect(authComponents).toContain('<NordicIcon name="china" size={18} ariaLabel="中国" />');
+    expect(authComponents).toContain('<NordicIcon name="china" size={18} ariaLabel={t("androidAuth.china")} />');
     expect(authComponents).toContain(">+86<");
   });
 

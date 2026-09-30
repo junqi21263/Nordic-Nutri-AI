@@ -160,7 +160,7 @@ export function streamProductCoachMessage(
       url: productApiEndpoint + "/coach-answer/stream",
       method: "POST",
       header: { authorization: "Bearer " + token, "content-type": "application/json" },
-      data: { clientRequestId, prompt, date },
+      data: { clientRequestId, prompt, date, locale: getLocale() },
       enableChunked: true,
       success: ({ statusCode }) => {
         if (statusCode !== 200) {
@@ -241,7 +241,7 @@ function streamWebCoachMessage(
     const response = await fetch(productApiEndpoint + "/coach-answer/stream", {
       method: "POST",
       headers: { authorization: "Bearer " + token, "content-type": "application/json" },
-      body: JSON.stringify({ clientRequestId, prompt, date }),
+      body: JSON.stringify({ clientRequestId, prompt, date, locale: getLocale() }),
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -294,7 +294,7 @@ export function getProductCoachMessages() {
 }
 
 export function getProductCoachBrief(date: string) {
-  return coalesceRequest(`coach-brief:${date}`, () =>
+  return coalesceRequest(`coach-brief:${date}:${getLocale()}`, () =>
     requestProductApi<ProductCoachBrief>(`/coach/brief?date=${encodeURIComponent(date)}`, {
       method: "GET",
       fallbackMessage: "营养教练摘要暂时无法读取，请稍后重试",
@@ -306,7 +306,7 @@ export function getProductCoachDailyTip(date: string, options?: { refresh?: bool
   const refresh = Boolean(options?.refresh);
   const params = new URLSearchParams({ date });
   if (refresh) params.set("refresh", "1");
-  return coalesceRequest(`coach-daily-tip:${date}:${refresh ? "1" : "0"}`, () =>
+  return coalesceRequest(`coach-daily-tip:${date}:${refresh ? "1" : "0"}:${getLocale()}`, () =>
     requestProductApi<ProductCoachDailyTip>(`/coach/daily-tip?${params.toString()}`, {
       method: "GET",
       fallbackMessage: "今日营养建议暂时无法读取，请稍后重试",
@@ -316,7 +316,7 @@ export function getProductCoachDailyTip(date: string, options?: { refresh?: bool
 }
 
 export function getProductCoachDailyBrief(date: string) {
-  return coalesceRequest(`coach-daily-brief:${date}`, () =>
+  return coalesceRequest(`coach-daily-brief:${date}:${getLocale()}`, () =>
     requestProductApi<ProductCoachDailyBrief>(`/coach/daily-brief?date=${encodeURIComponent(date)}`, {
       method: "GET",
       fallbackMessage: "NOVA 今日提醒暂时无法读取，请稍后重试",
@@ -345,8 +345,9 @@ export function sendProductCoachMessage(
     dailyUsage: ProductCoachDailyUsage;
   }>("/coach-answer", {
     method: "POST",
-    data: { clientRequestId, prompt, date },
+    data: { clientRequestId, prompt, date, locale: getLocale() },
     fallbackMessage: "营养教练暂时无法回答，请稍后重试",
     timeout: 20_000,
   });
 }
+import { getLocale } from "../i18n";

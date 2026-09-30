@@ -5,6 +5,7 @@ import type { Meal } from "../src/features/meals/domain";
 import { createMealFromAnalysis } from "../src/features/scanner/domain";
 import { toProductMealInput } from "../src/features/meals/product-meal-input";
 import { createPortionDraftStore } from "../src/stores/portion-draft-store";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceMeal: Meal = {
   id: "22222222-2222-4222-8222-222222222222",
@@ -55,7 +56,7 @@ describe("repeat meal", () => {
     const page = readFileSync(resolve(import.meta.dirname, "../src/pages/meal-detail/index.tsx"), "utf8");
     const adjustment = readFileSync(resolve(import.meta.dirname, "../src/pages/portion-adjustment/index.tsx"), "utf8");
 
-    expect(page).toContain('ariaLabel="再吃一次"');
+    expectLocalizedCopy(page, "再吃一次");
     expect(page).toContain("startMealRepeat(meal)");
     expect(adjustment).toContain("RecordTimeEditor");
     expect(adjustment).toContain("isRepeating");

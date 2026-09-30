@@ -112,11 +112,11 @@ describe("meal saved celebration motion", () => {
     const component = readFileSync(componentPath, "utf8");
     const layout = readFileSync(layoutPath, "utf8");
 
-    expect(component).toContain("本餐已保存！");
-    expect(component).toContain("本餐已更新！");
-    expect(component).toContain("查看本餐");
-    expect(component).toContain("继续记录");
-    expect(component).toContain("回到主页");
+    expect(component).toContain("mealSaved.title.${kind}");
+    expect(component).toContain("mealSaved.subtitle.${kind}");
+    expect(component).toContain("mealSaved.viewMeal");
+    expect(component).toContain("mealSaved.continue");
+    expect(component).toContain("mealSaved.backHome");
     expect(component).toContain('kind === "reused"');
     expect(component).toContain("!isTemplate && (");
     expect(layout).toContain("useMealSavedCelebrationStore");

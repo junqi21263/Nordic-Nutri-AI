@@ -1,4 +1,7 @@
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import { Text, Textarea, View } from "@tarojs/components";
+import { LanguageSettings } from "../../components/language-settings";
 import Taro, { useDidShow, usePullDownRefresh } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { AppButton } from "../../components/app-button";
@@ -20,7 +23,7 @@ import { getProductAccount } from "../../api/product-data-api";
 import { getProductWeeklyReview, type ProductWeeklyReview } from "../../api/insight-api";
 import { getMilestoneJourney, type ProductMilestoneJourney } from "../../api/milestone-api";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
-import { sortAchievementsForProfilePreview } from "../../features/coach/achievement-catalog";
+import { getAchievementDisplayTitle, sortAchievementsForProfilePreview } from "../../features/coach/achievement-catalog";
 import { createAchievements, type Achievement } from "../../features/coach/domain";
 import { refreshProductAchievements } from "../../features/coach/refresh-achievements";
 import { getLocalDateString } from "../../features/onboarding/domain";
@@ -39,8 +42,10 @@ import "./android-profile.scss";
 
 const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
 const loginEntryPath = isAndroidApp ? "/pages/android-auth/index" : "/pages/auth-entry/index";
+const goalKeys: Record<string, string> = { "增益增肌": "muscle_gain", "轻盈减脂": "fat_loss", "保持状态": "maintenance", "健康饮食": "performance" };
 
 export default function ProfilePage() {
+  useTranslation();
   useAppShare();
   const profile = useProfileStore();
   const meals = useMealStore();
@@ -205,7 +210,7 @@ export default function ProfilePage() {
   const openMilestoneJourney = () => Taro.navigateTo({ url: "/pages/milestone-journey/index" });
   const submitFeedback = async () => {
     if (!feedbackDraft.trim()) {
-      setFeedbackError("请先写下你的问题或建议");
+      setFeedbackError(t("feedback.required"));
       return;
     }
     try {
@@ -217,18 +222,18 @@ export default function ProfilePage() {
       setTimeout(() => {
         feedback.showModal({
           variant: "success",
-          title: "感谢你的反馈",
-          description: "我们已收到，会用它持续改进体验。",
-          primaryText: "好的",
+          title: t("feedback.thanks"),
+          description: t("feedback.receivedDescription"),
+          primaryText: t("feedback.okay"),
           dismissible: false,
         });
       }, bottomSheetExitDuration);
     } catch {
       feedback.showModal({
         variant: "error",
-        title: "反馈提交失败",
-        description: "内容已保留，请稍后重试。",
-        primaryText: "知道了",
+        title: t("feedback.submitFailed"),
+        description: t("feedback.submitFailedDescription"),
+        primaryText: t("common.confirm"),
         dismissible: true,
       });
     }
@@ -259,15 +264,15 @@ export default function ProfilePage() {
   const performLogout = () => {
     void logoutFlow
       .run()
-      .catch(() => feedback.show({ message: "退出登录失败，请稍后重试", tone: "error" }));
+      .catch(() => feedback.show({ message: t("profile.logoutFailed"), tone: "error" }));
   };
   const logout = () => {
     feedback.showModal({
       variant: "error",
-      title: "退出登录？",
-      description: "仅退出当前设备，不会删除你的饮食记录。",
-      primaryText: "退出登录",
-      secondaryText: "取消",
+      title: t("profile.logoutQuestion"),
+      description: t("profile.logoutWarning"),
+      primaryText: t("profile.logout"),
+      secondaryText: t("common.cancel"),
       onPrimary: performLogout,
       dismissible: true,
     });
@@ -282,7 +287,7 @@ export default function ProfilePage() {
 
   return (
     <PageLayout
-      title="个人中心"
+      title={t("profile.title")}
       activeTab="profile"
       hideNavigation
       showBrandHeader={!isAndroidApp}
@@ -304,7 +309,7 @@ export default function ProfilePage() {
           accountError={accountError}
           retryAccount={syncProfileFromAccount}
         /> : <>
-        <View ariaLabel="编辑个人资料" onClick={() => openPage("/pages/profile-edit/index")}>
+        <View ariaLabel={t("profile.editProfile")} onClick={() => openPage("/pages/profile-edit/index")}>
           <AppCard tone="dark" className="profile-hero profile-rhythm__identity">
             <Avatar
               label={profile.profile.nickname.slice(0, 1).toUpperCase()}
@@ -314,9 +319,9 @@ export default function ProfilePage() {
             <View className="profile-hero__copy">
               <Text className="profile-hero__name">{profile.profile.nickname}</Text>
               <Text className="profile-hero__goal">
-                {profile.profile.goalLabel} · 当前 {profile.profile.weight} kg
+                {goalKeys[profile.profile.goalLabel] ? t(`onboarding.goals.${goalKeys[profile.profile.goalLabel]}.title`) : profile.profile.goalLabel} · {t("profile.currentWeight", { weight: profile.profile.weight })}
               </Text>
-              <Badge tone="success">稳定前进中</Badge>
+              <Badge tone="success">{t("profile.movingForward")}</Badge>
             </View>
           </AppCard>
         </View>
@@ -324,38 +329,38 @@ export default function ProfilePage() {
         <View className="card-grid profile-rhythm__stats">
           <View onClick={() => openPage("/pages/goal-adjust/index")}>
             <StatisticCard
-              label="目标热量"
+              label={t("profile.targetCalories")}
               value={`${profile.profile.targetCalories}`}
-              hint="kcal · 可调整"
+              hint={t("profile.adjustable")}
             />
           </View>
           <View onClick={openCoach}>
             <StatisticCard
-              label="蛋白完成度"
+              label={t("profile.proteinCompletion")}
               value={`${proteinCompletion}%`}
-              hint="今日"
+              hint={t("profile.today")}
               tone="sage"
             />
           </View>
           <View onClick={openMealRecords}>
             <StatisticCard
-              label="已记录餐次"
+              label={t("profile.loggedMeals")}
               value={`${weeklyReview?.recordedMeals ?? meals.meals.length}`}
-              hint="本周"
+              hint={t("profile.thisWeek")}
               tone="beige"
             />
           </View>
           <View onClick={() => void openMilestoneJourney()}>
             <StatisticCard
-              label="我的旅程"
-              value={`${milestoneJourney?.currentStreakDays ?? 0} 天`}
-              hint="连续记录"
+              label={t("profile.journey")}
+              value={t("profile.days", { count: milestoneJourney?.currentStreakDays ?? 0 })}
+              hint={t("profile.streak")}
             />
           </View>
         </View>
 
         <View className="profile-rhythm__section-head">
-          <Text>成就</Text>
+          <Text>{t("profile.achievements")}</Text>
           <Text onClick={() => openPage("/pages/achievements/index")}>
             {unlockedAchievements}/{list.length} ›
           </Text>
@@ -363,121 +368,108 @@ export default function ProfilePage() {
         <View className="profile-rhythm__achievement-row">
           {sortAchievementsForProfilePreview(list)
             .slice(0, 3)
-            .map((achievement) => (
-              <View
-                className={`profile-rhythm__achievement ${achievement.unlocked ? "" : "profile-rhythm__achievement--locked"}`}
-                key={achievement.id}
-                onClick={() => openAchievement(achievement)}
-              >
-                <NordicIcon
-                  name={getAchievementIcon(achievement)}
-                  size={22}
-                  ariaLabel={achievement.title}
-                />
-                <Text>{achievement.title}</Text>
-              </View>
-            ))}
+            .map((achievement) => {
+              const title = getAchievementDisplayTitle(achievement.title, (key) => t(key));
+              return (
+                <View
+                  className={`profile-rhythm__achievement ${achievement.unlocked ? "" : "profile-rhythm__achievement--locked"}`}
+                  key={achievement.id}
+                  onClick={() => openAchievement(achievement)}
+                  ariaLabel={title}
+                >
+                  <NordicIcon
+                    name={getAchievementIcon(achievement)}
+                    size={22}
+                    ariaLabel={title}
+                  />
+                  <Text>{title}</Text>
+                </View>
+              );
+            })}
         </View>
 
         <View
           className="profile-rhythm__weekly-review"
-          ariaLabel="查看本周总结"
+          ariaLabel={t("profile.weeklySummary")}
           onClick={() => openPage("/pages/weekly-review/index")}
         >
           <View className="profile-rhythm__weekly-copy">
-            <Text className="profile-rhythm__weekly-title">本周回顾</Text>
-            <Text className="profile-rhythm__weekly-description">保持记录，稳步靠近增肌目标。</Text>
+            <Text className="profile-rhythm__weekly-title">{t("weekly.title")}</Text>
+            <Text className="profile-rhythm__weekly-description">{t("profile.weeklyDescription")}</Text>
           </View>
           <View className="profile-rhythm__weekly-score">
-            <Text className="profile-rhythm__weekly-score-label">营养节奏</Text>
+            <Text className="profile-rhythm__weekly-score-label">{t("profile.rhythm")}</Text>
             <Text className="profile-rhythm__weekly-score-value">{weeklyReview?.score ?? proteinCompletion}</Text>
-            <Text className="profile-rhythm__weekly-score-suffix">分 ›</Text>
+            <Text className="profile-rhythm__weekly-score-suffix">{t("profile.points")}</Text>
           </View>
         </View>
 
         </>}
         <View className="profile-rhythm__entry-sections">
           <View className="profile-rhythm__settings-section">
-            <Text className="profile-rhythm__settings-label">饮食管理</Text>
+            <Text className="profile-rhythm__settings-label">{t("profile.foodManagement")}</Text>
             <View className="profile-rhythm__settings-group">
               {isAndroidApp ? (
                 <View onClick={() => openPage("/pages/smart-reminder-settings/index")}>
-                  <ListItem icon={<NordicIcon name="bell" size={20} ariaLabel="记录提醒" />} title="记录提醒" description="按餐次设置轻量的本地提醒" />
+                  <ListItem icon={<NordicIcon name="bell" size={20} ariaLabel={t("profile.reminders")} />} title={t("profile.reminders")} description={t("profile.remindersDescription")} />
                 </View>
               ) : null}
               <View onClick={() => openPage("/pages/frequent-meals/index")}>
-                <ListItem icon={<NordicIcon name="bookmark" size={20} ariaLabel="我的常吃" />} title="我的常吃" description="保存熟悉的一餐，下次一键记录" />
+                <ListItem icon={<NordicIcon name="bookmark" size={20} ariaLabel={t("profile.favorites")} />} title={t("profile.favorites")} description={t("profile.favoritesDescription")} />
               </View>
               <View onClick={() => openPage("/pages/body-profile/index?from=settings&entry=1")}>
                 <ListItem
-                  icon={<NordicIcon name="ruler" size={20} ariaLabel="营养档案" />}
-                  title="营养档案"
-                  description="身体数据、饮食偏好与忌口"
+                  icon={<NordicIcon name="ruler" size={20} ariaLabel={t("profile.nutrition")} />}
+                  title={t("profile.nutrition")}
+                  description={t("profile.nutritionDescription")}
                 />
               </View>
             </View>
           </View>
 
           <View className="profile-rhythm__settings-section">
-            <Text className="profile-rhythm__settings-label">帮助与信息</Text>
+            <Text className="profile-rhythm__settings-label">{t("profile.helpInformation")}</Text>
             <View className="profile-rhythm__settings-group">
               <View onClick={openFeedback}>
                 <ListItem
-                  icon={<NordicIcon name="message-circle" size={20} ariaLabel="反馈与帮助" />}
+                  icon={<NordicIcon name="message-circle" size={20} ariaLabel={t("profile.feedback")} />}
                   title={
                     <View className="profile-feedback-title">
-                      <Text>反馈与帮助</Text>
+                      <Text>{t("profile.feedback")}</Text>
                       {unreadReplyCount > 0 ? (
                         <View className="profile-feedback-title__bell">
-                          <NordicIcon name="bell" size={16} ariaLabel="有新的反馈回复" />
+                          <NordicIcon name="bell" size={16} ariaLabel={t("profile.newFeedbackReply")} />
                         </View>
                       ) : null}
                     </View>
                   }
-                  description="告诉我们你的想法"
+                  description={t("profile.feedbackDescription")}
                   trailing="›"
                 />
               </View>
               <View onClick={() => setActiveModal("about")}>
                 <ListItem
-                  icon={<NordicIcon name="info" size={20} ariaLabel="关于我们" />}
-                  title="关于我们"
-                  description="产品介绍与使用说明"
+                  icon={<NordicIcon name="info" size={20} ariaLabel={t("profile.about")} />}
+                  title={t("profile.about")}
+                  description={t("profile.aboutDescription")}
                 />
               </View>
               <View onClick={() => openPage("/pages/privacy-policy/index")}>
                 <ListItem
-                  icon={<NordicIcon name="shield-check" size={20} ariaLabel="隐私政策与免责声明" />}
-                  title="隐私政策与免责声明"
-                  description="数据说明与账号注销"
+                  icon={<NordicIcon name="shield-check" size={20} ariaLabel={t("profile.privacy")} />}
+                  title={t("profile.privacy")}
+                  description={t("profile.privacyDescription")}
                 />
               </View>
+              <LanguageSettings />
             </View>
           </View>
 
-          <View className="profile-rhythm__settings-section">
-            <Text className="profile-rhythm__settings-label">和朋友一起</Text>
-            <View
-              className="profile-rhythm__recommend-card"
-              ariaLabel="推荐好友"
-              onClick={() => openPage("/pages/recommend-friends/index")}
-            >
-              <View className="profile-rhythm__recommend-icon">
-                <NordicIcon name="share" size={22} ariaLabel="推荐好友" />
-              </View>
-              <View className="profile-rhythm__recommend-copy">
-                <Text className="profile-rhythm__recommend-title">推荐好友</Text>
-                <Text className="profile-rhythm__recommend-description">分享海报，邀请朋友一起开始</Text>
-              </View>
-              <Text className="profile-rhythm__recommend-trailing">›</Text>
-            </View>
-          </View>
-
-          <View className="profile-rhythm__logout" ariaLabel="退出登录" onClick={logout}>
-            <NordicIcon name="log-out" size={20} ariaLabel="退出登录" />
+          <View className="profile-rhythm__logout" ariaLabel={t("profile.logout")} onClick={logout}>
+            <NordicIcon name="log-out" size={20} ariaLabel={t("profile.logout")} />
             <View className="profile-rhythm__logout-copy">
-              <Text className="profile-rhythm__logout-title">退出登录</Text>
-              <Text className="profile-rhythm__logout-description">仅退出当前设备</Text>
+              <Text className="profile-rhythm__logout-title">{t("profile.logout")}</Text>
+              <Text className="profile-rhythm__logout-description">{t("profile.logoutDescription")}</Text>
             </View>
           </View>
         </View>
@@ -498,13 +490,13 @@ export default function ProfilePage() {
       >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">
-            <Text className="profile-modal__title">反馈与帮助</Text>
+            <Text className="profile-modal__title">{t("profile.feedback")}</Text>
             <View
               className="profile-sheet__close"
-              ariaLabel="关闭反馈与帮助"
+              ariaLabel={t("profile.closeFeedback")}
               onClick={() => setActiveModal(null)}
             >
-              <NordicIcon name="x" size={20} ariaLabel="关闭" />
+              <NordicIcon name="x" size={20} ariaLabel={t("common.close")} />
             </View>
           </View>
           <View className="profile-feedback-tabs">
@@ -512,24 +504,23 @@ export default function ProfilePage() {
               className={`profile-feedback-tab ${feedbackMode === "submit" ? "profile-feedback-tab--active" : ""}`}
               onClick={() => changeFeedbackMode("submit")}
             >
-              <Text>提交反馈</Text>
+              <Text>{t("feedback.submit")}</Text>
             </View>
             <View
               className={`profile-feedback-tab ${feedbackMode === "history" ? "profile-feedback-tab--active" : ""}`}
               onClick={() => changeFeedbackMode("history")}
             >
-              <Text>我的反馈</Text>
+              <Text>{t("feedback.history")}</Text>
             </View>
           </View>
           {feedbackMode === "submit" ? (
             <>
               <Text className="profile-modal__lead">
-                告诉我们哪里不顺手，或你希望下一步看到什么。
-              </Text>
+                {t("feedback.lead")}</Text>
               <Textarea
                 className="profile-modal__input"
                 value={feedbackDraft}
-                placeholder="例如：我希望回顾中能看到每餐的蛋白变化"
+                placeholder={t("feedback.placeholder")}
                 maxlength={2000}
                 adjustPosition
                 cursorSpacing={20}
@@ -543,12 +534,10 @@ export default function ProfilePage() {
               />
               {feedbackError ? <Text className="form-field__error">{feedbackError}</Text> : null}
               <Text className="profile-modal__hint">
-                提交后将安全保存，用于定位问题和改进体验。
-              </Text>
+                {t("feedback.hint")}</Text>
               <View className="profile-sheet__action">
                 <AppButton size="medium" onClick={() => void submitFeedback()}>
-                  提交反馈
-                </AppButton>
+                  {t("feedback.submit")}</AppButton>
               </View>
             </>
           ) : (
@@ -560,20 +549,20 @@ export default function ProfilePage() {
                       <Text className="profile-feedback-status">
                         {
                           {
-                            new: "已收到",
-                            reviewing: "处理中",
-                            resolved: "已回复",
-                            closed: "已关闭",
+                            new: t("feedback.received"),
+                            reviewing: t("feedback.reviewing"),
+                            resolved: t("feedback.resolved"),
+                            closed: t("feedback.closed"),
                           }[item.status]
                         }
                       </Text>
                       <Text>{item.createdAt.slice(0, 10)}</Text>
                     </View>
-                    <Text className="profile-feedback-label">{item.category === "recognition" ? "识别纠错反馈" : "你的反馈"}</Text>
+                    <Text className="profile-feedback-label">{item.category === "recognition" ? t("feedback.recognition") : t("feedback.yours")}</Text>
                     <Text className="profile-feedback-card__content">{item.content}</Text>
                     {item.adminReply ? (
                       <View className="profile-feedback-reply">
-                        <Text className="profile-feedback-label">我们的回复</Text>
+                        <Text className="profile-feedback-label">{t("feedback.reply")}</Text>
                         <Text>{item.adminReply}</Text>
                       </View>
                     ) : null}
@@ -581,8 +570,8 @@ export default function ProfilePage() {
                 ))
               ) : (
                 <View className="profile-feedback-empty">
-                  <Text>暂无反馈记录</Text>
-                  <Text>你提交的反馈会在这里显示处理进度和回复。</Text>
+                  <Text>{t("feedback.empty")}</Text>
+                  <Text>{t("feedback.emptyDescription")}</Text>
                 </View>
               )}
             </View>
@@ -598,24 +587,16 @@ export default function ProfilePage() {
       >
         <View className="profile-sheet__content">
           <View className="profile-sheet__header">
-            <Text className="profile-modal__title">关于我们</Text>
+            <Text className="profile-modal__title">{t("profile.about")}</Text>
           </View>
           <Text className="profile-modal__lead">
-            Nordic Nutri AI 帮助你轻松看见、理解并记录每一餐。
+            {t("profile.aboutLead")}
           </Text>
           <View className="profile-modal__notice">
-            <Text>
-              面向健身与健康管理用户，把拍照识别、食物库、目标进度、餐次回顾与每日建议放在同一套轻松、可持续的节奏里。
-            </Text>
-            <Text>
-              当前支持微信登录与云端同步、饮食记录与周回顾、目标调整、标准食物库浏览，以及营养教练参考建议。
-            </Text>
-            <Text>
-              营养建议仅供日常参考，不构成医疗诊断或治疗建议；如有健康问题，请咨询专业人士。
-            </Text>
-            <Text>
-              产品持续迭代中，欢迎通过「反馈与帮助」告诉我们哪里不顺手，或你希望下一步看到什么。
-            </Text>
+            <Text>{t("profile.about1")}</Text>
+            <Text>{t("profile.about2")}</Text>
+            <Text>{t("profile.about3")}</Text>
+            <Text>{t("profile.about4")}</Text>
           </View>
         </View>
       </BottomSheet>

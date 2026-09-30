@@ -28,9 +28,9 @@ describe("achievement unlock overlay", () => {
     expect(modal).not.toContain("成长里程");
     expect(pageLayout).toContain("acknowledgeProductAchievementCelebration");
     expect(modal).not.toContain("useAchievementStore");
-    expect(modal).toContain("成就已解锁");
-    expect(modal).toContain("收下这份成就");
-    expect(modal).toContain("查看全部成就");
+    expect(modal).toContain('t("achievementUnlock.title")');
+    expect(modal).toContain('t("achievementUnlock.accept")');
+    expect(modal).toContain('t("achievementUnlock.viewAll")');
     expect(modal).not.toContain("achievement-unlock-overlay__progress");
     expect(modal).toContain('Taro.navigateTo({ url: "/pages/achievements/index" })');
     expect(pageLayout).toContain("AchievementUnlockModal");

@@ -2,8 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { createAndroidAuthApi } from "./android-auth-api";
 
 const nativeRequest = vi.hoisted(() => vi.fn());
-const networkAdd = vi.hoisted(() => vi.fn((_item: Record<string, unknown>) => ({ id: "vc-auth-1" })));
-const networkUpdate = vi.hoisted(() => vi.fn((_id: string, _item: Record<string, unknown>) => undefined));
+const networkAdd = vi.hoisted(() => vi.fn((item: Record<string, unknown>) => {
+  void item;
+  return { id: "vc-auth-1" };
+}));
+const networkUpdate = vi.hoisted(() => vi.fn((id: string, item: Record<string, unknown>) => {
+  void id;
+  void item;
+}));
 vi.mock("@capacitor/core", () => ({
   Capacitor: { isNativePlatform: () => true },
   CapacitorHttp: { request: nativeRequest },
