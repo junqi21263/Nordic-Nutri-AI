@@ -1,31 +1,13 @@
-import { enUS } from "./en-US";
-import { zhCN } from "./zh-CN";
-import { zhTW } from "./zh-TW";
-import type { AppLocale, LocaleMessages, LocaleOverrides } from "./types";
+import i18n, { getLocale } from "../i18n";
+import type { AppLocale, LocaleMessages } from "./types";
 
 export type { AppLocale, LocaleMessages } from "./types";
 
-export const defaultLocale: AppLocale = "zh-CN";
+export const defaultLocale: AppLocale = "en";
 
-const localeOverrides: Record<AppLocale, LocaleOverrides> = {
-  "zh-CN": {},
-  "zh-TW": zhTW,
-  "en-US": enUS,
-};
-
-/** Resolves local copy without a remote translation dependency. */
-export function getLocaleMessages(locale: AppLocale = defaultLocale): LocaleMessages {
-  const override = localeOverrides[locale].onboarding;
-  if (!override) return zhCN;
-
+/** Compatibility adapter for the existing typed onboarding composition. */
+export function getLocaleMessages(locale: AppLocale = getLocale()): LocaleMessages {
   return {
-    onboarding: {
-      ...zhCN.onboarding,
-      ...override,
-      goals: {
-        ...zhCN.onboarding.goals,
-        ...override.goals,
-      },
-    },
+    onboarding: i18n.getFixedT(locale)("onboarding", { returnObjects: true }) as LocaleMessages["onboarding"],
   };
 }

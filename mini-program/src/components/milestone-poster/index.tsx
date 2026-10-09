@@ -1,9 +1,10 @@
 import { Image, Text, View } from "@tarojs/components";
 import { NordicIcon } from "../nordic-icon";
 import type { MilestoneIllustrationAsset } from "../../features/milestones/asset-cache";
-import { getMilestoneIllustration, MILESTONE_CONFIG } from "../../features/milestones/config";
-import { getMilestoneShareMessage, getMilestoneShareMetrics } from "../../features/milestones/share-presentation";
+import { getMilestoneIllustration } from "../../features/milestones/config";
 import { MILESTONES, type Milestone, type MilestoneHighlight } from "../../features/milestones/stats";
+import { useTranslation } from "react-i18next";
+import { getLocalizedMilestoneMetrics, getLocalizedMilestoneStage } from "../../features/milestones/localized-presentation";
 
 export type MilestonePosterProps = {
   milestone: Milestone;
@@ -38,12 +39,13 @@ export type MilestonePosterProps = {
 };
 
 export function MilestonePoster(props: MilestonePosterProps) {
-  const config = MILESTONE_CONFIG[props.milestone];
+  const { t } = useTranslation();
   const illustrationSource = props.illustrationStatus
     ? props.illustration
     : props.illustration ?? props.illustrationAsset?.localSource ?? getMilestoneIllustration(props.milestone);
-  const shareMessage = getMilestoneShareMessage(props.milestone);
-  const shareMetrics = getMilestoneShareMetrics(props);
+  const translate = (key: string, options?: { count?: number }) => String(t(key, options));
+  const shareMessage = getLocalizedMilestoneStage(props.milestone, "message", translate);
+  const shareMetrics = getLocalizedMilestoneMetrics(props, translate);
   const activeMilestones = new Set(
     props.progressState
       ? props.progressState.filter((item) => item.active).map((item) => item.milestone)
@@ -57,22 +59,22 @@ export function MilestonePoster(props: MilestonePosterProps) {
           className="milestone-poster__illustration"
           src={illustrationSource}
           mode="aspectFill"
-          ariaLabel={`${props.milestone} 天里程碑插画`}
+          ariaLabel={t("milestonePoster.journeyAria")}
         />
       ) : (
         <View className="milestone-poster__illustration milestone-poster__illustration--placeholder">
           {props.illustrationStatus === "error" ? (
-            <Text onClick={props.onIllustrationRetry}>图片加载失败，点击重试</Text>
-          ) : <Text>图片加载中</Text>}
+            <Text onClick={props.onIllustrationRetry}>{t("milestonePoster.imageFailed")}</Text>
+          ) : <Text>{t("milestonePoster.imageLoading")}</Text>}
         </View>
       )}
       <View className="milestone-poster__body">
         <View className="milestone-poster__meta">
-          <Text>{config.stageLabel}</Text>
-          <Text>{config.stageNumber}</Text>
+          <Text>{getLocalizedMilestoneStage(props.milestone, "label", translate)}</Text>
+          <Text>{getLocalizedMilestoneStage(props.milestone, "number", translate)}</Text>
         </View>
-        <Text className="milestone-poster__eyebrow">{config.eyebrow}</Text>
-        <View className="milestone-poster__title" ariaLabel={`${props.milestone} 天`}>
+        <Text className="milestone-poster__eyebrow">{getLocalizedMilestoneStage(props.milestone, "eyebrow", translate)}</Text>
+        <View className="milestone-poster__title" ariaLabel={getLocalizedMilestoneStage(props.milestone, "number", translate)}>
           <Text className="milestone-poster__title-number">{props.milestone}</Text>
           <Text className="milestone-poster__title-unit">DAYS</Text>
         </View>
@@ -93,7 +95,7 @@ export function MilestonePoster(props: MilestonePosterProps) {
           ))}
         </View>
 
-        <View className="milestone-poster__journey" ariaLabel="里程碑进度">
+        <View className="milestone-poster__journey" ariaLabel={t("milestonePoster.journeyAria")}>
           <View className="milestone-poster__journey-line" />
           {MILESTONES.map((value) => (
             <View className="milestone-poster__journey-step" key={value}>
@@ -105,12 +107,12 @@ export function MilestonePoster(props: MilestonePosterProps) {
 
         {props.onShare ? (
           <View className="milestone-poster__share" onClick={props.onShare}>
-            <NordicIcon name="share" size={22} ariaLabel="生成分享卡" />
-            <Text>生成分享卡</Text>
+            <NordicIcon name="share" size={22} ariaLabel={t("milestonePoster.generateShare")} />
+            <Text>{t("milestonePoster.generateShare")}</Text>
           </View>
         ) : null}
-        {props.onContinue ? <Text className="milestone-poster__continue" onClick={props.onContinue}>继续记录 →</Text> : null}
-        {props.onViewIllustrations ? <Text className="milestone-poster__gallery-link" onClick={props.onViewIllustrations}>查看本阶段插画</Text> : null}
+        {props.onContinue ? <Text className="milestone-poster__continue" onClick={props.onContinue}>{t("milestonePoster.continue")}</Text> : null}
+        {props.onViewIllustrations ? <Text className="milestone-poster__gallery-link" onClick={props.onViewIllustrations}>{t("milestonePoster.gallery")}</Text> : null}
       </View>
     </View>
   );

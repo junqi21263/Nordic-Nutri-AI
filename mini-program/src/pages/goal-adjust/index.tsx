@@ -1,6 +1,8 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import {
   getProductNutritionPlan,
   saveProductGoal,
@@ -25,6 +27,7 @@ function parsePositiveInt(value: string) {
 }
 
 export default function GoalAdjustPage() {
+  useTranslation();
   const profile = useProfileStore();
   const feedback = useFeedbackStore();
   const [targetWeight, setTargetWeight] = useState(String(profile.profile.targetWeight || ""));
@@ -63,23 +66,23 @@ export default function GoalAdjustPage() {
     const nextFat = parsePositiveInt(fatG);
 
     if (!Number.isFinite(nextTargetWeight) || nextTargetWeight < 30 || nextTargetWeight > 300) {
-      feedback.show({ message: "请输入 30–300 kg 的目标体重", tone: "error" });
+      feedback.show({ message: t("goalAdjust.weightRange"), tone: "error" });
       return;
     }
     if (!Number.isFinite(nextCalories) || nextCalories < 800 || nextCalories > 10000) {
-      feedback.show({ message: "请输入 800–10000 kcal 的目标热量", tone: "error" });
+      feedback.show({ message: t("goalAdjust.calorieRange"), tone: "error" });
       return;
     }
     if (!Number.isFinite(nextProtein) || nextProtein < 1 || nextProtein > 1000) {
-      feedback.show({ message: "请输入 1–1000 g 的蛋白质目标", tone: "error" });
+      feedback.show({ message: t("goalAdjust.proteinRange"), tone: "error" });
       return;
     }
     if (!Number.isFinite(nextCarbs) || nextCarbs < 0 || nextCarbs > 1500) {
-      feedback.show({ message: "请输入 0–1500 g 的碳水目标", tone: "error" });
+      feedback.show({ message: t("goalAdjust.carbRange"), tone: "error" });
       return;
     }
     if (!Number.isFinite(nextFat) || nextFat < 1 || nextFat > 500) {
-      feedback.show({ message: "请输入 1–500 g 的脂肪目标", tone: "error" });
+      feedback.show({ message: t("goalAdjust.fatRange"), tone: "error" });
       return;
     }
 
@@ -113,9 +116,9 @@ export default function GoalAdjustPage() {
       });
       feedback.showModal({
         variant: "success",
-        title: "今日目标已更新",
-        description: "今日营养目标已同步。",
-        primaryText: "返回首页",
+        title: t("goalAdjust.saved"),
+        description: t("goalAdjust.synced"),
+        primaryText: t("goalAdjust.backHome"),
         dismissible: true,
         onPrimary: () => navigateBackOrHome("/pages/home/index"),
         onClose: () => navigateBackOrHome("/pages/home/index"),
@@ -123,9 +126,9 @@ export default function GoalAdjustPage() {
     } catch {
       feedback.showModal({
         variant: "error",
-        title: "目标保存失败",
-        description: "请稍后重试。",
-        primaryText: "知道了",
+        title: t("goalAdjust.saveFailed"),
+        description: t("goalAdjust.retryLater"),
+        primaryText: t("goalAdjust.okay"),
         dismissible: true,
       });
     } finally {
@@ -135,7 +138,7 @@ export default function GoalAdjustPage() {
 
   return (
     <PageLayout
-      title="调整今日目标"
+      title={t("goalAdjust.title")}
       showTabs={false}
       hideNavigation
       showBack
@@ -143,16 +146,16 @@ export default function GoalAdjustPage() {
       className="page-layout--goal-adjust"
     >
       <View className="profile-subpage__page-title">
-        <Text>调整今日目标</Text>
+        <Text>{t("goalAdjust.title")}</Text>
       </View>
       <View className="profile-flow profile-goal-adjust">
         <View className="profile-goal-adjust__intro">
-          <Text>可按自己的训练和饮食节奏，手动设定每日热量与三大营养素目标。</Text>
+          <Text>{t("goalAdjust.intro")}</Text>
         </View>
 
         <View className="profile-form">
           <View className="profile-form__field">
-            <Text>每日目标热量</Text>
+            <Text>{t("goalAdjust.calories")}</Text>
             <View className="profile-form__input-row">
               <Input
                 type="number"
@@ -165,7 +168,7 @@ export default function GoalAdjustPage() {
             </View>
           </View>
           <View className="profile-form__field">
-            <Text>蛋白质</Text>
+            <Text>{t("goalAdjust.protein")}</Text>
             <View className="profile-form__input-row">
               <Input
                 type="number"
@@ -178,7 +181,7 @@ export default function GoalAdjustPage() {
             </View>
           </View>
           <View className="profile-form__field">
-            <Text>碳水</Text>
+            <Text>{t("goalAdjust.carbs")}</Text>
             <View className="profile-form__input-row">
               <Input
                 type="number"
@@ -191,7 +194,7 @@ export default function GoalAdjustPage() {
             </View>
           </View>
           <View className="profile-form__field">
-            <Text>脂肪</Text>
+            <Text>{t("goalAdjust.fat")}</Text>
             <View className="profile-form__input-row">
               <Input
                 type="number"
@@ -203,12 +206,12 @@ export default function GoalAdjustPage() {
               <Text>g</Text>
             </View>
             <Text className="profile-form__hint">
-              宏量合计约 {macroCalories || 0} kcal
-              {calorieGap > 150 ? "，与热量目标差距较大，可再微调" : "，保存后同步到首页今日目标"}
+              {t("goalAdjust.macroTotal", { value: macroCalories || 0 })}
+              {calorieGap > 150 ? t("goalAdjust.macroGap") : t("goalAdjust.macroSync")}
             </Text>
           </View>
           <View className="profile-form__field">
-            <Text>目标体重</Text>
+            <Text>{t("goalAdjust.targetWeight")}</Text>
             <View className="profile-form__input-row">
               <Input
                 type="digit"
@@ -219,14 +222,14 @@ export default function GoalAdjustPage() {
               <Text>kg</Text>
             </View>
             <Text className="profile-form__hint">
-              当前 {profile.profile.weight} kg，建议设定可持续的阶段目标。
+              {t("goalAdjust.weightHint", { weight: profile.profile.weight })}
             </Text>
           </View>
         </View>
       </View>
       <View className="profile-edit__action">
         <AppButton size="large" loading={isSaving || loadingPlan} onClick={() => void save()}>
-          保存今日目标
+          {t("goalAdjust.save")}
         </AppButton>
       </View>
     </PageLayout>

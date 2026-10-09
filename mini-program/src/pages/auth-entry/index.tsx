@@ -1,6 +1,7 @@
 import { Text } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { loginWithWechat } from "../../api/auth-api";
 import { saveProductProfile } from "../../api/product-data-api";
 import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
@@ -30,6 +31,7 @@ async function syncWechatNickname(nickname: string | null): Promise<string | nul
 }
 
 export default function AuthEntryPage() {
+  const { t } = useTranslation();
   useAppShare();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const feedback = useFeedbackStore();
@@ -38,7 +40,7 @@ export default function AuthEntryPage() {
     setIsLoggingIn(true);
     try {
       const user = await loginWithWechat();
-      if (!user) throw new Error("微信登录未返回用户信息");
+      if (!user) throw new Error(t("authEntry.missingUser"));
       let syncedNickname: string | null = null;
       try {
         const result = await Taro.getUserInfo({ withCredentials: false });
@@ -55,7 +57,7 @@ export default function AuthEntryPage() {
       }
     } catch (error) {
       feedback.show({
-        message: error instanceof Error ? error.message : "登录未完成，请稍后重试",
+        message: error instanceof Error ? error.message : t("authEntry.loginFailed"),
         tone: "error",
       });
     } finally {
@@ -74,15 +76,15 @@ export default function AuthEntryPage() {
       <BottomSheet open className="auth-entry-sheet">
         <AppCard className="auth-entry-page__card">
           <Text className="auth-entry-page__eyebrow">NORDIC NUTRI AI</Text>
-          <Text className="auth-entry-page__card-title">继续你的营养节奏</Text>
+          <Text className="auth-entry-page__card-title">{t("authEntry.title")}</Text>
           <Text className="auth-entry-page__card-copy">
-            一键登录即可开始记录餐次，默认头像与昵称会自动生成，可在「我的」中随时更换。
+            {t("authEntry.description")}
           </Text>
           <AppButton size="large" loading={isLoggingIn} onClick={login}>
-            微信一键登录
+            {t("authEntry.wechatLogin")}
           </AppButton>
           <Text className="auth-entry-page__privacy-note">
-            登录即同意微信授权，昵称和头像可在「我的」中随时修改。
+            {t("authEntry.privacyNote")}
           </Text>
         </AppCard>
       </BottomSheet>

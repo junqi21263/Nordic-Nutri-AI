@@ -16,7 +16,7 @@ describe("milestone poster shared illustration loading", () => {
   it("keeps a fixed 4:3 hero placeholder with a retry action on asset errors", () => {
     const poster = read("components/milestone-poster/index.tsx");
     const styles = read("styles/page.scss");
-    expect(poster).toContain("图片加载失败，点击重试");
+    expect(poster).toContain('t("milestonePoster.imageFailed")');
     expect(poster).toContain("onIllustrationRetry");
     expect(styles).toContain(".milestone-poster__illustration--placeholder");
     expect(styles).toContain("aspect-ratio: 4 / 3;");

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createAdminConsoleService, AdminConsoleError } from "./admin-console-service.cjs";
 
-function makeDb({ users = [], profiles = [], feedback = [] } = {}) {
+function makeDb({ users = [], profiles = [], feedback = [], recognition = [] } = {}) {
   return {
     from(table) {
       const state = { table, filters: [], op: "select", payload: null, limitN: null, singleMode: null };
@@ -57,6 +57,13 @@ function makeDb({ users = [], profiles = [], feedback = [] } = {}) {
           }
           return { data: rows, error: null };
         }
+        if (state.table === "recognition_feedback") {
+          let rows = [...recognition];
+          for (const [op, col, val] of state.filters) {
+            if (op === "in" && col === "id") rows = rows.filter((row) => val.includes(row.id));
+          }
+          return { data: rows, error: null };
+        }
         return { data: [], error: null };
       };
       const api = {
@@ -88,7 +95,7 @@ test("rejects non-admin callers", async () => {
 test("lists users with profile nickname and login time", async () => {
   const svc = createAdminConsoleService({
     db: makeDb({
-      users: [{ id: "u1", is_admin: true, status: "active", created_at: "2026-07-01T00:00:00Z" }],
+      users: [{ id: "u1", is_admin: true, status: "active", registration_channel: "phone", created_at: "2026-07-01T00:00:00Z" }],
       profiles: [{ id: "u1", nickname: "北欧", last_login_at: "2026-07-30T01:00:00Z" }],
     }),
     isAdmin: async () => true,
@@ -97,6 +104,7 @@ test("lists users with profile nickname and login time", async () => {
   assert.equal(result.items[0].nickname, "北欧");
   assert.equal(result.items[0].isAdmin, true);
   assert.equal(result.items[0].lastLoginAt, "2026-07-30T01:00:00Z");
+  assert.equal(result.items[0].registrationChannel, "phone");
 });
 
 test("lists feedback and updates status", async () => {
@@ -122,6 +130,26 @@ test("lists feedback and updates status", async () => {
   assert.equal(listed.items[0].nickname, "北欧");
   const updated = await svc.updateFeedbackStatus("admin", feedbackId, { status: "reviewing" });
   assert.equal(updated.status, "reviewing");
+});
+
+test("admin list excludes old correction mirrors but keeps written Other feedback", async () => {
+  const wrongId = "22222222-2222-4222-8222-222222222222";
+  const otherId = "33333333-3333-4333-8333-333333333333";
+  const svc = createAdminConsoleService({
+    db: makeDb({
+      feedback: [
+        { id: "wrong-ticket", user_id: "u1", client_request_id: wrongId, device_context: { source: "recognition_feedback" }, status: "new", content: "食物修正" },
+        { id: "other-ticket", user_id: "u1", client_request_id: otherId, device_context: { source: "recognition_feedback" }, status: "new", content: "备注：名字不对" },
+      ],
+      recognition: [
+        { id: wrongId, feedback_type: "wrong_food" },
+        { id: otherId, feedback_type: "other", corrected_result: { note: "名字不对" } },
+      ],
+    }),
+    isAdmin: async () => true,
+  });
+  const result = await svc.listFeedback("admin");
+  assert.deepEqual(result.items.map((item) => item.id), ["other-ticket"]);
 });
 
 test("replies to feedback, resets the read state, and marks it resolved", async () => {

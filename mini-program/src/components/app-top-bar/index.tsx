@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import type { PropsWithChildren } from "react";
 import { NordicIcon } from "../nordic-icon";
 import { useSystemLayout } from "../../hooks/useSystemLayout";
@@ -35,7 +36,13 @@ export function AppTopBar({
   onRightAction,
   children,
 }: AppTopBarProps) {
+  const { t } = useTranslation();
   const layout = useSystemLayout();
+  const nativeSideWidth = Math.max(
+    44 * (Number(showBack) + Number(showHome)),
+    rightAction ? 112 : 44,
+  );
+  const sideWidth = process.env.TARO_ENV === "weapp" ? layout.rightInset : nativeSideWidth;
 
   const statusBarStyle = { height: `${layout.statusBarHeight}px` };
   const navBarStyle = { height: `${layout.navigationBarHeight}px` };
@@ -49,28 +56,28 @@ export function AppTopBar({
       <View className="app-top-bar__nav-bar" style={navBarStyle}>
         <View
           className="app-top-bar__side app-top-bar__side--left"
-          style={{ width: `${layout.rightInset}px` }}
+          style={{ width: `${sideWidth}px`, flexShrink: 0 }}
         >
           {showBack ? (
-            <View className="app-top-bar__btn" ariaLabel="返回" onClick={onBack}>
-              <NordicIcon name="back" size={24} ariaLabel="返回" />
+            <View className="app-top-bar__btn" ariaLabel={t("common.back")} onClick={onBack}>
+              <NordicIcon name="back" size={24} ariaLabel={t("common.back")} />
             </View>
           ) : null}
           {showHome ? (
-            <View className="app-top-bar__btn" ariaLabel="首页" onClick={onHome}>
-              <NordicIcon name="home" size={24} ariaLabel="首页" />
+            <View className="app-top-bar__btn" ariaLabel={t("tabs.home")} onClick={onHome}>
+              <NordicIcon name="home" size={24} ariaLabel={t("tabs.home")} />
             </View>
           ) : null}
         </View>
         <View
           className="app-top-bar__brand"
-          style={{ maxWidth: `${layout.titleMaxWidth}px` }}
+          style={{ maxWidth: process.env.TARO_ENV === "weapp" ? `${layout.titleMaxWidth}px` : `calc(100% - ${sideWidth * 2}px)`, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}
         >
           {children ?? <Text className="app-top-bar__brand-text">Nordic Nutri AI</Text>}
         </View>
         <View
           className="app-top-bar__side app-top-bar__side--right"
-          style={{ width: `${layout.rightInset}px` }}
+          style={{ width: `${sideWidth}px`, flexShrink: 0 }}
         >
           {rightAction ? (
             <View className="app-top-bar__right-action" ariaLabel={rightAction} onClick={onRightAction}>

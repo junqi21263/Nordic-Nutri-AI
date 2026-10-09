@@ -8,7 +8,7 @@ describe("My Journey Stitch restoration contract", () => {
   it("renders the approved content hierarchy and shared 2 by 2 stage card", () => {
     const page = read("pages/milestone-journey/index.tsx");
     expect(page).toContain("CURRENT JOURNEY");
-    expect(page).toContain("Journey Collection");
+    expect(page).toContain('t("milestoneJourney.collection")');
     expect(page).toContain("<MilestoneStageCard");
     expect(page).toContain("<MilestoneStageSheet");
   });
@@ -38,18 +38,14 @@ describe("My Journey Stitch restoration contract", () => {
     expect(page).not.toContain("claimPendingMilestone");
   });
 
-  it("keeps semantic stage keys separate from the Chinese Journey display copy", () => {
+  it("keeps semantic stage keys separate from localized Journey display copy", () => {
     const stages = read("features/milestones/journey-stage.ts");
     const card = read("components/milestone-stage-card/index.tsx");
     const sheet = read("components/milestone-stage-sheet/index.tsx");
     expect(stages).toContain('theme: "START"');
-    expect(stages).toContain('displayTitle: "起步"');
-    expect(stages).toContain('displaySeries: "起步系列"');
-    expect(stages).toContain('displayTitle: "生活方式"');
-    expect(card).toContain("stage.displayTitle");
-    expect(card).toContain("stage.displaySeries");
-    expect(sheet).toContain("stage.displayTitle");
-    expect(sheet).toContain("stage.displaySeries");
+    expect(stages).toContain('theme: "START"');
+    expect(card).toContain("milestoneJourney.stages.");
+    expect(sheet).toContain("milestoneJourney.stages.");
   });
 
   it("presents a fixed stage modal and previews series images in an in-app overlay", () => {
@@ -71,7 +67,7 @@ describe("My Journey Stitch restoration contract", () => {
     expect(bottomSheet).not.toContain("scrollable?: boolean");
     expect(styles).toContain(".modal-backdrop--milestone-stage-image-preview");
     expect(styles).toContain(".modal.milestone-stage-image-preview");
-    expect(sheet).toContain("点击空白处关闭");
+    expect(sheet).toContain('t("milestoneJourney.previewClose")');
     expect(page).toContain("scrollLocked={Boolean(selectedStage)}");
   });
 });

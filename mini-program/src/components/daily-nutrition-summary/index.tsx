@@ -1,7 +1,8 @@
 import { Text, View } from "@tarojs/components";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import {
   clampProgress,
-  formatTargetStatus,
   type DailySummary,
 } from "../../features/meals/domain";
 import { useAnimatedProgress } from "../../hooks/useAnimatedProgress";
@@ -9,14 +10,8 @@ import { AnimatedProgressBar } from "../animated-progress-bar";
 import { AppCard } from "../app-card";
 import { MacroProgress } from "../macro-progress";
 
-const macroRows: Array<{
-  key: "protein" | "carbs" | "fat";
-  label: string;
-  tone: "protein" | "carbs" | "fat";
-}> = [
-  { key: "protein", label: "蛋白质", tone: "protein" },
-  { key: "carbs", label: "碳水", tone: "carbs" },
-  { key: "fat", label: "脂肪", tone: "fat" },
+const macroRows: Array<{ key: "protein" | "carbs" | "fat"; tone: "protein" | "carbs" | "fat" }> = [
+  { key: "protein", tone: "protein" }, { key: "carbs", tone: "carbs" }, { key: "fat", tone: "fat" },
 ];
 export function DailyNutritionSummary({
   summary,
@@ -25,6 +20,7 @@ export function DailyNutritionSummary({
   summary: DailySummary;
   dashboard?: boolean;
 }) {
+  const { t } = useTranslation();
   const calorieProgress = clampProgress(summary.consumed.calories, summary.calories);
 
   if (dashboard) {
@@ -35,7 +31,7 @@ export function DailyNutritionSummary({
     <AppCard tone="beige" className="daily-summary">
       <View className="daily-summary__head">
         <View>
-          <Text className="daily-summary__label">今日能量</Text>
+          <Text className="daily-summary__label">{t("dailySummary.energy")}</Text>
           <Text className="daily-summary__value">
             {summary.consumed.calories}
             <Text> / {summary.calories} kcal</Text>
@@ -44,21 +40,21 @@ export function DailyNutritionSummary({
         <Text
           className={`daily-summary__status ${calorieProgress.exceeded ? "daily-summary__status--exceeded" : ""}`}
         >
-          {formatTargetStatus(calorieProgress, " kcal")}
+          {targetStatus(calorieProgress, " kcal", t)}
         </Text>
       </View>
       <MacroProgress
-        label="热量完成"
+        label={t("dailySummary.calorieCompletion")}
         value={summary.consumed.calories}
         target={summary.calories}
         unit=" kcal"
       />
       <View className="daily-summary__macros">
-        {macroRows.map(({ key, label, tone }) => {
+        {macroRows.map(({ key, tone }) => {
           const progress = clampProgress(summary.consumed[key], summary[key]);
           return (
             <View className="daily-summary__macro" key={key}>
-              <Text className="daily-summary__macro-label">{label}</Text>
+              <Text className="daily-summary__macro-label">{t(`nutrition.${key}`)}</Text>
               <Text className="daily-summary__macro-value">
                 {summary.consumed[key]}/{summary[key]}g
               </Text>
@@ -67,7 +63,7 @@ export function DailyNutritionSummary({
                   progress.exceeded ? "daily-summary__macro-over" : "daily-summary__macro-remaining"
                 }
               >
-                {formatTargetStatus(progress, "g", { short: true })}
+                {targetStatus(progress, "g", t, true)}
               </Text>
               <MacroProgress
                 label=""
@@ -83,6 +79,13 @@ export function DailyNutritionSummary({
   );
 }
 
+function targetStatus(progress: ReturnType<typeof clampProgress>, unit: string, t: TFunction, short = false) {
+  const amount = progress.exceeded ? progress.excess : Math.max(0, progress.remaining);
+  return t(progress.exceeded
+    ? short ? "dailySummary.overShort" : "dailySummary.over"
+    : short ? "dailySummary.remainingShort" : "dailySummary.remaining", { amount, unit });
+}
+
 function DailySummaryDashboard({
   summary,
   calorieProgress,
@@ -90,6 +93,7 @@ function DailySummaryDashboard({
   summary: DailySummary;
   calorieProgress: ReturnType<typeof clampProgress>;
 }) {
+  const { t } = useTranslation();
   const ringAmount = calorieProgress.exceeded
     ? calorieProgress.excess
     : Math.max(0, calorieProgress.remaining);
@@ -117,20 +121,20 @@ function DailySummaryDashboard({
           <View className="daily-summary__dashboard-ring-copy">
             <Text className="daily-summary__dashboard-ring-value">{ringAmount}</Text>
             <Text className="daily-summary__dashboard-ring-label">
-              {calorieProgress.exceeded ? "已超" : "剩余"}
+              {t(calorieProgress.exceeded ? "dailySummary.overShort" : "dailySummary.remainingShort", { amount: ringAmount, unit: " kcal" })}
             </Text>
           </View>
         </View>
         <View className="daily-summary__dashboard-macros">
-          {macroRows.map(({ key, label, tone }) => {
+          {macroRows.map(({ key, tone }) => {
             const progress = clampProgress(summary.consumed[key], summary[key]);
             return (
               <View className="daily-summary__dashboard-macro" key={key}>
                 <View className="daily-summary__dashboard-macro-head">
-                  <Text>{label}</Text>
+                  <Text>{t(`nutrition.${key}`)}</Text>
                   <Text className={progress.exceeded ? "daily-summary__dashboard-macro-over" : ""}>
                     {summary.consumed[key]}/{summary[key]}g
-                    {progress.exceeded ? ` · ${formatTargetStatus(progress, "g", { short: true })}` : ""}
+                    {progress.exceeded ? ` · ${targetStatus(progress, "g", t, true)}` : ""}
                   </Text>
                 </View>
                 <View
@@ -154,14 +158,14 @@ function DailySummaryDashboard({
       </View>
       <View className="daily-summary__dashboard-foot">
         <Text>
-          今日已摄入 {summary.consumed.calories} / {summary.calories} kcal
+          {t("dailySummary.todayIntake", { consumed: summary.consumed.calories, target: summary.calories })}
         </Text>
         <Text
           className={
             calorieProgress.exceeded ? "daily-summary__dashboard-foot-over" : undefined
           }
         >
-          {formatTargetStatus(calorieProgress, " kcal")}
+          {targetStatus(calorieProgress, " kcal", t)}
         </Text>
       </View>
     </AppCard>

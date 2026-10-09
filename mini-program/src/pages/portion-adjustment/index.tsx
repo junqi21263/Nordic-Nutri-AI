@@ -1,10 +1,12 @@
 import { Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { ErrorState } from "../../components/error-state";
 import { MacroProgress } from "../../components/macro-progress";
+import { RecordTimeEditor } from "../../components/record-time-editor";
 import { PageLayout } from "../../layouts/page-layout";
 import { mealTypeOptions } from "../../features/meals/meal-type";
 import { toMealSavedCelebration } from "../../features/meals/meal-saved-celebration-data";
@@ -19,6 +21,12 @@ import { useFeedbackStore } from "../../stores/feedback-store";
 import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebration-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { tryPresentPendingMilestone } from "../../features/milestones/presentation-flow";
+import { shouldClaimAfterMealSave } from "../../features/milestones/runtime";
+import { createClientRequestId } from "../../repositories/client-request-id";
+import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+import { snapshotForRecognition } from "../../features/recognition-feedback/domain";
+import { updateRecognitionFeedback } from "../../api/recognition-feedback-api";
+import { useRecognitionFeedbackStore } from "../../stores/recognition-feedback-store";
 
 const nowTime = () => {
   const date = new Date();
@@ -28,10 +36,18 @@ const nowTime = () => {
 const portionPresets = [25, 50, 75, 100, 125, 150, 175, 200];
 
 export default function PortionAdjustmentPage() {
+  const { t } = useTranslation();
+  const router = useRouter();
   const portion = usePortionDraftStore();
   const meals = useMealStore();
   const feedback = useFeedbackStore();
+  const isRepeating = portion.isRepeating;
+  const [recordDate, setRecordDate] = useState(getLocalDateString);
+  const [recordTime, setRecordTime] = useState(nowTime);
   const [isSaving, setIsSaving] = useState(false);
+  const saving = useRef(false);
+  const requestId = useRef(createClientRequestId());
+  const savedResult = useRef<Awaited<ReturnType<typeof createProductMeal>> | null>(null);
   const clearDraftAfterSuccess = useRef(false);
   useEffect(() => () => {
     if (clearDraftAfterSuccess.current) usePortionDraftStore.getState().reset();
@@ -40,39 +56,42 @@ export default function PortionAdjustmentPage() {
   if (!portion.meal || !adjusted)
     return (
       <PageLayout
-        title="调整份量"
-        subtitle="没有可调整的本地分析结果。"
-        eyebrow="确认餐食"
+        title={t("portionAdjustment.title")}
+        subtitle={t("portionAdjustment.noAnalysis")}
+        eyebrow={t("portionAdjustment.confirmMeal")}
         showTabs={false}
         leading="‹"
         onLeadingClick={() => navigateBackOrHome("/pages/analysis-result/index")}
       >
-        <ErrorState title="份量草稿不存在" description="请从分析结果进入份量调整。" />
+        <ErrorState title={t("portionAdjustment.missingDraft")} description={t("portionAdjustment.openFromAnalysis")} />
       </PageLayout>
     );
   const percentage = Math.round(portion.multiplier * 100);
   const trackProgress = ((percentage - 25) / 175) * 100;
   const adjustmentCopy =
     percentage === 100
-      ? "与原始识别份量一致"
+      ? isRepeating ? t("portionAdjustment.sameAsPrevious") : t("portionAdjustment.sameAsOriginal")
       : percentage > 100
-        ? `比原始份量增加 ${percentage - 100}%`
-        : `比原始份量减少 ${100 - percentage}%`;
+        ? t("portionAdjustment.increase", { value: percentage - 100 })
+        : t("portionAdjustment.decrease", { value: 100 - percentage });
   const canDecrease = portion.multiplier > 0.25;
   const canIncrease = portion.multiplier < 2;
   const selectedMealType = portion.meal.mealType;
   const setMealType = (mealType: MealType) => portion.setMealType(mealType);
   const save = async () => {
+    if (saving.current || clearDraftAfterSuccess.current) return;
     const editingId = portion.editingMealId;
     const draftMeal = portion.meal;
     const multiplier = portion.multiplier;
     if (!draftMeal || !adjusted) return;
-    const mealDate = getLocalDateString();
+    saving.current = true;
+    const mealDate = isRepeating ? recordDate : getLocalDateString();
+    const mealTime = isRepeating ? recordTime : nowTime();
     const previousCalories = meals.getDailySummary(mealDate).consumed.calories;
     setIsSaving(true);
     try {
-      let savedMeal = null;
-      if (editingId) {
+      let savedMeal = savedResult.current;
+      if (!savedMeal && editingId) {
         const current = meals.getMealById(editingId);
         if (!current) throw new Error("Meal not found");
         const originalQuantityByItemId = new Map(
@@ -89,20 +108,41 @@ export default function PortionAdjustmentPage() {
         });
         if (!saved) throw new Error("Meal not found");
         savedMeal = saved;
-      } else {
+      } else if (!savedMeal) {
         const localMeal = createMealFromAnalysis(
           draftMeal,
           multiplier,
-          getLocalDateString(),
-          nowTime(),
+          mealDate,
+          mealTime,
         );
-        savedMeal = await createProductMeal(toProductMealInput(localMeal));
+        const input = toProductMealInput(localMeal);
+        if (isRepeating) {
+          input.items = toProductMealInput({ ...localMeal, items: draftMeal.items }).items.map((item) => ({
+            ...item, quantityG: item.quantityG * multiplier,
+          }));
+        }
+        savedMeal = await createProductMeal({ ...input, templateId: portion.templateId, clientRequestId: requestId.current });
       }
-      const syncedMeals = await getProductMeals(mealDate);
-      meals.replaceRemoteMeals(syncedMeals, mealDate);
+      savedResult.current = savedMeal;
+      if (router.params.recognitionFeedback === "1") {
+        const recognitionState = useRecognitionFeedbackStore.getState();
+        const correctedResult = snapshotForRecognition(savedMeal);
+        recognitionState.setMealId(savedMeal.id);
+        recognitionState.setCorrectedResult(correctedResult);
+        if (recognitionState.feedbackId) {
+          void updateRecognitionFeedback(recognitionState.feedbackId, {
+            mealId: savedMeal.id,
+            correctedResult,
+          }).catch(() => undefined);
+        }
+      }
+      const savedDate = savedMeal.date;
+      const syncedMeals = await getProductMeals(savedDate);
+      meals.replaceRemoteMeals(syncedMeals, savedDate);
+      void refreshAndroidSmartReminders();
       try {
         const { evaluateProductAchievements } = await import("../../features/coach/refresh-achievements");
-        await evaluateProductAchievements(mealDate);
+        await evaluateProductAchievements(savedDate);
       } catch {
         // The saved meal remains valid if achievement refresh is temporarily unavailable.
       }
@@ -113,21 +153,22 @@ export default function PortionAdjustmentPage() {
             previousCalories,
             syncedMeals,
             targetCalories: meals.dailyTargets.calories,
-            kind: editingId ? "updated" : "created",
-            afterContinue: editingId ? undefined : async () => Boolean(await tryPresentPendingMilestone("normal_record_success")),
+            kind: isRepeating ? "reused" : editingId ? "updated" : "created",
+            afterContinue: isRepeating || editingId || !shouldClaimAfterMealSave(`${savedMeal.date}T${savedMeal.time}:00+08:00`) ? undefined : async () => Boolean(await tryPresentPendingMilestone("normal_record_success")),
           }),
         );
         clearDraftAfterSuccess.current = true;
       }
     } catch {
-      feedback.show({ message: "保存调整失败，请稍后重试", tone: "error" });
+      feedback.show({ message: savedResult.current ? t("portionAdjustment.saveSyncFailed") : t("portionAdjustment.saveFailed"), tone: "error" });
     } finally {
+      saving.current = false;
       setIsSaving(false);
     }
   };
   return (
     <PageLayout
-      title="调整份量"
+      title={t(isRepeating ? "portionAdjustment.repeat" : "portionAdjustment.title")}
       showTabs={false}
       hideNavigation
       showBack
@@ -137,28 +178,36 @@ export default function PortionAdjustmentPage() {
       <View className="portion-adjustment-page">
         <AppCard tone="beige" className="portion-summary">
           <View className="portion-summary__meal">
-            <Text className="portion-summary__label">当前餐食</Text>
+            <Text className="portion-summary__label">{t("portionAdjustment.currentMeal")}</Text>
             <Text className="portion-summary__meal-title">{adjusted.title}</Text>
           </View>
           <View className="portion-summary__energy">
-            <Text className="portion-summary__label">调整后热量</Text>
+            <Text className="portion-summary__label">{t("portionAdjustment.adjustedCalories")}</Text>
             <Text className="portion-summary__value">{adjusted.calories} kcal</Text>
           </View>
         </AppCard>
         <AppCard className="content-stack content-stack--compact">
+          {isRepeating ? (
+            <RecordTimeEditor
+              date={recordDate}
+              time={recordTime}
+              onDateChange={setRecordDate}
+              onTimeChange={setRecordTime}
+            />
+          ) : null}
           <View className="portion-adjustment-page__meal-type-block">
-            <Text className="portion-adjustment-page__meal-type-label">这是哪一餐？</Text>
-            <View className="portion-adjustment-page__meal-types" ariaLabel="选择餐次类型">
+            <Text className="portion-adjustment-page__meal-type-label">{t("portionAdjustment.whichMeal")}</Text>
+            <View className="portion-adjustment-page__meal-types" ariaLabel={t("portionAdjustment.selectMeal")}>
               {mealTypeOptions.map((option) => (
                 <View
                   key={option.value}
                   className={`portion-adjustment-page__meal-type ${
                     selectedMealType === option.value ? "portion-adjustment-page__meal-type--active" : ""
                   }`}
-                  ariaLabel={option.label}
+                  ariaLabel={t(`meals.${option.value}`)}
                   onClick={() => setMealType(option.value)}
                 >
-                  <Text>{option.label}</Text>
+                  <Text>{t(`meals.${option.value}`)}</Text>
                 </View>
               ))}
             </View>
@@ -167,19 +216,19 @@ export default function PortionAdjustmentPage() {
         <AppCard className="content-stack content-stack--compact">
           <View className="portion-stepper">
             <View>
-              <Text className="section-title__title">份量比例</Text>
-              <Text className="portion-stepper__hint">按 25% 微调，本地营养将即时同步</Text>
+              <Text className="section-title__title">{t("portionAdjustment.ratio")}</Text>
+              <Text className="portion-stepper__hint">{t("portionAdjustment.stepHint")}</Text>
             </View>
             <Text className="portion-stepper__value">{percentage}%</Text>
           </View>
-          <View className="portion-track" ariaLabel={`当前份量比例 ${percentage}%`}>
+          <View className="portion-track" ariaLabel={t("portionAdjustment.currentRatio", { value: percentage })}>
             <View className="portion-track__rail" />
             <View className="portion-track__fill" style={{ width: `${trackProgress}%` }} />
             <View className="portion-track__thumb" style={{ left: `${trackProgress}%` }} />
           </View>
-          <View className="portion-control" ariaLabel="份量比例控制">
+          <View className="portion-control" ariaLabel={t("portionAdjustment.ratioControl")}>
             <View
-              ariaLabel="减少份量 25%"
+              ariaLabel={t("portionAdjustment.decreasePortion")}
               className={`portion-control__button ${canDecrease ? "" : "portion-control__button--disabled"}`}
               onClick={() => canDecrease && portion.adjustBy(-0.25)}
             >
@@ -189,18 +238,18 @@ export default function PortionAdjustmentPage() {
               <Text className="portion-control__copy">{adjustmentCopy}</Text>
             </View>
             <View
-              ariaLabel="增加份量 25%"
+              ariaLabel={t("portionAdjustment.increasePortion")}
               className={`portion-control__button ${canIncrease ? "" : "portion-control__button--disabled"}`}
               onClick={() => canIncrease && portion.adjustBy(0.25)}
             >
               <Text>+</Text>
             </View>
           </View>
-          <View className="portion-presets" ariaLabel="快速选择份量比例">
+          <View className="portion-presets" ariaLabel={t("portionAdjustment.quickRatio")}>
             {portionPresets.map((percent) => (
               <View
                 key={percent}
-                ariaLabel={`设为 ${percent}% 份量`}
+                ariaLabel={t("portionAdjustment.setRatio", { value: percent })}
                 className={`portion-presets__item ${percent === percentage ? "portion-presets__item--active" : ""}`}
                 onClick={() => portion.setMultiplier(percent / 100)}
               >
@@ -209,22 +258,22 @@ export default function PortionAdjustmentPage() {
             ))}
           </View>
           <View
-            ariaLabel="恢复原始份量"
+            ariaLabel={t("portionAdjustment.restore")}
             className={`portion-reset ${percentage === 100 ? "portion-reset--disabled" : ""}`}
             onClick={() => percentage !== 100 && portion.setMultiplier(1)}
           >
-            <Text>恢复原始份量</Text>
+            <Text>{t("portionAdjustment.restore")}</Text>
           </View>
         </AppCard>
         <AppCard className="content-stack content-stack--compact">
-          <Text className="section-title__title">实时营养</Text>
-          <MacroProgress label="蛋白质" value={adjusted.protein} target={60} />
-          <MacroProgress label="碳水" value={adjusted.carbs} target={90} tone="carbs" />
-          <MacroProgress label="脂肪" value={adjusted.fat} target={25} tone="fat" />
+          <Text className="section-title__title">{t("portionAdjustment.realTimeNutrition")}</Text>
+          <MacroProgress label={t("nutrition.protein")} value={adjusted.protein} target={60} />
+          <MacroProgress label={t("nutrition.carbs")} value={adjusted.carbs} target={90} tone="carbs" />
+          <MacroProgress label={t("nutrition.fat")} value={adjusted.fat} target={25} tone="fat" />
           <Text className="portion-score">Meal Score · {adjusted.score}</Text>
         </AppCard>
         <AppButton size="large" loading={isSaving} onClick={() => void save()}>
-          {portion.editingMealId ? "保存调整" : "保存本餐"} · {adjusted.calories} kcal
+          {t(portion.editingMealId ? "portionAdjustment.saveAdjustment" : isRepeating ? "portionAdjustment.confirmAndLog" : "portionAdjustment.saveMeal")} · {adjusted.calories} kcal
         </AppButton>
       </View>
     </PageLayout>

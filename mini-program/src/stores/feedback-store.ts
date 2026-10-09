@@ -1,18 +1,19 @@
 import { create } from "zustand";
 
 export type FeedbackTone = "default" | "success" | "error";
-export type FeedbackPresentation = "native" | "prominent";
+export type FeedbackPresentation = "native" | "prominent" | "status";
 export type FeedbackModalVariant = "success" | "limit" | "error";
 
 export interface FeedbackMessage {
   message: string;
   tone?: FeedbackTone;
-  /** Uses the in-app larger toast when a short native notification would be hard to read. */
+  /** Chooses the in-app feedback surface when a short native notification would be hard to read. */
   presentation?: FeedbackPresentation;
 }
 
 export interface FeedbackModalOptions {
   variant: FeedbackModalVariant;
+  presentation?: "recognition";
   title: string;
   description?: string;
   primaryText: string;
@@ -43,7 +44,7 @@ type NativeToastBridge = {
 
 /** Prefer native WeChat/Taro toast so secondary pages always surface feedback. */
 export const presentNativeFeedbackToast: FeedbackToastPresenter = ({ message, presentation }) => {
-  if (presentation === "prominent") return;
+  if (presentation === "prominent" || presentation === "status") return;
   try {
     const globalBridge = globalThis as {
       wx?: NativeToastBridge;

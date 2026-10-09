@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   hasSeenFirstRunTip,
   markFirstRunTipSeen,
@@ -28,10 +29,12 @@ export function FirstRunTip({
   body,
   actionLabel,
   onAction,
-  dismissLabel = "知道了",
+  dismissLabel,
   className = "",
   onClose,
 }: FirstRunTipProps) {
+  const { t } = useTranslation();
+  const resolvedDismissLabel = dismissLabel ?? t("coachPage.gotIt");
   const [visible, setVisible] = useState(() => !hasSeenFirstRunTip(tipId));
 
   if (!visible) return null;
@@ -67,9 +70,9 @@ export function FirstRunTip({
         <View
           className={`first-run-tip__action ${actionLabel && onAction ? "first-run-tip__action--ghost" : "first-run-tip__action--primary"}`}
           onClick={close}
-          ariaLabel={dismissLabel}
+          ariaLabel={resolvedDismissLabel}
         >
-          <Text>{actionLabel && onAction ? dismissLabel : "知道了"}</Text>
+          <Text>{actionLabel && onAction ? resolvedDismissLabel : t("coachPage.gotIt")}</Text>
         </View>
       </View>
     </View>

@@ -221,6 +221,7 @@ function createWiredVisionWorker({ claimJob, vision, resolveImageUrl, commitQuot
       try {
         result = await vision.analyzeImage(job.user_id, {
           analysisId: job.id,
+          locale: job.raw_recognition?.requestLocale,
           clientRequestId: job.client_request_id,
           contentType: job.content_type || "image/jpeg",
           storedImageUrl: imageUrl,

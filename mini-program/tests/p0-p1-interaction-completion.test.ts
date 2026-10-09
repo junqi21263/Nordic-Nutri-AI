@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createMealFixtures } from "../src/features/meals/domain";
 import { createMealStore } from "../src/stores/meal-store";
 import { createProfileStore } from "../src/stores/profile-store";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(import.meta.dirname, "..", "src");
 const read = (path: string) => readFileSync(resolve(sourceRoot, path), "utf8");
@@ -35,19 +36,20 @@ describe("P0 / P1 本地体验补全", () => {
     const app = read("app.tsx");
     const plan = read("pages/nutrition-plan/index.tsx");
     const scanner = read("pages/food-scanner/index.tsx");
+    const foodMedia = read("platform/food-media.ts");
     const manualMeal = read("pages/manual-meal/index.tsx");
 
     expect(config).toContain('"pages/manual-meal/index"');
     expect(app).toContain("startApplicationAuth");
     expect(plan).toContain("markOnboardingCompleted");
-    expect(scanner).toContain("Taro.chooseMedia");
-    expect(scanner).toContain("sourceType: [source]");
+    expect(scanner).toContain("chooseFoodImage(source)");
+    expect(foodMedia).toContain("sourceType: source ? [source]");
     expect(scanner).toContain('chooseImage("camera")');
     expect(scanner).toContain('chooseImage("album")');
     expect(scanner).toContain("analyzeProductImage");
-    expect(scanner).toContain("图片识别服务尚未配置，可先手动记录");
-    expect(scanner).toContain("手动记录");
-    expect(manualMeal).toContain("手动记录");
+    expect(scanner).toContain('t("scannerPage.notConfigured")');
+    expect(scanner).toContain('t("scannerPage.manual")');
+    expect(manualMeal).toContain('t("manualMeal.save")');
     expect(manualMeal).toContain("createProductMeal");
     expect(manualMeal).toContain("getProductMeals");
   });
@@ -58,8 +60,8 @@ describe("P0 / P1 本地体验补全", () => {
     expect(records).toContain("SearchBar");
     expect(records).toContain("BottomSheet");
     expect(records).toContain("mealTypeFilter");
-    expect(records).toContain("清除筛选");
-    expect(records).toContain("筛选记录");
+    expect(records).toContain('t("records.clearFilters")');
+    expect(records).toContain('t("records.filter")');
   });
 
   it("从记录页新增餐次时同步激活扫描底部标签", () => {
@@ -84,17 +86,17 @@ describe("P0 / P1 本地体验补全", () => {
     expect(home).toContain("onActionClick={openRecords}");
     expect(coach).not.toContain("addSuggestedSnack");
     expect(coach).not.toContain('mealType: "snack"');
-    expect(coach).toContain("营养建议仅供日常饮食参考");
+    expect(coach).toContain('t("coachPage.disclaimer")');
     expect(profileEdit).toContain("/pages/goal-adjust/index");
     expect(home).toContain("/pages/goal-adjust/index");
-    expect(home).toContain("调整");
+    expectLocalizedCopy(home, "调整");
     expect(goalAdjust).toContain('className="page-layout--goal-adjust"');
     expect(goalAdjust).toContain('className="profile-subpage__page-title"');
     expect(goalAdjust).toContain("saveProductNutritionPlan");
     expect(goalAdjust).toContain("proteinG");
     expect(goalAdjust).toContain("carbsG");
     expect(goalAdjust).toContain("fatG");
-    expect(goalAdjust).toContain("调整今日目标");
+    expect(goalAdjust).toContain('t("goalAdjust.save")');
   });
 
   it("保持手动记录页面简洁并保留表单布局", () => {

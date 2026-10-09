@@ -3,7 +3,7 @@ import { requestProductApi } from "./product-api-client";
 
 export interface ProductFeedbackItem {
   id: string;
-  category: "product" | "bug" | "feature" | "support";
+  category: "product" | "bug" | "feature" | "support" | "recognition";
   content: string;
   status: "new" | "reviewing" | "resolved" | "closed";
   adminReply: string | null;

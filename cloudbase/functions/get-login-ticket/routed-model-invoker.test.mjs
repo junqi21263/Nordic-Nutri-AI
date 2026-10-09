@@ -2,6 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createRoutedModelInvoker, createRoutedModelStreamInvoker } from "./routed-model-invoker.cjs";
 
+test("cancelled nutrition invocation never starts a fallback model", async () => {
+  const controller = new AbortController();
+  let attempts = 0;
+  const invoke = createRoutedModelInvoker({
+    feature: "nutrition_plan",
+    getSignal: (_input, options) => options.signal,
+    resolver: { resolveCandidates: async () => [
+      { providerKey: "deepseek", modelKey: "primary", credential: "key" },
+      { providerKey: "deepseek", modelKey: "fallback", credential: "key" },
+    ] },
+    createService: () => async () => {
+      attempts += 1;
+      controller.abort();
+      throw new Error("cancelled");
+    },
+  });
+  await assert.rejects(invoke({}, { signal: controller.signal }));
+  assert.equal(attempts, 1);
+});
+
 test("invokes the primary configured route and annotates the effective provider", async () => {
   const invoker = createRoutedModelInvoker({
     feature: "daily_insight",

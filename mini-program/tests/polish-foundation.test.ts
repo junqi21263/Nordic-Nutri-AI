@@ -43,7 +43,7 @@ describe("MVP polish foundation", () => {
     const navigation = read("components/app-header/index.tsx");
     const layout = read("layouts/page-layout/index.tsx");
     expect(tokens).toContain("$duration-page");
-    expect(components).not.toContain("prefers-reduced-motion");
+    expect(components).toContain("prefers-reduced-motion");
     expect(components).toContain(".app-button:active");
     expect(navigation).toContain("ariaLabel");
     expect(layout).toContain("page-layout__content");

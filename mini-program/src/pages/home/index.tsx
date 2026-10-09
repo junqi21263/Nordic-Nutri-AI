@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import { Text, View } from "@tarojs/components";
 import Taro, {
   useDidShow,
@@ -7,6 +9,7 @@ import Taro, {
 } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
+import { RecentFrequentMeals } from "../../components/recent-frequent-meals";
 import { DailyNutritionSummary } from "../../components/daily-nutrition-summary";
 import { EmptyState } from "../../components/empty-state";
 import { FirstRunTip } from "../../components/first-run-tip";
@@ -31,6 +34,7 @@ import { useMealStore } from "../../stores/meal-store";
 import { getProductMeals, mapProductMeal } from "../../api/meal-data-api";
 import { getProductDailySummary, type ProductDailySummary } from "../../api/insight-api";
 import { useProfileStore } from "../../stores/profile-store";
+import { useAuthStore } from "../../auth/auth-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 import { usePlanSaveTransitionStore } from "../../stores/plan-save-transition-store";
 import { PlanSaveTransitionOverlay } from "../../components/plan-save-transition-overlay";
@@ -38,21 +42,37 @@ import { hasSeenWelcome } from "../../features/welcome/welcome-seen";
 import { useAppShare } from "../../hooks/use-app-share";
 import { isOnboardingCompleted } from "../../utils/local-experience";
 import { tryPresentPendingMilestone } from "../../features/milestones/presentation-flow";
+import { useAppTransitionStore } from "../../stores/app-transition-store";
+import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+import { DEFAULT_MEAL_GROUP_EXPANDED, mealGroupStateStorage, type MealGroupExpandedState } from "../../features/meals/meal-group-state";
+import { checkAndroidAppUpdate } from "../../features/app-update/runtime";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
+const greetingKeys: Record<string, string> = {
+  "你好": "hello", "夜色正静": "quietNight", "夜深了": "lateNight", "夜还很静": "beforeDawn",
+  "还没休息": "awakeLate", "周末早上好": "weekendMorning", "早上好": "morning",
+  "中午好": "noon", "下午好": "afternoon", "晚上好": "evening",
+};
+const goalKeys: Record<string, string> = {
+  "增益增肌": "muscle_gain", "轻盈减脂": "fat_loss", "保持状态": "maintenance", "健康饮食": "performance",
+};
 
 export default function HomePage() {
+  useTranslation();
   // Keep hooks in the page file so Taro enables share, plus useAppShare for real-device binding.
   useShareAppMessage(() => buildAppShareMessage());
   useShareTimeline(() => buildAppTimelineShare());
   useAppShare();
   const store = useMealStore();
   const profile = useProfileStore();
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const today = getLocalDateString();
   const [remoteSummary, setRemoteSummary] = useState<ProductDailySummary | null>(null);
+  const [homeDataReady, setHomeDataReady] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const hideWelcomeTransition = useAppTransitionStore((state) => state.hideWelcomeTransition);
   const planSaveHandoffActive = usePlanSaveTransitionStore((state) => state.handoffActive);
   const planSaveTransitionPhase = usePlanSaveTransitionStore((state) => state.phase);
   const revealPlanSaveTransition = usePlanSaveTransitionStore((state) => state.reveal);
@@ -60,6 +80,7 @@ export default function HomePage() {
   const planSaveEntranceStarted = useRef(false);
   const milestoneHomeCheckStarted = useRef(false);
   const [planSaveContentVisible, setPlanSaveContentVisible] = useState(false);
+  const [mealGroupExpanded, setMealGroupExpanded] = useState<MealGroupExpandedState>(DEFAULT_MEAL_GROUP_EXPANDED);
   const pullRefreshPending = useRef(false);
   const [guideFirstMeal, setGuideFirstMeal] = useState(
     () => !hasSeenFirstRunTip("home-first-meal"),
@@ -78,6 +99,16 @@ export default function HomePage() {
   const meals = store.getMealsByDate(today);
   const greeting = getCoachGreeting(remoteSummary?.serverTime ?? null);
   const remoteInsight = summary.staleRemote ? null : (remoteSummary?.insight ?? null);
+  useEffect(() => {
+    if (userId) setMealGroupExpanded(mealGroupStateStorage.load(userId));
+  }, [userId]);
+  const toggleMealGroup = (mealType: MealType) => {
+    setMealGroupExpanded((current) => {
+      const next = { ...current, [mealType]: !current[mealType] };
+      if (userId) mealGroupStateStorage.save(userId, next);
+      return next;
+    });
+  };
   usePullDownRefresh(() => {
     pullRefreshPending.current = true;
     setRefreshing(true);
@@ -91,6 +122,8 @@ export default function HomePage() {
       });
       return;
     }
+    setTimeout(hideWelcomeTransition, 180);
+    void checkAndroidAppUpdate();
     const mealState = useMealStore.getState();
     if (retireFirstRunTipsIfRecordedMeals(mealState.meals, mealState.dataSource)) {
       setGuideFirstMeal(false);
@@ -126,17 +159,21 @@ export default function HomePage() {
         store.setDailyTargets(dailySummary.targets);
         if (Array.isArray(dailySummary.meals)) {
           store.replaceRemoteMeals(dailySummary.meals.map(mapProductMeal), today);
+          void refreshAndroidSmartReminders();
           return;
         }
         const remoteMeals = await getProductMeals(today);
         store.replaceRemoteMeals(remoteMeals, today);
+        void refreshAndroidSmartReminders();
       })
       .catch(() => {
         setRemoteSummary(null);
-        setSyncError("云端同步暂时不可用，已保留本地记录。");
+        setSyncError(t("home.syncError"));
         store.setLoadingState(store.getMealsByDate(today).length ? "normal" : "empty");
       });
     void request.finally(() => {
+      if (cancelled) return;
+      setHomeDataReady(true);
       if (!cancelled && pullRefreshPending.current) {
         pullRefreshPending.current = false;
         setRefreshing(false);
@@ -173,25 +210,25 @@ export default function HomePage() {
     void Taro.switchTab({ url: "/pages/meal-records/index" });
   };
   const openManualMeal = () => Taro.navigateTo({ url: "/pages/manual-meal/index" });
-  if (store.loadingState === "loading" && !meals.length && !remoteSummary && !planSaveHandoffActive)
+  if (!homeDataReady && !planSaveHandoffActive)
     return (
       <PageLayout
-        title="今天的营养"
-        subtitle="正在整理你的云端记录。"
+        title={t("home.title")}
+        subtitle={t("home.sync")}
         eyebrow="Nordic Nutri"
         activeTab="home"
         refreshing={refreshing}
       >
-        <Loading label="正在加载今日餐次" />
+        <Loading label={t("home.loading")} />
       </PageLayout>
     );
   return (
     <PageLayout
       activeTab="home"
       hideNavigation
-      title="首页"
+      title={t("tabs.home")}
       refreshing={refreshing}
-      className="page-layout--home"
+      className={`page-layout--home${process.env.TARO_APP_PLATFORM === "android" ? " page-layout--home-android" : ""}`}
     >
       <View className={`home-page ${planSaveContentVisible ? "home-page--plan-save-entered" : ""}`}>
         <View className="home-page__header">
@@ -202,25 +239,25 @@ export default function HomePage() {
           />
           <View className="home-page__greeting-copy">
             <Text className="home-page__greeting">
-              {greeting}，{profile.profile.nickname}
+              {t("home.greetingWithName", { greeting: t(`home.greetings.${greetingKeys[greeting] || "hello"}`), name: profile.profile.nickname })}
             </Text>
-            <Text className="home-page__goal">目标：{profile.profile.goalLabel}</Text>
+            <Text className="home-page__goal">{t("home.goalWithLabel", { goal: goalKeys[profile.profile.goalLabel] ? t(`onboarding.goals.${goalKeys[profile.profile.goalLabel]}.title`) : profile.profile.goalLabel })}</Text>
           </View>
         </View>
         {syncError ? (
           <View className="home-page__sync-note">
             <Text>{syncError}</Text>
-            <Text onClick={() => setRefreshVersion((version) => version + 1)}>重试</Text>
+            <Text onClick={() => setRefreshVersion((version) => version + 1)}>{t("common.retry")}</Text>
           </View>
         ) : null}
         <View className="home-page__target">
           <View className="home-page__section-head home-page__section-head--row">
-            <Text>今日目标</Text>
+            <Text>{t("home.dailyTarget")}</Text>
             <Text
               className="home-page__section-action"
               onClick={() => void Taro.navigateTo({ url: "/pages/goal-adjust/index" })}
             >
-              调整
+              {t("home.adjust")}
             </Text>
           </View>
           <View onClick={() => void Taro.navigateTo({ url: "/pages/goal-adjust/index" })}>
@@ -231,51 +268,52 @@ export default function HomePage() {
           <FirstRunTip
             tipId="home-first-meal"
             step="1/3"
-            title="先拍下今天的第一餐"
-            body="点「去拍照」，对准整盘食物即可。识别后还能改餐次和份量再保存。"
-            actionLabel="去拍照"
+            title={t("home.firstMealTitle")}
+            body={t("home.firstMealBody")}
+            actionLabel={t("home.takePhoto")}
             onAction={openScanner}
             onClose={() => setGuideFirstMeal(false)}
           />
         ) : null}
         <View onClick={openRecords}>
           <AIInsightCard
-            label="NOVA · 营养洞察"
+            label={t("home.insightTitle")}
             headline={remoteInsight?.headline ?? undefined}
             content={
-              remoteInsight?.content ?? "云端洞察暂不可用；记录下一餐后可获得更贴合当天进度的建议。"
+              remoteInsight?.content ?? t("home.insightUnavailable")
             }
             loading={summary.staleRemote || (!remoteInsight && !syncError)}
-            actionLabel="查看饮食记录"
+            actionLabel={t("home.viewRecords")}
           />
         </View>
         <Text className="nutrition-disclaimer">
-          营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
+          {t("home.disclaimer")}
         </Text>
         <View
           className={`home-page__actions ${guideFirstMeal && meals.length === 0 ? "home-page__actions--guided" : ""}`}
         >
           <View className="home-page__action home-page__action--primary" onClick={openScanner}>
-            <NordicIcon name="camera" size={20} ariaLabel="拍照识别" />
-            <Text>拍照识别</Text>
+            <NordicIcon name="camera" size={20} ariaLabel={t("home.scanMeal")} />
+            <Text>{t("home.scanMeal")}</Text>
           </View>
           <View className="home-page__action" onClick={openManualMeal}>
-            <NordicIcon name="circle-plus" size={20} ariaLabel="记录饮食" />
-            <Text>记录饮食</Text>
+            <NordicIcon name="circle-plus" size={20} ariaLabel={t("home.logMeal")} />
+            <Text>{t("home.logMeal")}</Text>
           </View>
         </View>
+        <RecentFrequentMeals refreshVersion={refreshVersion} />
         <View className="home-page__meal-list">
           <SectionTitle
-            eyebrow="今日饮食"
-            title={meals.length ? "每一餐都算数" : "从第一餐开始"}
-            actionLabel="全部记录"
+            eyebrow={t("home.todayMeals")}
+            title={meals.length ? t("home.eachMealCounts") : t("home.startWithMeal")}
+            actionLabel={t("home.allRecords")}
             onActionClick={openRecords}
           />
           {store.loadingState === "empty" ? (
             <EmptyState
-              title="今天还没有记录"
-              description="从一餐开始，建立属于你的营养节奏。"
-              actionLabel="拍第一餐"
+              title={t("home.noRecords")}
+              description={t("home.noRecordsHint")}
+              actionLabel={t("home.scanFirstMeal")}
               onAction={openScanner}
               showMark={false}
             />
@@ -286,6 +324,8 @@ export default function HomePage() {
                   key={mealType}
                   mealType={mealType}
                   meals={meals.filter((meal) => meal.mealType === mealType)}
+                  expanded={mealGroupExpanded[mealType]}
+                  onToggle={() => toggleMealGroup(mealType)}
                   onSelect={(meal) => openDetail(meal.id)}
                   onAdd={openScanner}
                 />

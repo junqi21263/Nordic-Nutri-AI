@@ -79,6 +79,16 @@
       "installDependency": false,
       "triggers": [{"name":"vision-analysis-reaper-every-minute","type":"timer","config":"0 * * * * * *"}],
       "ignore": ["*.test.mjs", ".git/**"]
+    },
+    {
+      "name": "push-reminder-dispatcher",
+      "type": "Event",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "installDependency": false,
+      "triggers": [{"name":"push-reminder-dispatcher-every-minute","type":"timer","config":"0 * * * * * *"}],
+      "ignore": ["*.test.mjs", ".git/**"]
     }
   ]
 }

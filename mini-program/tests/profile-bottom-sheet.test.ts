@@ -20,7 +20,7 @@ describe("profile information bottom sheets", () => {
     expect(source).toContain('from "../../components/bottom-sheet"');
     expect(source).toContain("onDismiss={() => setActiveModal(null)}");
     expect(source).toContain('className="profile-sheet__close"');
-    expect(source).toContain('ariaLabel="关闭反馈与帮助"');
+    expect(source).toContain('ariaLabel={t("profile.closeFeedback")}');
     expect(source).not.toContain('ariaLabel="关闭隐私与数据"');
     expect(source).not.toContain('ariaLabel="关闭关于我们"');
     expect(styles).toContain(".profile-sheet {");
@@ -30,7 +30,9 @@ describe("profile information bottom sheets", () => {
     expect(styles).toContain(".profile-sheet--fixed");
     expect(styles).toContain("max-height: calc(100vh - 180px)");
     expect(readSource("../src/styles/components.scss")).toContain("position: fixed");
-    expect(readSource("../src/styles/components.scss")).toContain("touch-action: none");
+    expect(readSource("../src/styles/components.scss")).toContain("touch-action: pan-y");
+    expect(styles).toContain("overflow-y: auto");
+    expect(styles).toContain("resize: none");
   });
 
   it("keeps the sheet mounted for a downward exit animation and lowers compact actions", () => {
@@ -52,7 +54,7 @@ describe("profile information bottom sheets", () => {
     const profile = readSource("../src/pages/profile/index.tsx");
     const submitStart = profile.indexOf("const submitFeedback = async () => {");
     const submitEnd = profile.indexOf("} catch", submitStart);
-    const successStart = profile.indexOf('title: "感谢你的反馈"');
+    const successStart = profile.indexOf('title: t("feedback.thanks")');
     const successEnd = profile.indexOf("});", successStart);
     const successModal = profile.slice(successStart, successEnd);
     const submitFlow = profile.slice(submitStart, submitEnd);
@@ -65,7 +67,7 @@ describe("profile information bottom sheets", () => {
     expect(submitFlow).toContain("bottomSheetExitDuration");
     expect(successModal).toContain("dismissible: false");
     expect(successModal).not.toContain("onPrimary: () => setActiveModal(null)");
-    expect(successModal).toContain('description: "我们已收到，会用它持续改进体验。"');
+    expect(successModal).toContain('description: t("feedback.receivedDescription")');
     expect(profile).not.toContain("profile-feedback-submitted");
   });
 
@@ -93,11 +95,16 @@ describe("profile information bottom sheets", () => {
     expect(profile).toContain("cursorSpacing={20}");
     expect(profile).toContain("disableDefaultPadding");
     expect(profile).toContain("showConfirmBar={false}");
+    expect(profile).toContain("maxlength={2000}");
+    expect(profile).not.toContain("maxlength={120}");
     expect(profile).not.toContain("autoHeight");
     expect(profile).not.toContain('<Input\n            className="profile-modal__input"');
     expect(styles).toContain("min-height: 416px");
     expect(styles).toContain("font-size: $font-body");
     expect(styles).toContain("white-space: pre-wrap");
+    expect(styles).toContain("overflow-y: auto");
+    expect(styles).toContain(".profile-sheet--info .profile-modal__lead");
+    expect(styles).toContain("white-space: nowrap");
     expect(profile).toContain('nativeInput');
     expect(sheet).toContain("nativeInput?: boolean");
     expect(sheet).toContain('bottom-sheet--native-input');
@@ -121,13 +128,13 @@ describe("profile information bottom sheets", () => {
     expect(styles).toContain("overflow: hidden");
   });
 
-  it("always reopens feedback in a fresh submit state", () => {
+  it("opens feedback history when the user has prior submissions", () => {
     const profile = readSource("../src/pages/profile/index.tsx");
     const openFeedbackStart = profile.indexOf("const openFeedback = () => {");
     const openFeedbackEnd = profile.indexOf("};", openFeedbackStart);
     const openFeedback = profile.slice(openFeedbackStart, openFeedbackEnd);
 
-    expect(openFeedback).toContain('setFeedbackMode(hasFeedbackReply ? "history" : "submit")');
+    expect(openFeedback).toContain('setFeedbackMode(feedbackItems.length ? "history" : "submit")');
     expect(openFeedback).not.toContain("setFeedbackSubmitted");
   });
 });

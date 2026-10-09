@@ -11,6 +11,7 @@ export type { ProductMeal, ProductMealItem } from "../features/meals/product-mea
 
 export interface ProductMealInput {
   clientRequestId?: string;
+  templateId?: string | null;
   analysisId?: string | null;
   mealType: MealType;
   name: string;

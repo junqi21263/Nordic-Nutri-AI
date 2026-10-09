@@ -1,0 +1,18 @@
+@use "../../styles/tokens" as *;
+.recent-frequent {
+  margin: 28px 0; padding: 24px; background: $color-surface; border-radius: $radius-24;
+  &__heading { display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; min-width: 0; font-size: $font-h3; color: $color-forest-green; }
+  &__heading > taro-text-core { display: block; flex: 1 1 auto; min-width: 0; white-space: nowrap; }
+  &__heading > .app-button { width: auto; min-width: 0; flex: 0 0 auto; white-space: nowrap; }
+  &__row { display: flex; flex-direction: row; align-items: center; gap: 20px; width: 100%; padding: 20px 0; border-top: 1px solid $color-sage-light; }
+  &__skeleton { display: flex; flex-direction: column; gap: 8px; }
+  &__skeleton-row { display: flex; flex-direction: row; align-items: center; gap: 20px; padding: 16px 0; border-top: 1px solid $color-sage-light; }
+  &__skeleton-copy { display: flex; flex: 1; flex-direction: column; gap: 10px; }
+  &__skeleton-title { width: 48%; height: 24px; }
+  &__skeleton-meta { width: 72%; height: 18px; }
+  &__skeleton-button { flex: 0 0 112px; height: 48px; border-radius: $radius-full; }
+  &__copy { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; gap: 8px; font-size: $font-caption; }
+  &__copy > taro-text-core { display: block; min-width: 0; }
+  &__meta { display: block; font-size: $font-overline; color: $color-neutral-gray; }
+  .app-button { flex-shrink: 0; width: auto; }
+}

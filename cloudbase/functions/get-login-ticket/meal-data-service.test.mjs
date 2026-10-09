@@ -75,6 +75,25 @@ test("persists meal analysis with the database-supported completed status", asyn
   assert.equal(calls.find((call) => call.table === "ai_analysis")?.payload.status, "completed");
 });
 
+test("falls back to food catalog analysis when the model is unavailable", async () => {
+  const { db, calls } = createDb();
+  const service = createMealDataService({
+    db,
+    analyze: async () => { throw new Error("MODEL_QUOTA_EXCEEDED"); },
+    fallbackAnalyze: async ({ items }) => ({
+      mealName: items[0].name,
+      advice: "食物库参考",
+      items: [{ ...items[0], caloriesPer100g: 35, proteinPer100g: 2.4, carbsPer100g: 7.2, fatPer100g: 0.4 }],
+    }),
+  });
+  const result = await service.createAnalysis("user-1", {
+    clientRequestId: "11111111-1111-4111-8111-111111111111",
+    items: [{ name: "西兰花", quantityG: 150 }],
+  });
+  assert.equal(result.items[0].caloriesPer100g, 35);
+  assert.equal(calls.find((call) => call.table === "ai_analysis")?.payload.raw_recognition.advice, "食物库参考");
+});
+
 const validMeal = {
   clientRequestId: "11111111-1111-4111-8111-111111111111",
   mealType: "lunch",

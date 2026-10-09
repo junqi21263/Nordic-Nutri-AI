@@ -1,6 +1,8 @@
 import { Button, Image, Input, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import {
   getProductAccount,
   previewProductNutritionPlan,
@@ -41,6 +43,7 @@ async function refreshAchievementsInBackground() {
 }
 
 export default function ProfileEditPage() {
+  const { i18n } = useTranslation();
   const profile = useProfileStore();
   const feedback = useFeedbackStore();
   const [nickname, setNickname] = useState(profile.profile.nickname);
@@ -69,11 +72,11 @@ export default function ProfileEditPage() {
       setIsUploadingAvatar(true);
       const uploaded = await uploadProfileAvatar(filePath);
       profile.setProfile({ avatarUrl: uploaded.avatarUrl });
-      feedback.show({ message: "头像已更新", tone: "success" });
+      feedback.show({ message: t("profileEdit.avatarUpdated"), tone: "success" });
     } catch (error) {
       if (!String(error).includes("cancel")) {
         feedback.show({
-          message: error instanceof Error ? error.message : "头像上传失败，请稍后重试",
+          message: error instanceof Error ? error.message : t("profileEdit.avatarFailed"),
           tone: "error",
         });
       }
@@ -88,10 +91,10 @@ export default function ProfileEditPage() {
       setIsRandomizingAvatar(true);
       const updated = await randomizeDefaultAvatar(profile.profile.avatarUrl);
       profile.setProfile({ avatarUrl: updated.avatarUrl });
-      feedback.show({ message: "已换一张默认头像", tone: "success" });
+      feedback.show({ message: t("profileEdit.randomUpdated"), tone: "success" });
     } catch (error) {
       feedback.show({
-        message: error instanceof Error ? error.message : "随机头像失败，请稍后重试",
+        message: error instanceof Error ? error.message : t("profileEdit.randomFailed"),
         tone: "error",
       });
     } finally {
@@ -102,7 +105,7 @@ export default function ProfileEditPage() {
   const save = async () => {
     const nextNickname = nickname.trim();
     if (!nextNickname) {
-      feedback.show({ message: "请输入昵称", tone: "error" });
+      feedback.show({ message: t("profileEdit.nicknameRequired"), tone: "error" });
       return;
     }
     const nicknameError = nicknameModerationError(nextNickname);
@@ -112,7 +115,7 @@ export default function ProfileEditPage() {
     }
     const nextWeight = Number(weight);
     if (!Number.isFinite(nextWeight) || nextWeight < 30 || nextWeight > 300) {
-      feedback.show({ message: "请输入 30–300 kg 的体重", tone: "error" });
+      feedback.show({ message: t("profileEdit.weightRange"), tone: "error" });
       return;
     }
     setIsSaving(true);
@@ -125,7 +128,7 @@ export default function ProfileEditPage() {
         account.activityLevel === null ||
         account.trainingDays === null
       ) {
-        throw new Error("请先补全身体资料");
+        throw new Error(t("profileEdit.bodyRequired"));
       }
       const nextGoalType = goalTypeByLabel[goalLabel] ?? "muscle_gain";
       const settings = account.settings;
@@ -168,9 +171,9 @@ export default function ProfileEditPage() {
       const goalChanged = goalLabel !== profile.profile.goalLabel;
       feedback.showModal({
         variant: "success",
-        title: goalChanged ? "目标方向已更新" : "资料已保存",
-        description: goalChanged ? "营养目标已重新生成。" : "营养目标已同步更新。",
-        primaryText: "返回个人中心",
+        title: goalChanged ? t("profileEdit.goalUpdated") : t("profileEdit.profileSaved"),
+        description: goalChanged ? t("profileEdit.goalSynced") : t("profileEdit.profileSynced"),
+        primaryText: t("profileEdit.backProfile"),
         dismissible: true,
         onPrimary: () => navigateBackOrHome("/pages/profile/index"),
         onClose: () => navigateBackOrHome("/pages/profile/index"),
@@ -179,9 +182,9 @@ export default function ProfileEditPage() {
     } catch (error) {
       feedback.showModal({
         variant: "error",
-        title: "资料保存失败",
-        description: error instanceof Error ? error.message : "请稍后重试。",
-        primaryText: "知道了",
+        title: t("profileEdit.saveFailed"),
+        description: error instanceof Error ? error.message : t("profileEdit.retryLater"),
+        primaryText: t("profileEdit.okay"),
         dismissible: true,
       });
     } finally {
@@ -191,7 +194,7 @@ export default function ProfileEditPage() {
 
   return (
     <PageLayout
-      title="编辑资料"
+      title={t("profileEdit.title")}
       showTabs={false}
       hideNavigation
       showBack
@@ -220,26 +223,26 @@ export default function ProfileEditPage() {
               <Text>{profile.profile.nickname.slice(0, 1).toUpperCase()}</Text>
             )}
             <View className="profile-edit__avatar-action">
-              <Text>{isUploadingAvatar ? "上传中" : "更换头像"}</Text>
+              <Text>{isUploadingAvatar ? t("profileEdit.uploading") : t("profileEdit.changeAvatar")}</Text>
             </View>
           </Button>
           <View
             className={`profile-edit__randomize ${isRandomizingAvatar ? "profile-edit__randomize--busy" : ""}`}
             onClick={() => void onRandomizeAvatar()}
           >
-            <NordicIcon name="refresh-cw" size={18} ariaLabel="随机头像" />
-            <Text>{isRandomizingAvatar ? "更换中…" : "随机换一张"}</Text>
+            <NordicIcon name="refresh-cw" size={18} ariaLabel={t("profileEdit.randomAvatar")} />
+            <Text>{isRandomizingAvatar ? t("profileEdit.changing") : t("profileEdit.randomChange")}</Text>
           </View>
         </View>
         <View onClick={() => void Taro.navigateTo({ url: "/pages/goal-adjust/index" })}>
           <AppCard className="profile-form__summary profile-form__summary--action">
             <View className="profile-form__summary-icon">
-              <NordicIcon name="user-round" size={22} ariaLabel="个人资料" />
+              <NordicIcon name="user-round" size={22} ariaLabel={t("profileEdit.personalInfo")} />
             </View>
             <View>
-              <Text>当前目标</Text>
+              <Text>{t("profileEdit.currentGoal")}</Text>
               <Text>
-                {goalLabel} · {profile.profile.targetWeight} kg · 调整 ›
+                {goalTypeByLabel[goalLabel] ? t(`onboarding.goals.${goalTypeByLabel[goalLabel] === "maintain" ? "maintenance" : goalTypeByLabel[goalLabel]}.title`) : goalLabel} · {profile.profile.targetWeight} kg · {t("profileEdit.adjust")}
               </Text>
             </View>
           </AppCard>
@@ -247,38 +250,44 @@ export default function ProfileEditPage() {
 
         <View className="profile-form">
           <View className="profile-form__field">
-            <Text>昵称</Text>
+            <Text>{t("profileEdit.nickname")}</Text>
             <Input
               type="nickname"
               value={nickname}
               maxlength={16}
-              placeholder="输入你的昵称"
+              placeholder={t("profileEdit.nicknamePlaceholder")}
+              nativeProps={{
+                style: { boxSizing: "border-box", height: "100%", lineHeight: "normal", padding: 0 },
+              }}
               onInput={(event) => setNickname(event.detail.value)}
               onBlur={(event) => setNickname(event.detail.value)}
             />
           </View>
           <View className="profile-form__field">
-            <Text>当前体重</Text>
+            <Text>{t("profileEdit.currentWeight")}</Text>
             <View className="profile-form__input-row">
               <Input
                 type="digit"
                 value={weight}
                 placeholder="70"
+                nativeProps={{
+                  style: { boxSizing: "border-box", height: "100%", lineHeight: "normal", padding: 0 },
+                }}
                 onInput={(event) => setWeight(event.detail.value)}
               />
               <Text>kg</Text>
             </View>
           </View>
           <View className="profile-form__field">
-            <Text>当前方向</Text>
-             <View className="profile-choice-group profile-choice-group--single-line">
+            <Text>{t("profileEdit.direction")}</Text>
+             <View className={`profile-choice-group profile-choice-group--single-line${i18n.language === "en" ? " profile-choice-group--multiline" : ""}`}>
               {goalOptions.map((option) => (
                 <View
                   className={`profile-choice ${goalLabel === option ? "profile-choice--active" : ""}`}
                   key={option}
                   onClick={() => requestGoalChange(option)}
                 >
-                  <Text>{option}</Text>
+                  <Text>{t(`onboarding.goals.${goalTypeByLabel[option] === "maintain" ? "maintenance" : goalTypeByLabel[option]}.title`)}</Text>
                 </View>
               ))}
             </View>
@@ -287,24 +296,24 @@ export default function ProfileEditPage() {
 
         <View className="profile-edit__notice">
           <View className="profile-edit__notice-icon">
-            <NordicIcon name="check" size={20} ariaLabel="账号保存" />
+            <NordicIcon name="check" size={20} ariaLabel={t("profileEdit.accountSave")} />
           </View>
           <View>
-            <Text>资料保存说明</Text>
-            <Text>昵称会保存到你的账号，并更新个人中心展示。</Text>
+            <Text>{t("profileEdit.saveNote")}</Text>
+            <Text>{t("profileEdit.saveNoteText")}</Text>
           </View>
         </View>
       </View>
       <View className="profile-edit__action">
         <AppButton size="large" loading={isSaving} onClick={() => void save()}>
-          保存资料
+          {t("profileEdit.save")}
         </AppButton>
       </View>
       <ConfirmDialog
         open={Boolean(pendingGoalLabel)}
-        title="确认更新目标方向？"
-        description={`将切换为“${pendingGoalLabel ?? ""}”，并重新生成每日热量和营养目标。已记录的饮食数据不会改变。`}
-        confirmLabel="确认更新"
+        title={t("profileEdit.confirmGoal")}
+        description={t("profileEdit.confirmGoalDescription", { goal: pendingGoalLabel && goalTypeByLabel[pendingGoalLabel] ? t(`onboarding.goals.${goalTypeByLabel[pendingGoalLabel] === "maintain" ? "maintenance" : goalTypeByLabel[pendingGoalLabel]}.title`) : pendingGoalLabel ?? "" })}
+        confirmLabel={t("profileEdit.confirmUpdate")}
         onConfirm={confirmGoalChange}
         onCancel={() => setPendingGoalLabel(null)}
       />

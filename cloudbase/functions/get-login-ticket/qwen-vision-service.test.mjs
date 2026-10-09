@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { createQwenVisionService, shouldEscalate, PublicQwenVisionError } from "./qwen-vision-service.cjs";
+
+test("prompt distinguishes multi-food photos without inventing hidden ingredients", () => {
+  const source = readFileSync(new URL("./qwen-vision-service.cjs", import.meta.url), "utf8");
+  assert.match(source, /明显包含两个或以上/);
+  assert.match(source, /组合菜/);
+  assert.match(source, /不得.*凑数量|不要.*凑数量/);
+});
 
 const result = (overrides = {}) => ({
   mealName: "鸡胸肉沙拉", mealType: "lunch", confidence: 0.9, portionConfidence: 0.9,

@@ -1,5 +1,6 @@
 import { Image, Text, View } from "@tarojs/components";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import wechatIcon from "../../assets/icons/wechat.svg";
 import { PageLayout } from "../../layouts/page-layout";
 import {
@@ -10,16 +11,17 @@ import {
 import { useFeedbackStore } from "../../stores/feedback-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 
-function actionErrorMessage(error: unknown): string {
+function actionErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message;
   if (error && typeof error === "object") {
     const errMsg = (error as { errMsg?: unknown }).errMsg;
     if (typeof errMsg === "string" && errMsg.trim()) return errMsg;
   }
-  return "操作失败，请稍后重试";
+  return fallback;
 }
 
 export default function RecommendFriendsPage() {
+  const { t } = useTranslation();
   const feedback = useFeedbackStore();
   const [busy, setBusy] = useState<"wechat" | "save" | null>(null);
 
@@ -30,7 +32,7 @@ export default function RecommendFriendsPage() {
       await action();
       if (okMessage) feedback.show({ message: okMessage, tone: "success" });
     } catch (error) {
-      const message = actionErrorMessage(error);
+      const message = actionErrorMessage(error, t("recommendFriends.actionFailed"));
       // User dismissing the native share sheet is not an error worth toasting.
       if (/cancel|取消|fail cancel/i.test(message)) return;
       feedback.show({ message, tone: "error" });
@@ -41,7 +43,7 @@ export default function RecommendFriendsPage() {
 
   return (
     <PageLayout
-      title="推荐好友"
+      title={t("recommendFriends.title")}
       showTabs={false}
       hideNavigation
       showBack
@@ -55,7 +57,7 @@ export default function RecommendFriendsPage() {
             src={RECOMMEND_POSTER_IMAGE}
             mode="widthFix"
             showMenuByLongpress
-            ariaLabel="Nordic Nutri AI 推荐海报"
+            ariaLabel={t("recommendFriends.posterAlt")}
           />
         </View>
 
@@ -69,21 +71,21 @@ export default function RecommendFriendsPage() {
                 className="recommend-friends__wechat-logo"
                 src={wechatIcon}
                 mode="aspectFit"
-                ariaLabel="微信"
+                ariaLabel={t("recommendFriends.wechat")}
               />
             </View>
-            <Text className="recommend-friends__action-label">微信</Text>
+            <Text className="recommend-friends__action-label">{t("recommendFriends.wechat")}</Text>
           </View>
           <View
             className={`recommend-friends__action ${busy === "save" ? "recommend-friends__action--busy" : ""}`}
             onClick={() =>
-              void runAction("save", saveRecommendPosterToAlbum, "海报已保存到相册")
+              void runAction("save", saveRecommendPosterToAlbum, t("recommendFriends.saved"))
             }
           >
             <View className="recommend-friends__action-icon recommend-friends__action-icon--save">
               <Text className="recommend-friends__action-glyph">↓</Text>
             </View>
-            <Text className="recommend-friends__action-label">保存</Text>
+            <Text className="recommend-friends__action-label">{t("recommendFriends.save")}</Text>
           </View>
         </View>
       </View>

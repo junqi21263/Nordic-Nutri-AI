@@ -42,6 +42,7 @@ function mapProductItem(item: ProductMealItem): MealItem {
     id: item.id,
     name: item.name,
     amount: `${round(item.quantityG)}g`,
+    savedNutrition: { quantityG: item.quantityG, caloriesPer100g: item.caloriesPer100g, proteinPer100g: item.proteinPer100g, carbsPer100g: item.carbsPer100g, fatPer100g: item.fatPer100g },
     calories: round(item.caloriesPer100g * scale),
     protein: round(item.proteinPer100g * scale),
     carbs: round(item.carbsPer100g * scale),

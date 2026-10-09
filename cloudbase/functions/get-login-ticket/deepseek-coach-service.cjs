@@ -105,7 +105,7 @@ function buildCoachSystemPrompt(context, outputRules) {
 
 function buildMessages({ prompt, context, history, outputRules }) {
   return [
-    { role: "system", content: buildCoachSystemPrompt(context, outputRules) },
+    { role: "system", content: buildCoachSystemPrompt(context, outputRules) + require("./locale.cjs").localeInstruction(context?.locale) },
     ...history.slice(-10).map((message) => ({
       role: message.role === "assistant" ? "assistant" : "user",
       content: String(message.content ?? "").slice(0, 1000),

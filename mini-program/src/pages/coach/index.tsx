@@ -1,4 +1,7 @@
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import { Image, Text, View } from "@tarojs/components";
+import { chooseFoodImage } from "../../platform/food-media";
 import Taro, { useDidHide, useDidShow } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -52,21 +55,59 @@ type ChatMessage = {
   imageLabel?: string;
 };
 
-const defaultHeroPrompt = "下一餐怎么补充蛋白质？";
-const defaultQuickPrompts = ["我今天吃什么？", "我的蛋白够吗？", "下一餐怎么搭配？"];
-const dailyLimitMessage = "因个人开发成本有限，当前每人每日限制聊20句";
-const defaultDailyUsage: ProductCoachDailyUsage = { limit: 20, used: 0, remaining: 20 };
-const defaultDailyTip: ProductCoachDailyTip = {
-  type: "nutrition_tip",
-  headline: "下一餐加一份深色蔬菜",
-  content: "西兰花、菠菜等能帮助补充膳食纤维；搭配蛋白质和适量主食更均衡。",
-  reason: "帮助补足当天的膳食纤维。",
-  food: null,
-  source: "rule_v2",
-  model: null,
+const coachContextKeys: Record<string, string> = {
+  "三餐已记录": "coachPage.context.allLogged",
+  "午餐已记录": "coachPage.context.lunchLogged",
+  "早餐已记录": "coachPage.context.breakfastLogged",
+  "已完成两餐记录": "coachPage.context.twoLogged",
+  "今天还没有餐次记录": "coachPage.context.noneLogged",
+  "今日行动：晚间可补一份优质蛋白，帮助完成目标。": "coachPage.context.addProtein",
+  "今日行动：今日摄入偏少，可适当补足主食与蛋白。": "coachPage.context.addFood",
+  "今日行动：今天的营养节奏不错，继续保持。": "coachPage.context.keepGoing",
+  "今日行动：早餐可按需补记。": "coachPage.context.logBreakfastLater",
+  "今日行动：午餐还没记录，按自己的节奏补上。": "coachPage.context.logLunchLater",
+  "今日行动：晚餐还差一餐，继续完成今天节奏。": "coachPage.context.logDinnerLater",
+  "今日行动：继续记录下一餐，让今天的营养进度更完整。": "coachPage.context.logNext",
+  "今日行动：今天先完成第一餐记录。": "coachPage.context.logFirst",
+  "查看今日进度": "coachPage.context.viewProgress",
+  "补记早餐": "coachPage.context.backfillBreakfast",
+  "记录午餐": "coachPage.context.logLunch",
+  "记录晚餐": "coachPage.context.logDinner",
+  "记录下一餐": "coachPage.context.logNextMeal",
+  "记录第一餐": "coachPage.context.logFirstMeal",
 };
 
+function localizeCoachContext(copy: string): string {
+  const recorded = /^今日已记录 (\d+) 餐$/.exec(copy);
+  if (recorded) return t("coachPage.context.recordedCount", { count: Number(recorded[1]) });
+  const key = coachContextKeys[copy];
+  return key ? t(key) : copy;
+}
+
+const greetingKeys: Record<string, string> = {
+  "你好": "coachPage.greetings.hello", "夜色正静": "coachPage.greetings.quietNight", "夜深了": "coachPage.greetings.lateNight",
+  "夜还很静": "coachPage.greetings.stillNight", "还没休息": "coachPage.greetings.awake", "周末早上好": "coachPage.greetings.weekendMorning",
+  "早上好": "coachPage.greetings.morning", "中午好": "coachPage.greetings.noon", "下午好": "coachPage.greetings.afternoon", "晚上好": "coachPage.greetings.evening",
+};
+
+function localizeGreeting(copy: string): string {
+  const key = greetingKeys[copy];
+  return key ? t(key) : copy;
+}
+
+const defaultDailyUsage: ProductCoachDailyUsage = { limit: 20, used: 0, remaining: 20 };
+
 export default function CoachPage() {
+  const { i18n } = useTranslation();
+  const defaultDailyTip: ProductCoachDailyTip = {
+    type: "nutrition_tip",
+    headline: t("coachPage.defaultTipTitle"),
+    content: t("coachPage.defaultTipContent"),
+    reason: t("coachPage.defaultTipReason"),
+    food: null,
+    source: "rule_v2",
+    model: null,
+  };
   useAppShare();
   const meals = useMealStore();
   const profile = useProfileStore();
@@ -82,8 +123,8 @@ export default function CoachPage() {
   const [sending, setSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [restartDialogOpen, setRestartDialogOpen] = useState(false);
-  const [quickPrompts, setQuickPrompts] = useState(defaultQuickPrompts);
-  const [heroPrompt, setHeroPrompt] = useState(defaultHeroPrompt);
+  const [quickPrompts, setQuickPrompts] = useState(() => [t("coachPage.quick1"), t("coachPage.quick2"), t("coachPage.quick3")]);
+  const [heroPrompt, setHeroPrompt] = useState(() => t("coachPage.nextProtein"));
   const [serverTime, setServerTime] = useState<string | null>(null);
   const [dailyTip, setDailyTip] = useState<ProductCoachDailyTip | null>(null);
   const [dailyTipLoading, setDailyTipLoading] = useState(false);
@@ -109,7 +150,7 @@ export default function CoachPage() {
       role: "coach",
       content:
         advice[0]?.message ||
-        `你好，Lewis。今天还差 ${proteinLeft}g 蛋白质，晚餐加一份优质蛋白就能更接近目标。`,
+        t("coachPage.proactive", { name: "Lewis", grams: proteinLeft }),
       },
   ]);
   const bottomScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -179,6 +220,12 @@ export default function CoachPage() {
     }
   };
 
+  useEffect(() => {
+    setQuickPrompts([t("coachPage.quick1"), t("coachPage.quick2"), t("coachPage.quick3")]);
+    setHeroPrompt(t("coachPage.nextProtein"));
+    setDailyTip(null);
+  }, [i18n.language]);
+
   const loadDailyTip = async (refresh = false) => {
     if (dailyTipLoading) return;
     setDailyTipLoading(true);
@@ -196,7 +243,7 @@ export default function CoachPage() {
     role: "coach",
     content:
       advice[0]?.message ||
-      `${greeting}，Lewis。今天还差 ${proteinLeft}g 蛋白质，晚餐加一份优质蛋白就能更接近目标。`,
+      t("coachPage.proactive", { name: "Lewis", grams: proteinLeft }),
   });
 
   const handleRestartConversation = async () => {
@@ -209,9 +256,9 @@ export default function CoachPage() {
       setDraft("");
       setSelectedImagePath(null);
       await Promise.all([refreshCoachBrief(), loadDailyTip()]);
-      feedback.show({ message: "已开启新的营养教练对话", tone: "success" });
+      feedback.show({ message: t("coachPage.restartSuccess"), tone: "success" });
     } catch {
-      feedback.show({ message: "新对话开启失败，请稍后重试", tone: "error" });
+      feedback.show({ message: t("coachPage.restartFailed"), tone: "error" });
     } finally {
       setRestarting(false);
     }
@@ -265,9 +312,9 @@ export default function CoachPage() {
     if (dailyUsage.remaining <= 0) {
       feedback.showModal({
         variant: "limit",
-        title: "今日对话额度已用完",
-        description: dailyLimitMessage,
-        primaryText: "知道了",
+        title: t("coachPage.limitTitle"),
+        description: t("coachPage.limitMessage"),
+        primaryText: t("coachPage.gotIt"),
         dismissible: true,
       });
       return;
@@ -277,15 +324,15 @@ export default function CoachPage() {
     if (imagePath) {
       try {
         const imageMeal = await analyzeProductImage(imagePath);
-        content = `${userPrompt || "请分析这张食物图片。"}\n图片识别结果：${imageMeal.title}；${imageMeal.insight}`;
-        attachment = { imagePath, imageLabel: `已上传：${imageMeal.title}` };
+        content = `${userPrompt || t("coachPage.analyzeImage")}\n${t("coachPage.imageResult", { title: imageMeal.title, insight: imageMeal.insight })}`;
+        attachment = { imagePath, imageLabel: t("coachPage.uploaded", { name: imageMeal.title }) };
       } catch (error) {
         const isNotConfigured = error instanceof Error && error.name === "VISION_SERVICE_NOT_CONFIGURED";
         feedback.showModal({
           variant: feedbackVariantForError(error),
-          title: isNotConfigured ? "图片识别服务未配置" : "图片上传或识别失败",
-          description: isNotConfigured ? "请先发送文字问题。" : "请稍后重试。",
-          primaryText: "知道了",
+          title: t(isNotConfigured ? "coachPage.imageUnavailable" : "coachPage.imageFailed"),
+          description: t(isNotConfigured ? "coachPage.sendTextFirst" : "coachPage.tryLater"),
+          primaryText: t("coachPage.gotIt"),
           dismissible: true,
         });
         return;
@@ -294,13 +341,13 @@ export default function CoachPage() {
     const requestId = createClientRequestId();
     const optimisticId = "pending-" + requestId;
     const streamingId = "stream-" + requestId;
-    let analysis = createAnalysisProgress(userPrompt || "请分析这张食物图片。", Date.now());
+    let analysis = createAnalysisProgress(userPrompt || t("coachPage.analyzeImage"), Date.now());
     setMessages((current) => [
       ...current,
       {
         id: optimisticId,
         role: "user",
-        content: userPrompt || "请分析这张食物图片。",
+        content: userPrompt || t("coachPage.analyzeImage"),
         ...attachment,
       },
     ]);
@@ -371,14 +418,15 @@ export default function CoachPage() {
         setDailyUsage((current) => ({ ...current, used: current.limit, remaining: 0 }));
         feedback.showModal({
           variant: "limit",
-          title: "今日对话额度已用完",
-          description: dailyLimitMessage,
-          primaryText: "知道了",
+          title: t("coachPage.limitTitle"),
+          description: t("coachPage.limitMessage"),
+          primaryText: t("coachPage.gotIt"),
           dismissible: true,
         });
         return;
       }
       try {
+        if (process.env.TARO_ENV === "h5" && (!(streamError instanceof Error) || streamError.name !== "COACH_STREAM_UNSUPPORTED")) throw streamError;
         const result = await sendProductCoachMessage(content, date, requestId);
         if (!pageActiveRef.current) return;
         analysis = completeAnalysisForFallback(analysis, Date.now());
@@ -391,17 +439,17 @@ export default function CoachPage() {
           setDailyUsage((current) => ({ ...current, used: current.limit, remaining: 0 }));
           feedback.showModal({
             variant: "limit",
-            title: "今日对话额度已用完",
-            description: dailyLimitMessage,
-            primaryText: "知道了",
+            title: t("coachPage.limitTitle"),
+            description: t("coachPage.limitMessage"),
+            primaryText: t("coachPage.gotIt"),
             dismissible: true,
           });
         } else {
           feedback.showModal({
             variant: feedbackVariantForError(sendError),
-            title: "营养教练暂时无法回答",
-            description: "请稍后重试。",
-            primaryText: "知道了",
+            title: t("coachPage.coachUnavailable"),
+            description: t("coachPage.tryLater"),
+            primaryText: t("coachPage.gotIt"),
             dismissible: true,
           });
         }
@@ -418,14 +466,7 @@ export default function CoachPage() {
   const chooseCoachImage = async () => {
     if (sending) return;
     try {
-      const result = await Taro.chooseMedia({
-        count: 1,
-        mediaType: ["image"],
-        sourceType: ["album", "camera"],
-        sizeType: ["compressed"],
-      });
-      const picked = result.tempFiles[0];
-      const path = picked?.tempFilePath;
+      const path = await chooseFoodImage();
       if (!path) throw new Error("没有获取到图片");
       setSelectedImagePath(path);
     } catch (error) {
@@ -434,7 +475,7 @@ export default function CoachPage() {
         message:
           error instanceof Error && error.message.includes("图片过大")
             ? error.message
-            : "无法选择图片，请检查相册或相机权限",
+            : t("coachPage.imagePickFailed"),
         tone: "error",
       });
     }
@@ -457,15 +498,15 @@ export default function CoachPage() {
     <PageLayout
       activeTab="coach"
       hideNavigation
-      title="你的营养教练"
+      title={t("coachPage.title")}
       scrollLocked={restartDialogOpen}
       overlay={
         <>
           <ConfirmDialog
             open={restartDialogOpen}
-            title="新对话"
-            description="当前对话会清空，历史记录仍会保留。确定重新开始吗？"
-            confirmLabel="开启新对话"
+            title={t("coachPage.newChat")}
+            description={t("coachPage.restartQuestion")}
+            confirmLabel={t("coachPage.startNewChat")}
             onConfirm={() => void handleRestartConversation()}
             onCancel={() => setRestartDialogOpen(false)}
           />
@@ -480,10 +521,10 @@ export default function CoachPage() {
           />
           <View
             className="coach-chat__scroll-top"
-            ariaLabel="回到顶部"
+            ariaLabel={t("coachPage.backToTop")}
             onClick={scrollToCoachTop}
           >
-            <NordicIcon name="arrow-up" size={22} ariaLabel="回到顶部" />
+            <NordicIcon name="arrow-up" size={22} ariaLabel={t("coachPage.backToTop")} />
           </View>
         </>
       }
@@ -493,22 +534,22 @@ export default function CoachPage() {
         <View className="coach-chat__hero">
           <View className="coach-chat__hero-copy">
             <View className="coach-chat__hero-toolbar">
-              <Text className="coach-chat__hero-kicker">NOVA · 今日提醒</Text>
+              <Text className="coach-chat__hero-kicker">{t("coachPage.todayReminder")}</Text>
               <View
                 className="coach-chat__restart-action"
-                ariaLabel="新对话"
+                ariaLabel={t("coachPage.newChat")}
                 onClick={() => setRestartDialogOpen(true)}
               >
-                <NordicIcon name="refresh-cw" size={15} ariaLabel="新对话" />
-                <Text>新对话</Text>
+                <NordicIcon name="refresh-cw" size={15} ariaLabel={t("coachPage.newChat")} />
+                <Text>{t("coachPage.newChat")}</Text>
               </View>
             </View>
-            <Text className="coach-chat__hero-greeting">{greeting}，{profile.profile.nickname || "你"} 👋</Text>
-            <Text className="coach-chat__hero-summary">{heroContext.summary}</Text>
-            <Text className="coach-chat__hero-suggestion">{heroContext.suggestion}</Text>
-            <View className="coach-chat__hero-cta" ariaLabel={heroContext.ctaLabel} onClick={handlePrimaryAction}>
-              <Text>{heroContext.ctaLabel}</Text>
-              <NordicIcon name="chevron-right" size={16} ariaLabel={heroContext.ctaLabel} />
+            <Text className="coach-chat__hero-greeting">{localizeGreeting(greeting)}，{profile.profile.nickname || t("coachPage.you")} 👋</Text>
+            <Text className="coach-chat__hero-summary">{localizeCoachContext(heroContext.summary)}</Text>
+            <Text className="coach-chat__hero-suggestion">{localizeCoachContext(heroContext.suggestion)}</Text>
+            <View className="coach-chat__hero-cta" ariaLabel={localizeCoachContext(heroContext.ctaLabel)} onClick={handlePrimaryAction}>
+              <Text>{localizeCoachContext(heroContext.ctaLabel)}</Text>
+              <NordicIcon name="chevron-right" size={16} ariaLabel={localizeCoachContext(heroContext.ctaLabel)} />
             </View>
           </View>
         </View>
@@ -520,15 +561,15 @@ export default function CoachPage() {
                 ? "coach-chat__section-toggle--expanded"
                 : "coach-chat__section-toggle--collapsed"
             }`}
-            ariaLabel={expandedSections.progress ? "收起详细营养数据" : "展开详细营养数据"}
+            ariaLabel={t(expandedSections.progress ? "coachPage.collapseNutrition" : "coachPage.expandNutrition")}
             onClick={() =>
               setExpandedSections((current) => ({ ...current, progress: !current.progress }))
             }
           >
-            <View>
-              <Text className="coach-chat__progress-kicker">今日进度</Text>
+            <View className="coach-chat__progress-copy">
+              <Text className="coach-chat__progress-kicker">{t("coachPage.todayProgress")}</Text>
               <Text className="coach-chat__progress-title">
-                {heroContext.ctaAction === "progress" ? "查看今天的营养完成度" : heroContext.summary}
+                {heroContext.ctaAction === "progress" ? t("coachPage.viewProgress") : localizeCoachContext(heroContext.summary)}
               </Text>
             </View>
             <View className="coach-chat__progress-score-group">
@@ -536,7 +577,7 @@ export default function CoachPage() {
               <NordicIcon
                 name="chevron-right"
                 size={16}
-                ariaLabel={expandedSections.progress ? "收起" : "展开"}
+                ariaLabel={t(expandedSections.progress ? "coachPage.collapse" : "coachPage.expand")}
               />
             </View>
           </View>
@@ -547,18 +588,18 @@ export default function CoachPage() {
               <Text className="coach-chat__progress-task-status">
                 {heroContext.ctaAction === "progress" ? "✓" : "○"}
               </Text>
-              <Text>{heroContext.ctaAction === "progress" ? "三餐已记录" : heroContext.ctaLabel}</Text>
+              <Text>{heroContext.ctaAction === "progress" ? t("coachPage.threeMealsLogged") : localizeCoachContext(heroContext.ctaLabel)}</Text>
             </View>
             <View className="coach-chat__progress-task">
               <Text className="coach-chat__progress-task-status">
                 {summary.consumed.protein >= summary.protein ? "✓" : "○"}
               </Text>
-              <Text>{summary.consumed.protein >= summary.protein ? "已完成蛋白目标" : "完成蛋白目标"}</Text>
+              <Text>{t(summary.consumed.protein >= summary.protein ? "coachPage.proteinGoalDone" : "coachPage.proteinGoal")}</Text>
             </View>
           </View>
           {[
-            ["蛋白质", summary.consumed.protein, summary.protein, "g"] as const,
-            ["热量", summary.consumed.calories, summary.calories, " kcal"] as const,
+            [t("nutrition.protein"), summary.consumed.protein, summary.protein, "g"] as const,
+            [t("nutrition.calories"), summary.consumed.calories, summary.calories, " kcal"] as const,
           ].map(([label, consumed, target, unit]) => {
             const progress = clampProgress(Number(consumed), Number(target));
             return (
@@ -577,7 +618,7 @@ export default function CoachPage() {
               </View>
             );
           })}
-          {[["碳水", summary.consumed.carbs, summary.carbs, "g"] as const].map(([label, consumed, target, unit]) => {
+          {[[t("nutrition.carbs"), summary.consumed.carbs, summary.carbs, "g"] as const].map(([label, consumed, target, unit]) => {
                 const progress = clampProgress(Number(consumed), Number(target));
                 return (
                   <View className="coach-chat__progress-row" key={label}>
@@ -606,51 +647,51 @@ export default function CoachPage() {
                 ? "coach-chat__section-toggle--expanded"
                 : "coach-chat__section-toggle--collapsed"
             }`}
-            ariaLabel={expandedSections.suggestion ? "收起今日营养建议" : "展开今日营养建议"}
+            ariaLabel={t(expandedSections.suggestion ? "coachPage.collapseSuggestion" : "coachPage.expandSuggestion")}
             onClick={() =>
               setExpandedSections((current) => ({ ...current, suggestion: !current.suggestion }))
             }
           >
             <View className="coach-chat__suggestion-label">
-              <NordicIcon name="milestone" size={18} ariaLabel="今日营养建议" />
-              <Text>NOVA 小贴士</Text>
+              <NordicIcon name="milestone" size={18} ariaLabel={t("coachPage.tips")} />
+              <Text>{t("coachPage.tips")}</Text>
             </View>
             <View className="coach-chat__suggestion-actions">
               <View
                 className={`coach-chat__suggestion-refresh ${dailyTipLoading ? "coach-chat__suggestion-refresh--loading" : ""}`}
-                ariaLabel="换一个今日营养建议"
+                ariaLabel={t("coachPage.refreshTip")}
                 onClick={(event) => {
                   event.stopPropagation();
                   void loadDailyTip(true);
                 }}
               >
-                <NordicIcon name="refresh-cw" size={15} ariaLabel="换一个建议" />
-                <Text>换一个建议</Text>
+                <NordicIcon name="refresh-cw" size={15} ariaLabel={t("coachPage.refreshTip")} />
+                <Text>{t("coachPage.refreshTip")}</Text>
               </View>
               <View
                 className="coach-chat__suggestion-collapse"
-                ariaLabel={expandedSections.suggestion ? "收起" : "展开"}
+                ariaLabel={t(expandedSections.suggestion ? "coachPage.collapse" : "coachPage.expand")}
               >
-                <NordicIcon name="chevron-right" size={16} ariaLabel="展开或收起" />
+                <NordicIcon name="chevron-right" size={16} ariaLabel={t("coachPage.expand")} />
               </View>
             </View>
           </View>
           <Text className="coach-chat__suggestion-title">
-            {dailyTipLoading ? "正在整理今日建议…" : (dailyTip ?? defaultDailyTip).headline}
+            {dailyTipLoading ? t("coachPage.tipLoading") : (dailyTip ?? defaultDailyTip).headline}
           </Text>
           {expandedSections.suggestion ? (
             <>
               <Text className="coach-chat__suggestion-copy">
-                {dailyTipLoading ? "正在结合你的今日记录准备一条小建议。" : (dailyTip ?? defaultDailyTip).content}
+                {dailyTipLoading ? t("coachPage.tipLoadingDetail") : (dailyTip ?? defaultDailyTip).content}
               </Text>
               <Text className="coach-chat__suggestion-reason">
-                {dailyTipLoading ? "" : `推荐原因：${(dailyTip ?? defaultDailyTip).reason}`}
+                {dailyTipLoading ? "" : t("coachPage.reason", { reason: (dailyTip ?? defaultDailyTip).reason })}
               </Text>
               <View
                 className="coach-chat__suggestion-question"
                 onClick={() => void sendMessage(heroPrompt)}
               >
-                <NordicIcon name="protein" size={18} ariaLabel="营养建议延伸提问" />
+                <NordicIcon name="protein" size={18} ariaLabel={t("coachPage.quickQuestions")} />
                 <Text>{heroPrompt}</Text>
               </View>
             </>
@@ -708,7 +749,7 @@ export default function CoachPage() {
                   ? "coach-chat__section-toggle--expanded"
                   : "coach-chat__section-toggle--collapsed"
               }`}
-              ariaLabel={expandedSections.quickReplies ? "收起快捷提问" : "展开快捷提问"}
+              ariaLabel={t(expandedSections.quickReplies ? "coachPage.collapseQuick" : "coachPage.expandQuick")}
               onClick={() =>
                 setExpandedSections((current) => ({
                   ...current,
@@ -716,11 +757,11 @@ export default function CoachPage() {
                 }))
               }
             >
-              <Text className="coach-chat__quick-title">快捷提问</Text>
+              <Text className="coach-chat__quick-title">{t("coachPage.quickQuestions")}</Text>
               <NordicIcon
                 name="chevron-right"
                 size={16}
-                ariaLabel={expandedSections.quickReplies ? "收起" : "展开"}
+                ariaLabel={t(expandedSections.quickReplies ? "coachPage.collapse" : "coachPage.expand")}
               />
             </View>
             {expandedSections.quickReplies ? (
@@ -739,14 +780,14 @@ export default function CoachPage() {
           </View>
 
           <Text className="coach-chat__safety-note">
-            营养建议仅供日常饮食参考；营养识别与建议不构成医疗诊断或治疗建议。
+            {t("coachPage.disclaimer")}
           </Text>
         </View>
       </View>
 
       {dailyUsage.remaining <= 3 ? (
         <Text className="usage-quota-tip usage-quota-tip--coach">
-          今日教练对话剩余 {dailyUsage.remaining} 次
+          {t("coachPage.remaining", { count: dailyUsage.remaining })}
         </Text>
       ) : null}
 

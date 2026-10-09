@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(import.meta.dirname, "../src");
 
@@ -53,7 +54,7 @@ describe("product data HTTPS boundary", () => {
     expect(page).toContain("clearProductLocalState");
     expect(api).toContain("DELETE_MY_NORDIC_NUTRI_ACCOUNT");
     expect(page).toContain("/pages/auth-entry/index");
-    expect(page).toContain("确认注销并删除数据");
+    expect(page).toContain('t(confirmed ? "accountCancellation.confirm" : "accountCancellation.continue")');
     expect(policy).toContain("/pages/account-cancellation/index");
     expect(authApi).toContain("syncOnboardingCompletedFromServer");
     expect(client).toContain("SESSION_USER_MISSING");

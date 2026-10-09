@@ -57,3 +57,39 @@ test("createProductUserExists caches positive and negative lookups briefly", asy
   assert.equal(await exists("user-1"), false);
   assert.equal(calls, 2);
 });
+
+test("rejects an Android token when app_users.token_version has changed", async () => {
+  const db = {
+    from(table) {
+      assert.equal(table, "app_users");
+      return {
+        select() { return this; },
+        eq() { return this; },
+        async maybeSingle() { return { data: { id: "user-1", status: "active", token_version: 2 }, error: null }; },
+      };
+    },
+  };
+  const exists = createProductUserExists(db, { ttlMs: 0, clock: () => 1_000 });
+  assert.equal(await exists({ sub: "user-1", ver: 1 }), false);
+  assert.equal(await exists({ sub: "user-1", ver: 2 }), true);
+});
+
+test("does not cache versioned Android token lookups", async () => {
+  let calls = 0;
+  const db = {
+    from() {
+      return {
+        select() { return this; },
+        eq() { return this; },
+        async maybeSingle() {
+          calls += 1;
+          return { data: { id: "user-1", status: "active", token_version: calls === 1 ? 1 : 2 }, error: null };
+        },
+      };
+    },
+  };
+  const exists = createProductUserExists(db, { ttlMs: 10_000, clock: () => 1_000 });
+  assert.equal(await exists({ sub: "user-1", ver: 1 }), true);
+  assert.equal(await exists({ sub: "user-1", ver: 1 }), false);
+  assert.equal(calls, 2);
+});

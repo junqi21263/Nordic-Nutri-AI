@@ -36,7 +36,8 @@ describe("real visual analysis boundary", () => {
     expect(scanner).toContain("mediaAcquisitionMs, source");
     expect(scanner).toContain("VISION_CONTENT_BLOCKED");
     expect(scanner).toContain("formatVisionUploadHint");
-    expect(scanner).toContain('sizeType: ["compressed"]');
+    expect(scanner).toContain("chooseFoodImage(source)");
+    expect(read("src/platform/food-media.ts")).toContain('sizeType: ["compressed"]');
     expect(scanner).toContain('mode="aspectFit"');
     expect(scanner).not.toContain("assertImageWithinPickLimit");
     expect(scanner).not.toContain("captureRandom");

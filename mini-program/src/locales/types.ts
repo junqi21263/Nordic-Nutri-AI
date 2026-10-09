@@ -1,6 +1,6 @@
 import type { GoalType } from "../features/onboarding/domain";
 
-export type AppLocale = "zh-CN" | "zh-TW" | "en-US";
+export type { AppLocale } from "../i18n/locale";
 
 export interface GoalCopy {
   title: string;
@@ -15,6 +15,7 @@ export interface OnboardingCopy {
   title: string;
   subtitle: string;
   continue: string;
+  selected: string;
   goals: Record<GoalType, GoalCopy>;
 }
 

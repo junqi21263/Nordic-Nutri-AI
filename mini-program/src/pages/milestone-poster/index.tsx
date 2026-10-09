@@ -1,6 +1,7 @@
 import { Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   confirmMilestonePresentation,
   getPresentedMilestoneEvent,
@@ -30,11 +31,18 @@ type IllustrationState =
   | { kind: "ready"; source: string }
   | { kind: "error"; source: null };
 
-function getErrorMessage(reason: unknown) {
-  return reason instanceof Error && reason.message ? reason.message : "里程碑海报读取失败，请稍后重试";
+function getErrorMessage(reason: unknown, translate: (key: string) => string) {
+  const message = reason instanceof Error ? reason.message : "";
+  if (message === "该里程碑尚未可回看") return translate("milestonePoster.notReady");
+  for (const key of ["generating", "unsupportedShare", "brandAssetFailed", "qrAssetFailed", "illustrationFailed"] as const) {
+    const translated = translate(`milestonePoster.${key}`);
+    if (message === translated) return translated;
+  }
+  return translate("milestonePoster.loadFailed");
 }
 
 export default function MilestonePosterPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const layout = useSystemLayout();
   const eventId = router.params.eventId;
@@ -65,7 +73,7 @@ export default function MilestonePosterPage() {
       return;
     }
     if (!eventId) {
-      setState({ kind: "error", message: "缺少里程碑事件信息" });
+      setState({ kind: "error", message: t("milestonePoster.missingEvent") });
       return;
     }
     setState((current) => current.kind === "ready" ? current : { kind: "loading" });
@@ -85,9 +93,9 @@ export default function MilestonePosterPage() {
         eventId,
       });
     } catch (reason) {
-      setState({ kind: "error", message: getErrorMessage(reason) });
+      setState({ kind: "error", message: getErrorMessage(reason, (key) => String(t(key))) });
     }
-  }, [claimToken, demoMilestone, eventId, isDemo]);
+  }, [claimToken, demoMilestone, eventId, isDemo, t]);
 
   useEffect(() => {
     if (initializedKey.current === requestKey) return;
@@ -129,9 +137,9 @@ export default function MilestonePosterPage() {
     : null;
 
   const exportImage = useCallback(async () => {
-    if (!exporter) throw new Error("分享卡生成中，请稍候");
+    if (!exporter) throw new Error(t("milestonePoster.generating"));
     return exporter();
-  }, [exporter]);
+  }, [exporter, t]);
 
   const closeSharePreview = useCallback(() => {
     setSharePreviewOpen(false);
@@ -142,25 +150,25 @@ export default function MilestonePosterPage() {
     if (state.kind !== "ready") return;
     try {
       const path = providedPath ?? await exportImage();
-      if (typeof Taro.showShareImageMenu !== "function") throw new Error("当前基础库不支持分享图片，请升级微信后重试");
+      if (typeof Taro.showShareImageMenu !== "function") throw new Error(t("milestonePoster.unsupportedShare"));
       await Taro.showShareImageMenu({ path });
       if (!isDemo) await recordMilestoneShare(state.eventId);
       closeSharePreview();
     } catch (reason) {
-      Taro.showToast({ title: getErrorMessage(reason), icon: "none" });
+      Taro.showToast({ title: getErrorMessage(reason, (key) => String(t(key))), icon: "none" });
     }
-  }, [closeSharePreview, exportImage, isDemo, state]);
+  }, [closeSharePreview, exportImage, isDemo, state, t]);
 
   const saveToAlbum = useCallback(async (providedPath?: string) => {
     try {
       const path = providedPath ?? await exportImage();
       await Taro.saveImageToPhotosAlbum({ filePath: path });
-      Taro.showToast({ title: "已保存到相册", icon: "success" });
+      Taro.showToast({ title: t("milestonePoster.savedToAlbum"), icon: "success" });
       closeSharePreview();
     } catch (reason) {
-      Taro.showToast({ title: getErrorMessage(reason), icon: "none" });
+      Taro.showToast({ title: getErrorMessage(reason, (key) => String(t(key))), icon: "none" });
     }
-  }, [closeSharePreview, exportImage]);
+  }, [closeSharePreview, exportImage, t]);
 
   const openSharePreview = useCallback(async () => {
     if (sharePreviewBusy || sharePreviewOpen) return;
@@ -170,21 +178,21 @@ export default function MilestonePosterPage() {
       setSharePreviewPath(path);
       setSharePreviewOpen(true);
     } catch (reason) {
-      Taro.showToast({ title: getErrorMessage(reason), icon: "none" });
+      Taro.showToast({ title: getErrorMessage(reason, (key) => String(t(key))), icon: "none" });
     } finally {
       setSharePreviewBusy(false);
     }
-  }, [exportImage, sharePreviewBusy, sharePreviewOpen]);
+  }, [exportImage, sharePreviewBusy, sharePreviewOpen, t]);
 
   return (
-    <PageLayout title="里程碑" showTabs={false} hideNavigation showBack disablePageEnterAnimation onTopBarBack={() => navigateBackOrHome("/pages/milestone-journey/index")} scrollLocked={galleryOpen} className="page-layout--milestone-poster">
+    <PageLayout title={t("milestonePoster.pageTitle")} showTabs={false} hideNavigation showBack disablePageEnterAnimation onTopBarBack={() => navigateBackOrHome("/pages/milestone-journey/index")} scrollLocked={galleryOpen} className="page-layout--milestone-poster">
       <View className="milestone-poster-page">
-        {isDemo ? <Text className="milestone-poster-page__demo">预览数据 · 不会写入数据库</Text> : null}
-        {state.kind === "loading" ? <View className="milestone-poster-page__snapshot-shell" ariaLabel="正在读取里程碑海报" /> : null}
+        {isDemo ? <Text className="milestone-poster-page__demo">{t("milestonePoster.demoNote")}</Text> : null}
+        {state.kind === "loading" ? <View className="milestone-poster-page__snapshot-shell" ariaLabel={t("milestonePoster.loadingPage")} /> : null}
         {state.kind === "error" ? (
           <View className="milestone-poster-page__error">
             <Text>{state.message}</Text>
-            <Text onClick={() => void load()}>重新尝试</Text>
+            <Text onClick={() => void load()}>{t("milestonePoster.retry")}</Text>
           </View>
         ) : null}
         {poster ? (

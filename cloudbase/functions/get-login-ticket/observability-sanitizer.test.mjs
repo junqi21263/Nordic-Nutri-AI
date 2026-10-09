@@ -74,3 +74,9 @@ test("keeps bounded nested request and response payloads while redacting secrets
   assert.equal(result.request.body.authorization, "[REDACTED]");
   assert.equal(result.response.code, "MEAL_SERVICE_UNAVAILABLE");
 });
+
+test("redacts OTP and captcha values from traces", () => {
+  const result = sanitizeTraceMeta({ request: { body: { code: "123456", otp: "123456", captchaAnswer: "abcd" } }, response: { debugCode: "123456" } });
+  assert.deepEqual(result.request.body, { code: "[REDACTED]", otp: "[REDACTED]", captchaAnswer: "[REDACTED]" });
+  assert.deepEqual(result.response, { debugCode: "[REDACTED]" });
+});

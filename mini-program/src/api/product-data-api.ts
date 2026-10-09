@@ -187,7 +187,7 @@ export interface NutritionPlanPreviewResult {
   source?: "deepseek" | "formula" | string;
 }
 
-export function previewProductNutritionPlan(input: {
+export async function previewProductNutritionPlan(input: {
   age: number;
   sex: "female" | "male" | "undisclosed";
   heightCm: number;
@@ -199,12 +199,22 @@ export function previewProductNutritionPlan(input: {
   foodAvoidances?: string[];
   mealsPerDay?: number;
 }) {
-  return requestProductApi<NutritionPlanPreviewResult>("/nutrition-plan/preview", {
-    method: "POST",
-    data: input,
-    fallbackMessage: "营养计划计算失败，请稍后重试",
-    timeout: 35_000,
-  });
+  const startedAt = Date.now();
+  let outcome = "failed";
+  try {
+    const result = await requestProductApi<NutritionPlanPreviewResult>("/nutrition-plan/preview", {
+      method: "POST",
+      data: input,
+      fallbackMessage: "营养计划计算失败，请稍后重试",
+      timeout: 35_000,
+    });
+    outcome = "succeeded";
+    return result;
+  } finally {
+    if (process.env.TARO_APP_PLATFORM === "android" && process.env.NODE_ENV !== "production") {
+      console.info("[nutrition-plan] preview", { outcome, durationMs: Date.now() - startedAt });
+    }
+  }
 }
 
 export function saveProductNutritionPlan(

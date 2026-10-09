@@ -1,5 +1,6 @@
 import { Image, Text, View } from "@tarojs/components";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { MilestoneIllustrationAsset } from "../../features/milestones/asset-cache";
 import { resolveMilestoneIllustrationSource } from "../../features/milestones/asset-cache";
 import { createTaroMilestoneIllustrationTransport } from "../../features/milestones/taro-asset-transport";
@@ -15,6 +16,7 @@ export function MilestoneJourneyIllustration({
   className?: string;
   locked?: boolean;
 }) {
+  const { t } = useTranslation();
   const [source, setSource] = useState<string | null>(null);
   const [state, setState] = useState<IllustrationState>("loading");
   const load = useCallback(async () => {
@@ -34,7 +36,7 @@ export function MilestoneJourneyIllustration({
       {state === "ready" && source ? <Image src={source} mode="aspectFill" className="milestone-journey-illustration__image" /> : null}
       {state !== "ready" ? (
         <View className="milestone-journey-illustration__placeholder">
-          <Text onClick={state === "error" ? () => void load() : undefined}>{state === "error" ? "图片加载失败，点击重试" : ""}</Text>
+          <Text onClick={state === "error" ? () => void load() : undefined}>{state === "error" ? t("sharedUi.illustrationLoadFailed") : ""}</Text>
         </View>
       ) : null}
       {locked ? <View className="milestone-journey-illustration__ivory-overlay" /> : null}

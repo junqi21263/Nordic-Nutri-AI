@@ -1,5 +1,24 @@
 import type { Achievement } from "./domain";
 
+const ACHIEVEMENT_TRANSLATION_SLUGS: Record<string, string> = {
+  "第一餐记录": "firstMeal", "早餐节奏": "breakfastRhythm", "午餐专注": "lunchFocus",
+  "晚餐平衡": "dinnerBalance", "加餐有度": "snackBalance", "蛋白达人": "proteinExpert",
+  "连续七天": "sevenDayStreak", "连续十四天": "fourteenDayStreak", "累计三十餐": "thirtyMeals",
+  "累计五十餐": "fiftyMeals", "累计一百餐": "hundredMeals", "水分自律": "hydration",
+  "睡眠优先": "sleepFirst", "认识自己": "knowYourself", "恢复达人": "recoveryExpert",
+  "蔬菜优先": "vegetablesFirst", "碳水平衡": "carbBalance", "低脂选择": "lowFatChoice",
+  "收藏灵感": "savedInspiration", "连续达标": "consistentGoals",
+};
+
+export function getAchievementTranslationSlug(title: string) {
+  return ACHIEVEMENT_TRANSLATION_SLUGS[title];
+}
+
+export function getAchievementDisplayTitle(title: string, translate: (key: string) => string) {
+  const slug = getAchievementTranslationSlug(title);
+  return slug ? translate(`achievements.items.${slug}.title`) : title;
+}
+
 /** Shared copy for achievement detail sheets (aligned with server definitions). */
 export const ACHIEVEMENT_REQUIREMENTS: Record<string, string> = {
   第一餐记录: "成功记录任意 1 餐到云端。",

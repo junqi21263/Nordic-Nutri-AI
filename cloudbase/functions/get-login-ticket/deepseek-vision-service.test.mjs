@@ -14,9 +14,10 @@ test("DeepSeek vision uses the OpenAI-compatible endpoint and image content bloc
   const result = await service({ imageUrl: "data:image/jpeg;base64,abc", budget: { stageTimeout: () => 5000 } });
   assert.equal(request.url, "https://api.deepseek.com/chat/completions");
   assert.equal(request.body.model, "deepseek-v4-flash-vision-exp");
-  assert.equal(request.body.messages[0].content[0].type, "text");
-  assert.equal(request.body.messages[0].content[1].type, "image_url");
-  assert.equal(request.body.messages[0].content[1].image_url.detail, "low");
+  assert.equal(request.body.messages[0].role, "system");
+  assert.equal(request.body.messages[1].content[0].type, "text");
+  assert.equal(request.body.messages[1].content[1].type, "image_url");
+  assert.equal(request.body.messages[1].content[1].image_url.detail, "low");
   assert.equal(result.provider, "deepseek");
   assert.equal(result.items[0].name, "米饭");
 });
@@ -67,8 +68,8 @@ test("DeepSeek vision prefers the inline image when a temporary URL is also avai
     imageDataUrl: "data:image/jpeg;base64,inline-image",
     budget: { stageTimeout: () => 5000 },
   });
-  assert.equal(body.messages[0].content[1].image_url.url, "data:image/jpeg;base64,inline-image");
-  assert.equal(body.messages[0].content[1].image_url.detail, "low");
+  assert.equal(body.messages[1].content[1].image_url.url, "data:image/jpeg;base64,inline-image");
+  assert.equal(body.messages[1].content[1].image_url.detail, "low");
 });
 
 test("DeepSeek adapter honors the model selected by the dynamic vision route", async () => {
@@ -90,4 +91,26 @@ test("DeepSeek adapter honors the model selected by the dynamic vision route", a
   });
   assert.equal(body.model, "deepseek-custom-vision");
   assert.equal(result.model, "deepseek-custom-vision");
+});
+
+test("DeepSeek vision sends the requested response locale to the system prompt", async () => {
+  let body;
+  const service = createDeepseekVisionService({
+    apiKey: "deepseek-key",
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+        mealName: "Lunch", mealType: "lunch", confidence: 0.9, portionConfidence: 0.9,
+        needsEscalation: false, items: [{ name: "Rice", quantityG: 150, caloriesPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3 }],
+      }) } }] }), { status: 200 });
+    },
+  });
+  await service({
+    imageUrl: "data:image/jpeg;base64,inline-image",
+    locale: "en",
+    budget: { stageTimeout: () => 5000 },
+  });
+  assert.equal(body.messages[0].role, "system");
+  assert.match(body.messages[0].content, /English/);
+  assert.equal(body.messages[1].role, "user");
 });

@@ -215,6 +215,7 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
     const preferFast = Boolean(options?.preferFast);
     const preferences = await loadUserPreferences(userId);
     const context = dailyInsightContext(summary, preferences);
+    if (options.locale) context.locale = require("./locale.cjs").normalizeLocale(options.locale);
     const contextHash = createDailyInsightHash(context);
     let cached = null;
     if (db && typeof db.from === "function") {
@@ -258,7 +259,16 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
     return { ...summary, insight: await getDailyInsightForSummary(userId, date, summary, options) };
   }
 
-  async function getWeeklyReview(userId, endDate, options = {}) {
+  const weeklyRequests = new Map();
+  function getWeeklyReview(userId, endDate, options = {}) {
+    const key = JSON.stringify([userId, endDate, Boolean(options.preferFast), options.locale]);
+    if (weeklyRequests.has(key)) return weeklyRequests.get(key);
+    const request = loadWeeklyReview(userId, endDate, options).finally(() => weeklyRequests.delete(key));
+    weeklyRequests.set(key, request);
+    return request;
+  }
+
+  async function loadWeeklyReview(userId, endDate, options = {}) {
     assertDate(endDate);
     const preferFast = Boolean(options?.preferFast);
     const startDate = naturalWeekStartDate(endDate);
@@ -277,19 +287,31 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
       plan = null;
     }
     const review = calculateWeeklyNutrition(meals, plan, endDate);
+    let comparison = null;
+    try {
+      const previousEnd = shiftDate(endDate, -7);
+      const previousMeals = await listMealsRange(userId, shiftDate(startDate, -7), previousEnd, { resolveImages: false });
+      const previous = calculateWeeklyNutrition(previousMeals, plan, previousEnd);
+      if (previous.recordedDays > 0) comparison = { recordedDays: review.recordedDays - previous.recordedDays, recordedMeals: review.recordedMeals - previous.recordedMeals };
+    } catch {
+      console.warn("[weekly-review] previous-week comparison unavailable");
+    }
     const baseReview = {
       ...review,
+      averageCompletion: plan ? review.averageCompletion : { calories: null, protein: null, carbs: null, fat: null },
+      comparison,
       ...serverMetadata(clock),
       calorieTarget: review.targets.calories,
     };
     const context = weeklyReviewContext(baseReview);
+    if (options.locale) context.locale = require("./locale.cjs").normalizeLocale(options.locale);
     const contextHash = createWeeklyReviewHash(context);
     let cached = null;
     if (db && typeof db.from === "function") {
       try {
         const lookup = await db.from("weekly_nutrition_reviews").select("context_hash,payload,provider,model")
           .eq("user_id", userId).eq("end_date", endDate).maybeSingle();
-        const cachedModelMatches = !weeklyReviewModel || lookup.data?.model === weeklyReviewModel;
+        const cachedModelMatches = lookup.data?.provider === "rule_v1" || !weeklyReviewModel || lookup.data?.model === weeklyReviewModel;
         if (!lookup.error && cachedModelMatches && lookup.data?.context_hash === contextHash && lookup.data?.payload && typeof lookup.data.payload === "object") {
           cached = { ...lookup.data.payload, source: lookup.data.provider ?? "rule_v1", model: lookup.data.model ?? null, cached: true };
         }
@@ -322,8 +344,8 @@ function createInsightDataService({ db, listMealsRange, countMeals, getNutrition
     }
     const provider = typeof insight?.source === "string" && insight.source.trim() ? insight.source.trim() : "rule_v1";
     const payload = {
-      headline: String(insight?.headline || "本周节奏可继续稳定").trim().slice(0, 24),
-      summary: String(insight?.summary || "继续根据真实记录调整下一周的饮食安排。").trim().slice(0, 180),
+      headline: String(insight?.headline || "本周节奏可继续稳定").trim().slice(0, context.locale === "en" ? 72 : 24),
+      summary: String(insight?.summary || "继续根据真实记录调整下一周的饮食安排。").trim().slice(0, context.locale === "en" ? 540 : 180),
       strengths: Array.isArray(insight?.strengths) ? insight.strengths.slice(0, 2) : [],
       nextSteps: Array.isArray(insight?.nextSteps) ? insight.nextSteps.slice(0, 2) : [],
     };

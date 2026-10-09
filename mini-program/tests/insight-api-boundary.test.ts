@@ -40,8 +40,8 @@ describe("persisted insight API boundary", () => {
     const weeklyPage = read("src/pages/weekly-review/index.tsx");
     expect(weeklyPage).not.toContain("生成 7 天里程碑分享卡");
     expect(weeklyPage).not.toContain("weekly-review__milestone-link");
-    expect(weeklyPage).toContain("remoteReview?.recordedDays");
-    expect(weeklyPage).toContain("remoteReview?.rhythm");
+    expect(weeklyPage).toContain("review.recordedDays");
+    expect(weeklyPage).toContain("review.rhythm");
     const achievementsPage = read("src/pages/achievements/index.tsx");
 
     expect(weeklyPage).toContain("getProductWeeklyReview");

@@ -1,7 +1,7 @@
 const MAX_STRING_LENGTH = 2000;
 const MAX_PAYLOAD_DEPTH = 5;
 const MAX_PAYLOAD_KEYS = 64;
-const SENSITIVE_PAYLOAD_KEY = /token|secret|password|authorization|cookie|apikey|api_key|access_key|private_key|signature|base64|image/i;
+const SENSITIVE_PAYLOAD_KEY = /token|secret|password|authorization|cookie|apikey|api_key|access_key|private_key|signature|base64|image|otp|debugcode|verificationcode|captchaanswer|^captcha$/i;
 
 const TRACE_META_KEYS = new Set([
   "feature",
@@ -88,6 +88,10 @@ const AUDIT_SNAPSHOT_KEYS = new Set([
   "provider",
   "durationMs",
   "note",
+  "verificationId",
+  "oldVerificationId",
+  "targetType",
+  "purpose",
 ]);
 
 function boundedString(value) {
@@ -134,21 +138,23 @@ function sanitizeTraceStage(stage) {
 function sanitizeTraceMeta(meta) {
   const result = sanitizeByKeys(meta, TRACE_META_KEYS);
   for (const key of ["request", "response", "internalError"]) {
-    if (meta && Object.prototype.hasOwnProperty.call(meta, key)) result[key] = sanitizeTracePayload(meta[key]);
+    if (meta && Object.prototype.hasOwnProperty.call(meta, key)) result[key] = sanitizeTracePayload(meta[key], 0, { redactCode: key === "request" });
   }
   return result;
 }
 
-function sanitizeTracePayload(payload, depth = 0) {
+function sanitizeTracePayload(payload, depth = 0, options = {}) {
   if (payload === null || payload === undefined) return null;
   if (typeof payload === "string") return payload.slice(0, MAX_STRING_LENGTH);
   if (typeof payload === "number" || typeof payload === "boolean") return payload;
   if (depth >= MAX_PAYLOAD_DEPTH) return "[TRUNCATED]";
-  if (Array.isArray(payload)) return payload.slice(0, MAX_PAYLOAD_KEYS).map((item) => sanitizeTracePayload(item, depth + 1));
+  if (Array.isArray(payload)) return payload.slice(0, MAX_PAYLOAD_KEYS).map((item) => sanitizeTracePayload(item, depth + 1, options));
   if (typeof payload !== "object") return null;
   const output = {};
   for (const key of Object.keys(payload).slice(0, MAX_PAYLOAD_KEYS)) {
-    output[key] = SENSITIVE_PAYLOAD_KEY.test(key) ? "[REDACTED]" : sanitizeTracePayload(payload[key], depth + 1);
+    output[key] = (SENSITIVE_PAYLOAD_KEY.test(key) || (options.redactCode && key === "code"))
+      ? "[REDACTED]"
+      : sanitizeTracePayload(payload[key], depth + 1, options);
   }
   return output;
 }

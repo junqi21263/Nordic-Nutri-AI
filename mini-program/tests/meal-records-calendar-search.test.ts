@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(import.meta.dirname, "../src");
 
@@ -52,10 +53,10 @@ describe("meal records calendar search and filters", () => {
     const styles = readFileSync(resolve(sourceRoot, "styles/page.scss"), "utf8");
 
     expect(page).toContain("records-filter-sheet__section");
-    expect(page).toContain("按餐次类型或收藏查看当天的饮食记录。");
-    expect(page).toMatch(
-      /value: "snack", label: "加餐"[\s\S]*value: "favorite", label: "仅看收藏"/,
-    );
+    expectLocalizedCopy(page, "按餐次类型或收藏查看当天的饮食记录。");
+    expect(page).toContain('t(`meals.${option}`)');
+    expect(page).toContain('"snack"');
+    expect(page).toContain('"favorite"');
     expect(page).toContain('name="heart-filled"');
     expect(page).not.toContain("records-filter-sheet__close");
     expect(page).toContain("records-filter-sheet__manual-copy");

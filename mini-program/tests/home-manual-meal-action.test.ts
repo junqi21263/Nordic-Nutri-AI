@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const home = readFileSync(resolve(import.meta.dirname, "../src/pages/home/index.tsx"), "utf8");
 
@@ -11,7 +12,7 @@ describe("首页记录饮食入口", () => {
 
     expect(home).toContain('const openManualMeal = () => Taro.navigateTo({ url: "/pages/manual-meal/index" });');
     expect(actionStart).toBeGreaterThan(-1);
-    expect(action).toContain("记录饮食");
+    expectLocalizedCopy(action, "记录饮食");
     expect(action).not.toContain("openRecords");
   });
 });

@@ -10,7 +10,7 @@ describe("Stitch onboarding visual contract", () => {
   const onboardingSource = readSource("src/pages/onboarding/index.tsx");
   const layoutSource = readSource("src/layouts/page-layout/index.tsx");
   const tokenSource = readSource("src/styles/tokens.scss");
-  const zhCnSource = readSource("src/locales/zh-CN.ts");
+  const zhCnSource = readSource("src/i18n/locales/zh-CN.json");
 
   it("uses localized Stitch copy and a vertical goal-card structure", () => {
     [
