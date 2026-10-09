@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+def prodSigning = [
+    storeFile: System.getenv('NORDIC_PROD_KEYSTORE_PATH'),
+    storePassword: System.getenv('NORDIC_PROD_KEYSTORE_PASSWORD'),
+    keyAlias: System.getenv('NORDIC_PROD_KEY_ALIAS'),
+    keyPassword: System.getenv('NORDIC_PROD_KEY_PASSWORD')
+]
+def hasProdSigning = prodSigning.values().every { it }
+
 android {
     namespace = "com.lewislee.nordicnutri"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -22,8 +30,33 @@ android {
         }
         release {
             minifyEnabled false
+            if (hasProdSigning) {
+                signingConfig signingConfigs.create('prodRelease') {
+                    storeFile file(prodSigning.storeFile)
+                    storePassword prodSigning.storePassword
+                    keyAlias prodSigning.keyAlias
+                    keyPassword prodSigning.keyPassword
+                }
+            }
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+tasks.register('verifyProdReleaseSigning') {
+    doLast {
+        if (!hasProdSigning) {
+            throw new GradleException('Production APK signing is required. Set NORDIC_PROD_KEYSTORE_PATH, NORDIC_PROD_KEYSTORE_PASSWORD, NORDIC_PROD_KEY_ALIAS, and NORDIC_PROD_KEY_PASSWORD in the local build environment.')
+        }
+        if (!file(prodSigning.storeFile).isFile()) {
+            throw new GradleException('The file configured by NORDIC_PROD_KEYSTORE_PATH does not exist.')
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name in ['packageRelease', 'bundleRelease']) {
+        task.dependsOn tasks.named('verifyProdReleaseSigning')
     }
 }
 
