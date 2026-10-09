@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(import.meta.dirname, "../src");
 const read = (path: string) => readFileSync(resolve(sourceRoot, path), "utf8");
@@ -10,9 +11,9 @@ describe("弹窗与 Toast 排他性", () => {
     const profile = read("pages/profile/index.tsx");
 
     expect(profile).toContain("feedback.showModal({");
-    expect(profile).toContain("感谢你的反馈");
+    expectLocalizedCopy(profile, "感谢你的反馈");
     expect(profile).toContain('dismissible: false');
-    expect(profile).not.toContain('showNotice("感谢你的反馈")');
+    expect(profile).not.toContain('showNotice(t("feedback.thanks"))');
   });
 
   it("在删除确认弹窗关闭后才执行删除与 Toast 反馈", () => {

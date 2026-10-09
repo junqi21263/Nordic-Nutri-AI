@@ -1,12 +1,13 @@
 const crypto = require("node:crypto");
+const { normalizeLocale } = require("./locale.cjs");
 const {
   dietaryPatternLabel,
   foodAvoidanceLabels,
 } = require("./diet-preference-labels.cjs");
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-const medicalRiskPattern = /疾病|诊断|治疗|药物|吃药|处方|孕产|怀孕|哺乳|未成年|进食障碍|厌食|暴食/i;
-const urgentRiskPattern = /自杀|昏厥|胸痛|呼吸困难|严重过敏|急诊|急救/i;
+const medicalRiskPattern = /疾病|诊断|治疗|药物|吃药|处方|孕产|怀孕|哺乳|未成年|进食障碍|厌食|暴食|疾病|診斷|治療|藥物|懷孕|哺乳|未成年|飲食失調|diagnos|treat|medicat|pregnan|breastfeed|eating disorder|anorexi|bulimi/i;
+const urgentRiskPattern = /自杀|昏厥|胸痛|呼吸困难|严重过敏|急诊|急救|自殺|胸痛|呼吸困難|嚴重過敏|急診|suicid|faint|chest pain|difficulty breathing|severe allerg|emergency/i;
 const nutritionScopePattern = /营养|营养素|营养成分|营养价值|健康成分|好处|益处|饮食|食谱|食物|吃|喝|餐|蛋白|热量|卡路里|碳水|脂肪|纤维|膳食纤维|维生素|矿物质|微量元素|抗氧化|蔬菜|水果|主食|食材|加餐|早餐|午餐|晚餐|增肌|减脂|体重|饱腹|恢复|训练|运动|今日进度|适不适合|能不能吃|可以吃吗|热量高|多少蛋白|多少卡|鸡胸|猪肉|牛肉|羊肉|排骨|鱼肉|三文鱼|虾|鸡蛋|牛奶|酸奶|奶酪|豆腐|豆浆|米饭|面条|燕麦|蓝莓|草莓|苹果|香蕉|橙子|葡萄|西瓜|番茄|西红柿|西兰花|菠菜|黄瓜|土豆|红薯|坚果|杏仁|核桃|花生|面包|馒头|包子|饺子|沙拉|粥|咖啡|绿茶|果汁|藜麦|玉米|紫菜|海带|木耳|蘑菇|茄子|青椒|胡萝卜|芹菜|生菜|豆芽|黑豆|红豆|绿豆|鸡腿|鸭肉|鹅肉|蟹|贝|酸奶油|黄油|橄榄油|牛油果|猕猴桃|樱桃|芒果|火龙果|梨|桃子|杨桃|李子|柚子|柠檬|椰子|芝麻|瓜子|腰果|开心果|鹰嘴豆|扁豆|毛豆|四季豆|秋葵|芦笋|花菜|卷心菜|大白菜|小白菜|油麦菜|空心菜|海带结|紫薯|山药|芋头|南瓜|冬瓜|丝瓜|苦瓜|藕|萝卜|洋葱|大蒜|生姜|香菇|金针菇|杏鲍菇|平菇|金枪鱼|带鱼|鲈鱼|鳕鱼|虾仁|扇贝|蛤蜊|鱿鱼|墨鱼|皮蛋|鸭蛋|鹌鹑蛋|羊奶|豆干|腐竹|油条|全麦|意面|方便面|粉丝|米粉|年糕|粽子|馄饨|烧麦|寿司|三明治|汉堡|披萨|薯条|炸鸡|烤肉|火锅|麻辣烫|冒菜|凉皮|凉面|拌面|盖浇饭|盒饭|便当|外卖|零食|坚果包|能量棒|蛋白粉|乳清|胶原|益生菌/i;
 const foodFollowUpPattern = /(?:呢|怎么样|如何|可以吗|适合吗|行吗|好吗|怎样)[？?]?$/;
 const foodNutrientQuestionPattern = /富含|含有|营养素|营养成分|营养价值|健康成分|好处|益处|维生素|矿物质|微量元素|抗氧化|膳食纤维/i;
@@ -174,7 +175,7 @@ function safetyForPrompt(prompt) {
 }
 
 function isNutritionQuestion(prompt) {
-  return nutritionScopePattern.test(prompt);
+  return nutritionScopePattern.test(prompt) || /營養|飲食|熱量|纖維|體重|訓練|運動|\b(food|meal|eat|eating|diet|nutrition|protein|carbs?|fat|calories|breakfast|lunch|dinner|snack|vegetables?|fruit|weight|fiber|fibre|vitamins?|rice|chicken|eggs?|milk|yogurt|oats?|berries|fish|bread|salad|coffee|water)\b/i.test(prompt);
 }
 
 function looksLikeFoodFollowUp(prompt) {
@@ -314,6 +315,20 @@ function quickPromptsForContext(context) {
 }
 
 function createRuleReply(prompt, context, options = {}) {
+  const reply = createChineseRuleReply(prompt, context, options);
+  const locale = normalizeLocale(context?.locale);
+  if (locale === "zh-CN") return reply;
+  const en = locale === "en";
+  const risk = reply.safety !== "none";
+  return {
+    ...reply,
+    headline: risk ? (en ? "Please seek professional help" : "請尋求專業協助") : (en ? "Take one small step" : "從一個小行動開始"),
+    actions: [{ label: en ? "Next step" : "下一步", detail: risk ? (en ? "For urgent or serious symptoms, contact emergency services. For health concerns, consult a qualified professional." : "如有緊急或嚴重不適，請聯絡急救服務；健康問題請諮詢合格專業人員。") : (en ? "Log your next meal and review your nutrition goals." : "記錄下一餐，並查看你的營養目標。") }],
+    rationale: en ? "General nutrition guidance cannot replace individual professional advice." : "一般營養參考不能取代個人化專業建議。",
+  };
+}
+
+function createChineseRuleReply(prompt, context, options = {}) {
   const safety = safetyForPrompt(prompt);
   if (safety !== "none") {
     const urgent = safety === "urgent_care";
@@ -650,7 +665,8 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
 
     const dailyUsage = await consumeDailyMessage(userId);
     const conversationId = await getConversation(userId);
-    const [context, history] = await Promise.all([buildContext(userId, request.date), getMessages(userId, 10)]);
+    const [baseContext, history] = await Promise.all([buildContext(userId, request.date), getMessages(userId, 10)]);
+    const context = { ...baseContext, locale: normalizeLocale(input.locale) };
     const userMessage = await createUserMessage(userId, conversationId, request);
     const questionInScope = isNutritionQuestion(request.prompt) || isNutritionFollowUp(request.prompt, history);
     let source = "rule_v2";
@@ -686,7 +702,8 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
 
     const dailyUsage = await consumeDailyMessage(userId);
     const conversationId = await getConversation(userId);
-    const [context, history] = await Promise.all([buildContext(userId, request.date), getMessages(userId, 10)]);
+    const [baseContext, history] = await Promise.all([buildContext(userId, request.date), getMessages(userId, 10)]);
+    const context = { ...baseContext, locale: normalizeLocale(input.locale) };
     const userMessage = await createUserMessage(userId, conversationId, request);
     const fallback = createRuleReply(request.prompt, context, {
       inScope: isNutritionQuestion(request.prompt) || isNutritionFollowUp(request.prompt, history),
@@ -754,11 +771,16 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     }
   }
 
-  async function getBrief(userId, date) {
+  async function getBrief(userId, date, options = {}) {
     const safeDate = normalizeDate(date);
     const context = await buildContext(userId, safeDate);
     const [priority, dailyUsage] = [priorityForContext(context), await getDailyUsage(userId)];
-    const fallbackPrompts = quickPromptsForContext(context);
+    const locale = normalizeLocale(options.locale);
+    const fallbackPrompts = locale === "en"
+      ? ["How can I balance my next meal?", "What protein could I add to lunch?", "How can I keep a regular meal record?", "What can I pair with dinner?"]
+      : locale === "zh-TW"
+        ? ["下一餐如何搭配得更均衡？", "午餐可以補充哪些蛋白質？", "如何持續記錄餐食？", "晚餐可以怎麼搭配？"]
+        : quickPromptsForContext(context);
     // Keep brief on the rule-based prompt pack so coach entry stays interactive.
     // LLM generation remains reserved for daily tips and chat replies.
     return {
@@ -775,7 +797,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
 
   async function getDailyTip(userId, date, options = {}) {
     const safeDate = normalizeDate(date);
-    const context = await buildContext(userId, safeDate);
+    const context = { ...await buildContext(userId, safeDate), locale: normalizeLocale(options.locale) };
     const contextHash = tipContextHash({ ...context, dailyTipVersion: 2 });
     const refresh = Boolean(options.refresh);
 
@@ -812,9 +834,9 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     return { ...immediate, cached: false };
   }
 
-  async function getDailyBrief(userId, date) {
+  async function getDailyBrief(userId, date, options = {}) {
     const safeDate = normalizeDate(date);
-    const context = await buildProactiveBriefContext(userId, safeDate);
+    const context = { ...await buildProactiveBriefContext(userId, safeDate), locale: normalizeLocale(options.locale) };
     const contextHash = tipContextHash(context);
     try {
       const cached = await readCachedDailyBrief(userId, safeDate, contextHash);

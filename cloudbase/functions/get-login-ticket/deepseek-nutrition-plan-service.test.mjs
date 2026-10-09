@@ -6,6 +6,21 @@ import {
   normalizePlan,
 } from "./deepseek-nutrition-plan-service.cjs";
 
+test("nutrition cancellation reaches the upstream transport", async () => {
+  const controller = new AbortController();
+  let upstreamSignal;
+  const service = createDeepseekNutritionPlanService({
+    apiKey: "test-key", routeManaged: true,
+    fetchImpl: async (_url, { signal }) => {
+      upstreamSignal = signal;
+      controller.abort();
+      return { ok: false };
+    },
+  });
+  await assert.rejects(service({}, { signal: controller.signal }));
+  assert.equal(upstreamSignal.aborted, true);
+});
+
 test("accepts a balanced AI nutrition plan payload", () => {
   const plan = normalizePlan({
     calories: 2500,

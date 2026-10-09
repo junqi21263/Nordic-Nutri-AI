@@ -1,9 +1,10 @@
 import { Canvas } from "@tarojs/components";
 import Taro from "@tarojs/taro";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import brandLogoSource from "../../assets/brand/nordic-nutri-logo.png";
 import miniProgramCodeSource from "../../assets/brand/miniprogram-code.jpg";
-import { getMilestoneIllustrationAsset, MILESTONE_CONFIG } from "../../features/milestones/config";
+import { getMilestoneIllustrationAsset } from "../../features/milestones/config";
 import { resolveMilestoneIllustrationSource } from "../../features/milestones/asset-cache";
 import { createTaroMilestoneIllustrationTransport } from "../../features/milestones/taro-asset-transport";
 import { getMilestonePosterImageCandidates } from "./image-source";
@@ -17,10 +18,11 @@ import {
   MILESTONE_POSTER_FOOTER_QR_SIZE,
   MILESTONE_POSTER_HERO_HEIGHT,
 } from "./layout";
-import { getMilestoneShareMessage, getMilestoneShareMetrics } from "../../features/milestones/share-presentation";
+import { getLocalizedMilestoneMetrics, getLocalizedMilestoneStage } from "../../features/milestones/localized-presentation";
 import { MILESTONES } from "../../features/milestones/stats";
 import type { MilestonePosterProps } from "../milestone-poster";
 import "./index.scss";
+import { exportPosterCanvas } from './export';
 
 type CanvasNode = {
   width: number;
@@ -130,6 +132,7 @@ function drawBrandFooter(
   height: number,
   padding: number,
   assets: FooterCanvasAssets,
+  translate: (key: string) => string,
 ) {
   // This is one compact, right-aligned brand group: copy block on the left,
   // supplied mini-program QR at the far right. It deliberately avoids an
@@ -168,9 +171,9 @@ function drawBrandFooter(
   context.fillText(brandName, copyRight, footerCenter - 52);
   context.fillStyle = "#4d5750";
   context.font = "34px sans-serif";
-  context.fillText("每一次记录，都算数", copyRight, footerCenter + 8);
+  context.fillText(translate("milestonePoster.footerTagline"), copyRight, footerCenter + 8);
   context.font = "28px sans-serif";
-  context.fillText("扫码开始记录", copyRight, footerCenter + 56);
+  context.fillText(translate("milestonePoster.footerQr"), copyRight, footerCenter + 56);
   // The supplied JPEG has a white quiet zone. Multiply blends that white into
   // the warm footer paper while retaining the dark modules needed for scanning.
   context.save();
@@ -188,10 +191,10 @@ function drawPoster(
   props: MilestonePosterProps,
   image: { width: number; height: number },
   footerAssets: FooterCanvasAssets,
+  translate: (key: string, options?: { count?: number }) => string,
 ) {
-  const config = MILESTONE_CONFIG[props.milestone];
-  const shareMessage = getMilestoneShareMessage(props.milestone);
-  const shareMetrics = getMilestoneShareMetrics(props);
+  const shareMessage = getLocalizedMilestoneStage(props.milestone, "message", translate);
+  const shareMetrics = getLocalizedMilestoneMetrics(props, translate);
   const heroHeight = MILESTONE_POSTER_HERO_HEIGHT;
   const padding = 76;
   const imageRect = getMilestonePosterImageRect(image.width, image.height);
@@ -217,13 +220,13 @@ function drawPoster(
   context.fillRect(0, heroHeight, width, height - heroHeight);
   context.font = "600 32px sans-serif";
   context.fillStyle = "#153f2b";
-  context.fillText(config.stageLabel, padding, heroHeight + 88);
+  context.fillText(getLocalizedMilestoneStage(props.milestone, "label", translate), padding, heroHeight + 88);
   context.textAlign = "right";
-  context.fillText(config.stageNumber, width - padding, heroHeight + 88);
+  context.fillText(getLocalizedMilestoneStage(props.milestone, "number", translate), width - padding, heroHeight + 88);
   context.textAlign = "center";
   context.fillStyle = "#153f2b";
   context.font = "500 30px sans-serif";
-  context.fillText(config.eyebrow, width / 2, heroHeight + 142);
+  context.fillText(getLocalizedMilestoneStage(props.milestone, "eyebrow", translate), width / 2, heroHeight + 142);
   const titleCenter = heroHeight + 208;
   const titleText = `${props.milestone} DAYS`;
   drawOpticallyCenteredText(context, titleText, width / 2, titleCenter, "bold 88px Georgia", 2);
@@ -280,17 +283,18 @@ function drawPoster(
     context.font = "26px sans-serif";
     context.fillText(String(milestone), x, journeyTop + 42);
   });
-  drawBrandFooter(context, width, height, padding, footerAssets);
+  drawBrandFooter(context, width, height, padding, footerAssets, translate);
 }
 
 function loadCanvasImage(
   canvas: CanvasNode,
   source: string,
+  errorMessage: string,
 ): Promise<CanvasImage> {
   return new Promise((resolve, reject) => {
     const image = canvas.createImage();
     image.onload = () => resolve(image as never);
-    image.onerror = () => reject(new Error(`资源读取失败：${source}`));
+    image.onerror = () => reject(new Error(errorMessage));
     image.src = source;
   });
 }
@@ -302,6 +306,8 @@ export function MilestonePosterCanvas({
   poster: MilestonePosterProps;
   onReady: (exporter: MilestonePosterExporter) => void;
 }) {
+  const { t } = useTranslation();
+  const translate = useCallback((key: string, options?: { count?: number }) => String(t(key, options)), [t]);
   const canvasId = useMemo(() => `milestone-poster-${poster.milestone}`, [poster.milestone]);
 
   useEffect(() => {
@@ -336,27 +342,16 @@ export function MilestonePosterCanvas({
           image.onload = () => {
             if (disposed) return;
             void Promise.all([
-              loadCanvasImage(canvas, brandLogoSource),
-              loadCanvasImage(canvas, miniProgramCodeSource),
+              loadCanvasImage(canvas, brandLogoSource, translate("milestonePoster.brandAssetFailed")),
+              loadCanvasImage(canvas, miniProgramCodeSource, translate("milestonePoster.qrAssetFailed")),
             ]).then(([logo, miniProgramCode]) => {
               if (disposed) return;
-              drawPoster(context, width, height, poster, image, { logo, miniProgramCode });
-              onReady(async () => {
-                const result = await Taro.canvasToTempFilePath({
-                  canvas: canvas as never,
-                  fileType: "png",
-                  width,
-                  height,
-                  destWidth: width,
-                  destHeight: height,
-                } as never);
-                if (!result.tempFilePath) throw new Error("分享卡生成失败，请稍后重试");
-                return result.tempFilePath;
-              });
+              drawPoster(context, width, height, poster, image, { logo, miniProgramCode }, translate);
+              onReady(() => exportPosterCanvas(canvas as never, width, height));
             }).catch(() => {
               if (disposed) return;
               onReady(async () => {
-                throw new Error("品牌资源读取失败，请稍后重试");
+                throw new Error(translate("milestonePoster.brandAssetFailed"));
               });
             });
           };
@@ -369,7 +364,7 @@ export function MilestonePosterCanvas({
               return;
             }
             onReady(async () => {
-              throw new Error("插画读取失败，请稍后重试");
+              throw new Error(translate("milestonePoster.illustrationFailed"));
             });
           };
           image.src = imageCandidates[0] ?? "";
@@ -378,7 +373,7 @@ export function MilestonePosterCanvas({
     return () => {
       disposed = true;
     };
-  }, [canvasId, onReady, poster]);
+  }, [canvasId, onReady, poster, translate]);
 
   return <Canvas id={canvasId} canvasId={canvasId} className="milestone-poster-canvas" type="2d" />;
 }

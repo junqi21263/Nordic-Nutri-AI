@@ -14,3 +14,17 @@ export function getMilestoneSharePreviewDimensions() {
     ),
   };
 }
+
+export function getWeeklySharePreviewDimensions(
+  windowWidth: number,
+  windowHeight: number,
+  topOffset = 0,
+  aspectRatio = 3 / 4,
+) {
+  const ratio = aspectRatio > 0 ? aspectRatio : 3 / 4;
+  const width = Math.max(
+    0,
+    Math.min(360, windowWidth - 48, (windowHeight - topOffset - 184) * ratio),
+  );
+  return { width, height: width / ratio };
+}

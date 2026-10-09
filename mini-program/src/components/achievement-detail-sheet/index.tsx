@@ -1,4 +1,5 @@
 import { Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import Taro from "@tarojs/taro";
 import { BottomSheet } from "../../components/bottom-sheet";
 import {
@@ -6,6 +7,7 @@ import {
   getAchievementNextAction,
   getAchievementNextActionTarget,
   getAchievementRequirement,
+  getAchievementTranslationSlug,
 } from "../../features/coach/achievement-catalog";
 import { getAchievementIcon } from "../../features/coach/achievement-icons";
 import type { Achievement } from "../../features/coach/domain";
@@ -16,12 +18,18 @@ interface AchievementDetailSheetProps {
   onDismiss: () => void;
 }
 
+const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
+
 export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDetailSheetProps) {
+  const { t } = useTranslation();
+  const slug = achievement ? getAchievementTranslationSlug(achievement.title) : undefined;
   const metricLabel = achievement
     ? `${achievement.metric ?? Math.round(((achievement.progress || 0) / 100) * (achievement.target || 100))}/${achievement.target ?? "—"}${achievement.unit || ""}`
     : "";
   const canRecordNextMeal = Boolean(achievement && !achievement.unlocked && achievement.available !== false);
-  const nextActionLabel = getAchievementNextAction(achievement?.title ?? "", Number(achievement?.metric ?? 0));
+  const nextActionLabel = slug
+    ? t(`achievements.items.${slug}.action`)
+    : getAchievementNextAction(achievement?.title ?? "", Number(achievement?.metric ?? 0));
   const performNextAction = () => {
     onDismiss();
     const target = getAchievementNextActionTarget(achievement?.title ?? "");
@@ -36,31 +44,31 @@ export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDe
     <BottomSheet
       open={Boolean(achievement)}
       onDismiss={onDismiss}
-      className="achievement-detail-sheet"
+      className={`achievement-detail-sheet${isAndroidApp ? " achievement-detail-sheet--android" : ""}`}
       lockScroll
     >
       {achievement ? (
         <View className="achievement-detail">
           <View className={`achievement-detail__badge ${achievement.unlocked ? "" : "achievement-detail__badge--locked"}`}>
-            <NordicIcon name={getAchievementIcon(achievement)} size={36} ariaLabel={achievement.title} />
+            <NordicIcon name={getAchievementIcon(achievement)} size={28} ariaLabel={slug ? t(`achievements.items.${slug}.title`) : achievement.title} />
           </View>
-          <Text className="achievement-detail__title">{achievement.title}</Text>
+          <Text className="achievement-detail__title">{slug ? t(`achievements.items.${slug}.title`) : achievement.title}</Text>
           <Text className={`achievement-detail__state ${achievement.unlocked ? "achievement-detail__state--done" : ""}`}>
-            {achievement.available === false ? "即将上线" : achievement.unlocked ? "已解锁" : "未解锁"}
+            {achievement.available === false ? t("achievementDetail.upcoming") : achievement.unlocked ? t("achievementDetail.unlocked") : t("achievementDetail.locked")}
           </Text>
 
           <View className="achievement-detail__card">
-            <Text className="achievement-detail__label">{achievement.unlocked ? "达成时间" : "解锁目标"}</Text>
+            <Text className="achievement-detail__label">{achievement.unlocked ? t("achievementDetail.achievedAt") : t("achievementDetail.unlockGoal")}</Text>
             <Text className="achievement-detail__value">
               {achievement.unlocked
-                ? formatAchievementUnlockedAt(achievement.unlockedAt)
-                : achievement.requirement || getAchievementRequirement(achievement.title)}
+                ? formatAchievementUnlockedAt(achievement.unlockedAt).replace(/ 达成$/, ` ${t("achievementDetail.achievedSuffix")}`).replace("已根据云端记录解锁", t("achievementDetail.unlockedFromCloud"))
+                : slug ? t(`achievements.items.${slug}.requirement`) : achievement.requirement || getAchievementRequirement(achievement.title)}
             </Text>
           </View>
 
           {achievement.available !== false ? (
             <View className="achievement-detail__card">
-              <Text className="achievement-detail__label">当前进度</Text>
+              <Text className="achievement-detail__label">{t("achievementDetail.progress")}</Text>
               <Text className="achievement-detail__value">{metricLabel}</Text>
               <View className="achievement-detail__bar">
                 <View
@@ -79,7 +87,7 @@ export function AchievementDetailSheet({ achievement, onDismiss }: AchievementDe
           ) : null}
 
           <Text className="achievement-detail__hint" onClick={onDismiss}>
-            轻触空白处关闭
+            {t("achievementDetail.dismissHint")}
           </Text>
         </View>
       ) : null}

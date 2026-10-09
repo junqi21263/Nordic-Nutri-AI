@@ -407,7 +407,7 @@ test("uses rule weekly insight without DeepSeek when recorded days are sparse", 
   assert.equal(first.insight.cached, false);
   assert.equal(second.insight.cached, true);
   assert.equal(generationCount, 0);
-  assert.match(first.insight.summary, /1\s*天/);
+  assert.match(first.insight.summary, /记录还不足/);
 });
 
 test("regenerates a weekly review cached with a different model", async () => {

@@ -1,0 +1,198 @@
+/*postcss-pxtransform disable*/
+@use "../../styles/tokens" as *;
+
+.bottom-sheet.reminder-time-sheet {
+  background: #f9faf7;
+  border: 1px solid #e8ece6;
+  border-radius: 28px 28px 0 0;
+  box-sizing: border-box;
+  height: auto;
+  max-height: calc(100vh - 16px);
+  min-height: 0;
+  padding: 0 24px calc(24px + $safe-area-bottom);
+  width: 100%;
+  animation: reminder-time-sheet-enter 320ms $ease-emphasized both;
+}
+
+.bottom-sheet.reminder-time-sheet.bottom-sheet--closing {
+  animation: reminder-time-sheet-exit 220ms $ease-emphasized both;
+}
+
+.bottom-sheet.reminder-time-sheet > .bottom-sheet__handle {
+  background: rgba(28, 63, 50, 0.24);
+  height: 4px;
+  margin: 16px auto 16px;
+  width: 40px;
+}
+
+.reminder-time-sheet__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 16px;
+  text-align: center;
+}
+
+.reminder-time-sheet__title {
+  color: $color-text-primary;
+  display: block;
+  font-size: 18px;
+  font-weight: $font-weight-semibold;
+  letter-spacing: -0.2px;
+  line-height: 1.25;
+}
+
+.reminder-time-sheet__subtitle {
+  color: $color-text-secondary;
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.reminder-time-sheet__selector-card {
+  align-items: center;
+  background: $color-surface;
+  border: 1px solid #e8ece6;
+  border-radius: 16px;
+  box-shadow: inset 0 1px 4px rgba(28, 63, 50, 0.03);
+  display: flex;
+  justify-content: center;
+  min-height: 160px;
+  padding: 24px 16px;
+}
+
+.reminder-time-sheet__selectors {
+  align-items: center;
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  width: 100%;
+}
+
+.reminder-time-sheet__column {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reminder-time-sheet__label,
+.reminder-time-sheet__unit {
+  color: $color-text-secondary;
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.reminder-time-sheet__label {
+  margin-bottom: 8px;
+}
+
+.reminder-time-sheet__unit {
+  margin-top: 8px;
+}
+
+.reminder-time-sheet__wheel {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.reminder-time-sheet__arrow {
+  border-bottom: 2px solid $color-text-secondary;
+  border-left: 2px solid $color-text-secondary;
+  height: 8px;
+  margin: 4px 0 10px;
+  transform: rotate(135deg);
+  transition: border-color 160ms $ease-standard, transform 160ms $ease-standard;
+  width: 8px;
+}
+
+.reminder-time-sheet__arrow--down {
+  margin: 10px 0 4px;
+  transform: rotate(-45deg);
+}
+
+.reminder-time-sheet__arrow:active {
+  border-color: #1c3f32;
+  transform: rotate(135deg) scale(0.86);
+}
+
+.reminder-time-sheet__arrow--down:active {
+  transform: rotate(-45deg) scale(0.86);
+}
+
+.reminder-time-sheet__value {
+  color: #1c3f32;
+  display: block;
+  font-size: 32px;
+  font-weight: $font-weight-medium;
+  letter-spacing: -0.4px;
+  line-height: 1;
+}
+
+.reminder-time-sheet__colon {
+  color: #1c3f32;
+  font-size: 24px;
+  font-weight: $font-weight-regular;
+  line-height: 1;
+  margin-top: 16px;
+}
+
+.reminder-time-sheet__actions {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-top: 16px;
+}
+
+.reminder-time-sheet__action {
+  align-items: center;
+  border-radius: 12px;
+  display: flex;
+  font-size: 14px;
+  font-weight: $font-weight-semibold;
+  height: 48px;
+  justify-content: center;
+  text-align: center;
+  transition: opacity 160ms $ease-standard, transform 160ms $ease-standard;
+}
+
+.reminder-time-sheet__action:active {
+  opacity: 0.84;
+  transform: scale(0.97);
+}
+
+.reminder-time-sheet__action--cancel {
+  background: transparent;
+  border: 1px solid rgba(28, 63, 50, 0.22);
+  color: $color-text-secondary;
+}
+
+.reminder-time-sheet__action--confirm {
+  background: #1c3f32;
+  color: $color-warm-white;
+  box-shadow: 0 4px 10px rgba(28, 63, 50, 0.12);
+}
+
+@keyframes reminder-time-sheet-enter {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes reminder-time-sheet-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(24px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-sheet.reminder-time-sheet,
+  .reminder-time-sheet__arrow,
+  .reminder-time-sheet__action {
+    animation: none;
+    transition: none;
+  }
+}

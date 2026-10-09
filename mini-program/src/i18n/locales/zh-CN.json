@@ -1,0 +1,347 @@
+{
+  "sharedUi": { "emptyTitle": "这里还没有内容", "emptyDescription": "完成下一步后，你的记录会显示在这里。", "errorTitle": "暂时无法显示", "errorDescription": "内容暂时不可用，请稍后重试。", "loadingContent": "正在准备内容…", "searchPlaceholder": "搜索饮食记录", "searchAction": "搜索", "clearSearch": "清除搜索", "mealGroupExpanded": "已展开{{meal}}", "mealGroupCollapsed": "已收起{{meal}}", "mealCount": "{{count}} 餐", "mealCount_one": "{{count}} 餐", "mealCount_other": "{{count}} 餐", "addMealType": "新增{{meal}}", "editMealType": "编辑{{meal}}", "novaInsight": "NOVA 洞察", "refreshing": "正在刷新", "goalUpdated": "目标已更新", "updated": "已更新", "preparingHome": "正在准备你的营养主页", "failure": "失败", "success": "成功", "limitReached": "额度提示", "complete": "完成", "illustrationLoadFailed": "图片加载失败，点击重试" },
+  "dailySummary": { "energy": "今日能量", "calorieCompletion": "热量完成度", "over": "超出目标 {{amount}}{{unit}}", "overShort": "已超", "remaining": "还可摄入 {{amount}}{{unit}}", "remainingShort": "剩余", "todayIntake": "今日已摄入 {{consumed}} / {{target}} kcal" },
+  "recordTime": { "title": "记录时间", "editTime": "修改记录时间", "editable": "可修改", "set": "设置", "today": "今天", "adjustDate": "调整日期", "previousDay": "前一天", "nextDay": "后一天", "setTime": "直接设置时间", "hour": "小时", "minute": "分钟" },
+  "recentMeals": { "title": "最近常吃", "seeAll": "查看全部", "loading": "正在加载最近常吃…", "loadFailed": "常吃推荐加载失败，点击重试", "empty": "多记录几餐，常吃的搭配会出现在这里。", "lastRecorded": "上次记录：{{date}} · {{calories}} kcal", "quickLog": "快速记录" },
+  "achievements": { "title": "全部成就", "count": "已收集 {{unlocked}} / {{total}}", "hint": "点按卡片查看目标或达成时间 · 依据云端记录计算", "filterLabel": "成就筛选", "filters": { "all": "全部 {{count}}", "unlocked": "已解锁 {{count}}", "progress": "进行中 {{count}}" }, "states": { "upcoming": "即将上线", "unlockedCard": "已解锁 · 查看时间", "progress": "完成度 {{progress}}%" }, "items": {
+    "firstMeal": { "title": "第一餐记录", "requirement": "成功记录任意 1 餐到云端。", "action": "去记录第一餐" }, "breakfastRhythm": { "title": "早餐节奏", "requirement": "在 3 个不同日期记录早餐。", "action": "去记录早餐" }, "lunchFocus": { "title": "午餐专注", "requirement": "在 3 个不同日期记录午餐。", "action": "去记录午餐" }, "dinnerBalance": { "title": "晚餐平衡", "requirement": "在 3 个不同日期记录晚餐。", "action": "去记录晚餐" }, "snackBalance": { "title": "加餐有度", "requirement": "在 3 个不同日期记录加餐。", "action": "去记录加餐" }, "proteinExpert": { "title": "蛋白达人", "requirement": "有 3 天蛋白质完成度达到 90% 及以上。", "action": "去记录下一餐" }, "sevenDayStreak": { "title": "连续七天", "requirement": "连续 7 天都有饮食记录。", "action": "去记录下一餐" }, "fourteenDayStreak": { "title": "连续十四天", "requirement": "连续 14 天都有饮食记录。", "action": "去记录下一餐" }, "thirtyMeals": { "title": "累计三十餐", "requirement": "累计记录 30 餐。", "action": "去记录下一餐" }, "fiftyMeals": { "title": "累计五十餐", "requirement": "累计记录 50 餐。", "action": "去记录下一餐" }, "hundredMeals": { "title": "累计一百餐", "requirement": "累计记录 100 餐。", "action": "去记录下一餐" }, "hydration": { "title": "水分自律", "requirement": "即将上线：完成每日饮水目标。", "action": "去记录下一餐" }, "sleepFirst": { "title": "睡眠优先", "requirement": "即将上线：连续记录优质睡眠。", "action": "去记录下一餐" }, "knowYourself": { "title": "认识自己", "requirement": "完成身体资料、目标与饮食偏好。", "action": "去完善资料" }, "recoveryExpert": { "title": "恢复达人", "requirement": "即将上线：完成恢复日节奏。", "action": "去记录下一餐" }, "vegetablesFirst": { "title": "蔬菜优先", "requirement": "有 3 天的餐食包含蔬菜。", "action": "去记录下一餐" }, "carbBalance": { "title": "碳水平衡", "requirement": "有 3 天碳水完成度在 60%–120%，且蛋白质不少于 60%。", "action": "去记录下一餐" }, "lowFatChoice": { "title": "低脂选择", "requirement": "有 3 天脂肪未超标，且蛋白质完成度不少于 60%。", "action": "去记录下一餐" }, "savedInspiration": { "title": "收藏灵感", "requirement": "收藏任意 1 餐作为灵感。", "action": "去记录下一餐" }, "consistentGoals": { "title": "连续达标", "requirement": "连续 3 天营养完成度达到 80% 及以上。", "action": "去记录下一餐" }
+  } },
+  "achievementDetail": { "upcoming": "即将上线", "unlocked": "已解锁", "locked": "未解锁", "achievedAt": "达成时间", "unlockGoal": "解锁目标", "progress": "当前进度", "achievedSuffix": "达成", "unlockedFromCloud": "已根据云端记录解锁", "dismissHint": "轻触空白处关闭" },
+  "achievementUnlock": { "title": "成就已解锁", "close": "关闭成就弹窗", "sparkle": "解锁闪光", "accept": "收下这份成就", "viewAll": "查看全部成就" },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "done": "完成",
+    "clear": "清除",
+    "confirm": "确认",
+    "back": "返回",
+    "retry": "重试",
+    "loading": "加载中…",
+    "continue": "继续",
+    "details": "查看详情",
+    "collapse": "收起详情",
+    "requestFailed": "请求失败，请稍后重试",
+    "sessionExpired": "登录已失效，请重新登录"
+  },
+  "tabs": {
+    "home": "首页",
+    "food-scanner": "扫描",
+    "meal-records": "记录",
+    "food-catalog": "食物库",
+    "coach": "教练",
+    "profile": "我的"
+  },
+  "coachPage": {
+    "composer": { "placeholder": "问问营养教练，比如：晚餐吃什么？", "removeImage": "移除已选图片", "chooseFoodImage": "选择饮食图片", "chooseImage": "选择图片", "sendMessage": "发送消息", "send": "发送" },
+    "analysisProgress": { "completed": "已完成分析 · {{duration}}", "collapseSummary": "收起分析摘要", "expandSummary": "展开分析摘要", "summary": "分析摘要", "dailyTitle": "正在分析你的饮食…", "generalTitle": "正在整理营养信息…", "steps": { "dailyStepRecords": "查看今日饮食记录", "dailyStepNutrition": "整理当前营养摄入", "dailyStepAdvice": "生成饮食建议", "generalStepQuestion": "理解你的问题", "generalStepNutrition": "整理相关营养信息", "generalStepAdvice": "生成建议" } },
+    "greetings": { "hello": "你好", "quietNight": "夜色正静", "lateNight": "夜深了", "stillNight": "夜还很静", "awake": "还没休息", "weekendMorning": "周末早上好", "morning": "早上好", "noon": "中午好", "afternoon": "下午好", "evening": "晚上好" },
+    "context": { "allLogged": "三餐已记录", "lunchLogged": "午餐已记录", "breakfastLogged": "早餐已记录", "twoLogged": "已完成两餐记录", "noneLogged": "今天还没有餐次记录", "addProtein": "今日行动：晚间可补一份优质蛋白，帮助完成目标。", "addFood": "今日行动：今日摄入偏少，可适当补足主食与蛋白。", "keepGoing": "今日行动：今天的营养节奏不错，继续保持。", "logBreakfastLater": "今日行动：早餐可按需补记。", "logLunchLater": "今日行动：午餐还没记录，按自己的节奏补上。", "logDinnerLater": "今日行动：晚餐还差一餐，继续完成今天节奏。", "logNext": "今日行动：继续记录下一餐，让今天的营养进度更完整。", "logFirst": "今日行动：今天先完成第一餐记录。", "viewProgress": "查看今日进度", "backfillBreakfast": "补记早餐", "logLunch": "记录午餐", "logDinner": "记录晚餐", "logNextMeal": "记录下一餐", "logFirstMeal": "记录第一餐", "recordedCount": "今日已记录 {{count}} 餐" },
+    "title": "你的营养教练", "newChat": "新对话", "restartQuestion": "当前对话会清空，历史记录仍会保留。确定重新开始吗？", "startNewChat": "开启新对话", "backToTop": "回到顶部", "todayReminder": "NOVA · 今日提醒", "you": "你", "todayProgress": "今日进度", "viewProgress": "查看今天的营养完成度", "threeMealsLogged": "三餐已记录", "proteinGoalDone": "已完成蛋白目标", "proteinGoal": "完成蛋白目标", "tips": "NOVA 小贴士", "refreshTip": "换一个建议", "tipLoading": "正在整理今日建议…", "tipLoadingDetail": "正在结合你的今日记录准备一条小建议。", "reason": "推荐原因：{{reason}}", "quickQuestions": "快捷提问", "disclaimer": "营养建议仅供日常饮食参考；营养识别与建议不构成医疗诊断或治疗建议。", "remaining": "今日教练对话剩余 {{count}} 次", "expand": "展开", "collapse": "收起", "expandNutrition": "展开详细营养数据", "collapseNutrition": "收起详细营养数据", "expandSuggestion": "展开今日营养建议", "collapseSuggestion": "收起今日营养建议", "expandQuick": "展开快捷提问", "collapseQuick": "收起快捷提问", "limitTitle": "今日对话额度已用完", "limitMessage": "因个人开发成本有限，当前每人每日限制聊20句", "gotIt": "知道了", "tryLater": "请稍后重试。", "coachUnavailable": "营养教练暂时无法回答", "imageUnavailable": "图片识别服务未配置", "imageFailed": "图片上传或识别失败", "sendTextFirst": "请先发送文字问题。", "imagePickFailed": "无法选择图片，请检查相册或相机权限", "uploaded": "已上传：{{name}}", "analyzeImage": "请分析这张食物图片。", "imageResult": "图片识别结果：{{title}}；{{insight}}", "restartSuccess": "已开启新的营养教练对话", "restartFailed": "新对话开启失败，请稍后重试", "nextProtein": "下一餐怎么补充蛋白质？", "quick1": "我今天吃什么？", "quick2": "我的蛋白够吗？", "quick3": "下一餐怎么搭配？", "defaultTipTitle": "下一餐加一份深色蔬菜", "defaultTipContent": "西兰花、菠菜等能帮助补充膳食纤维；搭配蛋白质和适量主食更均衡。", "defaultTipReason": "帮助补足当天的膳食纤维。", "proactive": "你好，{{name}}。今天还差 {{grams}}g 蛋白质，晚餐加一份优质蛋白就能更接近目标。"
+  },
+  "scannerPage": {
+    "title": "食物扫描", "headline": "记录这一餐", "subtitle": "对准餐盘，让每一口都有依据。", "scanning": "识别中", "analyzingFood": "正在识别餐品与营养信息", "analysisRunning": "正在分析", "scanLimit": "今日识别次数已用完", "limitDescription": "明天会恢复额度，也可以先手动记录这一餐。", "limitLong": "今日图片识别次数已用完，请明天再试或手动记录。", "limitTomorrow": "今日图片识别次数已用完，明日恢复", "remaining": "今日识别剩余 {{count}} 次", "gotIt": "知道了", "manual": "手动记录", "manualMeal": "手动记录这一餐", "notConfigured": "图片识别服务尚未配置，可先手动记录。", "contentBlocked": "图片未通过安全审核，请更换后重试", "nonFood": "上传的图片为非食物，请重新上传食物图片", "timeout": "识别时间有点久，请重新试一次", "processing": "识别仍在后台处理中，稍后回来查看", "network": "网络似乎不太稳定，请检查后重试", "failed": "图片识别失败，请重新选择图片或手动记录。", "failedTitle": "图片识别失败", "openFailed": "暂时无法打开图片，请检查相机、相册和网络权限。", "openFailedTitle": "无法打开图片", "fallback": "可检查相机、相册和网络权限；如果视觉服务尚未配置，可以先手动记录。", "tipTitle": "把整盘食物拍进取景框", "tipBody": "尽量自然光、餐盘完整入镜。准备好后点「开始拍摄」，也可改用图库。", "takePhoto": "开始拍摄", "frameHint": "餐盘取景提示", "scanningAria": "正在扫描", "imageReady": "本地图片已就绪", "naturalLight": "自然光更清晰", "preparing": "已选择图片，正在准备云端分析", "frameFood": "将食物完整放入取景框", "cameraAria": "拍摄并开始分析", "camera": "拍摄", "galleryAria": "从图库选择图片", "gallery": "图库", "captureAnalyze": "拍摄并分析", "chooseAgain": "重新选择图片"
+  },
+  "mealDetail": {
+    "title": "餐食详情", "recordDetails": "餐次详情", "recordMissingSubtitle": "找不到这条云端记录。", "recordMissing": "餐次不存在", "recordMissingDescription": "它可能已被删除，或链接已经失效。", "backToRecords": "返回饮食记录", "composition": "营养构成", "insight": "营养小结", "insightImpact": "这餐对今日目标的影响", "insightBasis": "查看建议依据", "saveTemplateFailed": "保存常吃失败，请重试", "savedTemplate": "已加入我的常吃", "saveTemplate": "保存到我的常吃", "editMeal": "编辑本餐", "edit": "编辑", "repeatMeal": "再吃一次", "favoriteMeal": "收藏本餐", "unfavoriteMeal": "取消收藏本餐", "favorite": "收藏", "unfavorite": "取消收藏", "favorited": "已收藏", "deleteMeal": "删除本餐", "delete": "删除", "scoreBasis": "评分依据", "scoreWhy": "为什么是这个评分？", "mealProtein": "本餐蛋白质", "mealCarbs": "本餐碳水", "insightNote": "建议会随你当天已记录的餐食动态更新。", "gotIt": "知道了", "deleteQuestion": "删除这餐？", "deleteDescription": "删除后，本地营养汇总会立即更新。", "deleted": "餐次已删除", "deletedSynced": "餐次已删除并同步", "deleteFailed": "删除失败，请稍后重试", "savedFavorite": "已加入收藏", "removedFavorite": "已取消收藏", "savedFavoriteHint": "已加入收藏，可在「记录」筛选里查看", "favoriteFailed": "收藏状态更新失败，请稍后重试",
+    "scores": { "A": { "label": "优秀搭配", "summary": "蛋白质充足，脂肪控制得当。", "reason1": "蛋白质达到一餐建议量", "reason2": "脂肪没有超过单餐建议量" }, "B": { "label": "均衡表现", "summary": "整体营养不错，还可进一步优化搭配。", "reason1": "蛋白质达到基础建议量", "reason2": "可结合当天剩余目标调整份量" }, "C": { "label": "可再优化", "summary": "建议补充优质蛋白，让这一餐更均衡。", "reason1": "蛋白质低于一餐建议量", "reason2": "搭配一份优质蛋白会更完整" } }
+  },
+  "analysisResult": {
+    "expand": "展开", "collapse": "收起",
+    "title": "营养分析", "missingSubtitle": "还没有本地分析结果。", "eyebrow": "分析结果", "missingTitle": "分析结果不存在", "missingDescription": "请返回扫描页重新拍摄餐盘。", "backToScan": "返回扫描", "keepFood": "至少需要保留一种食物", "addedTitle": "已添加到本次识别", "addedDescription": "已补充：{{name}} · {{grams}}g\n你可以继续核对这一餐，再决定是否保存", "replacedTitle": "已更新本次识别", "replacedDescription": "已替换为：{{name}} · {{grams}}g\n你可以继续核对这一餐，再决定是否保存", "feedbackSubmitted": "反馈已提交", "feedbackNote": "你提交的反馈：{{note}}\n我们会认真查看并持续优化体验。", "feedbackOther": "你选择了「其他」，未填写补充说明。我们会认真查看这次识别结果。", "gotIt": "知道了", "saveFailed": "分析或保存失败，请检查网络后重试", "defaultEvaluation": "这餐吃得不错", "discardQuestion": "放弃本次分析？", "discardDescription": "返回后，本次未保存的分析结果将不再保留。", "discard": "放弃并返回", "continueAnalysis": "继续分析", "completedSubtitle": "本地分析已完成，保存前可微调份量。", "completed": "分析完成", "viewOriginal": "查看原始餐食照片", "photoCaption": "点按查看原图 · 云端视觉识别", "confidence": "识别可信度", "nutritionData": "营养数据", "partialUsda": "部分 USDA", "correctRecognition": "识别不准确，提交纠错反馈", "correct": "纠错", "notAccurate": "识别不准确？", "mealTypeQuestion": "这是哪一餐？", "chooseMealType": "选择餐次类型", "mealScore": "餐点评分", "scoreGrade": "{{grade}} · 餐点评分", "ingredients": "识别食材", "expandIngredients": "展开识别食材", "collapseIngredients": "收起识别食材", "viewRecords": "查看饮食记录", "disclaimer": "营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。", "adjustPortion": "调整份量", "saveMeal": "保存本餐"
+  },
+  "settings": {
+    "language": "语言",
+    "followSystem": "跟随系统",
+    "title": "设置"
+  },
+  "languageSettings": {
+    "title": "语言设置",
+    "introTitle": "选择你习惯的语言",
+    "introBody": "选择一种让你读起来更自在的语言，Nordic 会在应用中使用它。",
+    "availableLanguages": "可选语言",
+    "localeNames": { "zhCN": "简体中文", "zhTW": "繁體中文", "en": "English" },
+    "systemDescription": "跟随设备语言（当前为{{language}}）。",
+    "infoTitle": "你的记录不会改变",
+    "info": "这里只调整 Nordic 的显示语言，不会修改饮食记录或个人资料。",
+    "apply": "保存并应用",
+    "applyFailed": "语言设置未能应用，请重试。",
+    "footer": "之后也可以随时更改此偏好。",
+    "back": "返回",
+    "reset": "重置为系统语言",
+    "selected": "已选中"
+  },
+  "nutrition": {
+    "protein": "蛋白质",
+    "carbs": "碳水",
+    "fat": "脂肪",
+    "calories": "热量",
+    "kcal": "千卡"
+  },
+  "meals": {
+    "all": "全部",
+    "favorite": "仅看收藏",
+    "breakfast": "早餐",
+    "lunch": "午餐",
+    "dinner": "晚餐",
+    "snack": "加餐"
+  },
+  "profile": {
+    "title": "个人中心", "editProfile": "编辑个人资料", "currentWeight": "当前 {{weight}} kg", "movingForward": "稳定前进中", "targetCalories": "目标热量", "adjustable": "kcal · 可调整", "proteinCompletion": "蛋白完成度", "today": "今日", "loggedMeals": "已记录餐次", "thisWeek": "本周", "journey": "我的旅程", "days": "{{count}} 天", "streak": "连续记录", "achievements": "成就", "weeklySummary": "查看本周总结", "weeklyDescription": "保持记录，稳步靠近你的目标。", "rhythm": "营养节奏", "points": "分 ›", "newFeedbackReply": "有新的反馈回复", "closeFeedback": "关闭反馈与帮助", "aboutLead": "Nordic Nutri AI 帮助你轻松看见、理解并记录每一餐。", "about1": "面向健身与健康管理用户，把拍照识别、食物库、目标进度、餐次回顾与每日建议放在同一套轻松、可持续的节奏里。", "about2": "当前支持登录与云端同步、饮食记录与周回顾、目标调整、标准食物库浏览，以及营养教练参考建议。", "about3": "营养建议仅供日常参考，不构成医疗诊断或治疗建议；如有健康问题，请咨询专业人士。", "about4": "产品持续迭代中，欢迎通过「反馈与帮助」告诉我们哪里不顺手，或你希望下一步看到什么。", "logoutQuestion": "退出登录？", "logoutWarning": "仅退出当前设备，不会删除你的饮食记录。", "logoutFailed": "退出登录失败，请稍后重试",
+    "foodManagement": "饮食管理",
+    "helpInformation": "帮助与信息",
+    "feedback": "反馈与帮助",
+    "feedbackDescription": "告诉我们你的想法",
+    "about": "关于我们",
+    "aboutDescription": "产品介绍与使用说明",
+    "privacy": "隐私政策与免责声明",
+    "privacyDescription": "数据说明与账号注销",
+    "logout": "退出登录",
+    "logoutDescription": "仅退出当前设备",
+    "favorites": "我的常吃",
+    "favoritesDescription": "保存熟悉的一餐，下次一键记录",
+    "nutrition": "营养档案",
+    "nutritionDescription": "身体数据、饮食偏好与忌口",
+    "reminders": "记录提醒",
+    "remindersDescription": "按餐次设置轻量的本地提醒"
+  },
+  "profileOverview": {"editProfile":"编辑个人资料","noNickname":"未设置昵称","loadingProfile":"资料加载中","currentWeight":"当前 {{weight}} kg","movingForward":"稳定前进中","startWithMeal":"从这一餐开始","syncing":"记录同步中","quote":"每一份认真记录，都在慢慢成为更好的自己。","partialData":"部分数据暂未更新，已保留上次结果","updating":"正在更新成长数据","retry":"重试","dailyProgress":"01 / DAILY PROGRESS · 成长概览","manageGoals":"目标管理","calorieTarget":"目标热量","adjustable":"可调整","calorieBalance":"千卡标准配比","consumedToday":"今日已摄入","proteinProgress":"蛋白完成度","today":"今日","notLoaded":"尚未加载","proteinAria":"蛋白质完成度：{{value}}","notLoggedToday":"今日待记录","proteinConsumed":"已摄入 {{value}} g","waitingNutrition":"等待营养数据","mealsThisWeek":"本周餐次","days":"天","streak":"连续记录","journey":"02 / YOUR JOURNEY · 成长手账","streakDays":"连续记录 {{count}} 天","sproutWeek":"本周萌芽周期","sproutHint":"坚持每日打卡，滋养健康种子","day":"Day {{count}}","recorded":"已记录","notRecorded":"未记录","calendarLoading":"记录日历尚未加载","viewJourney":"查看完整健康旅程","achievements":"我的小成就","all":"全部 ›","unlocked":"已点亮","locked":"未点亮","noAchievements":"暂无成就，记录从这一餐开始","achievementsLoading":"成就尚未加载","weeklyReview":"本周回顾","weeklyWithMeals":"保持记录，慢慢找到自己的饮食节奏。","weeklyWithoutMeals":"从这一餐开始，慢慢找到自己的节奏。","rhythm":"营养节奏","points":"分 ›"},
+  "profileEdit": {"title":"编辑资料","avatarUpdated":"头像已更新","avatarFailed":"头像上传失败，请稍后重试","randomUpdated":"已换一张默认头像","randomFailed":"随机头像失败，请稍后重试","nicknameRequired":"请输入昵称","weightRange":"请输入 30–300 kg 的体重","bodyRequired":"请先补全身体资料","goalUpdated":"目标方向已更新","profileSaved":"资料已保存","goalSynced":"营养目标已重新生成。","profileSynced":"营养目标已同步更新。","backProfile":"返回个人中心","saveFailed":"资料保存失败","retryLater":"请稍后重试。","okay":"知道了","uploading":"上传中","changeAvatar":"更换头像","randomAvatar":"随机头像","changing":"更换中…","randomChange":"随机换一张","personalInfo":"个人资料","currentGoal":"当前目标","adjust":"调整 ›","nickname":"昵称","nicknamePlaceholder":"输入你的昵称","currentWeight":"当前体重","direction":"当前方向","accountSave":"账号保存","saveNote":"资料保存说明","saveNoteText":"昵称会保存到你的账号，并更新个人中心展示。","save":"保存资料","confirmGoal":"确认更新目标方向？","confirmGoalDescription":"将切换为“{{goal}}”，并重新生成每日热量和营养目标。已记录的饮食数据不会改变。","confirmUpdate":"确认更新"},
+  "goalAdjust": {"title":"调整今日目标","intro":"可按自己的训练和饮食节奏，手动设定每日热量与三大营养素目标。","calories":"每日目标热量","protein":"蛋白质","carbs":"碳水","fat":"脂肪","macroTotal":"宏量合计约 {{value}} kcal","macroGap":"，与热量目标差距较大，可再微调","macroSync":"，保存后同步到首页今日目标","targetWeight":"目标体重","weightHint":"当前 {{weight}} kg，建议设定可持续的阶段目标。","save":"保存今日目标","saved":"今日目标已更新","synced":"今日营养目标已同步。","backHome":"返回首页","saveFailed":"目标保存失败","retryLater":"请稍后重试。","okay":"知道了","weightRange":"请输入 30–300 kg 的目标体重","calorieRange":"请输入 800–10000 kcal 的目标热量","proteinRange":"请输入 1–1000 g 的蛋白质目标","carbRange":"请输入 0–1500 g 的碳水目标","fatRange":"请输入 1–500 g 的脂肪目标"},
+  "frequentMeals": {"title":"我的常吃","loading":"正在加载你的常吃…","intro":"把经常吃的保存下来，下次一键记录。","filterAria":"按餐次筛选常吃","selected":"，已选中","loadFailed":"常吃餐食暂时未能加载","checkNetwork":"请检查网络后重试。","empty":"还没有保存常吃","emptyFilter":"这个餐次还没有常吃","emptyHint":"遇到经常吃的餐食，可以在餐食详情中选择「保存到我的常吃」，下次不用重新识别。","logOne":"去记录一餐","meal":"餐食","protein":"蛋白质 {{value}}g","manage":"管理{{name}}","menuTitle":"管理这项常吃","edit":"编辑","delete":"删除","lastLogged":"最近记录：{{date}} · 已记录 {{count}} 次","neverUsed":"尚未使用","logAgain":"一键记录{{name}}","log":"一键记录","deleteQuestion":"删除常吃？","deleteDescription":"仅删除模板，已经记录的餐食不受影响。","deleteFailed":"删除失败，请重试"},
+  "bodyProfile": {"title":"身体资料","saveFailed":"身体资料保存失败","retryLater":"请稍后重试。","okay":"知道了","editStep":"调整资料","step":"第 2 步，共 4 步","editProgress":"调整身体资料","progress":"当前为第 2 步，共 4 步","backProfile":"返回个人中心","backGoal":"返回目标选择","editTitle":"更新你的身体情况","newTitle":"告诉我们你的身体情况","editCopy":"修改后可继续调整饮食偏好，并重新生成营养目标。","newCopy":"这些信息将帮助我们为你制定更合适的营养计划。","foundation":"基础信息与生活方式","nickname":"昵称","nicknamePlaceholder":"输入你的昵称","randomNickname":"换一个昵称","age":"年龄","years":"岁","height":"身高","weight":"体重","gender":"生理性别","male":"男","female":"女","activity":"日常活动量","selected":"已选择","continue":"继续","activities":{"sedentary":{"title":"低活动","description":"久坐为主，日常活动较少。"},"light":{"title":"轻度活动","description":"有少量日常活动或偶尔训练。"},"moderate":{"title":"中等活动","description":"有一定日常活动或每周规律训练。"},"high":{"title":"高活动","description":"日常活动较多或训练频率较高。"},"very_high":{"title":"很高活动","description":"体力劳动较多或几乎每天高强度训练。"}},"errors":{"nickname":"请输入昵称","age":"年龄需在 14–80 岁之间","gender":"请选择性别","heightCm":"身高需在 120–230 cm 之间","weightKg":"体重需在 30–300 kg 之间","activityLevel":"请选择日常活动量","trainingDays":"训练频率需在 0–7 天之间"}},
+  "nutritionPlan": {"title":"营养计划","incompleteSubtitle":"先完成身体资料，才能生成更贴近你的本地预览。","preview":"计划预览","incomplete":"还差一点资料","incompleteCopy":"返回补全身体数据后，就能看到每日营养目标。","backEdit":"返回调整资料","loadingInsight":"正在根据你的身体数据计算营养目标…","saveFailed":"资料保存失败","retryLater":"请稍后重试。","okay":"知道了","planSaveFailed":"计划保存失败，请稍后重试","updateStep":"更新计划","step":"第 4 步，共 4 步","updateProgress":"确认更新后的营养计划","progress":"当前为第 4 步，共 4 步","backPreferences":"返回饮食偏好与限制","planReady":"计划已生成","updatedTitle":"新的计划已准备好","readyTitle":"你的计划已准备好","updatedCopy":"确认后将更新你的每日营养目标。","readyCopy":"从今天开始，按自己的节奏稳步前进。","insight":"营养洞察","targets":"每日目标","calories":"热量","milestones":"第一阶段里程碑","loggingMilestone":"记录里程碑","streak7":"连续记录 7 天","streakHint":"建立属于你的稳定节奏","nutritionMilestone":"营养里程碑","macroGoal":"完成每日三项营养目标","macroHint":"先专注蛋白质、碳水和脂肪的均衡摄入","saveUpdate":"保存并更新目标","start":"开始我的计划","adjust":"调整计划参数","generating":"正在生成营养计划…","regenerating":"正在生成营养计划…","generationComplete":"计划已生成","openingPlan":"正在打开你的计划","waiting":"已等待 {{seconds}} 秒，服务仍在处理中，请稍候","generatingDescription":"正在根据你的资料与饮食偏好生成，请稍候"},
+  "nutritionPlanSupplement": { "genericInsight": "根据身体资料和饮食偏好估算每日营养目标。" },
+  "smartReminders": {"back":"返回","title":"记录提醒","subtitle":"在需要的时候，轻轻提醒你。","description":"餐次未记录时提醒","schedule":"餐次推送排程","collapse":"收起提醒说明","expand":"展开提醒说明","collapseAction":"收起","expandAction":"展开","enabledCount":"已启用 {{count}} 个提醒","scheduleHint":"记录完成后，当天对应提醒会自动跳过。","remindTime":"提醒于","edit":"修改 ›","closed":"该餐次已关闭提醒","footer":"每个餐次每天最多提醒一次","footerNote":"记录完成后，该餐次当天将不再提醒。","toggleOn":"已开启","toggleOff":"已关闭","permissionTitle":"通知权限未开启","permissionBody":"请在系统设置中允许 Nordic Nutri AI 发送通知，提醒才会生效。","okay":"知道了","scheduleSyncFailed":"云端提醒排程同步失败，请稍后重试","toggleSyncFailed":"云端提醒开关同步失败，请稍后重试","notEffective":"提醒暂时未生效，请重试","allEnabled":"提醒已全部开启","allDisabled":"已停用就餐提醒","mealEnabled":"{{meal}}提醒已开启","mealDisabled":"{{meal}}提醒已关闭","timeInvalid":"请选择对应时间段内的时间","timeAdjusted":"{{meal}}提醒已调整","adjustTime":"调整{{meal}}提醒时间","reminderCount":"已启用 {{count}} 个提醒"},
+  "reminderTime": {"title":"{{meal}}提醒时间","subtitle":"{{meal}}适宜记录时间 {{start}} – {{end}}","hours":"小时","minutes":"分钟","hourUnit":"时","minuteUnit":"分","increase":"增加{{label}}","decrease":"减少{{label}}","cancel":"取消","save":"保存"},
+  "reminderAlarm": {"icon":"闹钟提醒","daily":"每天 {{time}}，轻轻提醒你记录{{meal}}","fallback":"将在预设餐点时间轻轻唤醒记录","note":"温和守护你的每一餐日常节奏","confirm":"已设好，静候美味"},
+  "reminderPaused": {"icon":"提醒已关闭","title":"已关闭就餐提醒","restart":"之后可以随时重新开启","note":"需要时，我们仍在这里。","okay":"知道了"},
+  "frequentMealEdit": {"loading":"正在加载常吃详情","nutritionIncomplete":"该食物营养数据不完整","discardTitle":"放弃未保存的修改？","discard":"放弃修改","invalid":"请填写名称和有效份量（1–2000g）","saved":"已保存修改","saveFailed":"保存失败，修改已保留","title":"编辑常吃","missing":"常吃不存在或暂时无法加载","retry":"请返回常吃列表，或重试。","mealName":"餐食名称","mealType":"默认餐次","foodCount":"食物组成 · {{count}} 项","subtitle":"调整默认份量，不会修改已经记录的餐食。","itemQuantity":"{{name}}份量克","remove":"移除{{name}}","addFood":"＋ 添加食物","energy":"预计能量总计","protein":"蛋白质","carbs":"碳水","fat":"脂肪","deleteTitle":"删除这项常吃？","deleteBody":"已经记录的餐食不受影响。","delete":"删除","deleteFailed":"删除失败，请重试","deleteSaved":"删除此常吃","saveChanges":"保存修改"},
+  "recommendFriends": {"title":"推荐好友","posterAlt":"Nordic Nutri AI 推荐海报","wechat":"微信","save":"保存","saved":"海报已保存到相册","actionFailed":"操作失败，请稍后重试"},
+  "portionAdjustment": {"title":"调整份量","repeat":"再吃一次","noAnalysis":"没有可调整的本地分析结果。","confirmMeal":"确认餐食","missingDraft":"份量草稿不存在","openFromAnalysis":"请从分析结果进入份量调整。","sameAsPrevious":"与上次记录份量一致","sameAsOriginal":"与原始识别份量一致","increase":"比原始份量增加 {{value}}%","decrease":"比原始份量减少 {{value}}%","saveSyncFailed":"记录已保存，列表同步失败，请重试","saveFailed":"保存调整失败，请稍后重试","currentMeal":"当前餐食","adjustedCalories":"调整后热量","whichMeal":"这是哪一餐？","selectMeal":"选择餐次类型","ratio":"份量比例","stepHint":"按 25% 微调，本地营养将即时同步","currentRatio":"当前份量比例 {{value}}%","ratioControl":"份量比例控制","decreasePortion":"减少份量 25%","increasePortion":"增加份量 25%","quickRatio":"快速选择份量比例","setRatio":"设为 {{value}}% 份量","restore":"恢复原始份量","realTimeNutrition":"实时营养","saveAdjustment":"保存调整","confirmAndLog":"确认并记录","saveMeal":"保存本餐"},
+  "dietPreferences": {"title":"饮食偏好与限制","stepAdjust":"调整偏好","step":"第 3 步，共 4 步","progressAdjust":"调整饮食偏好","progress":"当前为第 3 步，共 4 步","back":"返回上一页","backBody":"返回身体资料","updateTitle":"更新饮食偏好","introTitle":"让计划更适合你","updateCopy":"习惯、忌口与餐次变化后，下一步会按新偏好重算营养目标。","introCopy":"告诉我们你的饮食习惯与限制，我们会据此调整每日推荐。","section":"饮食偏好","choosePattern":"选择最接近日常习惯的一项","avoid":"需要避开的食物","avoidHint":"可多选；没有可直接继续","mealsPerDay":"每日餐次","mealUnit":"餐","generating":"正在生成计划","regenerate":"重新生成计划","generate":"生成我的计划","calculationFailed":"营养计划计算失败，请稍后重试","selected":"已选择","pattern":{"none":"无特殊","noneDescription":"均衡饮食","vegetarian":"素食为主","vegetarianDescription":"优先植物蛋白","vegan":"纯素饮食","veganDescription":"不含动物性食物","pescatarian":"鱼素饮食","pescatarianDescription":"以鱼类与植物为主","low_carb":"低碳饮食","low_carbDescription":"适度控制碳水","keto":"生酮饮食","ketoDescription":"高脂低碳结构","mediterranean":"地中海饮食","mediterraneanDescription":"橄榄油与全谷物","halal":"清真饮食","halalDescription":"遵循清真饮食习惯"},"avoidance":{"dairy":"乳制品","nuts":"坚果","seafood":"海鲜","beef":"牛肉","eggs":"鸡蛋","gluten":"麸质","pork":"猪肉","soy":"大豆","spicy":"辛辣食物"}},
+  "privacyPolicy": {"title":"隐私政策与免责声明","lead":"你的记录与健康信息，应该由你清楚掌握。","contact":"如对本政策或个人信息处理有疑问，请通过「我的 → 反馈与帮助」联系我们。","sections":[{"title":"收集的信息","content":"为提供服务，我们会处理微信登录身份标识、你主动设置的昵称和头像、身体与营养目标档案、饮食记录、你主动上传的识别图片，以及你提交的反馈内容。"},{"title":"使用目的","content":"这些信息仅用于账号识别和数据隔离、展示记录与目标进度、进行餐食营养估算、提供图片识别和营养教练参考建议，以及处理你的问题与反馈。"},{"title":"智能处理与权限用途","content":"当你主动选择餐食图片时，图片将用于识别食材和生成营养估算；相机和相册仅用于选择餐食图片或保存你主动发起的分享海报。昵称和头像仅在你主动授权或编辑时使用。"},{"title":"存储与保留","content":"数据通过 HTTPS 加密连接写入 CloudBase，并在你的 Nordic Nutri AI 产品账号存续期间保留。注销成功后，产品资料、身体与目标档案、饮食记录、识别图片及相关数据将被删除。"},{"title":"你的权利","content":"你可以在资料页修改昵称、头像、身体档案和目标；可以退出当前设备登录；也可以申请注销 Nordic Nutri AI 产品账号。产品账号注销不会注销或影响你的微信账号。"},{"title":"免责声明","content":"营养识别、营养估算与教练建议仅供日常饮食参考，不构成医疗诊断、治疗或处方，也不能替代医生、注册营养师或其他专业人士的意见。如有健康问题，请及时咨询专业人士。"}],"metadata":"政策信息","operator":"运营主体：李某某（个人开发者）","version":"政策版本号：1.0.0","effective":"生效日期：2026-08-16","cancelTitle":"注销 Nordic Nutri AI 产品账号","cancelDescription":"删除产品数据，不影响你的微信账号"},
+  "accountCancellation": {"title":"注销账号","warning":"注销后无法恢复","deleteScope":"将立即删除 Nordic Nutri AI 中的账号资料、身体与目标档案、饮食记录、识别图片及相关数据。","wechat":"此操作不会注销或影响你的微信账号。","stepOne":"确认删除范围","stepOneCopy":"请确认你已了解数据将立即物理删除，无法找回。","stepTwo":"再次确认后注销","stepTwoCopy":"第二次点击后即提交注销请求，不需要重复微信登录。","confirmAria":"确认注销 Nordic Nutri AI 产品账号","continueAria":"继续注销 Nordic Nutri AI 产品账号","confirm":"确认注销并删除数据","continue":"我已了解，继续","success":"账号已注销，相关数据已删除","failed":"账号注销失败，请稍后重试"},
+  "milestoneJourney": {"title":"我的旅程","loading":"正在读取当前旅程","loadFailed":"我的旅程暂时无法读取，请稍后重试","retry":"重新尝试","progress":"里程碑进度","streak":"连续记录 {{count}} 天","next":"距离 {{count}} 天还有 {{remaining}} 天","completed":"你已完成本周期全部里程碑","collection":"Journey Collection","collectionSubtitle":"记录属于你的每一个阶段","pending":"已解锁 · 待展示","unlocked":"已解锁","locked":"未解锁","daysRemaining":"还差 {{count}} 天","nextBadge":"下一阶段","days":"天","current":"当前：{{current}} / {{target}} 天","pendingTitle":"这一阶段已经解锁","pendingMessage":"你的里程碑海报正在等待展示。完成正常领取后，就可以在这里永久回看。","acknowledge":"知道了","series":"{{name}}系列","seriesNote":"解锁时系统会为这一段旅程固定其中一张插画","continue":"继续记录","previewClose":"点击空白处关闭","stages":{"start":{"title":"起步","message":"第一段节奏已经建立，继续记录下一餐。"},"rhythm":{"title":"节奏","message":"连续记录一周，让饮食记录慢慢形成自己的节奏。"},"balance":{"title":"平衡","message":"当记录逐渐稳定，你会解锁下一段 Journey。"},"lifestyle":{"title":"生活方式","message":"坚持记录到 30 天，把这一段饮食旅程留成属于你的月度海报。"}}},
+  "feedback": {
+    "required": "请先写下你的问题或建议", "receivedDescription": "我们已收到，会用它持续改进体验。", "okay": "好的", "submitFailed": "反馈提交失败", "submitFailedDescription": "内容已保留，请稍后重试。", "recognition": "识别纠错反馈",
+    "submit": "提交反馈",
+    "history": "我的反馈",
+    "lead": "告诉我们哪里不顺手，或你希望下一步看到什么。",
+    "placeholder": "例如：我希望回顾中能看到每餐的蛋白变化",
+    "hint": "提交后将安全保存，用于定位问题和改进体验。",
+    "empty": "暂无反馈记录",
+    "emptyDescription": "你提交的反馈会在这里显示处理进度和回复。",
+    "received": "已收到",
+    "reviewing": "处理中",
+    "resolved": "已回复",
+    "closed": "已关闭",
+    "yours": "你的反馈",
+    "reply": "我们的回复",
+    "thanks": "感谢你的反馈"
+  },
+  "weekly": {
+    "title": "本周回顾",
+    "loading": "正在整理本周记录…",
+    "loadFailed": "暂时无法读取周回顾",
+    "scoreCaption": "/ 100 营养节奏分",
+    "recorded": "已记录",
+    "notRecorded": "未记录",
+    "future": "未到来",
+    "daysOutOfSeven": "{{days}} / 7 天",
+    "mealsTotal": "餐食总计",
+    "mealsCount": "{{count}} 餐",
+    "streak": "连续记录",
+    "streakDays": "{{days}} 天",
+    "nutritionNote": "仅计算有记录日期，反映已记录的部分摄入。",
+    "insufficientRecords": "记录不足，暂不作营养判断。",
+    "missingNotZero": "未记录不代表没有吃饭。",
+    "goodFallback": "愿意回顾饮食，就是了解自己的开始。",
+    "nextStepFallback": "下周每天至少记录一餐",
+    "daySummary": "{{date}} 记录摘要",
+    "mealsLogged": "已记录 {{count}} 餐",
+    "dayNutrition": "已记录热量 {{calories}} kcal · 蛋白质 {{protein}} g",
+    "weekdays": { "0": "一", "1": "二", "2": "三", "3": "四", "4": "五", "5": "六", "6": "日" },
+    "comparison": { "prefix": "较上周同期", "recordedDays": "记录天数", "recordedMeals": "餐数", "more": "多", "fewer": "少", "same": "持平", "dayUnit": "天", "mealUnit": "餐", "colon": "：", "separator": "，" },
+    "rhythm": "本周节奏",
+    "nutrition": "核心营养完成度",
+    "observations": "NOVA · 本周观察",
+    "good": "做得不错",
+    "attention": "值得留意",
+    "nextStep": "下周只做一件事",
+    "goal": "下周小目标",
+    "goalHint": "一份轻量建议，不必追求完美",
+    "share": "生成 Nordic Weekly",
+    "journey": "查看我的历史旅程",
+    "calories": "热量平均完成度",
+    "protein": "蛋白质平均完成度",
+    "carbs": "碳水平均完成度",
+    "fat": "脂肪平均完成度",
+    "noRecords": "当天暂无记录，不代表没有吃饭",
+    "viewRecords": "查看当天饮食记录"
+  },
+  "share": {
+    "save": "保存卡片至相册",
+    "apps": "分享到微信、QQ等应用",
+    "generating": "正在生成分享卡...",
+    "saved": "已保存到相册", "downloaded": "已请求下载图片", "saveFailed": "保存失败，请检查相册权限后重试", "shareHint": "请先保存图片，再从相册分享到社交平台", "shareFailed": "暂时无法打开分享渠道，请先保存图片", "illustrationNotSaved": "插画已更换，本次选择无法保存", "title": "Nordic Weekly 分享卡", "moments": "WEEKLY MOMENTS", "recordedDays": "记录天数", "recordedMeals": "用心用餐", "protein": "蛋白质达成", "longestStreak": "最长连续", "daysOutOfSeven": "/ 7 天", "mealsUnit": "餐食", "daysUnit": "天", "highlight": "本周观察", "nextGoal": "下一周的温柔约定", "brandSubtitle": "饮食记录",
+    "series": ["每周静心札记", "北欧一周手记", "留给这一周的片刻"],
+    "highlightWithMeals": ["留下 {{count}} 餐记录，慢慢了解自己的饮食节奏", "本周记录了 {{days}} 天，为了解饮食习惯留下线索", "{{count}} 餐记录，串起这一周的饮食片段"],
+    "highlightWithoutMeals": ["愿意回顾，就是新的开始", "这一周暂未记录，下次可以从一餐开始", "从下一次记录开始，慢慢看见自己的节奏"],
+    "footerVariants": ["每一份认真记录，都在慢慢成为更好的自己", "慢慢记录，慢慢看见自己的节奏", "按自己的步调前进，每一步都值得珍惜"]
+  },
+  "home": {
+    "title": "今天的营养",
+    "loading": "正在加载今日餐次",
+    "sync": "正在整理你的云端记录。",
+    "syncError": "云端同步暂时不可用，已保留本地记录。",
+    "greetingWithName": "{{greeting}}，{{name}}",
+    "greetings": { "hello": "你好", "quietNight": "夜色正静", "lateNight": "夜深了", "beforeDawn": "夜还很静", "awakeLate": "还没休息", "weekendMorning": "周末早上好", "morning": "早上好", "noon": "中午好", "afternoon": "下午好", "evening": "晚上好" },
+    "goalWithLabel": "目标：{{goal}}",
+    "dailyTarget": "今日目标",
+    "adjust": "调整",
+    "firstMealTitle": "先拍下今天的第一餐",
+    "firstMealBody": "点「去拍照」，对准整盘食物即可。识别后还能改餐次和份量再保存。",
+    "takePhoto": "去拍照",
+    "insightTitle": "NOVA · 营养洞察",
+    "insightUnavailable": "云端洞察暂不可用；记录下一餐后可获得更贴合当天进度的建议。",
+    "viewRecords": "查看饮食记录",
+    "disclaimer": "营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。",
+    "scanMeal": "拍照识别",
+    "logMeal": "记录饮食",
+    "todayMeals": "今日饮食",
+    "eachMealCounts": "每一餐都算数",
+    "startWithMeal": "从第一餐开始",
+    "allRecords": "全部记录",
+    "noRecords": "今天还没有记录",
+    "noRecordsHint": "从一餐开始，建立属于你的营养节奏。",
+    "scanFirstMeal": "拍第一餐"
+  },
+  "welcome": {
+    "caption": "营养记录 · 从每一餐开始",
+    "title": "拍一餐，营养心中有数",
+    "subtitle": "读懂餐盘里的食材与热量，\n陪你慢慢养成好习惯",
+    "retrying": "正在重试…",
+    "retry": "连接暂不可用，点击重试",
+    "start": "开启健康之旅"
+  },
+  "authEntry": {
+    "title": "继续你的营养节奏",
+    "description": "一键登录即可开始记录餐次，默认头像与昵称会自动生成，可在「我的」中随时更换。",
+    "wechatLogin": "微信一键登录",
+    "privacyNote": "登录即同意微信授权，昵称和头像可在「我的」中随时修改。",
+    "missingUser": "微信登录未返回用户信息",
+    "loginFailed": "登录未完成，请稍后重试"
+  },
+  "androidAuth": {
+    "back": "返回", "phone": "手机号", "china": "中国", "phonePlaceholder": "请输入手机号", "password": "密码", "passwordPlaceholder": "请输入密码", "hidePassword": "隐藏", "showPassword": "显示",
+    "captcha": "图形验证码", "enterCaptcha": "输入图形验证码", "loadCaptcha": "点击加载验证码", "refreshCaptcha": "刷新图形验证码", "refresh": "刷新", "captchaIncorrect": "图形验证码不正确，请重新输入", "otpAria": "6 位验证码",
+    "welcomeTitle": "欢迎来到 Nordic Nutri", "welcomeSubtitle": "读懂每一餐，让健康生活更简单。", "connecting": "连接中…", "googleLogin": "使用 Google 登录", "chooseMethod": "或选择以下方式", "email": "邮箱", "noAccount": "还没有账号？", "registerNow": "立即注册帐号", "termsLead": "继续即表示你同意 Nordic 的", "termsOfService": "服务条款", "termsJoin": "和", "privacyPolicy": "隐私政策", "termsTail": "。",
+    "emailPlaceholder": "请输入邮箱地址", "useEmail": "使用邮箱", "usePhone": "使用手机号", "loggingIn": "登录中…", "login": "登录", "forgotPassword": "忘记密码？", "registerPrompt": "还没有账号？立即注册", "sending": "发送中…", "resendAfter": "{{count}} 秒后重新获取", "getCode": "获取验证码", "haveAccount": "已有账号？", "goToLogin": "去登录", "verifyPhone": "验证手机号", "verifyEmail": "验证邮箱", "enterSmsCode": "输入短信验证码", "enterEmailCode": "输入邮箱验证码", "codeSentTo": "验证码已发送至 {{target}}", "resend": "重新获取", "changePhone": "更换手机号", "changeEmail": "更换邮箱", "setPassword": "设置密码", "setLoginPassword": "设置登录密码", "confirmPassword": "确认密码", "registering": "注册中…", "register": "注册账号", "recoverAccount": "找回账号", "recoverPassword": "找回密码", "setNewPassword": "设置新密码", "enterCodeSentTo": "请输入发送至 {{target}} 的验证码", "updating": "更新中…", "resetPassword": "重置密码", "registerSuccess": "注册成功", "passwordUpdated": "密码已更新", "welcomeBack": "欢迎回来", "passwordUpdatedHint": "密码已更新，请使用新密码登录", "healthyLife": "开启你的健康生活", "retryConnection": "重试连接", "backHome": "返回首页", "gotIt": "知道了", "completeCaptchaRetry": "请完成图形验证后重新获取验证码", "codeSent": "验证码已发送", "registeredPhoneDescription": "无需重复注册，请直接使用手机号和密码登录。", "registeredEmailDescription": "无需重复注册，请直接使用邮箱和密码登录。",
+    "limit": { "dailyTitle": "今日验证码已达上限", "dailyDescription": "今日发送次数已用完，请明日再试。", "frequentTitle": "验证码发送过于频繁", "frequentDescription": "请求间隔太短，请稍后再试。" },
+    "errors": { "googleUnavailable": "Google 登录服务暂不可用，请稍后重试", "googleCredential": "Google 登录凭证无效，请重试", "invalidRequest": "输入信息有误，请检查邮箱或手机号格式后重试", "invalidCredentials": "账号或密码不正确", "captchaInvalid": "图形验证码不正确，请重新输入", "captchaExpired": "图形验证码已过期，请刷新", "otpInvalid": "验证码不正确", "otpExpired": "验证码已过期，请重新获取", "emailRegistered": "该邮箱已注册，请直接登录", "phoneRegistered": "该手机号已注册，请直接登录", "rateLimited": "操作过于频繁，请稍后重试", "codeUnavailable": "验证码发送失败，请稍后重试", "network": "连接失败，请检查网络后重试", "failed": "操作失败，请稍后重试", "sessionLaunch": "连接暂不可用，登录状态已保留，请重试", "googleLoginFailed": "登录失败，请重试" },
+    "validation": { "email": "请输入有效的邮箱地址，例如 name@example.com", "phone": "请输入有效的手机号，并检查国家区号", "captchaLoad": "请先加载图形验证码", "captchaRequired": "请输入图形验证码", "passwordMin": "密码至少需要 8 位", "passwordMax": "密码不能超过 128 位", "passwordMismatch": "两次输入的密码不一致", "passwordRequired": "请输入密码", "otp": "请输入 6 位验证码" }
+  },
+  "milestonePoster": {
+    "title": "里程碑分享卡", "refreshIllustration": "更换本周插画", "closePreview": "关闭分享卡预览", "close": "关闭", "longPressHint": "长按保存图片", "privateStatsHint": "仅分享里程碑进度，不包含个人资料", "saveImage": "保存图片", "saveToAlbum": "保存卡片至相册", "openShare": "打开系统分享面板", "shareApps": "分享到微信、QQ等应用",
+    "journeyAria": "里程碑进度", "imageFailed": "图片加载失败，点击重试", "imageLoading": "图片加载中", "generateShare": "生成分享卡", "continue": "继续记录 →", "gallery": "查看本阶段插画",
+    "stages": { "3": { "label": "起步阶段", "number": "第 1 阶段", "eyebrow": "连续记录 · 起步", "message": "连续记录 3 天，认真对待每一餐，饮食节奏会慢慢变稳。" }, "7": { "label": "建立节奏", "number": "第 2 阶段", "eyebrow": "连续记录 · 节奏", "message": "连续记录 7 天，你正在把每一餐的选择，慢慢过成自己的节奏。" }, "14": { "label": "营养平衡", "number": "第 3 阶段", "eyebrow": "连续记录 · 平衡", "message": "连续记录 14 天，继续留意那些慢慢走向平衡的小变化。" }, "30": { "label": "稳定习惯", "number": "第 4 阶段", "eyebrow": "连续记录 · 习惯", "message": "连续记录 30 天，健康饮食正慢慢成为你的生活习惯。" } },
+    "metrics": { "meals": "已记录餐次", "streak": "连续记录", "goal": "饮食目标完成", "protein": "平均蛋白质", "carbs": "平均碳水", "mealValue": "{{count}} 餐", "dayValue": "{{count}} 天" },
+    "footerTagline": "每一次记录，都算数", "footerQr": "扫码开始记录", "brandAssetFailed": "品牌图片读取失败，请稍后重试", "qrAssetFailed": "二维码读取失败，请稍后重试", "illustrationFailed": "插画读取失败，请稍后重试",
+    "pageTitle": "里程碑", "demoNote": "预览数据 · 不会写入数据库", "loadingPage": "正在读取里程碑海报", "missingEvent": "缺少里程碑事件信息", "notReady": "该里程碑尚未可回看", "loadFailed": "里程碑海报读取失败，请稍后重试", "retry": "重新尝试", "generating": "分享卡生成中，请稍候", "unsupportedShare": "当前基础库不支持分享图片，请升级微信后重试", "savedToAlbum": "已保存到相册"
+  },
+  "milestoneGallery": { "frozen": "本次解锁", "previous": "上一张插画", "next": "下一张插画", "hint": "左右滑动查看 · 点击空白处关闭" },
+  "recognitionFeedback": {
+    "title": { "reasons": "识别不准确？", "removeItem": "选择要移除的食物", "replaceItem": "选择要替换的食物", "nutrition": "怎么修正营养数据？", "missing": "补充遗漏的食物", "replace": "替换识别错误的食物", "other": "告诉我们哪里不准确" },
+    "subtitle": { "reasons": "请选择原因，我们会帮你直接修正这次识别。", "food": "输入食物和大致份量，我们会更新本次识别。", "sync": "这次修改会同步到当前识别结果。" },
+    "reasons": {
+      "wrong_food": { "label": "食物识别错了", "description": "替换成正确的食物" },
+      "missing_food": { "label": "少识别了食物", "description": "把漏掉的食物添加进来" },
+      "extra_food": { "label": "多识别了食物", "description": "移除不属于这餐的食物" },
+      "portion_inaccurate": { "label": "份量不准确", "description": "直接调整这餐份量" },
+      "other": { "label": "其他", "description": "告诉我们哪里需要改进" }
+    },
+    "remainingRequired": "至少需要保留一种食物", "enter": "进入", "choose": "选择", "item": { "remove": "移除{{name}}", "replace": "替换{{name}}" }, "noItems": "当前没有可调整的食物。", "portion": "份量", "adjustPortion": "调整份量", "portionDescription": "修改这餐的整体份量比例", "food": "食物", "editFood": "修改食物", "foodDescription": "重新选择对应的食物数据",
+    "foodName": "食物名称", "clearFoodName": "清空食物名称", "missing": { "placeholder": "例如：西兰花、鸡蛋、米饭", "unmatched": "暂时无法匹配，请尝试更具体的名称", "quantity": "大约吃了多少？", "estimateAria": "自动估算", "estimateNote": "营养数据将根据食物名称和克重自动估算。", "successAria": "已添加", "replaced": "已替换本次识别", "added": "已加入本次识别", "analyzing": "正在分析食物…", "replace": "替换当前食物", "add": "添加到本次识别" },
+    "other": { "placeholder": "请简单描述一下问题", "failed": "提交失败，请重试", "submitting": "正在提交…", "submit": "提交反馈" }
+  },
+  "mealSaved": {
+    "title": { "created": "本餐已保存！", "updated": "本餐已更新！", "reused": "再吃一次已记录！", "template": "已加入我的常吃！" },
+    "subtitle": { "created": "营养数据已同步到今日进度。", "updated": "更新后的营养数据已同步到今日进度。", "reused": "复制的餐食已同步到今日进度。", "template": "下次可以一键记录这餐。" },
+    "nutrients": { "protein": "蛋白质", "carbs": "碳水", "fat": "脂肪" }, "todayProgress": "今日进度", "viewMeal": "查看本餐", "viewNext": "继续记录", "continue": "继续记录", "backHome": "回到主页"
+  },
+  "appUpdate": {
+    "title": "发现新版本 {{version}}", "defaultNote": "体验与稳定性改进", "market": "前往应用市场", "download": "直接下载 APK", "retryInstall": "重新下载并安装", "later": "稍后再说",
+    "status": { "downloading": "正在安全下载 {{progress}}%", "verified": "安装包校验完成", "installing": "正在打开系统安装器", "permission": "请允许安装此来源的应用后重试", "failed": "下载或安装未完成，请重试" }
+  },
+  "records": {
+    "title": "饮食记录", "favorite": "已收藏", "syncFailed": "饮食记录同步失败，请稍后重试",
+    "firstRunTitle": "在这里回看今天的饮食", "firstRunBody": "拍完并保存后，每一餐都会出现在这里。也可以点「去添加」先手动补录。", "add": "去添加",
+    "searchPlaceholder": "搜索餐次或食材", "filter": "筛选记录", "previousMonth": "上一月", "previousWeek": "上一周",
+    "yearMonth": "{{year}} 年 {{month}} 月", "collapseCalendar": "收起月历", "expandCalendar": "展开整月日历", "collapse": "收起", "expand": "展开",
+    "nextMonth": "下一月", "nextWeek": "下一周", "date": "{{day}}日", "dateWithRecord": "{{day}}日，有饮食记录",
+    "weekdays": { "sun": "日", "mon": "一", "tue": "二", "wed": "三", "thu": "四", "fri": "五", "sat": "六" },
+    "dailySummary": "当日汇总", "overTarget": "超出 {{amount}} kcal", "remaining": "还可摄入 {{amount}} kcal",
+    "searchResults": "搜索结果", "todayMeals": "今日餐次", "loadFailed": "无法读取云端餐次",
+    "noMatches": "没有符合条件的餐次", "futureEmpty": "未来日期还没有餐次", "dayEmpty": "当天没有记录",
+    "tryOtherFilter": "换个关键词或清除筛选再试试。", "clearFilters": "清除筛选", "addMeal": "新增餐次",
+    "filterHint": "按餐次类型或收藏查看当天的饮食记录。", "filterSection": "筛选", "done": "完成",
+    "manualLog": "手动记录", "manualMeal": "手动记录一餐", "manualHint": "不方便拍照时，直接录入食材与份量"
+  },
+  "foodCatalog": {
+    "all": "全部", "unnamed": "未命名食物", "unavailable": "食物库暂时不可用，请稍后重试",
+    "searchTooShort": "请输入至少两个字母或汉字", "search": "搜索", "searchPlaceholder": "搜索食物名称",
+    "searching": "查询中", "loading": "正在加载食物库…", "searchResults": "搜索结果", "popular": "热门推荐",
+    "refreshPopular": "换一批热门推荐", "refresh": "换一批", "viewDetails": "查看食物详情",
+    "emptyTitle": "暂未找到匹配食物", "emptyHint": "可尝试中文或英文食物名，例如 beef、鸡胸肉、salmon。",
+    "categories": { "all": "全部", "meat_poultry": "肉禽", "seafood": "鱼虾海鲜", "egg_dairy": "蛋类与乳制品", "plant_protein": "豆类与植物蛋白", "grains_tubers": "谷物与薯类", "vegetables": "蔬菜", "fruits": "水果", "nuts_seeds": "坚果与种子", "oils_seasonings": "油脂与调味", "beverages": "饮品", "basic_processed": "烘焙与基础加工食材", "regional_staples": "地域特色常用食材", "nordic_staples": "北欧常见食材", "north_american_staples": "北美常见食材", "egg": "蛋类", "dairy": "乳制品", "soy": "豆制品", "grain": "谷物", "beverage": "饮料", "seasoning": "调味品", "mixed_dish": "混合菜", "other": "其他" },
+    "tags": { "high_protein": "高蛋白", "low_fat": "低脂", "high_carb": "高碳水", "low_calorie": "低热量", "plant_protein": "植物蛋白", "high_fiber": "高膳食纤维" }
+  },
+  "manualMeal": {
+    "title": "手动记录", "nameRequired": "请填写这一餐的名称", "nutritionRequired": "请填写有效的热量与营养数据",
+    "localInsight": "这是一条手动补充的本地饮食记录。", "saveFailed": "保存失败，请检查网络后重试",
+    "selectedFood": "已从食物库选中", "name": "餐食名称", "namePlaceholder": "例如：鸡胸肉沙拉",
+    "time": "记录时间", "type": "餐次类型", "estimate": "营养估算", "estimating": "正在自动估算…",
+    "estimateStatus": { "prompt": "填写餐食名称后可自动估算，也可手动修改", "estimated": "已按“{{title}}”自动估算，可继续手动修改", "failed": "暂未获得自动估算，请按包装或常见份量手动填写", "portion": "已按当前份量自动计算，可继续手动修改", "preparing": "正在根据餐食名称准备估算…" },
+    "reestimate": "重新估算", "portion": "食用份量", "localSave": "本地保存",
+    "saveHint": "记录会保存在当前设备，并同步到今日汇总。", "save": "保存这餐"
+  },
+  "foodDetail": {
+    "title": "食物详情", "emptyTitle": "没有可展示的食物", "emptyHint": "请返回食物库重新选择。",
+    "gotIt": "知道了", "firstFood": "已经是第一个", "lastFood": "已经是最后一个",
+    "previousFood": "上一个食物", "nextFood": "下一个食物", "variants": "版本选择", "variantCount": "{{count}} 个营养版本",
+    "recommendedVariant": "推荐版本", "otherVariant": "其他营养版本",
+    "variantNutrition": "{{calories}} kcal · 蛋白质 {{protein}}g", "portion": "份量选择", "custom": "自定义",
+    "nutrition": "营养成分", "insightLoading": "NOVA 正在根据这份食物的真实营养数据生成介绍…",
+    "insightUnavailable": "云端洞察暂时不可用，请稍后重试。", "replace": "替换当前食物",
+    "addToRecognition": "添加 {{grams}}g 到本次识别", "addToMeal": "添加到本餐"
+  },
+  "onboarding": {
+    "brand": "Nordic Nutri AI",
+    "step": "第 1 步，共 4 步",
+    "progressAriaLabel": "当前为第 1 步，共 4 步",
+    "backAriaLabel": "返回",
+    "title": "你的目标是什么？",
+    "subtitle": "我们将根据你的目标，为你制定个性化营养计划。",
+    "continue": "继续",
+    "selected": "已选择",
+    "goals": {
+      "muscle_gain": {
+        "title": "增益增肌",
+        "description": "增加肌肉量与力量。"
+      },
+      "fat_loss": {
+        "title": "轻盈减脂",
+        "description": "降低体脂，同时尽量保留肌肉。"
+      },
+      "maintenance": {
+        "title": "保持状态",
+        "description": "维持稳定、均衡的身体状态。"
+      },
+      "performance": {
+        "title": "健康饮食",
+        "description": "建立均衡、可持续的饮食习惯。"
+      }
+    }
+  }
+}

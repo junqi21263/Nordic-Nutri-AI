@@ -1,5 +1,7 @@
 import Taro from "@tarojs/taro";
 import { loginWithWechat } from "../api/auth-api";
+import { androidAuthApi } from "../api/android-auth-api";
+import type { AppAuthUser } from "./auth-store";
 import { getProductAccount } from "../api/product-data-api";
 import { getLocalDateString } from "../features/onboarding/domain";
 import { refreshProductAchievements } from "../features/coach/refresh-achievements";
@@ -21,12 +23,30 @@ import {
   refreshSession,
   restoreSession,
 } from "./session-manager";
+import { useAppTransitionStore } from "../stores/app-transition-store";
+
+const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
+
+function finishWelcomeTransition() {
+  if (!isAndroidApp) return;
+  setTimeout(() => useAppTransitionStore.getState().hideWelcomeTransition(), 180);
+}
 
 function openWelcomeIfNeeded() {
   const pages = Taro.getCurrentPages();
   const route = pages[pages.length - 1]?.route || "";
   if (route.includes("pages/welcome/index")) return Promise.resolve();
   return Taro.reLaunch({ url: "/pages/welcome/index" });
+}
+
+function openLoginPage() {
+  if (isAndroidApp) {
+    return Taro.reLaunch({ url: "/pages/android-auth/index" }).then((result) => {
+      finishWelcomeTransition();
+      return result;
+    });
+  }
+  return Taro.reLaunch({ url: "/pages/auth-entry/index" });
 }
 
 async function loadIdentity(user: { id: string }) {
@@ -89,11 +109,20 @@ async function loadIdentity(user: { id: string }) {
   }
 }
 
+function isAppAuthUser(value: unknown): value is AppAuthUser {
+  return Boolean(value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string");
+}
+
 const authBootstrap = createAuthBootstrap({
+  preserveSessionOnError: isAndroidApp,
   restore: restoreSession,
-  getUser: getCurrentUser,
+  getUser: async () => {
+    if (!isAndroidApp) return getCurrentUser();
+    const result = await androidAuthApi.getMe() as { user?: unknown };
+    return isAppAuthUser(result.user) ? result.user : null;
+  },
   refresh: refreshSession,
-  login: loginWithWechat,
+  login: isAndroidApp ? async () => null : loginWithWechat,
   loadIdentity,
   clear: clearInvalidSession,
 });
@@ -111,8 +140,11 @@ const applicationLaunch = createRuntimeApplicationLaunch(
     isOnboardingCompleted,
     hasSeenWelcome,
     openHome: () => Taro.switchTab({ url: "/pages/home/index" }),
-    openOnboarding: () => Taro.reLaunch({ url: "/pages/onboarding/index" }),
-    openLogin: () => Taro.reLaunch({ url: "/pages/auth-entry/index" }),
+    openOnboarding: () => Taro.reLaunch({ url: "/pages/onboarding/index" }).then((result) => {
+      finishWelcomeTransition();
+      return result;
+    }),
+    openLogin: openLoginPage,
     openWelcome: () => openWelcomeIfNeeded(),
   },
 );

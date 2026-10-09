@@ -1,4 +1,5 @@
 import Taro from "@tarojs/taro";
+import { useSyncExternalStore } from "react";
 import {
   getOnboardingNavigationMetrics,
   type OnboardingNavigationMetrics,
@@ -16,6 +17,11 @@ export interface SystemLayout extends OnboardingNavigationMetrics {
 
 const FALLBACK_STATUS_BAR = 44;
 const FALLBACK_TAB_BAR = 56;
+const isWeChatRuntime = process.env.TARO_ENV === "weapp";
+
+function finiteInset(value: number, fallback = 0): number {
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
 
 function getSafeBottom(): number {
   try {
@@ -62,23 +68,27 @@ function computeMetrics(): SystemLayout {
     }
   }
 
-  try {
-    menuButtonRect = Taro.getMenuButtonBoundingClientRect();
-  } catch {
-    // Android / devtools may not have capsule
+  if (isWeChatRuntime) {
+    try {
+      menuButtonRect = Taro.getMenuButtonBoundingClientRect();
+    } catch {
+      // Android / devtools may not have capsule
+    }
   }
 
   const m = getOnboardingNavigationMetrics({
-    statusBarHeight,
-    windowWidth,
+    // The native Android container already excludes the system status bar.
+    // H5 can report NaN here; it must never become an invalid CSS padding.
+    statusBarHeight: isWeChatRuntime ? finiteInset(statusBarHeight, FALLBACK_STATUS_BAR) : 0,
+    windowWidth: finiteInset(windowWidth, 375),
     menuButtonRect,
   });
 
   return {
     ...m,
-    safeBottom: getSafeBottom(),
+    safeBottom: finiteInset(getSafeBottom()),
     tabBarHeight: FALLBACK_TAB_BAR,
-    screenWidth: getScreenWidth(),
+    screenWidth: finiteInset(getScreenWidth(), 375),
   };
 }
 
@@ -89,9 +99,29 @@ function getCachedLayout(): SystemLayout {
   return cachedLayout;
 }
 
-/** Unified system layout hook. Computes once and caches. */
+const listeners = new Set<() => void>();
+
+function refreshLayout() {
+  cachedLayout = computeMetrics();
+  listeners.forEach((notify) => notify());
+}
+
+function subscribeLayout(notify: () => void) {
+  if (listeners.size === 0) {
+    Taro.onWindowResize(refreshLayout);
+    // Also refresh after pages remount following an inactive interval.
+    cachedLayout = computeMetrics();
+  }
+  listeners.add(notify);
+  return () => {
+    listeners.delete(notify);
+    if (listeners.size === 0) Taro.offWindowResize(refreshLayout);
+  };
+}
+
+/** One shared snapshot, refreshed when the viewport changes. */
 export function useSystemLayout(): SystemLayout {
-  return getCachedLayout();
+  return useSyncExternalStore(subscribeLayout, getCachedLayout, getCachedLayout);
 }
 
 export { computeMetrics };

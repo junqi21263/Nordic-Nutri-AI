@@ -6,6 +6,7 @@ import { createAchievementStore } from "../src/stores/achievement-store";
 import { createCoachStore } from "../src/stores/coach-store";
 import { createMealFixtures } from "../src/features/meals/domain";
 import { createProfileStore } from "../src/stores/profile-store";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const coachPageSource = () =>
   readFileSync(resolve(import.meta.dirname, "../src/pages/coach/index.tsx"), "utf8");
@@ -49,7 +50,7 @@ describe("local coach and profile", () => {
     const titleStart = source.indexOf('className="coach-chat__page-title"');
     const titleEnd = source.indexOf('className="coach-chat__status"');
 
-    expect(source).toContain('title="你的营养教练"');
+    expectLocalizedCopy(source, "你的营养教练");
     expect(source.slice(titleStart, titleEnd)).not.toContain("你的营养教练");
     expect(source.slice(titleStart, titleEnd)).not.toContain("NordicIcon");
     expect(source).not.toContain("coach-chat__avatar");
@@ -63,19 +64,18 @@ describe("local coach and profile", () => {
       "utf8",
     );
 
-    expect(source).toContain("NOVA · 今日提醒");
-    expect(composer).toContain("问问营养教练");
+    expectLocalizedCopy(source, "NOVA · 今日提醒");
+    expectLocalizedCopy(composer, "问问营养教练");
     expect(source).toContain('className="coach-chat__hero-greeting"');
     expect(source).toContain('className="coach-chat__hero-summary"');
     expect(source).toContain('className="coach-chat__hero-suggestion"');
     expect(source).not.toContain('className="coach-chat__status-badge"');
     expect(source).not.toContain('className="coach-chat__suggestion-product"');
     expect(source).not.toContain("addSuggestedSnack");
-    expect(source).toContain("const defaultQuickPrompts");
     expect(source).toContain("quickPrompts.slice(0, 4).map");
     expect(source).toContain('className="coach-chat__quick-chip-text"');
     expect(source).not.toContain('className="coach-chat__hero-actions"');
-    expect(source).not.toContain("查看今日进度");
+    expect(source).toContain('"查看今日进度": "coachPage.context.viewProgress"');
 
     const pageStyles = readFileSync(
       resolve(import.meta.dirname, "../src/styles/page.scss"),
@@ -83,7 +83,7 @@ describe("local coach and profile", () => {
     );
     expect(pageStyles).toContain(".coach-chat__quick-actions {\n  display: flex;");
     expect(pageStyles).toContain("justify-content: center;");
-    expect(pageStyles).toContain("white-space: nowrap;");
+    expect(pageStyles).toContain("flex-wrap: wrap;");
   });
 
   it("keeps restart parallel to NOVA and places the dynamic question below the nutrition tip", () => {
@@ -134,7 +134,7 @@ describe("local coach and profile", () => {
     expect(source).not.toContain("MovableArea");
     expect(source).not.toContain("MovableView");
     expect(source).toContain('className="coach-chat__scroll-top"');
-    expect(source).toContain('ariaLabel="回到顶部"');
+    expectLocalizedCopy(source, "回到顶部");
     expect(source).toContain("Taro.pageScrollTo({ scrollTop: 0, duration: 300 })");
     expect(source).toContain('name="arrow-up" size={22}');
     expect(source).toContain("onClick={scrollToCoachTop}");
@@ -234,14 +234,15 @@ describe("local coach and profile", () => {
       "utf8",
     );
 
-    expect(source).toContain('title="个人中心"');
-    expect(source).toContain('className="page-layout--profile"');
+    expectLocalizedCopy(source, "个人中心");
+    expect(source).toContain('page-layout--profile-android profile-stitch');
     expect(source).not.toContain('className="profile-page-title"');
     expect(source).not.toContain('title="我的节奏"');
     expect(source).not.toContain('className="profile-rhythm__goal-progress"');
     expect(source).not.toContain("把目标、记录与改变放在同一张地图上。");
-    expect(source).toContain("蛋白完成度");
-    expect(source).toContain("本周回顾");
+    const androidOverview = readFileSync(resolve(import.meta.dirname, "../src/pages/profile/android-overview.tsx"), "utf8");
+    expectLocalizedCopy(androidOverview, "蛋白完成度");
+    expectLocalizedCopy(androidOverview, "本周回顾");
     expect(source).toContain('setActiveKey("coach")');
     expect(source).toContain('Taro.switchTab({ url: "/pages/coach/index" })');
     expect(source).toContain('Taro.switchTab({ url: "/pages/meal-records/index" })');
@@ -276,19 +277,19 @@ describe("local coach and profile", () => {
       expect(source).toContain(`/pages/${page}/index`);
     });
     expect(source).toContain("/pages/body-profile/index?from=settings&entry=1");
-    expect(source).toContain('title="营养档案"');
+    expectLocalizedCopy(source, "营养档案");
     expect(source).not.toContain('title="身体资料"');
     expect(source).not.toContain('title="饮食偏好"');
-    expect(source).toContain('description="身体数据、饮食偏好与忌口"');
+    expectLocalizedCopy(source, "身体数据、饮食偏好与忌口");
     expect(source).not.toContain("formatDietPreferencesSummary");
     expect(source).not.toContain("nutritionProfileSummary");
     expect(source).toContain("/pages/goal-adjust/index");
     expect(appConfig).toContain("pages/privacy-policy/index");
-    expect(source).toContain('title="隐私政策与免责声明"');
+    expectLocalizedCopy(source, "隐私政策与免责声明");
     expect(source).toContain("/pages/privacy-policy/index");
     expect(source).toContain('className="profile-feedback-title"');
-    expect(source).toContain("反馈与帮助");
-    expect(source).toContain('title="关于我们"');
+    expectLocalizedCopy(source, "反馈与帮助");
+    expectLocalizedCopy(source, "关于我们");
     expect(source).not.toContain('title="主题"');
     expect(source).not.toContain('title="语言"');
     expect(source).not.toContain('title="提醒"');
@@ -306,13 +307,13 @@ describe("local coach and profile", () => {
       "utf8",
     );
     expect(source).not.toContain('activeModal === "privacy"');
-    expect(policy).toContain("写入 CloudBase");
-    expect(policy).toContain("注销 Nordic Nutri AI 产品账号");
+    expect(policy).toContain('t(`privacyPolicy.sections.${index}.content`)');
+    expectLocalizedCopy(policy, "注销 Nordic Nutri AI 产品账号");
     expect(source).toContain('activeModal === "feedback"');
-    expect(source).toContain("提交反馈");
+    expectLocalizedCopy(source, "提交反馈");
     expect(source).toContain('activeModal === "about"');
-    expect(source).toContain("Nordic Nutri AI 帮助你轻松看见、理解并记录每一餐。");
-    expect(source).toContain("不构成医疗诊断或治疗建议");
+    expectLocalizedCopy(source, "帮助你轻松看见、理解并记录每一餐");
+    expectLocalizedCopy(source, "不构成医疗诊断或治疗建议");
     expect(source).not.toContain(">知道了<");
   });
 
@@ -327,16 +328,16 @@ describe("local coach and profile", () => {
     );
 
     expect(profileEdit).toContain("profile.setProfile");
-    expect(profileEdit).toContain("保存资料");
+    expectLocalizedCopy(profileEdit, "保存资料");
     expect(profileEdit).toContain('className="page-layout--profile-edit"');
     expect(profileEdit).not.toContain('className="profile-subpage__page-title"');
     expect(profileEdit).toContain('className="profile-edit__notice"');
     expect(profileEdit).toContain('className="profile-edit__action"');
-    expect(profileEdit).toContain("昵称会保存到你的账号");
+    expectLocalizedCopy(profileEdit, "昵称会保存到你的账号");
     expect(profileEdit).not.toContain('eyebrow="我的节奏"');
     expect(profileEdit).not.toContain("保留最重要的信息，让目标更贴合现在的你。");
     expect(goalAdjust).toContain("profile.setProfile");
-    expect(goalAdjust).toContain("保存今日目标");
+    expectLocalizedCopy(goalAdjust, "保存今日目标");
     expect(goalAdjust).toContain("saveProductNutritionPlan");
   });
 
@@ -350,21 +351,21 @@ describe("local coach and profile", () => {
       "utf8",
     );
 
-    expect(achievements).toContain("全部成就");
+    expectLocalizedCopy(achievements, "全部成就");
     expect(achievements).toContain("createAchievements");
     expect(achievements).toContain('className="page-layout--achievements"');
     expect(achievements).toContain('className="profile-subpage__page-title"');
     expect(achievements).not.toContain("继续记录，让每一餐都成为节奏。");
-    expect(weeklyReview).toContain('title="本周回顾"');
-    expect(weeklyReview).toContain('className="page-layout--weekly-review"');
+    expectLocalizedCopy(weeklyReview, "本周回顾");
+    expect(weeklyReview).toContain('className="page-layout--weekly-v2"');
     expect(weeklyReview).not.toContain('className="profile-subpage__page-title"');
-    expect(weeklyReview).toContain('className="weekly-review__hero-aside"');
+    expect(weeklyReview).toContain('className="weekly-v2__score-row"');
     expect(weeklyReview).not.toContain("看见已经做到的，再决定下一步。");
-    expect(weeklyReview).toContain('className="weekly-review__rhythm"');
-    expect(weeklyReview).toContain("本周节奏");
-    expect(weeklyReview).toContain("getMondayBasedWeekDates");
+    expect(weeklyReview).toContain('className="weekly-v2__week"');
+    expectLocalizedCopy(weeklyReview, "本周节奏");
+    expect(weeklyReview).toContain("getProductWeeklyReview(date");
     expect(weeklyReview).not.toContain("day - (6 - index)");
-    expect(weeklyReview).toContain("下周小目标");
-    expect(weeklyReview).toContain("基于已同步到云端的饮食记录");
+    expectLocalizedCopy(weeklyReview, "下周小目标");
+    expect(weeklyReview).toContain("review.recordedDays");
   });
 });

@@ -20,10 +20,10 @@ describe("daily target exceed presentation", () => {
     expect(summary).toContain("100 - calorieProgress.percent");
     expect(summary).toContain("conic-gradient(from 0deg");
     expect(summary).not.toContain("conic-gradient(from -90deg");
-    expect(summary).toContain('calorieProgress.exceeded ? "已超" : "剩余"');
-    expect(summary).toContain("formatTargetStatus");
+    expect(summary).toContain('t(calorieProgress.exceeded ? "dailySummary.overShort" : "dailySummary.remainingShort",');
+    expect(summary).toContain("function targetStatus");
     expect(records).toContain("meal-records-page__summary-status--exceeded");
-    expect(records).toContain("formatTargetStatus(calorieProgress");
+    expect(records).toContain("clampProgress");
     expect(coach).toContain("coach-chat__progress-track--exceeded");
     expect(coach).toContain("formatTargetStatus");
     expect(pageStyles).toContain(".daily-summary__dashboard-ring--exceeded");

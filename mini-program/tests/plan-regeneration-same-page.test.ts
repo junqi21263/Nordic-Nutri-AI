@@ -11,8 +11,8 @@ describe("plan regeneration layout isolation", () => {
     const page = read("pages/diet-preferences/index.tsx");
 
     expect(page).toContain("diet-preferences-page");
-    expect(page).toContain("每日餐次");
-    expect(page).toContain("重新生成计划");
+    expect(page).toContain('t("dietPreferences.mealsPerDay")');
+    expect(page).toContain('"dietPreferences.regenerate"');
     expect(page).toContain("<PlanTransitionOverlay");
     expect(page).not.toContain("plan-regeneration__preferences");
     expect(page).not.toContain("plan-regeneration__result");
@@ -87,7 +87,7 @@ describe("plan regeneration layout isolation", () => {
     const overlay = read("components/plan-transition-overlay/index.tsx");
     expect(overlay).toContain('PlanTransitionOverlayPhase = "processing" | "completing"');
     expect(overlay).toContain('PlanTransitionOverlayVariant = "regenerate" | "initial"');
-    expect(overlay).toContain("正在生成营养计划");
+    expect(overlay).toContain('variant === "initial" ? "nutritionPlan.generating" : "nutritionPlan.regenerating"');
     expect(overlay).not.toContain("OPTIMIZING MACROS");
     expect(overlay).toContain("plan-transition-overlay__completion-mark");
     expect(overlay).toContain('name="check-inverse"');
@@ -102,7 +102,7 @@ describe("plan regeneration layout isolation", () => {
 
     expect(preferences).toContain("showProcessingOverlay");
     expect(preferences).toContain("stitchInitialProcessingMotion.buttonPressMs");
-    expect(preferences).toContain("正在生成计划");
+    expect(preferences).toContain('fromSettings ? "dietPreferences.regenerate" : "dietPreferences.generate"');
     expect(preferences).toContain('name="refresh-cw"');
     expect(preferences).toContain('className="diet-preferences-page__action-source"');
     expect(preferences).not.toContain("loading={processing}");

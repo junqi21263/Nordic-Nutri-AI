@@ -12,6 +12,7 @@ import {
   createHttpServer,
   createHunyuanGenerationService,
   createRuntimeService,
+  createAppVersionOnlyService,
   readRuntimeConfig,
   selectDeepseekModel,
   signFoodImageDispatch,
@@ -56,6 +57,47 @@ async function withServer(server, run) {
   }
 }
 
+test("routes recognition feedback independently from vision analysis", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: () => ({ sub: "user-a" }),
+      productUserExists: async () => true,
+      recognitionFeedback: {
+        createFeedback: async (userId, body) => {
+          calls.push(["create", userId, body]);
+          return { feedbackId: "22222222-2222-4222-8222-222222222222" };
+        },
+        updateFeedback: async (userId, id, body) => {
+          calls.push(["update", userId, id, body]);
+          return { feedbackId: id };
+        },
+      },
+    },
+  });
+
+  await withServer(server, async (baseUrl) => {
+    const create = await fetch(`${baseUrl}/recognition-feedback`, {
+      method: "POST",
+      headers: { authorization: "Bearer token", "content-type": "application/json" },
+      body: JSON.stringify({ feedbackType: "other", originalResult: { items: [] } }),
+    });
+    assert.equal(create.status, 200);
+    assert.deepEqual(await create.json(), { feedbackId: "22222222-2222-4222-8222-222222222222" });
+
+    const patch = await fetch(`${baseUrl}/recognition-feedback/22222222-2222-4222-8222-222222222222`, {
+      method: "PATCH",
+      headers: { authorization: "Bearer token", "content-type": "application/json" },
+      body: JSON.stringify({ correctedResult: { items: [] } }),
+    });
+    assert.equal(patch.status, 200);
+  });
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0][0], "create");
+  assert.equal(calls[1][0], "update");
+});
+
 function createRuntimeDb() {
   return {
     from: () => ({}),
@@ -88,6 +130,13 @@ test("reports only missing runtime configuration names", () => {
   );
 });
 
+test("allows OTP debug reveal only for the known DEV environment", () => {
+  const base = { WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "test-dev-d4gyxnn0b5dfa2c8a", IDENTITY_HASH_PEPPER: "identity-pepper", CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret", AUTH_DEBUG_OTP_REVEAL: "true" };
+  assert.equal(readRuntimeConfig(base).debugOtpReveal, true);
+  assert.throws(() => readRuntimeConfig({ ...base, TCB_ENV: "lewis-healthy-d4glgqqzv73a5bc10" }), /allowed only in development/);
+  assert.throws(() => readRuntimeConfig({ ...base, TCB_ENV: "unknown-env", AUTH_ENVIRONMENT: "development" }), /allowed only in development/);
+});
+
 test("assembles every runtime service after the RDB client is available", () => {
   const db = createRuntimeDb();
   const service = createRuntimeService({
@@ -102,12 +151,30 @@ test("assembles every runtime service after the RDB client is available", () => 
   });
 
   for (const capability of ["issue", "verifySession"]) assert.equal(typeof service[capability], "function");
-  for (const capability of ["data", "meals", "insights", "coach", "feedback"]) assert.ok(service[capability]);
+  assert.equal(typeof service.appVersion.getLatest, "function");
+  for (const capability of ["data", "meals", "insights", "coach", "feedback", "recognitionFeedback"]) assert.ok(service[capability]);
   assert.equal(typeof service.vision?.analyzeImage, "function");
   assert.equal(service.vision?.provider, null);
   assert.equal(service.vision?.model, null);
   assert.equal(service.visionAnalysisFoundationEnabled, false);
   assert.equal(service.foodImageDispatchSecret, "");
+});
+
+test("can initialize the app-version endpoint without Android auth services", async () => {
+  const service = createAppVersionOnlyService({
+    WX_APPID: "wx-app", WX_SECRET: "wx-secret", TCB_ENV: "env-id", IDENTITY_HASH_PEPPER: "identity-pepper",
+    CLOUDBASE_APIKEY: "cloudbase-key", APP_SESSION_SECRET: "session-secret",
+  }, {
+    cloudbaseSdk: { init: () => ({ rdb: () => ({ from: () => ({
+      select: () => ({
+        eq: () => ({ in: () => ({ eq: () => ({
+          order: () => ({ limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
+        }) }) }),
+      }),
+    }) }) }) },
+  });
+
+  assert.deepEqual(await service.appVersion.getLatest(), { update: null });
 });
 
 test("wires old-image audit through the configured vision route", () => {
@@ -423,6 +490,52 @@ test("uses formula nutrition targets after a legacy shared DeepSeek budget is ex
     "model_tokens_output",
   ]);
   assert.ok(metrics.every((item) => item.meta.feature === "nutrition_plan"));
+});
+
+test("nutrition preview keeps the formula plan when optional AI fails", async () => {
+  const server = createHttpServer({ service: {
+    verifySession: () => ({ sub: "user-1" }),
+    calculateNutritionPlan: async () => { throw new Error("upstream unavailable"); },
+  } });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/nutrition-plan/preview`, {
+      method: "POST", headers: { "content-type": "application/json", authorization: "Bearer valid-session" },
+      body: JSON.stringify({ sex: "male", age: 30, heightCm: 175, weightKg: 70 }),
+    });
+    assert.equal(response.status, 200);
+    const plan = await response.json();
+    assert.equal(plan.source, "formula");
+    assert.equal(plan.calories, 2560);
+    assert.ok(plan.insight);
+  });
+});
+
+test("nutrition preview bounds optional AI waiting and aborts the pending request", async () => {
+  let aborted = false;
+  const server = createHttpServer({ service: {
+    verifySession: () => ({ sub: "user-1" }),
+    calculateNutritionPlan: (_body, { signal } = {}) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve({ insight: "late insight" }), 6500);
+      signal?.addEventListener("abort", () => {
+        aborted = true;
+        clearTimeout(timer);
+        reject(new Error("cancelled"));
+      }, { once: true });
+    }),
+  } });
+  await withServer(server, async (baseUrl) => {
+    const started = Date.now();
+    const response = await fetch(`${baseUrl}/get-login-ticket/nutrition-plan/preview`, {
+      method: "POST", headers: { "content-type": "application/json", authorization: "Bearer valid-session" },
+      body: JSON.stringify({ sex: "male", age: 30, heightCm: 175, weightKg: 70 }),
+    });
+    assert.equal(response.status, 200);
+    const plan = await response.json();
+    assert.equal(aborted, true);
+    assert.ok(Date.now() - started < 6000);
+    assert.equal(plan.source, "formula");
+    assert.notEqual(plan.insight, "late insight");
+  });
 });
 
 test("routes Hunyuan generation through the signed worker when configured", async () => {
@@ -1347,6 +1460,93 @@ test("admin food routes reject product sessions without admin_console role", asy
   });
 });
 
+test("admin push test is restricted to admin sessions and returns a trace id", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "admin-session" ? { sub: "admin-1", role: "admin_console" } : null,
+      push: { sendTest: async (input) => { calls.push(input); return { sent: 1, accepted: 1, received: null, displayed: null, opened: null, status: "pending", invalidated: 0, messageIds: ["projects/demo/messages/1"], deliveryIds: ["11111111-1111-4111-8111-111111111111"], deliveryId: "11111111-1111-4111-8111-111111111111" }; } },
+      adminAudit: { record: async () => undefined },
+      observability: {
+        startTrace: () => ({ traceId: "trace_push_test", startedAt: new Date().toISOString(), stages: [] }),
+        recordStage: () => undefined,
+        finishTrace: async () => undefined,
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/get-login-ticket/api/admin/push/test`, { method: "POST", body: "{}" });
+    assert.equal(denied.status, 401);
+    const response = await fetch(`${baseUrl}/get-login-ticket/api/admin/push/test`, {
+      method: "POST",
+      headers: { authorization: "Bearer admin-session", "content-type": "application/json" },
+      body: JSON.stringify({ userId: "user-1", mealType: "lunch", scenario: "missed_streak" }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { sent: 1, accepted: 1, received: null, displayed: null, opened: null, status: "pending", invalidated: 0, messageIds: ["projects/demo/messages/1"], deliveryIds: ["11111111-1111-4111-8111-111111111111"], deliveryId: "11111111-1111-4111-8111-111111111111", traceId: "trace_push_test" });
+  });
+  assert.deepEqual(calls, [{ userId: "user-1", mealType: "lunch", scenario: "missed_streak", traceId: "trace_push_test" }]);
+});
+
+test("product push delivery acknowledgements are bound to the authenticated user", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "product-session" ? { sub: "user-1" } : null,
+      push: { acknowledgeDelivery: async (userId, input) => { calls.push({ userId, input }); return { acknowledged: true, deliveryId: input.deliveryId, event: input.event, status: "received" }; } },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/push-delivery/ack`, {
+      method: "POST",
+      headers: { authorization: "Bearer product-session", "content-type": "application/json" },
+      body: JSON.stringify({ deliveryId: "11111111-1111-4111-8111-111111111111", event: "received" }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { acknowledged: true, deliveryId: "11111111-1111-4111-8111-111111111111", event: "received", status: "received" });
+  });
+  assert.deepEqual(calls, [{ userId: "user-1", input: { deliveryId: "11111111-1111-4111-8111-111111111111", event: "received" } }]);
+});
+
+test("native push receipts use token proof and do not require a product session", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      push: { acknowledgeNativeDelivery: async (input) => { calls.push(input); return { acknowledged: true, deliveryId: input.deliveryId, event: input.event, status: "displayed" }; } },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/push-delivery/native-ack`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ deliveryId: "11111111-1111-4111-8111-111111111111", event: "displayed", token: "device-token" }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { acknowledged: true, deliveryId: "11111111-1111-4111-8111-111111111111", event: "displayed", status: "displayed" });
+  });
+  assert.deepEqual(calls, [{ deliveryId: "11111111-1111-4111-8111-111111111111", event: "displayed", token: "device-token" }]);
+});
+
+test("product push token route binds registration to the authenticated user", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "product-session" ? { sub: "user-1" } : null,
+      push: { registerToken: async (userId, input) => { calls.push({ userId, input }); return { registered: true }; } },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/push-tokens`, {
+      method: "POST",
+      headers: { authorization: "Bearer product-session", "content-type": "application/json" },
+      body: JSON.stringify({ token: "device-token", platform: "android", packageName: "com.lewislee.nordicnutri.dev" }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { registered: true });
+  });
+  assert.deepEqual(calls, [{ userId: "user-1", input: { token: "device-token", platform: "android", packageName: "com.lewislee.nordicnutri.dev" } }]);
+});
+
 test("model quota policies are readable and editable only through an admin session", async () => {
   const saves = [];
   const server = createHttpServer({
@@ -1841,5 +2041,14 @@ test("omits Access-Control-Allow-Origin so CloudBase gateway does not duplicate 
     });
     assert.equal(response.status, 503);
     assert.equal(response.headers.get("access-control-allow-origin"), null);
+  });
+});
+
+test("distinguishes an unavailable app-version service from a failed release lookup", async () => {
+  const server = createHttpServer({ service: null });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/app/version`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { code: "APP_VERSION_SERVICE_NOT_CONFIGURED" });
   });
 });

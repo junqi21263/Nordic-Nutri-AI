@@ -24,12 +24,12 @@ const getSavedMultiplier = (meal: Meal) => {
   return normalizeMultiplier(first);
 };
 
-const toScannerFixture = (meal: Meal, multiplier = 1): ScannerMealFixture => ({
+const toScannerFixture = (meal: Meal, multiplier = 1, includeImage = true): ScannerMealFixture => ({
   id: `edit-${meal.id}`,
   title: meal.title,
   mealType: meal.mealType,
-  imageKey: meal.imageKey ?? "bowl",
-  imageUrl: meal.imageUrl ?? null,
+  imageKey: includeImage ? (meal.imageKey ?? "bowl") : "bowl",
+  imageUrl: includeImage ? (meal.imageUrl ?? null) : null,
   confidence: 100,
   items: meal.items.map((item) => {
     if (multiplier === 1 || !item.aiQuantityG) return { ...item };
@@ -47,9 +47,12 @@ const toScannerFixture = (meal: Meal, multiplier = 1): ScannerMealFixture => ({
 export interface PortionDraftStore {
   meal: ScannerMealFixture | null;
   editingMealId: string | null;
+  isRepeating: boolean;
+  templateId: string | null;
   multiplier: number;
   start: (meal: ScannerMealFixture) => void;
   startMealEdit: (meal: Meal) => void;
+  startMealRepeat: (meal: Meal, templateId?: string) => void;
   setMealType: (mealType: Meal["mealType"]) => void;
   setMultiplier: (multiplier: number) => void;
   adjustBy: (delta: number) => void;
@@ -60,6 +63,8 @@ export const createPortionDraftStore = () =>
   create<PortionDraftStore>((set, get) => ({
     meal: null,
     editingMealId: null,
+    isRepeating: false,
+    templateId: null,
     multiplier: 1,
     start: (meal) => {
       const current = get();
@@ -67,11 +72,17 @@ export const createPortionDraftStore = () =>
       const multiplier = Number.isFinite(meal.portionMultiplier)
         ? normalizeMultiplier(meal.portionMultiplier as number)
         : 1;
-      set({ meal, editingMealId: null, multiplier });
+      set({ meal, editingMealId: null, isRepeating: false, templateId: null, multiplier });
     },
     startMealEdit: (meal) => {
       const multiplier = getSavedMultiplier(meal);
-      set({ meal: toScannerFixture(meal, multiplier), editingMealId: meal.id, multiplier });
+      set({ meal: toScannerFixture(meal, multiplier), editingMealId: meal.id, isRepeating: false, templateId: null, multiplier });
+    },
+    startMealRepeat: (meal, templateId) => {
+      const draft = toScannerFixture(meal, 1);
+      draft.insight = "";
+      draft.items = meal.items.map((item) => ({ ...item, aiQuantityG: readQuantityG(item.amount) }));
+      set({ meal: draft, editingMealId: null, isRepeating: true, templateId: templateId ?? null, multiplier: 1 });
     },
     setMealType: (mealType) =>
       set((state) => (state.meal ? { meal: { ...state.meal, mealType } } : state)),
@@ -82,6 +93,6 @@ export const createPortionDraftStore = () =>
       const state = get();
       return state.meal ? getAdjustedAnalysis(state.meal, state.multiplier) : null;
     },
-    reset: () => set({ meal: null, editingMealId: null, multiplier: 1 }),
+    reset: () => set({ meal: null, editingMealId: null, isRepeating: false, templateId: null, multiplier: 1 }),
   }));
 export const usePortionDraftStore = createPortionDraftStore();

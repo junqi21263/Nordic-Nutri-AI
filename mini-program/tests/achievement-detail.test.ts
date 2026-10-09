@@ -6,6 +6,7 @@ import {
   getAchievementNextAction,
   getAchievementNextActionTarget,
   getAchievementRequirement,
+  getAchievementTranslationSlug,
   sortAchievementsForProfilePreview,
 } from "../src/features/coach/achievement-catalog";
 
@@ -25,6 +26,12 @@ describe("achievement detail interactions", () => {
     expect(getAchievementNextActionTarget("认识自己")).toBe("/pages/profile-edit/index");
   });
 
+  it("maps each known achievement title to locale copy without changing stored titles", () => {
+    expect(getAchievementTranslationSlug("第一餐记录")).toBe("firstMeal");
+    expect(getAchievementTranslationSlug("认识自己")).toBe("knowYourself");
+    expect(getAchievementTranslationSlug("未知成就")).toBeUndefined();
+  });
+
   it("uses the shared bottom-sheet detail instead of a separate route", () => {
     const page = readFileSync(resolve(srcRoot, "pages/achievements/index.tsx"), "utf8");
     const detailSheet = readFileSync(resolve(srcRoot, "components/achievement-detail-sheet/index.tsx"), "utf8");
@@ -33,8 +40,8 @@ describe("achievement detail interactions", () => {
     expect(detailSheet).toContain("BottomSheet");
     expect(detailSheet).toContain("lockScroll");
     expect(detailSheet).toContain("unlockedAt");
-    expect(detailSheet).toContain("解锁目标");
-    expect(detailSheet).toContain("当前进度");
+    expect(detailSheet).toContain('t("achievementDetail.unlockGoal")');
+    expect(detailSheet).toContain('t("achievementDetail.progress")');
     expect(detailSheet).toContain("getAchievementNextAction");
     expect(catalog).toContain("去记录第一餐");
     expect(catalog).toContain("去记录早餐");
@@ -42,7 +49,7 @@ describe("achievement detail interactions", () => {
     expect(detailSheet).toContain("getAchievementNextActionTarget");
     expect(detailSheet).toContain("Taro.switchTab({ url: target })");
     expect(detailSheet).toContain("Taro.navigateTo({ url: target })");
-    expect(page).toContain("达成时间");
+    expect(detailSheet).toContain('t("achievementDetail.achievedAt")');
     expect(page).toContain("achievement-center__filters");
     expect(page).toContain("scrollLocked={isPageScrollLocked}");
   });

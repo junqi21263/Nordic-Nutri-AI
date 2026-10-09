@@ -29,6 +29,12 @@ export function toProductMealInput(
     items: meal.items.map((item) => {
       const quantityG = readQuantity(item.amount);
       const scale = quantityG / 100;
+      const saved = item.savedNutrition;
+      const unchanged = saved && item.amount === `${Math.round(saved.quantityG)}g`
+        && item.calories === Math.round(saved.caloriesPer100g * saved.quantityG / 100)
+        && item.protein === Math.round(saved.proteinPer100g * saved.quantityG / 100)
+        && item.carbs === Math.round(saved.carbsPer100g * saved.quantityG / 100)
+        && item.fat === Math.round(saved.fatPer100g * saved.quantityG / 100);
       return {
         name: item.name,
         quantityG,
@@ -40,6 +46,7 @@ export function toProductMealInput(
         proteinPer100g: item.protein / scale,
         carbsPer100g: item.carbs / scale,
         fatPer100g: item.fat / scale,
+        ...(unchanged ? saved : {}),
       };
     }),
   };

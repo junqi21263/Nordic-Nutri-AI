@@ -1,4 +1,5 @@
 const dailyTipTypes = new Set(["nutrition_tip", "food_function", "food_knowledge"]);
+const { normalizeLocale, localeInstruction } = require("./locale.cjs");
 const unsafeDailyTipWording = /诊断|治疗|处方|药物|吃药|用药|孕期|怀孕|哺乳|厌食|暴食|替代医疗/i;
 const genericCoachQuickPromptWording = /怎么吃更健康|吃什么比较好|饮食怎么安排|怎么搭配更好/i;
 const forbiddenPresentationWording = /```|[`*#]|^\s*(?:回复|答复|回答|建议|说明)\s*[:：]/m;
@@ -46,7 +47,7 @@ function normalizeFood(value) {
   return { name, proteinG: Math.round(proteinG * 10) / 10 };
 }
 
-function validateDailyTip(payload) {
+function validateDailyTip(payload, locale) {
   let value = payload;
   try {
     if (typeof value === "string") value = JSON.parse(value);
@@ -56,36 +57,56 @@ function validateDailyTip(payload) {
   if (!value || typeof value !== "object" || Array.isArray(value) || !dailyTipTypes.has(value.type)) {
     throw dailyTipError();
   }
-  const headline = boundedText(value.headline, 32);
-  const content = boundedText(value.content, 120);
-  const reason = boundedText(value.reason, 30);
+  const factor = normalizeLocale(locale) === "en" ? 2 : 1;
+  const headline = boundedText(value.headline, 32 * factor);
+  const content = boundedText(value.content, 120 * factor);
+  const reason = boundedText(value.reason, 30 * factor);
   if (!headline || !content || !reason || unsafeDailyTipWording.test(`${headline}\n${content}\n${reason}`) || forbiddenPresentationWording.test(`${headline}\n${content}\n${reason}`)) {
     throw dailyTipError();
   }
   return { type: value.type, headline, content, reason, food: normalizeFood(value.food) };
 }
 
-function validateCoachQuickPrompt(payload) {
+function validateCoachQuickPrompt(payload, locale) {
   let value = payload;
   try {
     if (typeof value === "string") value = JSON.parse(value);
   } catch {
     throw dailyTipError();
   }
-  const prompt = boundedText(value?.prompt, 28);
+  const prompt = boundedText(value?.prompt, normalizeLocale(locale) === "en" ? 90 : 28);
   if (!prompt || !/[？?]$/.test(prompt) || unsafeDailyTipWording.test(prompt) || genericCoachQuickPromptWording.test(prompt) || forbiddenPresentationWording.test(prompt)) {
     throw dailyTipError();
   }
-  return prompt.replace(/\?$/, "？");
+  return normalizeLocale(locale) === "en" ? prompt : prompt.replace(/\?$/, "？");
 }
 
-function pickFallback(type, random) {
+const localizedFallbacks = {
+  en: {
+    nutrition_tip: ["Add vegetables to your next meal", "Try pairing vegetables with a protein source and a staple food for balance.", "A simple option for your next meal."],
+    food_function: ["Oats can be part of breakfast", "Pair oats with yogurt and fruit for a varied breakfast.", "An everyday food pairing to try."],
+    food_knowledge: ["Read the nutrition label", "Check the ingredients, protein, and energy per serving alongside packaging claims.", "The label offers more detail than a claim."],
+  },
+  "zh-TW": {
+    nutrition_tip: ["下一餐加一份蔬菜", "可以搭配蔬菜、蛋白質食物和適量主食，讓一餐更均衡。", "下一餐可嘗試的小選擇。"],
+    food_function: ["燕麥也能做早餐", "燕麥搭配優格和水果，可以讓早餐的食物種類更豐富。", "一種日常搭配方式。"],
+    food_knowledge: ["讀懂食品標示", "選購時可同時查看成分、蛋白質含量和每份熱量。", "別只看包裝上的宣傳文字。"],
+  },
+};
+function pickFallback(type, random, locale) {
+  const localized = localizedFallbacks[normalizeLocale(locale)];
+  if (localized?.[type]) {
+    const [headline, content, reason] = localized[type];
+    return { type, headline, content, reason, food: null };
+  }
   const items = fallbackTips[type];
   const index = Math.min(items.length - 1, Math.floor(random() * items.length));
   return { ...items[index] };
 }
 
-function pickCoachQuickPrompt(random) {
+function pickCoachQuickPrompt(random, locale) {
+  if (normalizeLocale(locale) === "en") return "What could I pair with my next meal for balanced nutrition?";
+  if (normalizeLocale(locale) === "zh-TW") return "下一餐如何搭配得更均衡？";
   const index = Math.min(fallbackCoachQuickPrompts.length - 1, Math.floor(random() * fallbackCoachQuickPrompts.length));
   return fallbackCoachQuickPrompts[index];
 }
@@ -111,7 +132,7 @@ function createDeepseekDailyTipCompletion({ apiKey, model, fetchImpl = globalThi
           temperature: 0.8,
           max_tokens: isCoachQuickPrompt ? 80 : 220,
           messages: [
-            { role: "system", content: isCoachQuickPrompt ? COACH_QUICK_PROMPT_SYSTEM_PROMPT : DAILY_TIP_SYSTEM_PROMPT },
+            { role: "system", content: (isCoachQuickPrompt ? COACH_QUICK_PROMPT_SYSTEM_PROMPT : DAILY_TIP_SYSTEM_PROMPT) + localeInstruction(context?.locale) },
             { role: "user", content: JSON.stringify(isCoachQuickPrompt ? { nutritionContext: context } : { tipType: type, nutritionContext: context }) },
           ],
         }),
@@ -142,14 +163,14 @@ function createDailyTipService({ apiKey, model, requestCompletion, contextProvid
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "deepseek-v4-flash";
   const complete = requestCompletion ?? (apiKey ? createDeepseekDailyTipCompletion({ apiKey, model: selectedModel, fetchImpl }) : null);
   const generateDailyTip = async ({ date, context, type }) => {
-    if (!complete) return { ...pickFallback(type, random), source: "rule_v2", model: null, usage: null };
+    if (!complete) return { ...pickFallback(type, random, context?.locale), source: "rule_v2", model: null, usage: null };
     try {
       const raw = unwrapCompletion(await complete({ date, type, context }));
-      const tip = validateDailyTip(raw.payload);
+      const tip = validateDailyTip(raw.payload, context?.locale);
       return { ...tip, source, model: selectedModel, usage: raw.usage };
     } catch (error) {
       if (routeManaged) throw error;
-      return { ...pickFallback(type, random), source: "rule_v2", model: null, usage: null };
+      return { ...pickFallback(type, random, context?.locale), source: "rule_v2", model: null, usage: null };
     }
   };
   const getDailyTip = async ({ date, context, preferFast = false } = {}) => {
@@ -158,21 +179,21 @@ function createDailyTipService({ apiKey, model, requestCompletion, contextProvid
     const types = ["nutrition_tip", "food_function", "food_knowledge"];
     const type = types[Math.min(types.length - 1, Math.floor(random() * types.length))];
     if (!preferFast) return generateDailyTip({ date, context: nutritionContext, type });
-    const immediate = { ...pickFallback(type, random), source: "rule_v2", model: null, usage: null };
+    const immediate = { ...pickFallback(type, random, nutritionContext?.locale), source: "rule_v2", model: null, usage: null };
     return { ...immediate, upgrade: generateDailyTip({ date, context: nutritionContext, type }) };
   };
 
   getDailyTip.getQuickPrompt = async ({ date, context } = {}) => {
     if (typeof date !== "string" || !datePattern.test(date)) throw dailyTipError("DAILY_TIP_INPUT_INVALID");
     const nutritionContext = context ?? (typeof contextProvider === "function" ? await contextProvider(date) : {});
-    if (!complete) return { prompt: pickCoachQuickPrompt(random), source: "rule_v2", model: null, usage: null };
+    if (!complete) return { prompt: pickCoachQuickPrompt(random, nutritionContext?.locale), source: "rule_v2", model: null, usage: null };
     try {
       const raw = unwrapCompletion(await complete({ purpose: "coach_quick_prompt", context: nutritionContext }));
-      const prompt = validateCoachQuickPrompt(raw.payload);
+      const prompt = validateCoachQuickPrompt(raw.payload, nutritionContext?.locale);
       return { prompt, source, model: selectedModel, usage: raw.usage };
     } catch (error) {
       if (routeManaged) throw error;
-      return { prompt: pickCoachQuickPrompt(random), source: "rule_v2", model: null, usage: null };
+      return { prompt: pickCoachQuickPrompt(random, nutritionContext?.locale), source: "rule_v2", model: null, usage: null };
     }
   };
 

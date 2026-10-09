@@ -89,6 +89,9 @@ export function PageLayout({
   const dismissSavedMealCelebration = useMealSavedCelebrationStore((state) => state.dismiss);
   const [pageVisible, setPageVisible] = useState(false);
   const layout = useSystemLayout();
+  const coachBottomClearance = className?.split(/\s+/).includes("page-layout--coach-chat")
+    ? `${layout.tabBarHeight + layout.safeBottom + 56}px`
+    : undefined;
   const activeAchievement = manualAchievementCelebration ?? (achievementUnlocked
     ? achievements.find((item) => item.id === achievementUnlocked.achievementId) ?? null
     : null);
@@ -134,6 +137,7 @@ export function PageLayout({
 
   return (
     <AppSafeArea
+      style={cssVars}
       className={[
         "page-layout",
         showTabs ? "" : "page-layout--without-tabs",
@@ -161,11 +165,13 @@ export function PageLayout({
           pageVisible && !disablePageEnterAnimation ? "page-layout__scroll--entered" : "",
         ].filter(Boolean).join(" ")}
         style={{
-          ...cssVars,
           paddingTop: showBrandHeader ? `${layout.totalHeaderHeight}px` : "0px",
         }}
       >
-        <View className="page-layout__content">
+        <View
+          className="page-layout__content"
+          style={coachBottomClearance ? { paddingBottom: coachBottomClearance } : undefined}
+        >
           {!hideNavigation ? (
             <AppHeader
               title={title}
@@ -202,6 +208,10 @@ export function PageLayout({
           targetCalories={savedMeal.targetCalories}
           onViewMeal={() => {
             dismissSavedMealCelebration();
+            if (savedMeal.kind === "reused" || savedMeal.kind === "template") {
+              void Taro.switchTab({ url: "/pages/meal-records/index" });
+              return;
+            }
             void finishMealSaveSuccessFlow()
               .then((openedPoster) => {
                 if (openedPoster) return undefined;
@@ -217,6 +227,10 @@ export function PageLayout({
           }}
           onContinue={() => {
             dismissSavedMealCelebration();
+            if (savedMeal.kind === "reused" || savedMeal.kind === "template") {
+              void Taro.switchTab({ url: "/pages/home/index" });
+              return;
+            }
             void finishMealSaveSuccessFlow()
               .then((openedPoster) => {
                 if (!openedPoster) return Taro.switchTab({ url: "/pages/home/index" });

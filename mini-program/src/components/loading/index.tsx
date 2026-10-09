@@ -1,9 +1,11 @@
 import { Text, View } from "@tarojs/components";
-export function Loading({ label = "正在准备营养视图" }: { label?: string }) {
+import { useTranslation } from "react-i18next";
+export function Loading({ label }: { label?: string }) {
+  const { t } = useTranslation();
   return (
     <View className="loading">
       <View className="loading__dot" />
-      <Text>{label}</Text>
+      <Text>{label ?? t("sharedUi.loadingContent")}</Text>
     </View>
   );
 }

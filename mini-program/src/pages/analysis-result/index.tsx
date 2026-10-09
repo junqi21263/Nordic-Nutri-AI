@@ -1,6 +1,8 @@
 import { Image, Text, View } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import Taro, { useRouter } from "@tarojs/taro";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AIInsightCard } from "../../components/ai-insight-card";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
@@ -36,6 +38,16 @@ import { navigateBackOrHome } from "../../utils/navigation";
 import { useCountUp } from "../../hooks/useCountUp";
 import { useBottomActionReveal } from "../../hooks/useBottomActionReveal";
 import { useMealRecognitionMotion, type MealRecognitionMotionPhase } from "../../hooks/useMealRecognitionMotion";
+import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+import { RecognitionFeedbackSheet, type RecognitionFeedbackSheetMode } from "../../components/recognition-feedback-sheet";
+import { createRecognitionFeedback, updateRecognitionFeedback } from "../../api/recognition-feedback-api";
+import {
+  mealItemFromAnalyzedFood,
+  snapshotForRecognition,
+  withCorrectedItems,
+  type RecognitionFeedbackReason,
+} from "../../features/recognition-feedback/domain";
+import { useRecognitionFeedbackStore } from "../../stores/recognition-feedback-store";
 
 const nowTime = () => {
   const date = new Date();
@@ -120,6 +132,7 @@ function RecognitionMacroProgress({
 }
 
 export default function AnalysisResultPage() {
+  useTranslation();
   const router = useRouter();
   const analysisStore = useAnalysisStore();
   const portion = usePortionDraftStore();
@@ -132,6 +145,11 @@ export default function AnalysisResultPage() {
   const [replayKey, setReplayKey] = useState(0);
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
+  const [recognitionFeedbackSheetMode, setRecognitionFeedbackSheetMode] =
+    useState<RecognitionFeedbackSheetMode | null>(null);
+  const [recognitionFeedbackItemAction, setRecognitionFeedbackItemAction] =
+    useState<"replace" | "remove" | null>(null);
+  const recognitionFeedbackCreateRef = useRef<Promise<string> | null>(null);
   const isDev = process.env.NODE_ENV !== "production";
   const motion = useMealRecognitionMotion(revealOnMount || replayKey > 0, replayKey);
   const bottomAction = useBottomActionReveal(revealOnMount || replayKey > 0, replayKey, motion.phase);
@@ -150,19 +168,67 @@ export default function AnalysisResultPage() {
     if (!analysisStore.analysis) return;
     analysisStore.setAnalysis({ ...analysisStore.analysis, mealType });
   };
+  const syncRecognitionCorrection = (correctedMeal: typeof meal) => {
+    if (!correctedMeal) return;
+    if (portion.meal?.id === correctedMeal.id && portion.editingMealId === null) {
+      const multiplier = portion.multiplier;
+      portion.reset();
+      portion.start(correctedMeal);
+      portion.setMultiplier(multiplier);
+    }
+    const state = useRecognitionFeedbackStore.getState();
+    const correctedResult = snapshotForRecognition(correctedMeal);
+    state.setCorrectedResult(correctedResult);
+    if (!state.feedbackId) return;
+    void updateRecognitionFeedback(state.feedbackId, {
+      mealId: state.mealId,
+      correctedResult,
+    }).catch(() => undefined);
+  };
+
+  const recordRecognitionReason = (reason: RecognitionFeedbackReason, note?: string) => {
+    const currentMeal = useAnalysisStore.getState().analysis;
+    if (!currentMeal) return;
+    const originalResult = snapshotForRecognition(currentMeal);
+    useRecognitionFeedbackStore.getState().start({
+      analysisId: currentMeal.analysisId ?? null,
+      feedbackType: reason.type,
+      originalResult,
+    });
+    const creation = createRecognitionFeedback({
+      analysisId: currentMeal.analysisId ?? null,
+      feedbackType: reason.type,
+      originalResult,
+      note: note || null,
+    }).then(({ feedbackId }) => {
+      const state = useRecognitionFeedbackStore.getState();
+      state.setFeedbackId(feedbackId);
+      if (state.correctedResult || state.mealId || state.pendingNote) {
+        void updateRecognitionFeedback(feedbackId, {
+          mealId: state.mealId,
+          correctedResult: state.correctedResult,
+          note: state.pendingNote,
+        }).catch(() => undefined);
+      }
+      return feedbackId;
+    });
+    recognitionFeedbackCreateRef.current = creation;
+    void creation.catch(() => undefined);
+  };
+
   if (!meal)
     return (
       <PageLayout
-        title="营养分析"
-        subtitle="还没有本地分析结果。"
-        eyebrow="分析结果"
+        title={t("analysisResult.title")}
+        subtitle={t("analysisResult.missingSubtitle")}
+        eyebrow={t("analysisResult.eyebrow")}
         showTabs={false}
         leading="‹"
         onLeadingClick={() => navigateBackOrHome("/pages/food-scanner/index")}
       >
-        <ErrorState title="分析结果不存在" description="请返回扫描页重新拍摄餐盘。" />
+        <ErrorState title={t("analysisResult.missingTitle")} description={t("analysisResult.missingDescription")} />
         <AppButton size="large" onClick={() => navigateBackOrHome("/pages/food-scanner/index")}>
-          返回扫描
+          {t("analysisResult.backToScan")}
         </AppButton>
       </PageLayout>
     );
@@ -176,6 +242,152 @@ export default function AnalysisResultPage() {
   const isContentVisible = !isRecognitionMotion || hasReachedPhase(motion.phase, "contentReveal");
   const shouldAnimateMetrics = isRecognitionMotion && isMetricsCounting;
   const shouldAnimateContentMetrics = isRecognitionMotion && isContentVisible;
+  const handleRecognitionReason = (reason: RecognitionFeedbackReason) => {
+    if (reason.type === "extra_food" && meal.items.length <= 1) {
+      feedback.show({ message: t("analysisResult.keepFood"), tone: "error" });
+      return;
+    }
+    recordRecognitionReason(reason);
+    if (reason.type === "wrong_food") {
+      setRecognitionFeedbackItemAction("replace");
+      setRecognitionFeedbackSheetMode("items");
+      return;
+    }
+    if (reason.type === "missing_food") {
+      setRecognitionFeedbackSheetMode("missing");
+      return;
+    }
+    if (reason.type === "extra_food") {
+      setRecognitionFeedbackItemAction("remove");
+      setRecognitionFeedbackSheetMode("items");
+      return;
+    }
+    if (reason.type === "portion_inaccurate") {
+      setRecognitionFeedbackSheetMode(null);
+      if (portion.meal?.id !== meal.id || portion.editingMealId !== null) portion.start(meal);
+      void Taro.navigateTo({ url: "/pages/portion-adjustment/index?recognitionFeedback=1" });
+      return;
+    }
+    setRecognitionFeedbackSheetMode("other");
+  };
+
+  const handleRecognitionItem = (item: (typeof adjusted.items)[number]) => {
+    const state = useRecognitionFeedbackStore.getState();
+    if (recognitionFeedbackItemAction === "remove") {
+      if (meal.items.length <= 1) {
+        feedback.show({ message: t("analysisResult.keepFood"), tone: "error" });
+        setRecognitionFeedbackSheetMode(null);
+        return;
+      }
+      const nextMeal = withCorrectedItems(meal, meal.items.filter((entry) => entry.id !== item.id));
+      analysisStore.setAnalysis(nextMeal);
+      setRecognitionFeedbackSheetMode(null);
+      state.setSelectionMode(null);
+      syncRecognitionCorrection(nextMeal);
+      return;
+    }
+    state.setReplacementItemId(item.id);
+    setRecognitionFeedbackSheetMode("replace");
+  };
+
+  const handleReplaceFood = async (name: string, quantityG: number) => {
+    const currentMeal = useAnalysisStore.getState().analysis;
+    const targetId = useRecognitionFeedbackStore.getState().replacementItemId;
+    if (!currentMeal || !targetId || !currentMeal.items.some((item) => item.id === targetId)) return false;
+    try {
+      const result = await analyzeProductMeal([{ name, quantityG }]);
+      const analyzedFood = result.items[0];
+      const nextItem = analyzedFood
+        ? mealItemFromAnalyzedFood({ ...analyzedFood, quantityG }, targetId)
+        : null;
+      if (!nextItem) return false;
+      const nextMeal = withCorrectedItems(currentMeal, currentMeal.items.map((item) => item.id === targetId ? nextItem : item));
+      analysisStore.setAnalysis(nextMeal);
+      syncRecognitionCorrection(nextMeal);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleMissingFood = async (name: string, quantityG: number) => {
+    try {
+      const result = await analyzeProductMeal([{ name, quantityG }]);
+      const analyzedFood = result.items[0];
+      const nextItem = analyzedFood
+        ? mealItemFromAnalyzedFood({ ...analyzedFood, quantityG }, `recognition-manual-${Date.now()}`)
+        : null;
+      if (!nextItem) return false;
+      const currentMeal = useAnalysisStore.getState().analysis;
+      if (!currentMeal) return false;
+      const nextMeal = withCorrectedItems(currentMeal, [...currentMeal.items, nextItem]);
+      analysisStore.setAnalysis(nextMeal);
+      syncRecognitionCorrection(nextMeal);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleMissingSuccess = (name: string, quantityG: number) => {
+    setRecognitionFeedbackSheetMode(null);
+    feedback.showModal({
+      variant: "success",
+      presentation: "recognition",
+      title: t("analysisResult.addedTitle"),
+      description: t("analysisResult.addedDescription", { name, grams: quantityG }),
+      primaryText: t("analysisResult.gotIt"),
+    });
+  };
+
+  const handleReplacementSuccess = (name: string, quantityG: number) => {
+    setRecognitionFeedbackSheetMode(null);
+    useRecognitionFeedbackStore.getState().setReplacementItemId(null);
+    feedback.showModal({
+      variant: "success",
+      presentation: "recognition",
+      title: t("analysisResult.replacedTitle"),
+      description: t("analysisResult.replacedDescription", { name, grams: quantityG }),
+      primaryText: t("analysisResult.gotIt"),
+    });
+  };
+
+  const handleNutritionAction = (action: "portion" | "food") => {
+    setRecognitionFeedbackSheetMode(null);
+    if (action === "portion") {
+      if (portion.meal?.id !== meal.id || portion.editingMealId !== null) portion.start(meal);
+      void Taro.navigateTo({ url: "/pages/portion-adjustment/index?recognitionFeedback=1" });
+      return;
+    }
+    const firstItem = adjusted.items[0];
+    if (firstItem) {
+      useRecognitionFeedbackStore.getState().setReplacementItemId(firstItem.id);
+      setRecognitionFeedbackSheetMode("replace");
+    }
+  };
+
+  const handleOtherNote = async (note: string) => {
+    const state = useRecognitionFeedbackStore.getState();
+    try {
+      const feedbackId = state.feedbackId ?? await recognitionFeedbackCreateRef.current;
+      if (!feedbackId) return false;
+      if (note) await updateRecognitionFeedback(feedbackId, { note });
+    } catch {
+      return false;
+    }
+    setRecognitionFeedbackSheetMode(null);
+    feedback.showModal({
+      variant: "success",
+      presentation: "recognition",
+      title: t("analysisResult.feedbackSubmitted"),
+      description: note
+        ? t("analysisResult.feedbackNote", { note })
+        : t("analysisResult.feedbackOther"),
+      primaryText: t("analysisResult.gotIt"),
+    });
+    return true;
+  };
+
   const save = async () => {
     const localMeal = {
       date: getLocalDateString(),
@@ -203,8 +415,19 @@ export default function AnalysisResultPage() {
           ? { ...request, name: textAnalysis.mealName, items: textAnalysis.items }
           : request,
       );
+      const recognitionState = useRecognitionFeedbackStore.getState();
+      const correctedResult = snapshotForRecognition(saved);
+      recognitionState.setMealId(saved.id);
+      recognitionState.setCorrectedResult(correctedResult);
+      if (recognitionState.feedbackId) {
+        void updateRecognitionFeedback(recognitionState.feedbackId, {
+          mealId: saved.id,
+          correctedResult,
+        }).catch(() => undefined);
+      }
       const syncedMeals = await getProductMeals(localMeal.date);
       meals.replaceRemoteMeals(syncedMeals, localMeal.date);
+      void refreshAndroidSmartReminders();
       useMealSavedCelebrationStore.getState().show(
         toMealSavedCelebration({
           savedMeal: saved,
@@ -221,12 +444,26 @@ export default function AnalysisResultPage() {
         // The saved meal remains valid if achievement refresh is temporarily unavailable.
       }
     } catch {
-      feedback.show({ message: "分析或保存失败，请检查网络后重试", tone: "error" });
+      feedback.show({ message: t("analysisResult.saveFailed"), tone: "error" });
     }
   };
-  const evaluation = meal.evaluation || "这餐吃得不错";
+  const evaluation = meal.evaluation || t("analysisResult.defaultEvaluation");
   const heroImage = scanner.previewPath ?? imageByKey[meal.imageKey];
   const previewImage = () => Taro.previewImage({ current: heroImage, urls: [heroImage] });
+  const exitConfirmDialog = (
+    <ConfirmDialog
+      open={exitConfirmOpen}
+      title={t("analysisResult.discardQuestion")}
+      description={t("analysisResult.discardDescription")}
+      confirmLabel={t("analysisResult.discard")}
+      cancelLabel={t("analysisResult.continueAnalysis")}
+      onCancel={() => setExitConfirmOpen(false)}
+      onConfirm={() => {
+        setExitConfirmOpen(false);
+        Taro.navigateBack();
+      }}
+    />
+  );
   return (
     <PageLayout
       title={evaluation}
@@ -235,41 +472,42 @@ export default function AnalysisResultPage() {
       showBack
       scrollLocked={exitConfirmOpen}
       onTopBarBack={() => setExitConfirmOpen(true)}
+      overlay={exitConfirmDialog}
       className="page-layout--analysis-result"
     >
       <View
         className="analysis-result-page"
         data-recognition-reveal={isRecognitionMotion ? "true" : undefined}
         data-motion-phase={motion.isRevealing ? motion.phase : undefined}
-        data-base-revealed={motion.isRevealing && isBaseVisible ? "true" : undefined}
-        data-nutrition-revealed={motion.isRevealing && isNutritionVisible ? "true" : undefined}
-        data-content-revealed={motion.isRevealing && isContentVisible ? "true" : undefined}
+        data-base-revealed={isBaseVisible ? "true" : undefined}
+        data-nutrition-revealed={isNutritionVisible ? "true" : undefined}
+        data-content-revealed={isContentVisible ? "true" : undefined}
         data-bottom-revealed={bottomAction.phase === "complete" ? "true" : undefined}
       >
         <View className="analysis-result-page__header" data-motion-layer="base">
           <View className="analysis-result-page__heading">
             <Text className="analysis-result-page__title">{evaluation}</Text>
             <Text className="analysis-result-page__subtitle">
-              本地分析已完成，保存前可微调份量。
+              {t("analysisResult.completedSubtitle")}
             </Text>
           </View>
           <View className="analysis-result-page__ai-status">
-            <NordicIcon name="check" size={22} ariaLabel="分析完成" />
-            <Text>分析完成</Text>
+            <NordicIcon name="check" size={22} ariaLabel={t("analysisResult.completed")} />
+            <Text>{t("analysisResult.completed")}</Text>
           </View>
         </View>
 
         <AppCard tone="beige" className="analysis-result-page__summary" motionLayer="base">
           <View
             className="analysis-result-page__summary-visual"
-            ariaLabel="查看原始餐食照片"
+            ariaLabel={t("analysisResult.viewOriginal")}
             onClick={previewImage}
           >
             <Image className="analysis-result-page__summary-image" src={heroImage} mode="aspectFill" />
             <View className="analysis-result-page__summary-scrim" />
             <View className="analysis-result-page__summary-hero-copy">
               <Text className="analysis-result-page__summary-title">{meal.title}</Text>
-              <Text className="analysis-result-page__summary-caption">点按查看原图 · 云端视觉识别</Text>
+              <Text className="analysis-result-page__summary-caption">{t("analysisResult.photoCaption")}</Text>
             </View>
           </View>
           <View className="analysis-result-page__summary-body">
@@ -284,38 +522,46 @@ export default function AnalysisResultPage() {
             >
               <View className="analysis-result-page__confidence-main">
                 <View className="analysis-result-page__confidence-icon">
-                  <NordicIcon name="check" size={14} ariaLabel="识别可信度" />
+                  <NordicIcon name="check" size={14} ariaLabel={t("analysisResult.confidence")} />
                 </View>
                 <View className="analysis-result-page__confidence-copy">
                   <Text className="analysis-result-page__confidence-value">{meal.confidence}%</Text>
-                  <Text className="analysis-result-page__confidence-label">识别可信度</Text>
+                  <Text className="analysis-result-page__confidence-label">{t("analysisResult.confidence")}</Text>
                 </View>
               </View>
               {(meal.nutritionSource === "usda" || meal.nutritionSource === "mixed") && (
                 <>
                   <View className="analysis-result-page__confidence-divider" />
                   <View className="analysis-result-page__confidence-source">
-                    <Text className="analysis-result-page__confidence-source-label">营养数据</Text>
+                    <Text className="analysis-result-page__confidence-source-label">{t("analysisResult.nutritionData")}</Text>
                     <Text className="analysis-result-page__confidence-source-value">
-                      {meal.nutritionSource === "usda" ? "USDA" : "部分 USDA"}
+                      {meal.nutritionSource === "usda" ? "USDA" : t("analysisResult.partialUsda")}
                     </Text>
                   </View>
                 </>
               )}
+              <View
+                className="analysis-result-page__recognition-feedback-link"
+                ariaLabel={t("analysisResult.correctRecognition")}
+                onClick={() => setRecognitionFeedbackSheetMode("reasons")}
+              >
+                <NordicIcon name="pencil" size={16} ariaLabel={t("analysisResult.correct")} />
+                <Text>{t("analysisResult.notAccurate")}</Text>
+              </View>
             </View>
             <View className="analysis-result-page__meal-type-block">
-              <Text className="analysis-result-page__meal-type-label">这是哪一餐？</Text>
-              <View className="analysis-result-page__meal-types" ariaLabel="选择餐次类型">
+              <Text className="analysis-result-page__meal-type-label">{t("analysisResult.mealTypeQuestion")}</Text>
+              <View className="analysis-result-page__meal-types" ariaLabel={t("analysisResult.chooseMealType")}>
                 {mealTypeOptions.map((option) => (
                   <View
                     key={option.value}
                     className={`analysis-result-page__meal-type ${
                       meal.mealType === option.value ? "analysis-result-page__meal-type--active" : ""
                     }`}
-                    ariaLabel={option.label}
+                    ariaLabel={t(`meals.${option.value}`)}
                     onClick={() => setMealType(option.value)}
                   >
-                    <Text>{option.label}</Text>
+                    <Text>{t(`meals.${option.value}`)}</Text>
                   </View>
                 ))}
               </View>
@@ -327,14 +573,14 @@ export default function AnalysisResultPage() {
           <CircularProgress
             value={adjusted.score === "A" ? 92 : adjusted.score === "B" ? 76 : 58}
             total={100}
-            label="餐点评分"
+            label={t("analysisResult.mealScore")}
             tone="score"
             reveal={isRecognitionMotion ? isMetricsCounting : true}
             revealDurationMs={mealRecognitionMotionConfig.countDurationMs}
             animateValue={isRecognitionMotion}
           />
           <View className="analysis-result-page__score-copy">
-            <Text className="analysis-result-page__score-grade">{adjusted.score} · 餐点评分</Text>
+            <Text className="analysis-result-page__score-grade">{t("analysisResult.scoreGrade", { grade: adjusted.score })}</Text>
             <RecognitionCountedText
               className="analysis-result-page__score-kcal"
               target={adjusted.calories}
@@ -346,14 +592,14 @@ export default function AnalysisResultPage() {
               <RecognitionCountedText
                 className="nutrition-tag nutrition-tag--protein"
                 target={adjusted.protein}
-                suffix="g 蛋白质"
+                suffix={`g ${t("nutrition.protein")}`}
                 enabled={shouldAnimateMetrics}
                 holdAtZero={isRecognitionMotion}
               />
               <RecognitionCountedText
                 className="nutrition-tag nutrition-tag--carbs"
                 target={adjusted.carbs}
-                suffix="g 碳水"
+                suffix={`g ${t("nutrition.carbs")}`}
                 enabled={shouldAnimateMetrics}
                 holdAtZero={isRecognitionMotion}
                 delayMs={mealRecognitionMotionConfig.macroStaggerMs}
@@ -361,7 +607,7 @@ export default function AnalysisResultPage() {
               <RecognitionCountedText
                 className="nutrition-tag nutrition-tag--fat"
                 target={adjusted.fat}
-                suffix="g 脂肪"
+                suffix={`g ${t("nutrition.fat")}`}
                 enabled={shouldAnimateMetrics}
                 holdAtZero={isRecognitionMotion}
                 delayMs={mealRecognitionMotionConfig.macroStaggerMs * 2}
@@ -373,12 +619,12 @@ export default function AnalysisResultPage() {
         <AppCard className="analysis-result-page__ingredients" motionLayer="content">
           <View
             className="analysis-result-page__ingredients-heading"
-            ariaLabel={ingredientsExpanded ? "收起识别食材" : "展开识别食材"}
+            ariaLabel={t(ingredientsExpanded ? "analysisResult.collapseIngredients" : "analysisResult.expandIngredients")}
             onClick={() => setIngredientsExpanded((current) => !current)}
           >
-            <Text className="analysis-result-page__section-title">识别食材</Text>
+            <Text className="analysis-result-page__section-title">{t("analysisResult.ingredients")}</Text>
             <View className="analysis-result-page__ingredients-toggle">
-              <Text>{ingredientsExpanded ? "收起" : "展开"}</Text>
+              <Text>{t(ingredientsExpanded ? "analysisResult.collapse" : "analysisResult.expand")}</Text>
               <View
                 className={
                   ingredientsExpanded
@@ -389,7 +635,7 @@ export default function AnalysisResultPage() {
                 <NordicIcon
                   name="chevron-right"
                   size={14}
-                  ariaLabel={ingredientsExpanded ? "收起" : "展开"}
+                  ariaLabel={t(ingredientsExpanded ? "analysisResult.collapse" : "analysisResult.expand")}
                 />
               </View>
             </View>
@@ -416,7 +662,7 @@ export default function AnalysisResultPage() {
             : null}
           <View className="analysis-result-page__macro-list">
             <RecognitionMacroProgress
-              label="蛋白质"
+              label={t("nutrition.protein")}
               value={adjusted.protein}
               target={60}
               enabled={shouldAnimateContentMetrics}
@@ -424,7 +670,7 @@ export default function AnalysisResultPage() {
               delayMs={motionSchedule.macroDelaysMs[0] ?? 0}
             />
             <RecognitionMacroProgress
-              label="碳水"
+              label={t("nutrition.carbs")}
               value={adjusted.carbs}
               target={90}
               tone="carbs"
@@ -433,7 +679,7 @@ export default function AnalysisResultPage() {
               delayMs={motionSchedule.macroDelaysMs[1] ?? 0}
             />
             <RecognitionMacroProgress
-              label="脂肪"
+              label={t("nutrition.fat")}
               value={adjusted.fat}
               target={25}
               tone="fat"
@@ -447,7 +693,7 @@ export default function AnalysisResultPage() {
         <AIInsightCard
           motionLayer="content"
           content={meal.insight}
-          actionLabel="查看饮食记录"
+          actionLabel={t("analysisResult.viewRecords")}
           onActionClick={() => Taro.switchTab({ url: "/pages/meal-records/index" })}
         />
         <View
@@ -458,7 +704,7 @@ export default function AnalysisResultPage() {
         >
           <View animation={bottomAction.disclaimerAnimation}>
             <Text className="nutrition-disclaimer">
-              营养识别与建议仅供日常饮食参考，不构成医疗诊断或治疗建议。
+              {t("analysisResult.disclaimer")}
             </Text>
           </View>
           <View className="analysis-result-page__actions">
@@ -472,28 +718,32 @@ export default function AnalysisResultPage() {
                   Taro.navigateTo({ url: "/pages/portion-adjustment/index" });
                 }}
               >
-                调整份量
+                {t("analysisResult.adjustPortion")}
               </AppButton>
             </View>
             <View className="analysis-result-page__action-motion" animation={bottomAction.saveButtonAnimation}>
               <AppButton size="large" disabled={!bottomAction.isSaveInteractive} onClick={() => void save()}>
-                保存本餐
+                {t("analysisResult.saveMeal")}
               </AppButton>
             </View>
           </View>
         </View>
       </View>
-      <ConfirmDialog
-        open={exitConfirmOpen}
-        title="放弃本次分析？"
-        description="返回后，本次未保存的分析结果将不再保留。"
-        confirmLabel="放弃并返回"
-        cancelLabel="继续分析"
-        onCancel={() => setExitConfirmOpen(false)}
-        onConfirm={() => {
-          setExitConfirmOpen(false);
-          Taro.navigateBack();
-        }}
+      <RecognitionFeedbackSheet
+        open={recognitionFeedbackSheetMode !== null}
+        mode={recognitionFeedbackSheetMode ?? "reasons"}
+        items={adjusted.items}
+        itemAction={recognitionFeedbackItemAction}
+        canRemoveItems={adjusted.items.length > 1}
+        onDismiss={() => setRecognitionFeedbackSheetMode(null)}
+        onSelectReason={handleRecognitionReason}
+        onSelectItem={handleRecognitionItem}
+        onSelectNutrition={handleNutritionAction}
+        onSubmitMissing={handleMissingFood}
+        onMissingSuccess={handleMissingSuccess}
+        onSubmitReplace={handleReplaceFood}
+        onReplacementSuccess={handleReplacementSuccess}
+        onSubmitOther={handleOtherNote}
       />
     </PageLayout>
   );

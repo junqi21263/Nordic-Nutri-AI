@@ -1,6 +1,8 @@
 import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from "@tarojs/taro";
 import { buildAppShareMessage, buildAppTimelineShare } from "../features/share/app-share";
 
+const isWeChatRuntime = process.env.TARO_ENV === "weapp";
+
 type SharePage = {
   onShareAppMessage?: () => ReturnType<typeof buildAppShareMessage>;
   onShareTimeline?: () => ReturnType<typeof buildAppTimelineShare>;
@@ -20,6 +22,7 @@ export function useAppShare(path?: string) {
   useShareTimeline(() => buildAppTimelineShare());
 
   useDidShow(() => {
+    if (!isWeChatRuntime) return;
     bindPageShareHandlers(path);
     void Taro.showShareMenu({
       withShareTicket: true,

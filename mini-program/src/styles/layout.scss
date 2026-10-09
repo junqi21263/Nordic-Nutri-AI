@@ -4,6 +4,10 @@
   background: $color-background;
   min-height: 100vh;
 }
+.app-layout:has(> .welcome-page--android) {
+  background: #5b3a29;
+  min-height: 100dvh;
+}
 .page-layout {
   background: $color-background;
   min-height: 100vh;
@@ -37,8 +41,7 @@
   z-index: 0;
 }
 .page-layout__scroll--entered {
-  animation: page-layout-content-enter 180ms ease-out both;
-  will-change: opacity, transform;
+  animation: page-layout-content-enter 180ms ease-out;
 }
 @keyframes page-layout-content-enter {
   from {
@@ -55,6 +58,9 @@
   box-sizing: border-box;
   min-height: 100vh;
   padding: $space-16 $page-horizontal calc($tabbar-height + $safe-area-bottom + $section-gap);
+  /* #ifdef H5 */
+  padding: $space-16 $page-horizontal calc(var(--app-tab-bar-height, #{$tabbar-height}) + var(--app-safe-bottom, 0px) + #{$section-gap});
+  /* #endif */
 }
 .page-layout--without-tabs .page-layout__content {
   padding-bottom: calc($safe-area-bottom + $section-gap);
@@ -89,6 +95,9 @@
 .page-layout--coach-chat .page-layout__content {
   // Reserve scroll space for the fixed composer and tab bar.
   padding-bottom: calc($tabbar-height + $safe-area-bottom + 112px);
+  /* #ifdef H5 */
+  padding-bottom: calc(var(--app-tab-bar-height, #{$tabbar-height}) + var(--app-safe-bottom, 0px) + 112px);
+  /* #endif */
 }
 .page-layout--manual-meal .page-layout__content {
   padding-bottom: calc($safe-area-bottom + 176px);
@@ -119,7 +128,7 @@
   padding-bottom: calc($tabbar-height + $safe-area-bottom + $space-32);
 }
 .page-layout--food-detail .page-layout__content {
-  padding-bottom: calc($safe-area-bottom + 132px);
+  padding-bottom: calc($safe-area-bottom + 180px);
 }
 .page-layout--profile-edit .page-layout__content,
 .page-layout--goal-adjust .page-layout__content {

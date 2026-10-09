@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(process.cwd(), "src");
 const read = (path: string) => readFileSync(resolve(sourceRoot, path), "utf8");
@@ -69,7 +70,7 @@ describe("餐食详情交互", () => {
     expect(detail).toContain('import("../../features/coach/refresh-achievements")');
     expect(detail).toContain("await evaluateProductAchievements(meal.date)");
     expect(detail).toContain('name={meal.favorite ? "heart-filled" : "heart"}');
-    expect(detail).toContain("可在「记录」筛选里查看");
+    expect(detail).toContain('t(nextFavorite ? "mealDetail.savedFavoriteHint" : "mealDetail.removedFavorite")');
     expect(detail).toContain("meal-detail-page__action--favorite");
     expect(styles).toContain(".meal-detail-page__action--favorite");
     expect(styles).not.toContain(

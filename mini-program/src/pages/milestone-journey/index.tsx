@@ -1,8 +1,10 @@
 import { Text, View } from "@tarojs/components";
 import Taro, { useDidShow } from "@tarojs/taro";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getMilestoneJourney, type ProductMilestoneEvent, type ProductMilestoneJourney } from "../../api/milestone-api";
 import { MilestoneJourneyIllustration } from "../../components/milestone-journey-illustration";
+import { Loading } from "../../components/loading";
 import { MilestoneStageCard } from "../../components/milestone-stage-card";
 import { MilestoneStageSheet } from "../../components/milestone-stage-sheet";
 import { getMilestoneIllustrationAssetById } from "../../features/milestones/config";
@@ -30,7 +32,20 @@ function currentJourneyStage(streakDays: number): Milestone {
   return [...MILESTONES].reverse().find((milestone) => streakDays >= milestone) ?? 3;
 }
 
+function MilestoneJourneySkeleton() {
+  const { t } = useTranslation();
+  return <View className="milestone-journey-page__skeleton" ariaLabel={t("milestoneJourney.loading")}>
+    <Loading label={`${t("milestoneJourney.loading")}…`} />
+    <View className="milestone-journey-page__skeleton-hero skeleton" />
+    <View className="milestone-journey-page__skeleton-heading skeleton" />
+    <View className="milestone-journey-page__skeleton-collection">
+      {[0, 1, 2, 3].map((index) => <View className="milestone-journey-page__skeleton-card skeleton" key={index} />)}
+    </View>
+  </View>;
+}
+
 export default function MilestoneJourneyPage() {
+  const { t } = useTranslation();
   const [journey, setJourney] = useState<ProductMilestoneJourney | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,11 +58,11 @@ export default function MilestoneJourneyPage() {
       setJourney(await getMilestoneJourney());
     } catch (reason) {
       console.error("[milestones] journey load failed:", reason);
-      setError("我的旅程暂时无法读取，请稍后重试");
+      setError(t("milestoneJourney.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useDidShow(() => { void load(); });
 
@@ -69,7 +84,7 @@ export default function MilestoneJourneyPage() {
 
   return (
     <PageLayout
-      title="我的旅程"
+      title={t("milestoneJourney.title")}
       showTabs={false}
       hideNavigation
       showBack
@@ -78,18 +93,18 @@ export default function MilestoneJourneyPage() {
       className="page-layout--milestone-journey"
     >
       <View className="milestone-journey-page">
-        <View className="milestone-journey-page__hero">
+        {loading ? <MilestoneJourneySkeleton /> : <View className="milestone-journey-page__hero">
           <View className="milestone-journey-page__hero-copy">
             <Text className="milestone-journey-page__eyebrow">CURRENT JOURNEY</Text>
-            <Text className="milestone-journey-page__headline">连续记录 {streakDays} 天</Text>
-            <Text className="milestone-journey-page__next-copy">{nextMilestone ? `距离 ${nextMilestone} DAYS 还有 ${remainingDays} 天` : "你已完成本周期全部里程碑"}</Text>
-            <Text className="milestone-journey-page__message">{JOURNEY_STAGE_CONFIG[heroStage].journeyMessage}</Text>
+            <Text className="milestone-journey-page__headline">{t("milestoneJourney.streak", { count: streakDays })}</Text>
+            <Text className="milestone-journey-page__next-copy">{nextMilestone ? t("milestoneJourney.next", { count: nextMilestone, remaining: remainingDays }) : t("milestoneJourney.completed")}</Text>
+            <Text className="milestone-journey-page__message">{t(`milestoneJourney.stages.${JOURNEY_STAGE_CONFIG[heroStage].theme.toLowerCase()}.message`)}</Text>
           </View>
           <View className="milestone-journey-page__hero-art">
             <MilestoneJourneyIllustration asset={heroAsset} className="milestone-journey-page__hero-image" />
             <Text className="milestone-journey-page__hero-stage">STAGE {String(MILESTONES.indexOf(heroStage) + 1).padStart(2, "0")}</Text>
           </View>
-          <View className="milestone-journey-page__progress" ariaLabel="里程碑进度">
+          <View className="milestone-journey-page__progress" ariaLabel={t("milestoneJourney.progress")}>
             {MILESTONES.map((milestone) => {
               const event = getCurrentJourneyMilestoneEvent(currentEvents, milestone);
               const state = getJourneyStageState({ milestone, event, nextMilestone });
@@ -101,15 +116,14 @@ export default function MilestoneJourneyPage() {
               );
             })}
           </View>
-        </View>
+        </View>}
 
-        {loading ? <View className="milestone-journey-page__state"><Text>正在读取当前旅程…</Text></View> : null}
-        {error ? <View className="milestone-journey-page__state"><Text>{error}</Text><Text onClick={() => void load()}>重新尝试</Text></View> : null}
+        {error ? <View className="milestone-journey-page__state"><Text>{error}</Text><Text onClick={() => void load()}>{t("milestoneJourney.retry")}</Text></View> : null}
         {!loading && !error ? (
           <>
             <View className="milestone-journey-page__collection-heading">
-              <Text>Journey Collection</Text>
-              <Text>记录属于你的每一个阶段</Text>
+              <Text>{t("milestoneJourney.collection")}</Text>
+              <Text>{t("milestoneJourney.collectionSubtitle")}</Text>
             </View>
             <View className="milestone-journey-page__collection">
               {MILESTONES.map((milestone) => {

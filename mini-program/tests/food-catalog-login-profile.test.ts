@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 const sourceRoot = resolve(import.meta.dirname, "../src");
 
@@ -9,16 +10,17 @@ describe("food catalog discovery and login profile sync", () => {
     const config = readFileSync(resolve(sourceRoot, "app.config.ts"), "utf8");
     const tabBar = readFileSync(resolve(sourceRoot, "components/bottom-tab-bar/index.tsx"), "utf8");
 
-    expect(config).toContain('{ pagePath: "pages/coach/index", text: "教练" }');
-    expect(config).toContain('{ pagePath: "pages/meal-records/index", text: "记录" }');
+    expect(config).toContain('"pages/coach/index"');
+    expect(config).toContain('"pages/meal-records/index"');
     expect(config).not.toContain('{ pagePath: "pages/food-scanner/index", text: "扫描" }');
-    expect(tabBar).toContain('{ key: "food-catalog", label: "食物库", icon: "food-bowl" }');
+    expect(tabBar).toContain('t(`tabs.${item.key}`)');
     expect(tabBar).toContain('if (key === "food-scanner")');
     expect(tabBar).toContain("Taro.navigateTo({ url: route })");
   });
 
   it("loads a fresh discovery list on food catalog entry and renders a resilient food image", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/food-catalog/index.tsx"), "utf8");
+    const styles = readFileSync(resolve(sourceRoot, "styles/page.scss"), "utf8");
     const manualMeal = readFileSync(resolve(sourceRoot, "pages/manual-meal/index.tsx"), "utf8");
     const detail = readFileSync(resolve(sourceRoot, "pages/food-detail/index.tsx"), "utf8");
     const labels = readFileSync(
@@ -40,35 +42,37 @@ describe("food catalog discovery and login profile sync", () => {
     expect(page).toContain("searchProductFoodCatalog");
     expect(page).toMatch(/didBootstrapRef|hasBootstrappedRef|catalogBootstrappedRef/);
     expect(page).toContain("void loadTaxonomy()");
-    expect(page).toContain("热门推荐");
+    expectLocalizedCopy(page, "热门推荐");
     expect(page).not.toContain("最近记录");
     expect(manualMeal).toContain("FoodThumbnail");
     expect(page).toContain("pages/food-detail/index");
     expect(page).toContain("FoodThumbnail");
     expect(detail).toContain("FoodThumbnail");
-    expect(detail).toContain("份量选择");
-    expect(detail).toMatch(/NOVA|营养洞察/);
+    expectLocalizedCopy(detail, "份量选择");
+    expect(detail).toContain('t("home.insightTitle")');
     expect(labels).toContain("高蛋白");
     expect(api).toContain("getProductFoodCategories");
     expect(api).toContain("getProductFoodByBarcode");
     expect(api).toContain("getProductFoodVariants");
     expect(api).toContain("standard_food_v1");
-    expect(detail).toContain("版本选择");
+    expect(detail).toContain('t("foodDetail.variants")');
     expect(appConfig).toContain('"pages/food-detail/index"');
+    expect(styles).toMatch(/\.food-catalog-rail--tags\s*\{[^}]*position:\s*static;/);
+    expect(styles).toMatch(/\.food-catalog-tags__row\s*\{[\s\S]*?align-items:\s*center;[\s\S]*?min-height:\s*40px;/);
   });
 
   it("keeps bootstrap default avatar and only syncs a real WeChat nickname on login", () => {
     const page = readFileSync(resolve(sourceRoot, "pages/auth-entry/index.tsx"), "utf8");
     const profileEdit = readFileSync(resolve(sourceRoot, "pages/profile-edit/index.tsx"), "utf8");
 
-    expect(page).toContain("微信一键登录");
+    expectLocalizedCopy(page, "微信一键登录");
     expect(page).toContain("saveProductProfile");
     expect(page).toContain("useProfileStore.getState().setProfile");
-    expect(page).toContain("默认头像与昵称会自动生成");
+    expectLocalizedCopy(page, "默认头像与昵称会自动生成");
     expect(page).not.toContain("uploadProfileAvatar");
     expect(profileEdit).toContain("uploadProfileAvatar");
     expect(profileEdit).toContain("randomizeDefaultAvatar");
-    expect(profileEdit).toContain("随机换一张");
+    expectLocalizedCopy(profileEdit, "随机换一张");
     expect(profileEdit).toContain("openType=\"chooseAvatar\"");
   });
 });

@@ -143,6 +143,7 @@ function createMealDataService({
   model = "deepseek-v4-flash",
   resolveImageUrl,
   generateMealInsight,
+  fallbackAnalyze,
   getNutritionPlan,
   onMealMutation,
 }) {
@@ -187,10 +188,16 @@ function createMealDataService({
   async function resolveInsight({ analysisId, userId, mealName, items, existingInsight, allowGenerate = true }) {
     if (typeof existingInsight === "string" && existingInsight.trim()) return existingInsight.trim().slice(0, 1000);
     if (analysisId) {
-      const analysis = await db.from("ai_analysis").select("advice").eq("id", analysisId).eq("user_id", userId).maybeSingle();
+      const analysis = await db.from("ai_analysis").select("advice,normalized_items").eq("id", analysisId).eq("user_id", userId).maybeSingle();
       if (analysis.error) throw new Error("Meal analysis read failed");
       const advice = typeof analysis.data?.advice === "string" ? analysis.data.advice.trim() : "";
-      if (advice) return advice.slice(0, 1000);
+      const analyzedNames = Array.isArray(analysis.data?.normalized_items)
+        ? analysis.data.normalized_items.map((item) => item?.name).filter(Boolean)
+        : [];
+      const namesUnchanged = !analyzedNames.length || (
+        analyzedNames.length === items.length && analyzedNames.every((name, index) => name === items[index]?.name)
+      );
+      if (advice && namesUnchanged) return advice.slice(0, 1000);
     }
     if (!allowGenerate || typeof generateMealInsight !== "function") return null;
     try {
@@ -303,7 +310,13 @@ function createMealDataService({
     async createAnalysis(userId, input) {
       if (typeof analyze !== "function") throw new PublicMealDataError("MEAL_ANALYSIS_UNAVAILABLE", "餐食分析暂不可用");
       const clientRequestId = assertUuid(input?.clientRequestId, "请求 ID");
-      const result = await analyze({ items: input?.items, userId });
+      let result;
+      try {
+        result = await analyze({ items: input?.items, userId });
+      } catch (error) {
+        if (typeof fallbackAnalyze !== "function") throw error;
+        result = await fallbackAnalyze({ items: input?.items, userId });
+      }
       const saved = await db.from("ai_analysis").insert({
         user_id: userId,
         provider: result.provider || result.source || "deepseek",
@@ -367,6 +380,12 @@ function createMealDataService({
         return prior;
       }
       let imagePath = meal.imageUrl;
+      let templateId = null;
+      if (input.templateId) {
+        templateId = assertUuid(input.templateId, '常吃 ID');
+        const template = await db.from('meal_templates').select('id').eq('user_id', userId).eq('id', templateId).maybeSingle();
+        if (template.error || !template.data) throw invalid('常吃不存在');
+      }
       if (meal.analysisId) {
         const analysis = await db.from("ai_analysis").select("id,image_path,advice").eq("id", meal.analysisId).eq("user_id", userId).maybeSingle();
         if (analysis.error || !analysis.data?.id) throw invalid("分析记录无效");
@@ -401,6 +420,7 @@ function createMealDataService({
       const created = await db.from("meal_records").insert({
         user_id: userId,
         plan_id: activePlan?.id ?? null,
+        ...(templateId ? { template_id: templateId } : {}),
         analysis_id: meal.analysisId,
         client_request_id: meal.clientRequestId,
         meal_type: meal.mealType,
@@ -523,4 +543,4 @@ function createMealDataService({
   };
 }
 
-module.exports = { createMealDataService, PublicMealDataError, normalizeStoredImagePath };
+module.exports = { createMealDataService, PublicMealDataError, normalizeStoredImagePath, normalizeItems };

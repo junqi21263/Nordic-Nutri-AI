@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 describe("profile edit real save", () => {
   it("writes nickname, weight, and goal direction through authenticated HTTPS data clients", () => {
@@ -17,7 +18,7 @@ describe("profile edit real save", () => {
     expect(page).toContain("增益增肌");
     expect(page).toContain("健康饮食");
     expect(page).toContain("profile-choice-group--single-line");
-    expect(page).toContain("目标方向已更新");
+    expectLocalizedCopy(page, "目标方向已更新");
     expect(page).toContain("getProductAccount");
     expect(page).toContain("nicknameModerationError");
     expect(page).toContain("feedback.show({ message: nicknameError");

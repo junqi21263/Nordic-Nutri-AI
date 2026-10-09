@@ -33,11 +33,13 @@ export function createAnalysisProgress(prompt: string, startedAt: number): Analy
     source: "frontend-summary",
     startedAt,
     expanded: true,
-    title: usesDailyNutritionContext ? "正在分析你的饮食…" : "正在整理营养信息…",
+    title: usesDailyNutritionContext
+      ? "coachPage.analysisProgress.dailyTitle"
+      : "coachPage.analysisProgress.generalTitle",
     steps: createSteps(
       usesDailyNutritionContext
-        ? ["查看今日饮食记录", "整理当前营养摄入", "生成饮食建议"]
-        : ["理解你的问题", "整理相关营养信息", "生成建议"],
+        ? ["dailyStepRecords", "dailyStepNutrition", "dailyStepAdvice"]
+        : ["generalStepQuestion", "generalStepNutrition", "generalStepAdvice"],
     ),
   };
 }

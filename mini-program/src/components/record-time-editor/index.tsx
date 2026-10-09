@@ -1,5 +1,6 @@
 import { Input, Text, View } from "@tarojs/components";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { shiftDate } from "../../features/meals/domain";
 import { getLocalDateString } from "../../features/onboarding/domain";
 import { Modal } from "../modal";
@@ -18,11 +19,12 @@ const normalizeTimePart = (value: string, maximum: number) => {
 };
 
 export function RecordTimeEditor({ date, time, onDateChange, onTimeChange }: RecordTimeEditorProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [draftHour, setDraftHour] = useState(time.slice(0, 2));
   const [draftMinute, setDraftMinute] = useState(time.slice(3, 5));
   const today = getLocalDateString();
-  const dateLabel = date === today ? "今天" : date;
+  const dateLabel = date === today ? t("recordTime.today") : date;
   const commitTime = (hour = draftHour, minute = draftMinute) => {
     const nextHour = normalizeTimePart(hour, 23) || "00";
     const nextMinute = normalizeTimePart(minute, 59) || "00";
@@ -38,26 +40,26 @@ export function RecordTimeEditor({ date, time, onDateChange, onTimeChange }: Rec
 
   return (
     <>
-      <View className="record-time-editor__summary" ariaLabel="修改记录时间" onClick={openEditor}>
+      <View className="record-time-editor__summary" ariaLabel={t("recordTime.editTime")} onClick={openEditor}>
         <View>
           <Text className="record-time-editor__value">{dateLabel} · {time}</Text>
-          <Text className="record-time-editor__hint">可修改</Text>
+          <Text className="record-time-editor__hint">{t("recordTime.editable")}</Text>
         </View>
-        <Text className="record-time-editor__action">设置</Text>
+        <Text className="record-time-editor__action">{t("recordTime.set")}</Text>
       </View>
       <Modal open={open}>
         <View className="record-time-editor__sheet">
           <View className="record-time-editor__sheet-head">
-            <Text>设置记录时间</Text>
-            <Text onClick={() => { commitTime(); setOpen(false); }}>完成</Text>
+            <Text>{t("recordTime.title")}</Text>
+            <Text onClick={() => { commitTime(); setOpen(false); }}>{t("common.done")}</Text>
           </View>
           <View className="record-time-editor__control">
-            <Text>调整日期</Text>
+            <Text>{t("recordTime.adjustDate")}</Text>
             <View>
-              <View ariaLabel="前一天" onClick={() => onDateChange(shiftDate(date, -1))}>−</View>
+              <View ariaLabel={t("recordTime.previousDay")} onClick={() => onDateChange(shiftDate(date, -1))}>−</View>
               <Text>{dateLabel}</Text>
               <View
-                ariaLabel="后一天"
+                ariaLabel={t("recordTime.nextDay")}
                 className={date >= today ? "record-time-editor__step--disabled" : ""}
                 onClick={() => date < today && onDateChange(shiftDate(date, 1))}
               >
@@ -66,10 +68,10 @@ export function RecordTimeEditor({ date, time, onDateChange, onTimeChange }: Rec
             </View>
           </View>
           <View className="record-time-editor__time-controls">
-            <Text>直接设置时间</Text>
+            <Text>{t("recordTime.setTime")}</Text>
             <View className="record-time-editor__direct-time">
               <Input
-                ariaLabel="小时"
+                ariaLabel={t("recordTime.hour")}
                 type="number"
                 maxlength={2}
                 value={draftHour}
@@ -78,7 +80,7 @@ export function RecordTimeEditor({ date, time, onDateChange, onTimeChange }: Rec
               />
               <Text>:</Text>
               <Input
-                ariaLabel="分钟"
+                ariaLabel={t("recordTime.minute")}
                 type="number"
                 maxlength={2}
                 value={draftMinute}

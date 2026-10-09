@@ -396,6 +396,9 @@
     .module-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
     .module-toolbar h2 { flex: 1 1 auto; min-width: 120px; }
     .module-toolbar input, .module-toolbar select { height: 40px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; background: var(--paper); color: var(--text); min-width: 180px; }
+    .nn-verification-toolbar { flex-wrap: nowrap; }
+    .nn-verification-toolbar > select { width: auto; flex: 0 1 190px; min-width: 160px; }
+    .nn-verification-toolbar > .button { flex: 0 0 auto; }
     .nn-audit-filter-bar, .nn-user-images-toolbar, .nn-moderation-toolbar { display: flex; align-items: center; flex-wrap: nowrap; }
     .nn-audit-filter-bar input { width: auto; min-width: 0; flex: 1 1 320px; }
     .nn-audit-filter-bar select { width: auto; min-width: 0; flex: 0 1 190px; }
@@ -507,8 +510,16 @@
     .nn-food-filter-bar select { flex: 0 1 210px; min-width: 160px; }
     .nn-food-filter-bar .food-admin-toggle { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; width: max-content; min-width: max-content; white-space: nowrap; }
     .nn-food-filter-bar .food-admin-toggle input[type="checkbox"] { width: 16px; min-width: 16px; height: 16px; margin: 0; padding: 0; }
+    .nn-push-test-bar { display: grid; grid-template-columns: minmax(280px, 1fr) 210px 180px auto; align-items: center; gap: 12px; }
+    .nn-push-test-field { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .nn-push-test-field .nn-input,
+    .nn-push-test-field .nn-select { width: 100%; height: 40px; min-height: 40px; }
+    .nn-push-test-send { min-width: 138px; }
+    .nn-push-test-status { margin-top: 12px; }
     @media (max-width: 900px) { .module-toolbar.quota-toolbar { display: flex; flex-wrap: wrap; } .module-toolbar.quota-toolbar > span { flex: 1 1 100%; order: 3; } .quota-toolbar__range { flex: 1 1 260px; justify-content: flex-start; } }
     @media (max-width: 760px) { .nn-food-filter-bar { flex-wrap: wrap; } }
+    @media (max-width: 760px) { .nn-verification-toolbar { flex-wrap: wrap; } .nn-verification-toolbar > select { width: 100%; flex-basis: 100%; } }
+    @media (max-width: 760px) { .nn-push-test-bar { grid-template-columns: 1fr; align-items: stretch; } .nn-push-test-send { width: 100%; } }
     .reject-modal__panel { width: min(440px, 100%); padding: 0; overflow: hidden; border-radius: 18px; background: var(--linen); border: 1px solid var(--line); box-shadow: 0 28px 56px rgba(23, 61, 42, .2); }
     .reject-modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 16px; background: linear-gradient(180deg, #f3f6f0 0%, var(--linen) 100%); border-bottom: 1px solid var(--line); }
     .reject-modal__header-copy { min-width: 0; }
@@ -601,10 +612,10 @@
     <div class="admin-layout">
       <nav class="admin-nav nn-sidebar" aria-label="后台模块">
         <div class="admin-nav__group" data-nav-domain="dashboard"><span class="admin-nav__label">概览</span><button type="button" class="admin-nav__item" data-module="dashboard">总览</button></div>
-        <div class="admin-nav__group" data-nav-domain="users"><span class="admin-nav__label">用户</span><button type="button" class="admin-nav__item" data-module="users">用户数据</button></div>
+        <div class="admin-nav__group" data-nav-domain="users"><span class="admin-nav__label">用户</span><button type="button" class="admin-nav__item" data-module="users">用户数据</button><button type="button" class="admin-nav__item" data-module="verification">验证码中心</button></div>
         <div class="admin-nav__group" data-nav-domain="food-library"><span class="admin-nav__label">食材库</span><button type="button" class="admin-nav__item" data-module="foods">食材管理</button><button type="button" class="admin-nav__item active" data-module="images">食材生图</button><button type="button" class="admin-nav__item" data-module="audit">旧图审计</button></div>
         <div class="admin-nav__group" data-nav-domain="ai-operations"><span class="admin-nav__label">AI 运营</span><button type="button" class="admin-nav__item" data-module="ops">运营总览</button><button type="button" class="admin-nav__item" data-module="quota">额度管理</button></div>
-        <div class="admin-nav__group" data-nav-domain="jobs"><span class="admin-nav__label">任务</span><button type="button" class="admin-nav__item" data-module="jobs">Jobs</button></div>
+        <div class="admin-nav__group" data-nav-domain="jobs"><span class="admin-nav__label">任务</span><button type="button" class="admin-nav__item" data-module="jobs">Jobs</button><button type="button" class="admin-nav__item" data-module="push">推送测试</button></div>
         <div class="admin-nav__group" data-nav-domain="moderation"><span class="admin-nav__label">内容安全</span><button type="button" class="admin-nav__item" data-module="moderation">内容安全</button><button type="button" class="admin-nav__item" data-module="user-images">用户图片</button></div>
         <div class="admin-nav__group" data-nav-domain="feedback"><span class="admin-nav__label">反馈</span><button type="button" class="admin-nav__item" data-module="feedback">问题反馈</button></div>
         <div class="admin-nav__group" data-nav-domain="system"><span class="admin-nav__label">系统</span><button type="button" class="admin-nav__item" data-module="health">系统健康</button><button type="button" class="admin-nav__item" data-module="traces">Traces</button><button type="button" class="admin-nav__item" data-module="audit-logs">审计日志</button><button type="button" class="admin-nav__item" data-module="system">系统配置</button></div>
@@ -612,12 +623,25 @@
 
       <div class="admin-main nn-content">
         <section id="moduleUsers" class="admin-module" hidden>
-          <div class="module-toolbar">
+          <div class="module-toolbar nn-verification-toolbar">
             <h2>用户数据</h2>
             <input id="userSearch" type="search" placeholder="搜索昵称或用户 ID" autocomplete="off" />
             <button id="refreshUsers" class="button secondary" type="button">刷新</button>
           </div>
           <div id="userTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+        </section>
+
+        <section id="moduleVerification" class="admin-module" hidden>
+          <div class="module-toolbar">
+            <h2>验证码中心</h2>
+            <select id="verificationTypeFilter"><option value="">全部渠道</option><option value="email">Email</option><option value="phone">SMS</option></select>
+            <select id="verificationPurposeFilter"><option value="">全部用途</option><option value="register">注册</option><option value="reset_password">找回密码</option></select>
+            <select id="verificationStatusFilter"><option value="">全部状态</option><option value="created">已创建</option><option value="sent">已发送</option><option value="failed">发送失败</option><option value="used">已使用</option><option value="expired">已过期</option><option value="invalidated">已失效</option></select>
+            <button id="refreshVerification" class="button secondary" type="button">刷新</button>
+          </div>
+          <p class="muted" style="margin:0 0 12px">仅显示验证码生命周期、供应商返回和 Trace 关联。生产环境不会显示验证码明文；DEV 调试码仅在服务端显式开启时出现。</p>
+          <div id="verificationTable" class="data-table"><p class="muted" style="padding:18px">请先登录后台</p></div>
+          <div id="verificationDetail" class="nn-compact-panel" hidden style="margin-top:16px"></div>
         </section>
 
         <section id="moduleFeedback" class="admin-module" hidden>
@@ -950,7 +974,7 @@
         <section id="moduleTraces" class="admin-module" hidden>
           <div class="module-toolbar"><h2>Trace Explorer</h2><span class="muted">按请求状态定位阶段耗时与 Provider</span><button id="refreshTraces" class="button secondary" type="button">刷新</button></div>
           <div class="trace-filter-toolbar">
-            <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / 接口 / 错误码" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="processing">processing</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceHttpStatusFilter"><option value="">全部状态码</option><option value="200">200</option><option value="202">202</option><option value="400">400</option><option value="401">401</option><option value="404">404</option><option value="408">408</option><option value="409">409</option><option value="429">429</option><option value="500">500</option><option value="503">503</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="foods">foods</option><option value="feedback">feedback</option><option value="milestones">milestones</option><option value="profile">profile</option><option value="admin">admin</option><option value="system">system</option></select><select id="traceStageFilter"><option value="">全部阶段</option><option value="request">request</option><option value="init">init</option><option value="upload">upload</option><option value="uploaded">uploaded</option><option value="safety_check">safety_check</option><option value="evaluation">evaluation</option><option value="flash">flash</option><option value="nutrition">nutrition</option><option value="persistence">persistence</option><option value="storage_upload">storage_upload</option><option value="temp_url_generation">temp_url_generation</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
+            <div class="ops-filter-row"><input id="traceSearch" type="search" placeholder="Trace ID / 接口 / 错误码" autocomplete="off" /><select id="traceStatusFilter"><option value="">全部状态</option><option value="succeeded">succeeded</option><option value="processing">processing</option><option value="failed">failed</option><option value="timed_out">timed_out</option><option value="rate_limited">rate_limited</option><option value="cancelled">cancelled</option></select><select id="traceHttpStatusFilter"><option value="">全部状态码</option><option value="200">200</option><option value="202">202</option><option value="400">400</option><option value="401">401</option><option value="404">404</option><option value="408">408</option><option value="409">409</option><option value="429">429</option><option value="500">500</option><option value="503">503</option></select><select id="traceFeatureFilter"><option value="">全部功能</option><option value="vision">vision</option><option value="nutrition">nutrition</option><option value="coach">coach</option><option value="meals">meals</option><option value="foods">foods</option><option value="feedback">feedback</option><option value="milestones">milestones</option><option value="profile">profile</option><option value="push">push</option><option value="admin">admin</option><option value="system">system</option></select><select id="traceStageFilter"><option value="">全部阶段</option><option value="request">request</option><option value="init">init</option><option value="upload">upload</option><option value="uploaded">uploaded</option><option value="safety_check">safety_check</option><option value="evaluation">evaluation</option><option value="flash">flash</option><option value="nutrition">nutrition</option><option value="persistence">persistence</option><option value="storage_upload">storage_upload</option><option value="temp_url_generation">temp_url_generation</option></select><button id="traceApplyFilters" class="button" type="button">筛选</button></div>
             <div class="trace-quick-filters nn-status-filter" aria-label="Trace 快捷筛选"><span class="muted">快捷筛选</span><button class="filter" type="button" data-trace-quick-filter="all">全部</button><button class="filter" type="button" data-trace-quick-filter="failed">失败</button><button class="filter" type="button" data-trace-quick-filter="timed_out">超时</button><button class="filter" type="button" data-trace-quick-filter="last24h">最近 24 小时</button><button class="filter" type="button" data-trace-quick-filter="vision">Vision</button><button class="filter" type="button" data-trace-quick-filter="coach">Coach</button><button id="traceClearFilters" class="button link" type="button">清除筛选</button></div>
           </div>
           <p id="traceActiveFilters" class="muted" aria-live="polite">当前未应用筛选</p>
@@ -962,6 +986,11 @@
           <div class="nn-page-header"><div><p class="eyebrow">Operations / Runtime</p><h2>Jobs</h2><p class="muted">代码配置与真实调度状态分开展示。</p></div><button id="refreshJobs" class="button secondary" type="button">刷新</button></div>
           <section class="ops-panel nn-compact-panel nn-jobs-panel"><div class="nn-section-heading"><div><p class="eyebrow">Controlled execution</p><h3>手动运行</h3></div><span class="nn-status-badge nn-status-badge--warning">白名单任务</span></div><div class="nn-filter-bar"><select id="runNowJobKey"><option value="">选择白名单 Job</option></select><button id="runNowJob" class="button" type="button">Run Now</button><span class="muted">手动运行会写入 Admin Audit，不接受命令或调度配置。</span></div></section>
           <section class="ops-panel nn-compact-panel nn-jobs-list-panel"><div class="nn-section-heading"><div><p class="eyebrow">Job catalog</p><h3>运行目录</h3></div><span class="muted">Last Run 来自真实运行记录</span></div><div id="jobsTable" class="nn-jobs-list"><p class="ops-empty">加载中…</p></div></section>
+        </section>
+
+        <section id="modulePush" class="admin-module" hidden>
+          <div class="nn-page-header"><div><p class="eyebrow">Operations / Push</p><h2>推送测试</h2><p class="muted">仅向指定 DEV 用户发送一条提醒，用于验证 Android FCM 链路与通知文案。</p></div></div>
+          <section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">FCM delivery</p><h3>白名单测试</h3></div><span class="nn-status-badge nn-status-badge--warning">DEV only</span></div><div class="nn-filter-bar nn-push-test-bar"><label class="nn-field nn-push-test-field"><span>用户 ID</span><input id="pushTestUserId" class="nn-input" type="text" placeholder="输入内部用户 UUID" autocomplete="off" /></label><label class="nn-field nn-push-test-field"><span>推送场景</span><select id="pushTestScenario" class="nn-select"><option value="meal">餐次未记录</option><option value="missed_streak">连续多天未记录</option><option value="recorded_streak">已连续记录</option></select></label><label class="nn-field nn-push-test-field"><span>提醒餐次</span><select id="pushTestMealType" class="nn-select"><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option></select></label><button id="pushTestSend" class="button nn-push-test-send" type="button">发送测试 Push</button></div><p id="pushTestStatus" class="muted nn-push-test-status" aria-live="polite">请确认设备已登录 DEV 账号并完成通知授权。</p></section>
         </section>
 
         <section id="moduleAuditLogs" class="admin-module" hidden>
@@ -1156,7 +1185,9 @@
     if (storedCredentials.username) $("adminUsername").value = storedCredentials.username;
     sessionToken = storedCredentials.token || "";
     const MODULE_CACHE_TTL_MS = 60_000;
-    const moduleCache = { users: null, feedback: null, foods: null };
+    const API_REQUEST_TIMEOUT_MS = 30_000;
+    const PUSH_RECEIPT_WAIT_TIMEOUT_MS = 70_000;
+    const moduleCache = { users: null, verification: null, feedback: null, foods: null };
     function moduleCacheFresh(key) {
       const entry = moduleCache[key];
       return Boolean(entry && Date.now() - entry.at < MODULE_CACHE_TTL_MS);
@@ -1202,6 +1233,16 @@
       HY_IMAGE_UNAVAILABLE: "混元生图暂时不可用，请稍后重试",
       HY_IMAGE_DISABLED: "生图功能已关闭，请检查云函数环境变量",
       HY_IMAGE_DAILY_LIMIT: "今日生图额度已用尽，请明天再试或提高日限额",
+      FCM_NOT_CONFIGURED: "FCM 服务端凭证未配置，请检查 DEV CloudBase 环境变量",
+      FCM_AUTH_TIMEOUT: "FCM 鉴权超时，请检查 DEV 云函数到 Google FCM 的网络连通性",
+      FCM_TIMEOUT: "FCM 请求超时，请稍后重试并检查 Firebase 网络连通性",
+      FCM_UNAVAILABLE: "FCM 服务暂时不可用，请稍后重试",
+      PUSH_DELIVERY_NOT_FOUND: "推送回执不存在或已过期",
+      PUSH_SERVICE_UNAVAILABLE: "推送服务暂时不可用，请检查云函数和数据库迁移",
+      NETWORK_TIMEOUT: "接口请求超时，请稍后重试；若持续发生请查看 Trace",
+      PUSH_USER_ID_INVALID: "请输入有效的用户 ID",
+      PUSH_MEAL_TYPE_INVALID: "请选择有效的提醒餐次",
+      PUSH_SCENARIO_INVALID: "请选择有效的推送场景",
       FORBIDDEN: "当前账号不是管理员",
       UNAUTHORIZED: "登录已失效，请重新登录后台",
       USER_IMAGE_PROTECTED: "图片受保护，无法删除",
@@ -1229,7 +1270,7 @@
       return apiErrorMessage(error);
     };
     function createApiError({ endpoint, method, status = 0, json = {}, cause } = {}) {
-      const code = json.code || json.errorCode || (status ? `HTTP_${status}` : "NETWORK_ERROR");
+      const code = json.code || json.errorCode || (status ? `HTTP_${status}` : cause?.name === "AbortError" ? "NETWORK_TIMEOUT" : "NETWORK_ERROR");
       return Object.assign(new Error(json.message || json.errorMessage || json.error || code), { code, endpoint, method, status, json, cause });
     }
     function renderOperationFeed() {
@@ -1246,8 +1287,11 @@
       const token = sessionToken.trim();
       if (!token) throw new Error("请先使用帐号密码登录后台");
       const endpoint = `/api/admin${path}`; let response;
-      try { response = await fetch(`${base}${endpoint}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
+      const controller = typeof AbortController === "function" ? new AbortController() : null;
+      const timeout = controller ? window.setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS) : null;
+      try { response = await fetch(`${base}${endpoint}`, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body), ...(controller ? { signal: controller.signal } : {}) }); }
       catch (cause) { const error = createApiError({ endpoint, method, cause }); if (!quiet) recordOperation({ title: "接口连接失败", detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
+      finally { if (timeout !== null) window.clearTimeout(timeout); }
       const json = await response.json().catch(() => ({}));
       if (!response.ok) { const error = createApiError({ endpoint, method, status: response.status, json }); if (!quiet) recordOperation({ title: `接口错误 ${response.status}`, detail: `${method} ${endpoint} · ${apiErrorMessage(error)}`, isError: true }); throw error; }
       if (method !== "GET" && !quiet) recordOperation({ title: "接口操作已完成", detail: `${method} ${endpoint} · HTTP ${response.status}` });
@@ -2075,6 +2119,8 @@
     }
     function hasToken() { return Boolean(sessionToken.trim()); }
     const feedbackCategoryLabel = (category) => ({ product: "产品", bug: "缺陷", feature: "功能", support: "支持" }[category] || category || "—");
+    const registrationChannelLabels = { wechat: "微信小程序", email: "邮箱", phone: "手机号", google: "Google" };
+    const registrationChannelLabel = (channel) => registrationChannelLabels[channel] || channel || "未知";
     async function loadUsers({ force = false } = {}) {
       const host = $("userTable");
       if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
@@ -2090,9 +2136,56 @@
         const data = await api(`/users?q=${encodeURIComponent(q)}&limit=50`);
         const items = data.items || [];
         if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">未找到匹配用户</p>"; moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() }; return; }
-        host.innerHTML = `<table><thead><tr><th>昵称</th><th>最近登录</th><th>管理员</th><th>注册时间</th><th>用户 ID</th><th>排障</th></tr></thead><tbody>${items.map((user) => `<tr><td>${escapeHtml(user.nickname || "—")}</td><td>${escapeHtml(formatTime(user.lastLoginAt))}</td><td>${user.isAdmin ? "是" : "否"}</td><td>${escapeHtml(formatTime(user.createdAt))}</td><td><code>${escapeHtml(user.id)}</code></td><td><button class="button secondary" type="button" data-user-detail="${escapeHtml(user.id)}">查看详情</button></td></tr>`).join("")}</tbody></table>`;
+        host.innerHTML = `<table><thead><tr><th>昵称</th><th>注册渠道</th><th>最近登录</th><th>管理员</th><th>注册时间</th><th>用户 ID</th><th>排障</th></tr></thead><tbody>${items.map((user) => `<tr><td>${escapeHtml(user.nickname || "—")}</td><td>${escapeHtml(registrationChannelLabel(user.registrationChannel))}</td><td>${escapeHtml(formatTime(user.lastLoginAt))}</td><td>${user.isAdmin ? "是" : "否"}</td><td>${escapeHtml(formatTime(user.createdAt))}</td><td><code>${escapeHtml(user.id)}</code></td><td><button class="button secondary" type="button" data-user-detail="${escapeHtml(user.id)}">查看详情</button></td></tr>`).join("")}</tbody></table>`;
         bindUserDetailButtons();
         moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() };
+      } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
+    }
+    const verificationPurposeLabels = { register: "注册", reset_password: "找回密码" };
+    const verificationStatusLabels = { created: "已创建", sent: "已发送", failed: "发送失败", used: "已使用", expired: "已过期", invalidated: "已失效" };
+    function renderVerificationDetail(item) {
+      const host = $("verificationDetail");
+      if (!item) { host.hidden = true; host.innerHTML = ""; return; }
+      host.hidden = false;
+      const rows = [
+        ["验证码记录", item.id], ["渠道 / 用途", `${item.channel || "—"} · ${verificationPurposeLabels[item.purpose] || item.purpose || "—"}`],
+        ["目标（脱敏）", item.target], ["状态", verificationStatusLabels[item.status] || item.status],
+        ["创建 / 发送 / 过期", `${formatTime(item.createdAt)} · ${formatTime(item.sentAt)} · ${formatTime(item.expiresAt)}`],
+        ["使用时间", formatTime(item.usedAt)], ["发送 / 校验次数", `${item.sendAttempts ?? 0} / ${item.verifyAttempts ?? 0}`],
+        ["供应商", `${item.provider || "—"} · ${item.providerDeliveryStatus || "—"} · HTTP ${item.providerHttpStatus ?? "—"}`], ["供应商消息 ID", item.providerMessageId],
+        ["供应商错误", `${item.providerErrorCode || "—"}${item.providerErrorReason ? ` · ${item.providerErrorReason}` : ""}`],
+        ["用户 ID", item.userId], ["Trace ID", item.traceId], ["Captcha / 限流", `${item.captchaStatus || "—"} · ${item.rateLimitStatus || "—"}`],
+      ];
+      if (item.debugCode) rows.push(["DEV 调试验证码", item.debugCode]);
+      host.innerHTML = `<div class="nn-page-header"><div><p class="eyebrow">Verification detail</p><h3>验证码详情</h3></div><button class="button link" type="button" data-close-verification>关闭</button></div><div class="data-table"><table><tbody>${rows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value ?? "—")}</td></tr>`).join("")}</tbody></table></div>`;
+      host.querySelector("[data-close-verification]").onclick = () => renderVerificationDetail(null);
+    }
+    function bindVerificationTable(host, items) {
+      host.querySelectorAll("[data-verification-detail]").forEach((button) => { button.onclick = () => renderVerificationDetail(items.find((item) => item.id === button.dataset.verificationDetail)); });
+      host.querySelectorAll("[data-verification-resend]").forEach((button) => {
+        button.onclick = async () => {
+          if (!window.confirm("确认让后台重新发送这个验证码吗？旧验证码会立即失效。")) return;
+          try {
+            await api(`/verification-codes/${encodeURIComponent(button.dataset.verificationResend)}/resend`, { method: "POST", body: {} });
+            moduleCache.verification = null;
+            toast("验证码已重新发送");
+            await loadVerifications({ force: true });
+          } catch (error) { toast(apiErrorMessage(error), true); }
+        };
+      });
+    }
+    async function loadVerifications({ force = false } = {}) {
+      const host = $("verificationTable");
+      if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
+      const type = $("verificationTypeFilter").value; const purpose = $("verificationPurposeFilter").value; const status = $("verificationStatusFilter").value;
+      const cacheKey = `verification:${type}:${purpose}:${status}`;
+      if (!force && moduleCache.verification?.key === cacheKey && moduleCacheFresh("verification")) { host.innerHTML = moduleCache.verification.html; bindVerificationTable(host, moduleCache.verification.items || []); return; }
+      try {
+        const qs = new URLSearchParams({ limit: "100" }); if (type) qs.set("targetType", type); if (purpose) qs.set("purpose", purpose); if (status) qs.set("status", status);
+        const data = await api(`/verification-codes?${qs.toString()}`); const items = data.items || [];
+        if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">暂无验证码记录</p>"; moduleCache.verification = { key: cacheKey, html: host.innerHTML, items, at: Date.now() }; renderVerificationDetail(null); return; }
+        host.innerHTML = `<div style="overflow:auto"><table><thead><tr><th>时间</th><th>渠道</th><th>用途</th><th>目标</th><th>状态</th><th>供应商</th><th>次数</th><th>Trace</th><th>操作</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(formatTime(item.createdAt))}</td><td>${escapeHtml(item.channel || "—")}</td><td>${escapeHtml(verificationPurposeLabels[item.purpose] || item.purpose || "—")}</td><td>${escapeHtml(item.target || "—")}</td><td>${escapeHtml(verificationStatusLabels[item.status] || item.status || "—")}${item.debugCode ? `<br><small>DEV: ${escapeHtml(item.debugCode)}</small>` : ""}</td><td>${escapeHtml(item.provider || "—")}<br><small>${escapeHtml(item.providerDeliveryStatus || "—")}</small></td><td>${escapeHtml(`${item.sendAttempts ?? 0} / ${item.verifyAttempts ?? 0}`)}</td><td><code>${escapeHtml(item.traceId || "—")}</code></td><td><button class="button secondary" type="button" data-verification-detail="${escapeHtml(item.id)}">详情</button> <button class="button link" type="button" data-verification-resend="${escapeHtml(item.id)}">重发</button></td></tr>`).join("")}</tbody></table></div>`;
+        moduleCache.verification = { key: cacheKey, html: host.innerHTML, items, at: Date.now() }; bindVerificationTable(host, items);
       } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
     }
     const feedbackStatusLabels = { new: "已收到", reviewing: "处理中", resolved: "已回复", closed: "已关闭" };
@@ -3294,7 +3387,7 @@
     }
     function renderUserDetail(data) {
       const profile = data?.profile || {}; const overview = data?.overview || {};
-      $("userDetailSummary").innerHTML = `<div class="ops-user-summary"><div><span class="eyebrow">USER DETAIL</span><h3>${escapeHtml(profile.nickname || data.id)}</h3><code>${escapeHtml(data.id)}</code></div><div class="ops-window-grid">${[["餐食", overview.mealsCount], ["AI 使用", overview.aiUsageCount], ["图片", overview.imageCount], ["反馈", overview.feedbackCount], ["内容安全", overview.moderationCount], ["删除记录", overview.deletionCount]].map(([label, value]) => `<span>${label}<b>${escapeHtml(value ?? 0)}</b></span>`).join("")}</div></div><p class="muted">注册 ${escapeHtml(formatTime(profile.createdAt))} · 最近活跃 ${escapeHtml(formatTime(profile.lastActiveAt))}</p>`;
+      $("userDetailSummary").innerHTML = `<div class="ops-user-summary"><div><span class="eyebrow">USER DETAIL</span><h3>${escapeHtml(profile.nickname || data.id)}</h3><code>${escapeHtml(data.id)}</code></div><div class="ops-window-grid">${[["餐食", overview.mealsCount], ["AI 使用", overview.aiUsageCount], ["图片", overview.imageCount], ["反馈", overview.feedbackCount], ["内容安全", overview.moderationCount], ["删除记录", overview.deletionCount]].map(([label, value]) => `<span>${label}<b>${escapeHtml(value ?? 0)}</b></span>`).join("")}</div></div><p class="muted">注册渠道 ${escapeHtml(registrationChannelLabel(profile.registrationChannel))} · 注册 ${escapeHtml(formatTime(profile.createdAt))} · 最近活跃 ${escapeHtml(formatTime(profile.lastActiveAt))}</p>`;
       renderUserDetailPanels(data);
     }
     function renderUserTimeline(data) {
@@ -3308,11 +3401,12 @@
       try { const [detail, timeline] = await Promise.all([api(`/users/${encodeURIComponent(id)}`), api(`/users/${encodeURIComponent(id)}/timeline`)]); renderUserDetail(detail); renderUserTimeline(timeline); } catch (error) { setOpsMessage($("userDetailSummary"), apiErrorMessage(error), "danger"); setOpsMessage($("userTimeline"), "Timeline 暂时不可用", "danger"); }
     }
     function openUserDetail(userId) { $("userDetailId").value = userId || ""; setModule("user-detail"); loadUserDetailModule().catch(() => {}); }
-    const MODULE_LABELS = { dashboard: "总览", users: "用户数据", "user-detail": "用户详情", foods: "食材管理", images: "食材生图", audit: "旧图审计", ops: "运营总览", quota: "额度管理", jobs: "Jobs", moderation: "内容安全", "user-images": "用户图片", feedback: "问题反馈", health: "系统健康", traces: "Traces", "audit-logs": "审计日志", system: "系统配置" };
+    const MODULE_LABELS = { dashboard: "总览", users: "用户数据", verification: "验证码中心", "user-detail": "用户详情", foods: "食材管理", images: "食材生图", audit: "旧图审计", ops: "运营总览", quota: "额度管理", jobs: "Jobs", push: "推送测试", moderation: "内容安全", "user-images": "用户图片", feedback: "问题反馈", health: "系统健康", traces: "Traces", "audit-logs": "审计日志", system: "系统配置" };
     function setModule(name) {
       document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.classList.toggle("active", btn.dataset.module === name); });
       if ($("currentArea")) $("currentArea").textContent = MODULE_LABELS[name] || "管理后台";
       $("moduleUsers").hidden = name !== "users";
+      $("moduleVerification").hidden = name !== "verification";
       $("moduleFeedback").hidden = name !== "feedback";
       $("moduleFoods").hidden = name !== "foods";
       $("moduleImages").hidden = name !== "images";
@@ -3323,6 +3417,7 @@
       $("moduleHealth").hidden = name !== "health";
       $("moduleTraces").hidden = name !== "traces";
       $("moduleJobs").hidden = name !== "jobs";
+      $("modulePush").hidden = name !== "push";
       $("moduleAuditLogs").hidden = name !== "audit-logs";
       $("moduleUserDetail").hidden = name !== "user-detail";
       if (name === "user-detail") activateUserDetailTab("overview");
@@ -3330,6 +3425,7 @@
       $("moduleModeration").hidden = name !== "moderation";
       $("moduleSystem").hidden = name !== "system";
       if (name === "users") loadUsers().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "verification") loadVerifications().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "feedback") loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "foods") loadFoodAdminList().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "audit") refreshAuditRun().catch((error) => toast(apiErrorMessage(error), true));
@@ -3341,6 +3437,7 @@
       if (name === "health") loadSystemHealth().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "traces") loadTraces().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "jobs") loadJobs().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "push") $("pushTestUserId")?.focus();
       if (name === "audit-logs") loadAuditLogs().catch((error) => toast(apiErrorMessage(error), true));
       syncQuotaAutoRefresh(name === "quota");
     }
@@ -3358,6 +3455,49 @@
       }, QUOTA_AUTO_REFRESH_MS);
     }
     document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.onclick = () => setModule(btn.dataset.module); });
+    $("pushTestSend").onclick = async () => {
+      const userId = $("pushTestUserId")?.value.trim() || "";
+      const scenario = $("pushTestScenario")?.value || "meal";
+      const mealType = $("pushTestMealType")?.value || "";
+      const status = $("pushTestStatus");
+      if (!userId) { if (status) status.textContent = "请先输入白名单用户 ID。"; return; }
+      if (!window.confirm("确认向这个 DEV 用户发送一次测试 Push？")) return;
+      const button = $("pushTestSend");
+      if (button) { button.disabled = true; button.textContent = "发送中…"; }
+      if (status) status.textContent = "正在请求 FCM…";
+      try {
+        const result = await api("/push/test", { method: "POST", body: { userId, mealType, scenario } });
+        if (!result.deliveryId) {
+          if (status) status.textContent = `FCM 已处理：成功 ${result.accepted ?? result.sent ?? 0} 条，未找到可用设备 token。Trace ${result.traceId || "—"}`;
+          toast("没有可用的设备 token", true);
+          return;
+        }
+        if (status) status.textContent = `FCM 已接受，等待设备回执… Trace ${result.traceId || "—"}`;
+        toast("测试 Push 已发送，等待设备回执");
+        const deadline = Date.now() + PUSH_RECEIPT_WAIT_TIMEOUT_MS;
+        let deliveryResolved = false;
+        while (Date.now() < deadline) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+          const delivery = await api(`/push/test/${encodeURIComponent(result.deliveryId)}`, { quiet: true });
+          if (delivery.status === "pending" || delivery.status === "accepted") {
+            if (status) status.textContent = `FCM 已接受，等待设备回执… 已等待 ${Math.round((Date.now() - (new Date(delivery.createdAt).getTime() || Date.now())) / 1000)} 秒。Trace ${result.traceId || "—"}`;
+            continue;
+          }
+          const receipt = delivery.received === 1 ? "设备已收到" : delivery.received === 0 ? "等待超时，未收到设备回执" : "设备状态未确认";
+          const display = delivery.displayed === 1 ? "，通知已展示" : "";
+          const opened = delivery.opened === 1 ? "，用户已点击" : "";
+          if (status) status.textContent = `${receipt}${display}${opened}。Trace ${result.traceId || "—"}`;
+          deliveryResolved = true;
+          break;
+        }
+        if (!deliveryResolved && status) status.textContent = `等待设备回执超时，当前无法确认是否收到。Trace ${result.traceId || "—"}`;
+      } catch (error) {
+        if (status) status.textContent = apiErrorMessage(error);
+        toast(apiErrorMessage(error), true);
+      } finally {
+        if (button) { button.disabled = false; button.textContent = "发送测试 Push"; }
+      }
+    };
     bindUserDetailTabs();
     $("refreshDashboard").onclick = () => loadSystemHealth({ dashboard: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("dashboardOpenHealth").onclick = () => setModule("health");
@@ -3382,6 +3522,10 @@
     $("refreshUserTimeline").onclick = () => loadUserDetailModule().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshUsers").onclick = () => loadUsers({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("userSearch").onkeydown = (event) => { if (event.key === "Enter") loadUsers({ force: true }).catch((error) => toast(apiErrorMessage(error), true)); };
+    $("refreshVerification").onclick = () => loadVerifications({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("verificationTypeFilter").onchange = () => loadVerifications({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("verificationPurposeFilter").onchange = () => loadVerifications({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
+    $("verificationStatusFilter").onchange = () => loadVerifications({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("refreshFeedback").onclick = () => loadFeedback({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("feedbackStatusFilter").onchange = () => loadFeedback({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("refreshOps").onclick = () => loadOpsOverview().catch((error) => toast(apiErrorMessage(error), true));

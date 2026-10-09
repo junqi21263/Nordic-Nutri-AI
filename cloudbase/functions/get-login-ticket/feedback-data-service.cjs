@@ -59,13 +59,33 @@ function createFeedbackDataService({ db }) {
       const cap = Math.min(Math.max(Number(limit) || 30, 1), 50);
       const result = await db
         .from("user_feedback")
-        .select("id,category,content,status,admin_reply,created_at,replied_at,reply_read_at")
+        .select("id,category,content,status,admin_reply,created_at,replied_at,reply_read_at,client_request_id,device_context")
         .eq("user_id", userId)
-        .not("admin_reply", "is", null)
         .order("created_at", { ascending: false })
         .limit(cap);
       if (result.error) throw new Error("Feedback list failed");
-      const items = (result.data || []).map(mapFeedback);
+      const mirroredIds = (result.data || [])
+        .filter((row) => row.device_context?.source === "recognition_feedback" && row.client_request_id)
+        .map((row) => row.client_request_id);
+      const feedbackTypes = new Map();
+      if (mirroredIds.length) {
+        const recognition = await db
+          .from("recognition_feedback")
+          .select("id,feedback_type,corrected_result")
+          .eq("user_id", userId)
+          .in("id", mirroredIds)
+          .limit(cap);
+        if (recognition.error) throw new Error("Recognition feedback list failed");
+        for (const row of recognition.data || []) {
+          if (row.feedback_type === "other" && typeof row.corrected_result?.note === "string" && row.corrected_result.note.trim()) {
+            feedbackTypes.set(row.id, "other");
+          }
+        }
+      }
+      const items = (result.data || [])
+        .filter((row) => row.device_context?.source !== "recognition_feedback"
+          || feedbackTypes.get(row.client_request_id) === "other")
+        .map(mapFeedback);
       return {
         items,
         unreadReplyCount: items.filter((item) => item.adminReply && !item.replyReadAt).length,

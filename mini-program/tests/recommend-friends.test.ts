@@ -10,7 +10,7 @@ describe("recommend friends poster", () => {
     );
   });
 
-  it("wires profile entry above logout and uses WeChat share-image + album save", () => {
+  it("keeps the poster page available without a profile-page entry", () => {
     const profile = readFileSync(resolve(import.meta.dirname, "../src/pages/profile/index.tsx"), "utf8");
     const page = readFileSync(
       resolve(import.meta.dirname, "../src/pages/recommend-friends/index.tsx"),
@@ -22,11 +22,8 @@ describe("recommend friends poster", () => {
     );
     const appConfig = readFileSync(resolve(import.meta.dirname, "../src/app.config.ts"), "utf8");
 
-    expect(profile).toContain("推荐好友");
-    expect(profile).toContain("/pages/recommend-friends/index");
-    expect(profile.indexOf('openPage("/pages/recommend-friends/index")')).toBeLessThan(
-      profile.indexOf("onClick={logout}"),
-    );
+    expect(profile).not.toContain("推荐好友");
+    expect(profile).not.toContain("/pages/recommend-friends/index");
     expect(page).toContain("shareRecommendPosterToWechat");
     expect(page).toContain("saveRecommendPosterToAlbum");
     expect(helpers).toContain("showShareImageMenu");

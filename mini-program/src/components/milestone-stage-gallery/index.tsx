@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { MilestoneIllustrationAsset } from "../../features/milestones/asset-cache";
 import { getMilestoneIllustrationAsset, MILESTONE_ASSET_IDS } from "../../features/milestones/config";
 import type { Milestone } from "../../features/milestones/stats";
@@ -22,6 +23,7 @@ export function MilestoneStageGallery({
   frozenAsset: MilestoneIllustrationAsset;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const assets = useMemo(
     () => MILESTONE_ASSET_IDS[milestone].map((_, index) => getMilestoneIllustrationAsset(milestone, index, frozenAsset.version)),
     [frozenAsset.version, milestone],
@@ -61,19 +63,19 @@ export function MilestoneStageGallery({
           }}
         >
           <MilestoneJourneyIllustration asset={activeAsset} className="milestone-stage-gallery__image" />
-          {isFrozenAsset ? <Text className="milestone-stage-gallery__frozen">本次解锁</Text> : null}
+          {isFrozenAsset ? <Text className="milestone-stage-gallery__frozen">{t("milestoneGallery.frozen")}</Text> : null}
           {assets.length > 1 ? (
             <>
-              <View className="milestone-stage-gallery__nav milestone-stage-gallery__nav--prev" onClick={() => move(-1)} ariaLabel="上一张插画">
+              <View className="milestone-stage-gallery__nav milestone-stage-gallery__nav--prev" onClick={() => move(-1)} ariaLabel={t("milestoneGallery.previous")}>
                 <Text className="milestone-stage-gallery__nav-icon">‹</Text>
               </View>
-              <View className="milestone-stage-gallery__nav milestone-stage-gallery__nav--next" onClick={() => move(1)} ariaLabel="下一张插画">
+              <View className="milestone-stage-gallery__nav milestone-stage-gallery__nav--next" onClick={() => move(1)} ariaLabel={t("milestoneGallery.next")}>
                 <Text className="milestone-stage-gallery__nav-icon">›</Text>
               </View>
             </>
           ) : null}
         </View>
-        <Text className="milestone-stage-gallery__hint">左右滑动查看 · 点击空白处关闭</Text>
+        <Text className="milestone-stage-gallery__hint">{t("milestoneGallery.hint")}</Text>
       </View>
     </Modal>
   );

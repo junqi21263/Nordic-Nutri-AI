@@ -1,6 +1,7 @@
 import { Image, Textarea, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NordicIcon } from "../../../../components/nordic-icon";
 import { useSystemLayout } from "../../../../hooks/useSystemLayout";
 
@@ -17,7 +18,7 @@ export interface CoachComposerProps {
 
 export function CoachComposer({
   value,
-  placeholder = "问问营养教练，比如：晚餐吃什么？",
+  placeholder,
   disabled = false,
   selectedImagePath = null,
   onInput,
@@ -26,6 +27,8 @@ export function CoachComposer({
   onClearImage,
 }: CoachComposerProps) {
   const layout = useSystemLayout();
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t("coachPage.composer.placeholder");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
@@ -52,7 +55,7 @@ export function CoachComposer({
       {selectedImagePath ? (
         <View
           className="coach-composer__selected-image"
-          ariaLabel="取消已选图片"
+          ariaLabel={t("coachPage.composer.removeImage")}
           onClick={onClearImage}
         >
           <Image
@@ -62,14 +65,14 @@ export function CoachComposer({
           />
         </View>
       ) : null}
-      <View className="coach-composer__image-picker" ariaLabel="选择饮食图片" onClick={onPickImage}>
-        <NordicIcon name="camera" size={24} ariaLabel="选择图片" />
+      <View className="coach-composer__image-picker" ariaLabel={t("coachPage.composer.chooseFoodImage")} onClick={onPickImage}>
+        <NordicIcon name="camera" size={24} ariaLabel={t("coachPage.composer.chooseImage")} />
       </View>
       <View className="coach-composer__field">
         <Textarea
           className="coach-composer__input"
           value={value}
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           placeholderClass="coach-composer__input-placeholder"
           maxlength={1000}
           autoHeight
@@ -83,12 +86,12 @@ export function CoachComposer({
       </View>
       <View
         className={`coach-composer__send ${disabled || (!value.trim() && !selectedImagePath) ? "coach-composer__send--disabled" : ""}`}
-        ariaLabel="发送消息"
+        ariaLabel={t("coachPage.composer.sendMessage")}
         onClick={() => {
           if (!disabled && (value.trim() || selectedImagePath)) onSend();
         }}
       >
-        <NordicIcon name="arrow-up" size={24} ariaLabel="发送" />
+        <NordicIcon name="arrow-up" size={24} ariaLabel={t("coachPage.composer.send")} />
       </View>
     </View>
   );

@@ -1,6 +1,8 @@
 import { Input, Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import {
   getProductAccount,
   saveProductBodyProfile,
@@ -54,53 +56,47 @@ async function syncNicknameEverywhere(nickname: string) {
 }
 const activityOptions: Array<{
   value: ActivityLevel;
-  title: string;
-  description: string;
   trainingDays: string;
   icon: NordicIconName;
 }> = [
   {
     value: "sedentary",
-    title: "低活动",
-    description: "久坐为主，日常活动较少。",
     trainingDays: "0",
     icon: "activity-low",
   },
   {
     value: "light",
-    title: "轻度活动",
-    description: "有少量日常活动或偶尔训练。",
     trainingDays: "2",
     icon: "activity-light",
   },
   {
     value: "moderate",
-    title: "中等活动",
-    description: "有一定日常活动或每周规律训练。",
     trainingDays: "4",
     icon: "activity-moderate",
   },
   {
     value: "high",
-    title: "高活动",
-    description: "日常活动较多或训练频率较高。",
     trainingDays: "6",
     icon: "activity-high",
   },
   {
     value: "very_high",
-    title: "很高活动",
-    description: "体力劳动较多或几乎每天高强度训练。",
     trainingDays: "7",
     icon: "activity-high",
   },
 ];
 
 function FormError({ message }: { message?: string }) {
-  return message ? <Text className="form-field__error">{message}</Text> : null;
+  const translated = Object.entries({
+    "请输入昵称": "nickname", "年龄需在 14–80 岁之间": "age", "请选择性别": "gender",
+    "身高需在 120–230 cm 之间": "heightCm", "体重需在 30–300 kg 之间": "weightKg",
+    "请选择日常活动量": "activityLevel", "训练频率需在 0–7 天之间": "trainingDays",
+  }).find(([source]) => source === message)?.[1];
+  return message ? <Text className="form-field__error">{translated ? t(`bodyProfile.errors.${translated}`) : message}</Text> : null;
 }
 
 export default function BodyProfilePage() {
+  useTranslation();
   const router = useRouter();
   const fromSettings = isSettingsEditMode(router.params);
   const hydrateFromAccount = shouldHydrateFromAccount(router.params);
@@ -183,9 +179,9 @@ export default function BodyProfilePage() {
     } catch {
       feedback.showModal({
         variant: "error",
-        title: "身体资料保存失败",
-        description: "请稍后重试。",
-        primaryText: "知道了",
+        title: t("bodyProfile.saveFailed"),
+        description: t("bodyProfile.retryLater"),
+        primaryText: t("bodyProfile.okay"),
         dismissible: true,
       });
     } finally {
@@ -195,7 +191,7 @@ export default function BodyProfilePage() {
 
   return (
     <PageLayout
-      title="身体资料"
+      title={t("bodyProfile.title")}
       showTabs={false}
       hideNavigation
       showBrandHeader={false}
@@ -205,10 +201,10 @@ export default function BodyProfilePage() {
         <View className="onboarding-sticky-header">
           <OnboardingHeader
             brand="Nordic Nutri AI"
-            step={fromSettings ? "调整资料" : "第 2 步，共 4 步"}
+            step={t(fromSettings ? "bodyProfile.editStep" : "bodyProfile.step")}
             progress={fromSettings ? 1 / 3 : 0.5}
-            progressAriaLabel={fromSettings ? "调整身体资料" : "当前为第 2 步，共 4 步"}
-            backAriaLabel={fromSettings ? "返回个人中心" : "返回目标选择"}
+            progressAriaLabel={t(fromSettings ? "bodyProfile.editProgress" : "bodyProfile.progress")}
+            backAriaLabel={t(fromSettings ? "bodyProfile.backProfile" : "bodyProfile.backGoal")}
             onBack={() =>
               fromSettings ? leaveSettings() : navigateBackOrHome("/pages/onboarding/index")
             }
@@ -216,12 +212,12 @@ export default function BodyProfilePage() {
         </View>
         <View className="onboarding-heading body-profile__heading">
           <Text className="onboarding-heading__title">
-            {fromSettings ? "更新你的身体情况" : "告诉我们你的身体情况"}
+            {t(fromSettings ? "bodyProfile.editTitle" : "bodyProfile.newTitle")}
           </Text>
           <Text className="onboarding-heading__copy">
             {fromSettings
-              ? "修改后可继续调整饮食偏好，并重新生成营养目标。"
-              : "这些信息将帮助我们为你制定更合适的营养计划。"}
+              ? t("bodyProfile.editCopy")
+              : t("bodyProfile.newCopy")}
           </Text>
         </View>
 
@@ -229,20 +225,20 @@ export default function BodyProfilePage() {
           <AppCard className="body-profile__foundation-card">
             <View className="body-profile__foundation-heading">
               <View className="body-profile__foundation-icon-ground">
-                <NordicIcon name="user-round" size={20} ariaLabel="基础信息" />
+                <NordicIcon name="user-round" size={20} ariaLabel={t("bodyProfile.foundation")} />
               </View>
-              <Text className="body-profile__foundation-title">基础信息与生活方式</Text>
+              <Text className="body-profile__foundation-title">{t("bodyProfile.foundation")}</Text>
             </View>
 
             <View className="profile-form">
               <View className="profile-form__field">
-                <Text>昵称</Text>
+                <Text className="profile-form__label">{t("bodyProfile.nickname")}</Text>
                 <View className="profile-form__input-row profile-form__input-row--with-action">
                   <Input
                     className="profile-form__input--with-action"
                     value={draft.nickname}
                     maxlength={16}
-                    placeholder="输入你的昵称"
+                    placeholder={t("bodyProfile.nicknamePlaceholder")}
                     onInput={(event) => setField("nickname", event.detail.value)}
                     onBlur={(event) => {
                       const next = event.detail.value?.trim() || draft.nickname;
@@ -254,9 +250,9 @@ export default function BodyProfilePage() {
                   <View
                     className="profile-form__input-action"
                     onClick={refreshNickname}
-                    ariaLabel="换一个昵称"
+                    ariaLabel={t("bodyProfile.randomNickname")}
                   >
-                    <NordicIcon name="refresh-cw" size={18} ariaLabel="换一个昵称" />
+                    <NordicIcon name="refresh-cw" size={18} ariaLabel={t("bodyProfile.randomNickname")} />
                   </View>
                 </View>
                 <FormError message={errors.nickname} />
@@ -265,9 +261,9 @@ export default function BodyProfilePage() {
 
             <View className="body-profile__metrics body-profile__metrics--three-up">
               <View className="body-profile__metric-card">
-                <Text className="body-profile__metric-label">年龄</Text>
+                <Text className="body-profile__metric-label">{t("bodyProfile.age")}</Text>
                 <View className="body-profile__metric-icon-ground">
-                  <NordicIcon name="calendar-days" size={18} ariaLabel="年龄" />
+                  <NordicIcon name="calendar-days" size={18} ariaLabel={t("bodyProfile.age")} />
                 </View>
                 <View className="body-profile__metric-input-row">
                   <Input
@@ -279,14 +275,14 @@ export default function BodyProfilePage() {
                     onInput={(event) => setField("age", normalizeAgeInput(event.detail.value))}
                     onBlur={validate}
                   />
-                  <Text className="body-profile__metric-unit">岁</Text>
+                  <Text className="body-profile__metric-unit">{t("bodyProfile.years")}</Text>
                 </View>
                 <FormError message={errors.age} />
               </View>
               <View className="body-profile__metric-card">
-                <Text className="body-profile__metric-label">身高</Text>
+                <Text className="body-profile__metric-label">{t("bodyProfile.height")}</Text>
                 <View className="body-profile__metric-icon-ground">
-                  <NordicIcon name="ruler" size={18} ariaLabel="身高" />
+                  <NordicIcon name="ruler" size={18} ariaLabel={t("bodyProfile.height")} />
                 </View>
                 <View className="body-profile__metric-input-row">
                   <Input
@@ -305,9 +301,9 @@ export default function BodyProfilePage() {
                 <FormError message={errors.heightCm} />
               </View>
               <View className="body-profile__metric-card">
-                <Text className="body-profile__metric-label">体重</Text>
+                <Text className="body-profile__metric-label">{t("bodyProfile.weight")}</Text>
                 <View className="body-profile__metric-icon-ground">
-                  <NordicIcon name="weight" size={18} ariaLabel="体重" />
+                  <NordicIcon name="weight" size={18} ariaLabel={t("bodyProfile.weight")} />
                 </View>
                 <View className="body-profile__metric-input-row">
                   <Input
@@ -328,12 +324,12 @@ export default function BodyProfilePage() {
             </View>
 
             <View className="body-profile__foundation-gender">
-              <Text className="body-profile__section-label">生理性别</Text>
+              <Text className="body-profile__section-label">{t("bodyProfile.gender")}</Text>
               <View className="body-profile__segmented-control">
                 {(
                   [
-                    ["male", "男"],
-                    ["female", "女"],
+                    ["male", t("bodyProfile.male")],
+                    ["female", t("bodyProfile.female")],
                   ] as Array<[Gender, string]>
                 ).map(([value, label]) => (
                   <View
@@ -355,7 +351,7 @@ export default function BodyProfilePage() {
           </AppCard>
 
           <View className="body-profile__section">
-            <Text className="body-profile__section-label">日常活动量</Text>
+            <Text className="body-profile__section-label">{t("bodyProfile.activity")}</Text>
             <View className="body-profile__activity-list">
               {activityOptions.map((option) => (
                 <View
@@ -366,15 +362,15 @@ export default function BodyProfilePage() {
                   }
                 >
                   <View className="body-profile__activity-icon-ground">
-                    <NordicIcon name={option.icon} ariaLabel={option.title} />
+                    <NordicIcon name={option.icon} ariaLabel={t(`bodyProfile.activities.${option.value}.title`)} />
                   </View>
                   <View className="body-profile__activity-copy">
-                    <Text className="body-profile__activity-title">{option.title}</Text>
-                    <Text className="body-profile__activity-description">{option.description}</Text>
+                    <Text className="body-profile__activity-title">{t(`bodyProfile.activities.${option.value}.title`)}</Text>
+                    <Text className="body-profile__activity-description">{t(`bodyProfile.activities.${option.value}.description`)}</Text>
                   </View>
                   <View className="body-profile__activity-indicator">
                     {draft.activityLevel === option.value ? (
-                      <NordicIcon name="check-inverse" size={15} ariaLabel="已选择" />
+                      <NordicIcon name="check-inverse" size={15} ariaLabel={t("bodyProfile.selected")} />
                     ) : null}
                   </View>
                 </View>
@@ -391,7 +387,7 @@ export default function BodyProfilePage() {
             loading={isSaving}
             onClick={() => void continueToDietPreferences()}
           >
-            继续
+            {t("bodyProfile.continue")}
           </AppButton>
         </BottomActionLayout>
       </View>

@@ -56,6 +56,16 @@ const STANDARD_CATEGORY_LABELS: Record<string, Exclude<FoodCategory, "全部">> 
   north_american_staples: "北美常见食材",
 };
 
+const CATEGORY_CODE_BY_LABEL: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(STANDARD_CATEGORY_LABELS).map(([code, label]) => [label, code])),
+  "蛋类": "egg", "乳制品": "dairy", "豆制品": "soy", "谷物": "grain",
+  "饮料": "beverage", "调味品": "seasoning", "混合菜": "mixed_dish", "其他": "other",
+};
+
+export function getFoodCategoryCode(label: string): string | null {
+  return CATEGORY_CODE_BY_LABEL[label] ?? null;
+}
+
 /**
  * English USDA search keywords keyed by Chinese category label.
  * Tapping a category must hit USDA/cache search — not filter the tiny discover list.

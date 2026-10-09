@@ -28,10 +28,10 @@ test("accepts a bounded structured DeepSeek weekly review", async () => {
     requestCompletion: async ({ context }) => {
       assert.equal(context.weekly.score, 72);
       return JSON.stringify({
-        headline: "蛋白节奏稳定",
-        summary: "本周记录较稳定，下一周继续把蛋白质分配到每餐。",
-        strengths: ["记录了5天饮食"],
-        nextSteps: ["早餐加入一份高蛋白食物"],
+        headline: "NOVA 本周观察",
+        summary: context.allowedCopy.summary[0],
+        strengths: [context.allowedCopy.strengths[0]],
+        nextSteps: [context.allowedCopy.nextSteps[0]],
       });
     },
   });
@@ -39,19 +39,19 @@ test("accepts a bounded structured DeepSeek weekly review", async () => {
   const result = await service({ date: "2026-07-20", context: weeklyReviewContext(review) });
   assert.equal(result.source, "deepseek");
   assert.equal(result.model, "deepseek-v4-pro");
-  assert.equal(result.headline, "蛋白节奏稳定");
-  assert.equal(result.nextSteps[0], "早餐加入一份高蛋白食物");
+  assert.equal(result.headline, "NOVA 本周观察");
+  assert.equal(result.nextSteps[0], "下周每天至少记录一餐");
 });
 
 test("keeps the effective routed provider as the review source", async () => {
   const service = createDeepseekWeeklyReviewService({
     model: "qwen-plus",
     source: "qwen",
-    requestCompletion: async () => JSON.stringify({
+    requestCompletion: async ({ context }) => JSON.stringify({
       headline: "记录节奏稳定",
-      summary: "本周记录较完整，继续保持。",
-      strengths: [],
-      nextSteps: ["下周保持每日记录"],
+      summary: context.allowedCopy.summary[0],
+      strengths: [context.allowedCopy.strengths[0]],
+      nextSteps: [context.allowedCopy.nextSteps[0]],
     }),
   });
   const result = await service({ date: "2026-07-20", context: weeklyReviewContext(review) });
@@ -61,11 +61,11 @@ test("keeps the effective routed provider as the review source", async () => {
 
 test("uses V4 Flash when no weekly-review model is supplied", async () => {
   const service = createDeepseekWeeklyReviewService({
-    requestCompletion: async () => JSON.stringify({
+    requestCompletion: async ({ context }) => JSON.stringify({
       headline: "记录节奏稳定",
-      summary: "本周记录较完整，继续保持。",
-      strengths: ["已持续记录"],
-      nextSteps: ["下周保持每日记录"],
+      summary: context.allowedCopy.summary[0],
+      strengths: [context.allowedCopy.strengths[0]],
+      nextSteps: [context.allowedCopy.nextSteps[0]],
     }),
   });
 
@@ -81,7 +81,7 @@ test("returns safe local content when DeepSeek fails or violates output constrai
   const result = await service({ date: "2026-07-20", context: weeklyReviewContext(review) });
   assert.equal(result.source, "rule_v1");
   assert.equal(result.model, null);
-  assert.match(result.summary, /5\s*天/);
+  assert.match(result.strengths[0], /5\s*天/);
 });
 
 test("skips DeepSeek when recorded days are sparse", async () => {
@@ -103,11 +103,11 @@ test("skips DeepSeek when recorded days are sparse", async () => {
   const result = await service({ date: "2026-07-20", context: sparse });
   assert.equal(called, 0);
   assert.equal(result.source, "rule_v1");
-  assert.match(result.headline, /记录天数不足|难评估/);
-  assert.match(result.summary, /2\s*天/);
+  assert.match(result.summary, /记录还不足/);
+  assert.match(result.summary, /未记录不代表没有吃饭/);
 });
 
-test("rule fallback encodes completions for sparse weeks", () => {
+test("rule fallback avoids nutrition conclusions for sparse weeks", () => {
   const insight = createFallbackWeeklyReview(weeklyReviewContext({
     ...review,
     recordedDays: 2,
@@ -117,6 +117,7 @@ test("rule fallback encodes completions for sparse weeks", () => {
     score: 13,
   }));
   assert.equal(insight.source, "rule_v1");
-  assert.match(insight.summary, /4%/);
+  assert.doesNotMatch(insight.summary, /4%|6%|不足摄入/);
+  assert.match(insight.summary, /无法可靠评估/);
   assert.match(insight.nextSteps[0], /每天至少记录一餐/);
 });

@@ -9,20 +9,25 @@ function createProductUserExists(db, { ttlMs = 5_000, clock = () => Date.now() }
   }
   const cache = new Map();
 
-  return async function productUserExists(userId) {
+  return async function productUserExists(principal, tokenVersionOverride = null) {
+    const userId = typeof principal === "string" ? principal : principal?.sub;
+    const tokenVersion = tokenVersionOverride ?? (typeof principal === "object" ? principal?.ver : null);
     if (typeof userId !== "string" || !userId) return false;
     const now = clock();
-    const cached = cache.get(userId);
+    const canCache = tokenVersion == null;
+    const cached = canCache ? cache.get(userId) : null;
     if (cached && cached.expiresAt > now) return cached.exists;
 
-    const result = await db.from("app_users").select("id").eq("id", userId).maybeSingle();
+    const result = await db.from("app_users").select("id,status,token_version").eq("id", userId).maybeSingle();
     if (result?.error) {
       const error = new Error(result.error.message || "Product user lookup failed");
       error.code = "SESSION_LOOKUP_FAILED";
       throw error;
     }
-    const exists = Boolean(result?.data?.id);
-    cache.set(userId, { exists, expiresAt: now + ttlMs });
+    const exists = Boolean(result?.data?.id)
+      && (!result.data.status || result.data.status === "active")
+      && (tokenVersion == null || Number(result.data.token_version) === Number(tokenVersion));
+    if (canCache) cache.set(userId, { exists, expiresAt: now + ttlMs });
     return exists;
   };
 }
@@ -41,7 +46,7 @@ async function resolveProductSession(service, token) {
     return { session };
   }
   try {
-    const exists = await service.productUserExists(session.sub);
+    const exists = await service.productUserExists(session.sub, session.ver);
     if (!exists) {
       return {
         error: {

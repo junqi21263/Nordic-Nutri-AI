@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Text } from "@tarojs/components";
+import { useTranslation } from "react-i18next";
 import type { FeedbackModalOptions } from "../../stores/feedback-store";
 import { NordicIcon } from "../nordic-icon";
 
@@ -8,7 +9,6 @@ export interface FeedbackModalProps {
   onDismiss: () => void;
 }
 
-const exitDuration = 420;
 const variantClassName = {
   success: "feedback-modal--success",
   limit: "feedback-modal--limit",
@@ -17,6 +17,7 @@ const variantClassName = {
 
 /** Shared Stitch-aligned feedback surface. The host owns its lifecycle; this component owns exit motion. */
 export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
+  const { t } = useTranslation();
   const [closing, setClosing] = useState(false);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
     setTimeout(() => {
       callback?.();
       onDismiss();
-    }, exitDuration);
+    }, modal.presentation === "recognition" ? 360 : 420);
   };
 
   const handleBackdropClick = () => {
@@ -38,25 +39,33 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
 
   return (
     <View
-      className={`feedback-modal-overlay ${closing ? "feedback-modal-overlay--closing" : ""}`}
+      className={`feedback-modal-overlay ${modal.presentation === "recognition" ? "feedback-modal-overlay--recognition" : ""} ${closing ? "feedback-modal-overlay--closing" : ""}`}
       onClick={handleBackdropClick}
     >
       <View
-        className={`feedback-modal ${variantClassName[modal.variant]} ${closing ? "feedback-modal--closing" : ""}`}
+        className={`feedback-modal ${variantClassName[modal.variant]} ${modal.presentation === "recognition" ? "feedback-modal--recognition" : ""} ${closing ? "feedback-modal--closing" : ""}`}
         onClick={(event) => event.stopPropagation()}
       >
         {modal.dismissible && !modal.primaryText ? (
           <View className="feedback-modal__close" onClick={() => dismiss(modal.onClose)}>
-            <Text aria-label="关闭">×</Text>
+            <Text aria-label={t("common.close")}>×</Text>
           </View>
         ) : null}
         <View className={`feedback-modal__icon feedback-modal__icon--${modal.variant}`}>
+          {modal.presentation === "recognition" ? (
+            <>
+              <View className="feedback-modal__recognition-ring" />
+              {[1, 2, 3, 4].map((index) => (
+                <View key={index} className={`feedback-modal__recognition-particle feedback-modal__recognition-particle--${index}`} />
+              ))}
+            </>
+          ) : null}
           {modal.variant === "success" ? (
-            <NordicIcon name="check" size={52} ariaLabel="成功" />
+            <NordicIcon name="check" size={52} ariaLabel={t("sharedUi.success")} />
           ) : modal.variant === "limit" ? (
-            <NordicIcon name="hourglass" size={52} ariaLabel="额度提示" />
+            <NordicIcon name="hourglass" size={52} ariaLabel={t("sharedUi.limitReached")} />
           ) : (
-            <Text className="feedback-modal__icon-mark" aria-label="错误">
+            <Text className="feedback-modal__icon-mark" aria-label={t("sharedUi.failure")}>
               ×
             </Text>
           )}
@@ -65,7 +74,7 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
         {modal.description ? <Text className="feedback-modal__description">{modal.description}</Text> : null}
         <View className="feedback-modal__actions">
           <View
-            className={`feedback-modal__button feedback-modal__button--${modal.variant} ${modal.primaryText === "好的" ? "feedback-modal__button--short" : ""}`}
+            className={`feedback-modal__button feedback-modal__button--${modal.variant} ${modal.primaryText === t("feedback.okay") ? "feedback-modal__button--short" : ""}`}
             onClick={() => dismiss(modal.onPrimary)}
           >
             <Text>{modal.primaryText}</Text>

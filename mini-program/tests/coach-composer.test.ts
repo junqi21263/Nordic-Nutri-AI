@@ -50,7 +50,7 @@ describe("coach composer shape", () => {
     const component = read("src/pages/coach/components/CoachComposer/index.tsx");
     const componentStyles = read("src/pages/coach/components/CoachComposer/index.scss");
 
-    expect(component).toContain("placeholder={placeholder}");
+    expect(component).toContain("placeholder={resolvedPlaceholder}");
     expect(component).toContain('placeholderClass="coach-composer__input-placeholder"');
     expect(component).not.toContain("placeholderStyle");
     expect(componentStyles).toContain(".coach-composer__input-placeholder");
@@ -62,7 +62,7 @@ describe("coach composer shape", () => {
     const component = read("src/pages/coach/components/CoachComposer/index.tsx");
     const page = read("src/pages/coach/index.tsx");
 
-    expect(component).toContain("placeholder={placeholder}");
+    expect(component).toContain("placeholder={resolvedPlaceholder}");
     expect(component).not.toContain("coach-composer__placeholder");
     expect(component).not.toContain("onFocusChange");
     expect(page).not.toContain("coach-chat__composer-scrim");

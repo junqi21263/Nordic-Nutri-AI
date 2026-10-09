@@ -5,11 +5,14 @@ export type AuthStatus = "unknown" | "authenticated" | "anonymous";
 export interface AppAuthUser {
   id: string;
   email?: string | null;
+  emailVerified?: boolean;
+  createdPlatform?: string | null;
 }
 
 export interface AppAuthSession {
   user: AppAuthUser;
   accessToken?: string;
+  refreshToken?: string;
 }
 
 export interface AuthState {

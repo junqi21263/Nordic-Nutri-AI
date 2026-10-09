@@ -1,6 +1,7 @@
 import { Image, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AppCard } from "../app-card";
 import { NordicIcon } from "../nordic-icon";
 import type { DailyTargets } from "../../features/meals/domain";
@@ -16,8 +17,9 @@ interface MealDetailHeroProps {
 }
 
 function ScoreBadge({ score, label, onScorePress }: Pick<MealDetailHeroProps, "score" | "onScorePress"> & { label: string }) {
+  const { t } = useTranslation();
   return (
-    <View className="meal-detail-page__score-badge" ariaLabel="查看本餐评分依据" onClick={onScorePress}>
+    <View className="meal-detail-page__score-badge" ariaLabel={t("mealDetail.scoreBasis")} onClick={onScorePress}>
       <View className="meal-detail-page__score-grade">
         <Text>{score}</Text>
       </View>
@@ -37,34 +39,36 @@ function MacroValue({ value, dataPoint }: { value: number; dataPoint?: boolean }
 }
 
 function HeroMacros({ nutrition, dataPoint = false }: Pick<MealDetailHeroProps, "nutrition"> & { dataPoint?: boolean }) {
+  const { t } = useTranslation();
   return (
     <View className="meal-detail-page__hero-macros">
       <View className="meal-detail-page__hero-macro-chip">
         <MacroValue value={nutrition.protein} dataPoint={dataPoint} />
-        <Text className="meal-detail-page__hero-macro-label">蛋白质</Text>
+        <Text className="meal-detail-page__hero-macro-label">{t("nutrition.protein")}</Text>
       </View>
       <View className="meal-detail-page__hero-macro-chip">
         <MacroValue value={nutrition.carbs} dataPoint={dataPoint} />
-        <Text className="meal-detail-page__hero-macro-label">碳水</Text>
+        <Text className="meal-detail-page__hero-macro-label">{t("nutrition.carbs")}</Text>
       </View>
       <View className="meal-detail-page__hero-macro-chip">
         <MacroValue value={nutrition.fat} dataPoint={dataPoint} />
-        <Text className="meal-detail-page__hero-macro-label">脂肪</Text>
+        <Text className="meal-detail-page__hero-macro-label">{t("nutrition.fat")}</Text>
       </View>
     </View>
   );
 }
 
 function MealRatingSummary({ scoreSummary, onScorePress }: Pick<MealDetailHeroProps, "scoreSummary" | "onScorePress">) {
+  const { t } = useTranslation();
   return (
-    <View className="meal-detail-page__score-footer" ariaLabel="查看本餐评分依据" onClick={onScorePress}>
+    <View className="meal-detail-page__score-footer" ariaLabel={t("mealDetail.scoreBasis")} onClick={onScorePress}>
       <View className="meal-detail-page__score-footer-copy">
-        <Text className="meal-detail-page__score-footer-eyebrow">本餐评分</Text>
+        <Text className="meal-detail-page__score-footer-eyebrow">{t("analysisResult.mealScore")}</Text>
         <Text className="meal-detail-page__score-footer-summary">{scoreSummary}</Text>
       </View>
       <View className="meal-detail-page__score-footer-action">
-        <Text>依据</Text>
-        <NordicIcon name="chevron-right" size={16} ariaLabel="查看本餐评分依据" />
+        <Text>{t("mealDetail.scoreBasis")}</Text>
+        <NordicIcon name="chevron-right" size={16} ariaLabel={t("mealDetail.scoreBasis")} />
       </View>
     </View>
   );
@@ -78,6 +82,7 @@ export function MealDetailHero({
   scoreSummary,
   onScorePress,
 }: MealDetailHeroProps) {
+  const { t } = useTranslation();
   const [imageFailed, setImageFailed] = useState(false);
   useEffect(() => setImageFailed(false), [imageUrl]);
 
@@ -91,7 +96,7 @@ export function MealDetailHero({
     return (
       <AppCard tone="beige" className="meal-detail-page__hero meal-detail-page__hero--photo">
         <View className="meal-detail-page__hero-visual">
-          <View className="meal-detail-page__hero-image-hit" ariaLabel="查看原始餐食照片" onClick={previewImage}>
+          <View className="meal-detail-page__hero-image-hit" ariaLabel={t("mealDetail.viewOriginal")} onClick={previewImage}>
             <Image
               className="meal-detail-page__hero-image"
               mode="aspectFill"
@@ -100,12 +105,12 @@ export function MealDetailHero({
             />
           </View>
           <ScoreBadge score={score} label={scoreLabel} onScorePress={onScorePress} />
-          <View className="meal-detail-page__image-preview-hint" ariaLabel="查看原始餐食照片" onClick={previewImage}>
-            <Text>查看原图</Text>
+          <View className="meal-detail-page__image-preview-hint" ariaLabel={t("mealDetail.viewOriginal")} onClick={previewImage}>
+            <Text>{t("mealDetail.viewOriginal")}</Text>
           </View>
         </View>
         <View className="meal-detail-page__hero-body">
-          <Text className="meal-detail-page__calories">{nutrition.calories}<Text>kcal</Text></Text>
+          <Text className="meal-detail-page__calories">{nutrition.calories}<Text>{t("nutrition.kcal")}</Text></Text>
           <HeroMacros nutrition={nutrition} />
         </View>
         <MealRatingSummary scoreSummary={scoreSummary} onScorePress={onScorePress} />
@@ -120,7 +125,7 @@ export function MealDetailHero({
         <View className="meal-detail-page__data-hero-arc" />
         <View className="meal-detail-page__data-hero-calories">
           <Text className="meal-detail-page__data-hero-calories-value">{nutrition.calories}</Text>
-          <Text className="meal-detail-page__data-hero-calories-unit">千卡</Text>
+          <Text className="meal-detail-page__data-hero-calories-unit">{t("nutrition.kcal")}</Text>
         </View>
         <HeroMacros nutrition={nutrition} dataPoint />
       </View>

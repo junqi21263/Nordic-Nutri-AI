@@ -185,9 +185,17 @@ function calculateWeeklyNutrition(meals = [], plan = {}, endDate) {
   const daily = dates.map((date) => {
     const dayMeals = safeMeals.filter((meal) => dateKey(meal.recordedAt) === date);
     const summary = calculateDailyNutrition(dayMeals, dailyTargets);
-    return { date, recorded: dayMeals.length > 0, completion: summary.completion, progress: summary.progress };
+    return { date, recorded: dayMeals.length > 0, mealCount: dayMeals.length, future: date > safeEndDate, consumed: summary.consumed, completion: summary.completion, progress: summary.progress };
   });
   const recordedDays = daily.filter((day) => day.recorded).length;
+  const recorded = daily.filter((day) => day.recorded);
+  const averageCompletion = Object.fromEntries(nutrientKeys.map((key) => [key, recordedDays ? Math.round(recorded.reduce((sum, day) => sum + day.progress[key].percent, 0) / recordedDays) : null]));
+  let streak = 0;
+  let longestRecordedStreak = 0;
+  for (const day of daily) {
+    streak = day.recorded ? streak + 1 : 0;
+    longestRecordedStreak = Math.max(longestRecordedStreak, streak);
+  }
   const consistency = roundPercent((recordedDays / 7) * 100);
   const nutritionCompletion = weightedCompletion(progress);
   return {
@@ -202,11 +210,13 @@ function calculateWeeklyNutrition(meals = [], plan = {}, endDate) {
     score: Math.round(consistency * 0.35 + nutritionCompletion * 0.65),
     recordedMeals: safeMeals.length,
     recordedDays,
+    averageCompletion,
+    longestRecordedStreak,
     calorieCompletion: progress.calories.percent,
     proteinCompletion: progress.protein.percent,
     carbsCompletion: progress.carbs.percent,
     fatCompletion: progress.fat.percent,
-    rhythm: daily.map(({ date, recorded, completion }) => ({ date, recorded, completion })),
+    rhythm: daily.map(({ date, recorded, completion, mealCount, future, consumed }) => ({ date, recorded, completion, mealCount, future, consumed })),
   };
 }
 

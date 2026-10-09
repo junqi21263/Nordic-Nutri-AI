@@ -1,6 +1,8 @@
 import { Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { t } from "../../i18n";
 import { AppButton } from "../../components/app-button";
 import { AppCard } from "../../components/app-card";
 import { BottomActionLayout } from "../../components/bottom-action-layout";
@@ -60,6 +62,7 @@ type PlanView = {
 };
 
 export default function NutritionPlanPage() {
+  const { i18n } = useTranslation();
   const router = useRouter();
   const fromSettings = isSettingsEditMode(router.params);
   const { draft } = useOnboardingDraftStore();
@@ -211,16 +214,16 @@ export default function NutritionPlanPage() {
   if (!validation.valid || !validation.profile) {
     return (
       <PageLayout
-        title="营养计划"
-        subtitle="先完成身体资料，才能生成更贴近你的本地预览。"
-        eyebrow="计划预览"
+        title={t("nutritionPlan.title")}
+        subtitle={t("nutritionPlan.incompleteSubtitle")}
+        eyebrow={t("nutritionPlan.preview")}
         showTabs={false}
         leading="‹"
         onLeadingClick={leaveToBody}
       >
-        <EmptyState title="还差一点资料" description="返回补全身体数据后，就能看到每日营养目标。" />
+        <EmptyState title={t("nutritionPlan.incomplete")} description={t("nutritionPlan.incompleteCopy")} />
         <AppButton size="large" onClick={leaveToBody}>
-          返回调整资料
+          {t("nutritionPlan.backEdit")}
         </AppButton>
       </PageLayout>
     );
@@ -232,7 +235,7 @@ export default function NutritionPlanPage() {
     proteinG: 0,
     carbsG: 0,
     fatG: 0,
-    insight: "正在根据你的身体数据计算营养目标…",
+    insight: t("nutritionPlan.loadingInsight"),
     source: "loading",
   };
   const percents = macroEnergyPercents(activePlan);
@@ -288,9 +291,9 @@ export default function NutritionPlanPage() {
     } catch (error) {
       feedback.showModal({
         variant: "error",
-        title: "资料保存失败",
-        description: error instanceof Error ? error.message : "请稍后重试。",
-        primaryText: "知道了",
+        title: t("nutritionPlan.saveFailed"),
+        description: error instanceof Error ? error.message : t("nutritionPlan.retryLater"),
+        primaryText: t("nutritionPlan.okay"),
         dismissible: true,
       });
     } finally {
@@ -347,7 +350,7 @@ export default function NutritionPlanPage() {
       await Taro.switchTab({ url: "/pages/home/index" });
     } catch (error) {
       feedback.show({
-        message: error instanceof Error ? error.message : "计划保存失败，请稍后重试",
+        message: error instanceof Error ? error.message : t("nutritionPlan.planSaveFailed"),
         tone: "error",
       });
     } finally {
@@ -362,9 +365,9 @@ export default function NutritionPlanPage() {
     icon: NordicIconName;
     tone: "forest" | "sage" | "amber";
   }> = [
-    { label: "蛋白质", value: activePlan.proteinG, percent: percents.proteinPct, icon: "protein", tone: "forest" },
-    { label: "碳水", value: activePlan.carbsG, percent: percents.carbsPct, icon: "carbs", tone: "sage" },
-    { label: "脂肪", value: activePlan.fatG, percent: percents.fatPct, icon: "fat", tone: "amber" },
+    { label: t("nutrition.protein"), value: activePlan.proteinG, percent: percents.proteinPct, icon: "protein", tone: "forest" },
+    { label: t("nutrition.carbs"), value: activePlan.carbsG, percent: percents.carbsPct, icon: "carbs", tone: "sage" },
+    { label: t("nutrition.fat"), value: activePlan.fatG, percent: percents.fatPct, icon: "fat", tone: "amber" },
   ];
 
   return (
@@ -378,7 +381,7 @@ export default function NutritionPlanPage() {
         shouldPreparePlanReady ? "page-layout--nutrition-plan-animated" : ""
       }`}
     >
-      <View className={`nutrition-plan-page ${
+      <View className={`nutrition-plan-page ${process.env.TARO_APP_PLATFORM === "android" ? "nutrition-plan-page--android" : ""} ${
         shouldPreparePlanReady ? "nutrition-plan-page--entering" : ""
       } ${regenerated ? "nutrition-plan-page--regenerated" : ""} ${
         initialPlanEntry && shouldAnimatePlanReady
@@ -392,10 +395,10 @@ export default function NutritionPlanPage() {
         <View className="nutrition-plan__sticky-header">
           <OnboardingHeader
             brand="Nordic Nutri AI"
-            step={fromSettings ? "更新计划" : "第 4 步，共 4 步"}
+            step={t(fromSettings ? "nutritionPlan.updateStep" : "nutritionPlan.step")}
             progress={1}
-            progressAriaLabel={fromSettings ? "确认更新后的营养计划" : "当前为第 4 步，共 4 步"}
-            backAriaLabel="返回饮食偏好与限制"
+            progressAriaLabel={t(fromSettings ? "nutritionPlan.updateProgress" : "nutritionPlan.progress")}
+            backAriaLabel={t("nutritionPlan.backPreferences")}
             onBack={leaveToDiet}
           />
         </View>
@@ -404,40 +407,40 @@ export default function NutritionPlanPage() {
           shouldPreparePlanReady ? "nutrition-plan__reveal-item nutrition-plan__reveal-item--ready" : ""
         }`}>
           <View className="nutrition-plan__plan-ready-icon">
-            <NordicIcon name="celebration" size={28} ariaLabel="计划已生成" />
+            <NordicIcon name="celebration" size={28} ariaLabel={t("nutritionPlan.planReady")} />
           </View>
           <Text className="nutrition-plan__plan-ready-title">
-            {fromSettings ? "新的计划已准备好" : "你的计划已准备好"}
+            {t(fromSettings ? "nutritionPlan.updatedTitle" : "nutritionPlan.readyTitle")}
           </Text>
           <Text className="nutrition-plan__plan-ready-copy">
             {fromSettings
-              ? "确认后将更新你的每日营养目标。"
-              : "从今天开始，按自己的节奏稳步前进。"}
+              ? t("nutritionPlan.updatedCopy")
+              : t("nutritionPlan.readyCopy")}
           </Text>
         </AppCard>
 
         <View className={`nutrition-plan__insight ${
           shouldPreparePlanReady ? "nutrition-plan__reveal-item nutrition-plan__reveal-item--insight" : ""
         }`}>
-          <Text className="nutrition-plan__insight-label">营养洞察</Text>
-          <Text className="nutrition-plan__insight-copy">{activePlan.insight}</Text>
+          <Text className="nutrition-plan__insight-label">{t("nutritionPlan.insight")}</Text>
+          <Text className="nutrition-plan__insight-copy">{i18n.language === "zh-CN" ? activePlan.insight : t("nutritionPlanSupplement.genericInsight")}</Text>
         </View>
 
         <View className={`nutrition-plan__section ${
           shouldPreparePlanReady ? "nutrition-plan__reveal-item nutrition-plan__reveal-item--targets" : ""
         }`}>
-          <Text className="nutrition-plan__section-title">每日目标</Text>
+          <Text className="nutrition-plan__section-title">{t("nutritionPlan.targets")}</Text>
           <AppCard tone="beige" className="nutrition-plan__targets-card">
             <View className="nutrition-plan__calorie-row">
               <View>
-                <Text className="nutrition-plan__calorie-label">热量</Text>
+                <Text className="nutrition-plan__calorie-label">{t("nutritionPlan.calories")}</Text>
                 <Text className="nutrition-plan__calorie-value">
                   {isLoadingPlan ? "…" : initialPlanEntry ? animatedCalories : activePlan.calories}
                   <Text className="nutrition-plan__calorie-unit"> kcal</Text>
                 </Text>
               </View>
               <View className="nutrition-plan__calorie-icon">
-                <NordicIcon name="flame" size={24} ariaLabel="热量" />
+                <NordicIcon name="flame" size={24} ariaLabel={t("nutritionPlan.calories")} />
               </View>
             </View>
             <View className="nutrition-plan__targets-divider" />
@@ -465,25 +468,25 @@ export default function NutritionPlanPage() {
         <View className={`nutrition-plan__section ${
           shouldPreparePlanReady ? "nutrition-plan__reveal-item nutrition-plan__reveal-item--milestones" : ""
         }`}>
-          <Text className="nutrition-plan__section-title">第一阶段里程碑</Text>
+          <Text className="nutrition-plan__section-title">{t("nutritionPlan.milestones")}</Text>
           <AppCard className="nutrition-plan__milestone-list">
             <View className="nutrition-plan__milestone-row">
               <View className="nutrition-plan__milestone-icon">
-                <NordicIcon name="milestone" size={20} ariaLabel="记录里程碑" />
+                <NordicIcon name="milestone" size={20} ariaLabel={t("nutritionPlan.loggingMilestone")} />
               </View>
               <View className="nutrition-plan__milestone-copy">
-                <Text className="nutrition-plan__milestone-title">连续记录 7 天</Text>
-                <Text className="nutrition-plan__milestone-description">建立属于你的稳定节奏</Text>
+                <Text className="nutrition-plan__milestone-title">{t("nutritionPlan.streak7")}</Text>
+                <Text className="nutrition-plan__milestone-description">{t("nutritionPlan.streakHint")}</Text>
               </View>
             </View>
             <View className="nutrition-plan__milestone-row">
               <View className="nutrition-plan__milestone-icon">
-                <NordicIcon name="check" size={20} ariaLabel="营养里程碑" />
+                <NordicIcon name="check" size={20} ariaLabel={t("nutritionPlan.nutritionMilestone")} />
               </View>
               <View className="nutrition-plan__milestone-copy">
-                <Text className="nutrition-plan__milestone-title">完成每日三项营养目标</Text>
+                <Text className="nutrition-plan__milestone-title">{t("nutritionPlan.macroGoal")}</Text>
                 <Text className="nutrition-plan__milestone-description">
-                  先专注蛋白质、碳水和脂肪的均衡摄入
+                  {t("nutritionPlan.macroHint")}
                 </Text>
               </View>
             </View>
@@ -499,10 +502,10 @@ export default function NutritionPlanPage() {
             disabled={!plan || isLoadingPlan}
             onClick={() => void (fromSettings ? saveSettingsPlan() : completeOnboarding())}
           >
-            {fromSettings ? "保存并更新目标" : "开始我的计划"}
+            {t(fromSettings ? "nutritionPlan.saveUpdate" : "nutritionPlan.start")}
           </AppButton>
           <AppButton variant="outline" size="large" onClick={leaveToDiet}>
-            调整计划参数
+            {t("nutritionPlan.adjust")}
           </AppButton>
         </BottomActionLayout>
       </View>

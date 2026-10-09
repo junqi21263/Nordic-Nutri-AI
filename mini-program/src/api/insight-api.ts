@@ -1,6 +1,7 @@
 import type { Achievement } from "../features/coach/domain";
 import type { DailyTargets } from "../features/meals/domain";
 import { requestProductApi } from "./product-api-client";
+import { getLocale } from "../i18n";
 
 const summaryInflight = new Map<string, Promise<ProductDailySummary>>();
 
@@ -35,6 +36,9 @@ export interface ProductDailySummary {
 }
 
 export interface ProductWeeklyReview {
+  averageCompletion?: Record<keyof DailyTargets, number | null>;
+  longestRecordedStreak?: number;
+  comparison?: { recordedDays: number; recordedMeals: number } | null;
   startDate: string;
   endDate: string;
   score: number;
@@ -53,7 +57,7 @@ export interface ProductWeeklyReview {
   calorieTarget: number;
   consumed: DailyTargets;
   progress: ProductDailySummary["progress"];
-  rhythm: Array<{ date: string; recorded: boolean }>;
+  rhythm: Array<{ date: string; recorded: boolean; mealCount?: number; future?: boolean; consumed?: DailyTargets }>;
   insight: {
     headline: string;
     summary: string;
@@ -95,7 +99,7 @@ export function getProductMilestoneStats(milestone: ProductMilestoneStats["miles
 export function getProductDailySummary(date: string, options: { light?: boolean } = {}) {
   const params = new URLSearchParams({ date });
   if (options.light) params.set("light", "1");
-  const key = `${date}:${options.light ? "light" : "full"}`;
+  const key = `${date}:${options.light ? "light" : "full"}:${getLocale()}`;
   const existing = summaryInflight.get(key);
   if (existing) return existing;
   const request = requestProductApi<ProductDailySummary>(`/meal-summary?${params.toString()}`, {

@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { expectLocalizedCopy } from "./i18n-source-assertions";
 
 describe("profile edit save action", () => {
   it("keeps the save action visible while its success uses the feedback modal", () => {
     const source = readFileSync(resolve(import.meta.dirname, "../src/pages/profile-edit/index.tsx"), "utf8");
     expect(source).toContain("disablePageEnterAnimation");
     expect(source).toContain('className="profile-edit__action"');
-    expect(source).toContain("保存资料");
+    expectLocalizedCopy(source, "保存资料");
     expect(source).toContain('variant: "success"');
   });
 

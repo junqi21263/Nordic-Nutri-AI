@@ -20,9 +20,9 @@ describe("coach analysis progress", () => {
       expanded: true,
     });
     expect(analysis.steps.map((step) => step.label)).toEqual([
-      "查看今日饮食记录",
-      "整理当前营养摄入",
-      "生成饮食建议",
+      "dailyStepRecords",
+      "dailyStepNutrition",
+      "dailyStepAdvice",
     ]);
     expect(analysis.steps.map((step) => step.status)).toEqual(["active", "pending", "pending"]);
   });
@@ -31,9 +31,9 @@ describe("coach analysis progress", () => {
     const analysis = createAnalysisProgress("鸡胸肉蛋白质高吗？", 100);
 
     expect(analysis.steps.map((step) => step.label)).toEqual([
-      "理解你的问题",
-      "整理相关营养信息",
-      "生成建议",
+      "generalStepQuestion",
+      "generalStepNutrition",
+      "generalStepAdvice",
     ]);
   });
 
@@ -61,7 +61,7 @@ describe("analysis progress presentation", () => {
     const component = read("src/pages/coach/components/AnalysisProgress/index.tsx");
     const styles = read("src/styles/page.scss");
 
-    expect(component).toContain("已完成分析");
+    expect(component).toContain('"coachPage.analysisProgress.completed"');
     expect(component).toContain("onToggle");
     expect(component).toContain('name="sparkles"');
     expect(component).toContain('name="chevron-right"');

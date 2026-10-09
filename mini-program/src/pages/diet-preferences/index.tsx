@@ -1,6 +1,7 @@
 import { Text, View } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getProductAccount, previewProductNutritionPlan } from "../../api/product-data-api";
 import { AppButton } from "../../components/app-button";
 import { BottomActionLayout } from "../../components/bottom-action-layout";
@@ -26,7 +27,10 @@ import { usePlanRegenerationStore } from "../../stores/plan-regeneration-store";
 import { navigateBackOrHome } from "../../utils/navigation";
 import { queueOnboardingDraftSync } from "../../features/onboarding/onboarding-draft-cloud-sync";
 
+const isAndroidApp = process.env.TARO_APP_PLATFORM === "android";
+
 export default function DietPreferencesPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const fromSettings = isSettingsEditMode(router.params);
   const hydrateFromAccount = shouldHydrateFromAccount(router.params);
@@ -104,14 +108,14 @@ export default function DietPreferencesPage() {
         activityLevel: profile.activityLevel, trainingDays: profile.trainingDays, goalType: profile.goalType,
         dietaryPattern: draft.dietaryPattern, foodAvoidances: draft.foodAvoidances, mealsPerDay: Number(draft.mealsPerDay),
       }));
-      if (!fromSettings) {
+      if (!fromSettings && !isAndroidApp) {
         await new Promise<void>((resolve) => setTimeout(resolve, stitchInitialProcessingMotion.buttonPressMs));
         await new Promise<void>((resolve) => setTimeout(resolve, stitchInitialProcessingMotion.acknowledgementMs));
       }
       setShowProcessingOverlay(true);
       const [preview] = await Promise.all([
         previewRequest,
-        new Promise<void>((resolve) => setTimeout(resolve, minimumPlanProcessingMs)),
+        new Promise<void>((resolve) => setTimeout(resolve, isAndroidApp ? 0 : minimumPlanProcessingMs)),
       ]);
       completeRegeneration(preview);
       await new Promise<void>((resolve) => setTimeout(resolve, planReadyMotion.completingDurationMs));
@@ -126,7 +130,7 @@ export default function DietPreferencesPage() {
     } catch (error) {
       setShowProcessingOverlay(false);
       failRegeneration();
-      feedback.show({ message: error instanceof Error ? error.message : "营养计划计算失败，请稍后重试", tone: "error" });
+      feedback.show({ message: error instanceof Error ? error.message : t("dietPreferences.calculationFailed"), tone: "error" });
       await new Promise<void>((resolve) => setTimeout(resolve, 180));
       resetRegeneration();
     }
@@ -134,11 +138,18 @@ export default function DietPreferencesPage() {
 
   return (
     <PageLayout
-      title="饮食偏好与限制"
+      title={t("dietPreferences.title")}
       showTabs={false}
       hideNavigation
       showBrandHeader={false}
       className="page-layout--onboarding"
+      overlay={
+        <PlanTransitionOverlay
+          visible={overlayVisible}
+          phase={overlayPhase}
+          variant={fromSettings ? "regenerate" : "initial"}
+        />
+      }
     >
       <View className={`diet-preferences-page ${
         initialProcessing ? "diet-preferences-page--initial-processing" : ""
@@ -147,22 +158,20 @@ export default function DietPreferencesPage() {
           <View className="onboarding-sticky-header">
             <OnboardingHeader
               brand="Nordic Nutri AI"
-              step={fromSettings ? "调整偏好" : "第 3 步，共 4 步"}
+              step={t(fromSettings ? "dietPreferences.stepAdjust" : "dietPreferences.step")}
               progress={fromSettings ? 2 / 3 : 0.75}
-              progressAriaLabel={fromSettings ? "调整饮食偏好" : "当前为第 3 步，共 4 步"}
-              backAriaLabel={fromSettings ? "返回上一页" : "返回身体资料"}
+              progressAriaLabel={t(fromSettings ? "dietPreferences.progressAdjust" : "dietPreferences.progress")}
+              backAriaLabel={t(fromSettings ? "dietPreferences.back" : "dietPreferences.backBody")}
               onBack={leaveBack}
             />
           </View>
 
           <View className="onboarding-heading diet-preferences-page__heading">
           <Text className="onboarding-heading__title">
-            {fromSettings ? "更新饮食偏好" : "让计划更适合你"}
+            {t(fromSettings ? "dietPreferences.updateTitle" : "dietPreferences.introTitle")}
           </Text>
           <Text className="onboarding-heading__copy">
-            {fromSettings
-              ? "习惯、忌口与餐次变化后，下一步会按新偏好重算营养目标。"
-              : "告诉我们你的饮食习惯与限制，我们会据此调整每日推荐。"}
+            {t(fromSettings ? "dietPreferences.updateCopy" : "dietPreferences.introCopy")}
           </Text>
           </View>
 
@@ -170,12 +179,12 @@ export default function DietPreferencesPage() {
           <View className="diet-preferences-page__section">
             <View className="diet-preferences-page__section-heading">
               <View className="diet-preferences-page__icon-ground">
-                <NordicIcon name="food-apple" size={20} ariaLabel="饮食偏好" />
+                <NordicIcon name="food-apple" size={20} ariaLabel={t("dietPreferences.section")} />
               </View>
               <View>
-                <Text className="diet-preferences-page__section-title">饮食偏好</Text>
+                <Text className="diet-preferences-page__section-title">{t("dietPreferences.section")}</Text>
                 <Text className="diet-preferences-page__section-copy">
-                  选择最接近日常习惯的一项
+                  {t("dietPreferences.choosePattern")}
                 </Text>
               </View>
             </View>
@@ -190,11 +199,14 @@ export default function DietPreferencesPage() {
                     }`}
                     onClick={() => setField("dietaryPattern", option.value)}
                   >
-                    <Text className="diet-preferences-page__choice-title">{option.label}</Text>
-                    <Text className="diet-preferences-page__choice-copy">{option.description}</Text>
+                    <View className="diet-preferences-page__choice-name">
+                      <Text className="diet-preferences-page__choice-title">{t(`dietPreferences.pattern.${option.value}`)}</Text>
+                      <NordicIcon name={option.icon} size={16} />
+                    </View>
+                    <Text className="diet-preferences-page__choice-copy">{t(`dietPreferences.pattern.${option.value}Description`)}</Text>
                     <View className="diet-preferences-page__choice-indicator">
                       {selected ? (
-                        <NordicIcon name="check-inverse" size={14} ariaLabel="已选择" />
+                        <NordicIcon name="check-inverse" size={14} ariaLabel={t("dietPreferences.selected")} />
                       ) : null}
                     </View>
                   </View>
@@ -206,11 +218,11 @@ export default function DietPreferencesPage() {
           <View className="diet-preferences-page__section">
             <View className="diet-preferences-page__section-heading">
               <View className="diet-preferences-page__icon-ground">
-                <NordicIcon name="check" size={20} ariaLabel="食物限制" />
+                <NordicIcon name="check" size={20} ariaLabel={t("dietPreferences.avoid")} />
               </View>
               <View>
-                <Text className="diet-preferences-page__section-title">需要避开的食物</Text>
-                <Text className="diet-preferences-page__section-copy">可多选；没有可直接继续</Text>
+                <Text className="diet-preferences-page__section-title">{t("dietPreferences.avoid")}</Text>
+                <Text className="diet-preferences-page__section-copy">{t("dietPreferences.avoidHint")}</Text>
               </View>
             </View>
             <View className="diet-preferences-page__tag-list">
@@ -224,8 +236,8 @@ export default function DietPreferencesPage() {
                     }`}
                     onClick={() => toggleAvoidance(option.value)}
                   >
-                    <Text>{option.label}</Text>
-                    {selected ? <NordicIcon name="check" size={15} ariaLabel="已选择" /> : null}
+                    <Text>{t(`dietPreferences.avoidance.${option.value}`)}</Text>
+                    {selected ? <NordicIcon name="check" size={15} ariaLabel={t("dietPreferences.selected")} /> : null}
                   </View>
                 );
               })}
@@ -233,7 +245,7 @@ export default function DietPreferencesPage() {
           </View>
 
           <View className="diet-preferences-page__section">
-            <Text className="diet-preferences-page__section-title">每日餐次</Text>
+            <Text className="diet-preferences-page__section-title">{t("dietPreferences.mealsPerDay")}</Text>
             <View className="diet-preferences-page__meal-count">
               {mealCountOptions.map((option) => (
                 <View
@@ -246,7 +258,7 @@ export default function DietPreferencesPage() {
                   onClick={() => setField("mealsPerDay", option.value)}
                 >
                   <Text className="diet-preferences-page__meal-number">{option.value}</Text>
-                  <Text className="diet-preferences-page__meal-label">餐</Text>
+                  <Text className="diet-preferences-page__meal-label">{t("dietPreferences.mealUnit")}</Text>
                 </View>
               ))}
             </View>
@@ -258,20 +270,15 @@ export default function DietPreferencesPage() {
         <BottomActionLayout className="diet-preferences-page__action-source">
             <AppButton size="large" disabled={processing} onClick={() => void regeneratePlan()}>
               <View className="diet-preferences-page__generate-label">
-                <Text>{initialButtonLoading ? "正在生成计划" : fromSettings ? "重新生成计划" : "生成我的计划"}</Text>
+                <Text>{t(initialButtonLoading ? "dietPreferences.generating" : fromSettings ? "dietPreferences.regenerate" : "dietPreferences.generate")}</Text>
                 {initialButtonLoading ? (
                   <View className="diet-preferences-page__generate-spinner">
-                    <NordicIcon name="refresh-cw" size={18} ariaLabel="正在生成计划" />
+                    <NordicIcon name="refresh-cw" size={18} ariaLabel={t("dietPreferences.generating")} />
                   </View>
                 ) : null}
               </View>
             </AppButton>
         </BottomActionLayout>
-        <PlanTransitionOverlay
-          visible={overlayVisible}
-          phase={overlayPhase}
-          variant={fromSettings ? "regenerate" : "initial"}
-        />
       </View>
     </PageLayout>
   );

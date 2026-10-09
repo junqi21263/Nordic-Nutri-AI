@@ -1,6 +1,7 @@
 const pages = [
   "pages/welcome/index",
   "pages/auth-entry/index",
+  "pages/android-auth/index",
   "pages/onboarding/index",
   "pages/body-profile/index",
   "pages/diet-preferences/index",
@@ -14,6 +15,10 @@ const pages = [
   "pages/portion-adjustment/index",
   "pages/meal-detail/index",
   "pages/meal-records/index",
+  "pages/frequent-meals/index",
+  "pages/frequent-meal-edit/index",
+  "pages/smart-reminder-settings/index",
+  "pages/language-settings/index",
   "pages/coach/index",
   "pages/profile/index",
   "pages/privacy-policy/index",
