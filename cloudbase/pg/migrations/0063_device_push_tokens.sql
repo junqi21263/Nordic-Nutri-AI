@@ -4,7 +4,7 @@ create table public.device_push_tokens (
   user_id uuid not null references public.app_users(id) on delete cascade,
   token text not null check (char_length(btrim(token)) between 1 and 4096),
   platform text not null check (platform = 'android'),
-  package_name text not null check (package_name = 'com.lewislee.nordicnutri.dev'),
+  package_name text not null check (package_name in ('com.lewislee.nordicnutri.dev', 'com.lewislee.nordicnutri')),
   environment text not null check (char_length(btrim(environment)) between 1 and 128),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

@@ -3,7 +3,9 @@ import type { SmartReminderSettings } from "../features/smart-reminders/domain";
 import { getLocale } from "../i18n";
 import type { AppLocale } from "../i18n/locale";
 
-export const ANDROID_PUSH_PACKAGE = "com.lewislee.nordicnutri.dev";
+export const ANDROID_PUSH_PACKAGE = process.env.TARO_APP_ENV === "production"
+  ? "com.lewislee.nordicnutri"
+  : "com.lewislee.nordicnutri.dev";
 
 export function registerAndroidPushToken(token: string) {
   return requestProductApi<{ registered: boolean }>("/push-tokens", {

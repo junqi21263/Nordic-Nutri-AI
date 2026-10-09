@@ -85,6 +85,18 @@ test("accepts the existing Firebase service-account environment variable names",
   assert.equal(service.config.configured, true);
 });
 
+test("uses the production Android package for the production CloudBase environment", () => {
+  const service = createFcmPushService({
+    db: createDb(),
+    env: {
+      TCB_ENV: "lewis-healthy-d4glgqqzv73a5bc10",
+      FCM_ANDROID_PACKAGE: "com.lewislee.nordicnutri.dev",
+    },
+  });
+
+  assert.equal(service.config.packageName, "com.lewislee.nordicnutri");
+});
+
 test("sends a meal reminder through FCM and returns only safe delivery metadata", async () => {
   const db = createDb({ tokens: [{ id: "token-row-1", token: "device-token-1" }] });
   const requests = [];

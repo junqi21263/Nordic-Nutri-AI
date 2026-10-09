@@ -1,6 +1,8 @@
 const { createHash, createSign } = require("node:crypto");
 
 const ANDROID_PACKAGE = "com.lewislee.nordicnutri.dev";
+const PROD_ENV_ID = "lewis-healthy-d4glgqqzv73a5bc10";
+const PROD_ANDROID_PACKAGE = "com.lewislee.nordicnutri";
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
 const FCM_OAUTH_AUDIENCE = "https://oauth2.googleapis.com/token";
 const FCM_ENDPOINT = "https://fcm.googleapis.com/v1/projects";
@@ -124,7 +126,9 @@ function getFcmConfig(env) {
     projectId,
     clientEmail,
     privateKey,
-    packageName: requiredString(env.FCM_ANDROID_PACKAGE) || ANDROID_PACKAGE,
+    packageName: requiredString(env.TCB_ENV) === PROD_ENV_ID
+      ? PROD_ANDROID_PACKAGE
+      : requiredString(env.FCM_ANDROID_PACKAGE) || ANDROID_PACKAGE,
     environment: requiredString(env.TCB_ENV),
     relayUrl: normalizeRelayUrl(env.FCM_RELAY_URL),
     relaySharedSecret: requiredString(env.FCM_RELAY_SHARED_SECRET),
