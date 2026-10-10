@@ -22,7 +22,7 @@ pnpm deploy:cloudbase production get-login-ticket
 
 ## 2. 开发规则
 
-1. 新功能从 `develop` 创建 `feature/<short-name>`。
+1. 小程序新功能从 `develop` 创建 `feature/<short-name>`；Android 后续开发从 `Android-dev` 创建功能分支，按 `docs/ANDROID_DEV_TO_PROD_RELEASE.md` 晋升。
 2. 日常开发、云函数更新、测试 Hosting 更新，只允许指向 `test-dev-d4gyxnn0b5dfa2c8a`。
 3. 不得在代码、`.env`、小程序配置或文档中提交密钥。
 4. 测试环境不得连接生产 PostgreSQL、生产 Storage、生产 Worker 或生产自定义域名。
@@ -43,6 +43,8 @@ pnpm deploy:cloudbase production get-login-ticket
 测试环境允许频繁更新，但每次更新必须能通过 Git 提交或部署记录追溯。
 
 ## 4. 生产合并与发布规则
+
+以下是小程序主线的合并路径。Android 当前使用 `Android-dev` → `Android-prod` / `release/*`，具体步骤见 Android 发布清单；合并到 `main` 是单独的受控操作，不能由 APK 构建或云函数部署代替。
 
 只有测试环境验收通过后，才允许：
 
