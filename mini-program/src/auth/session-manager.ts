@@ -95,15 +95,17 @@ export async function refreshSession(): Promise<AppAuthSession | null> {
 }
 
 export async function clearInvalidSession() {
-  await import("../features/smart-reminders/coordinator").then(({ cancelAndroidSmartReminders }) => cancelAndroidSmartReminders()).catch(() => undefined);
-  await import("../features/smart-reminders/push-coordinator").then(({ unregisterAndroidPushToken }) => unregisterAndroidPushToken()).catch(() => undefined);
   persistSession(null);
   useAuthStore.getState().clear();
   useAchievementStore.getState().reset();
+  // A rejected session cannot authenticate push cleanup and would re-enter recovery.
+  await import("../features/smart-reminders/coordinator").then(({ cancelAndroidSmartReminders }) => cancelAndroidSmartReminders()).catch(() => undefined);
 }
 
 export async function signOut() {
-  const refreshToken = (await restoreSession())?.refreshToken;
+  const initialSession = await restoreSession();
+  await import("../features/smart-reminders/push-coordinator").then(({ unregisterAndroidPushToken }) => unregisterAndroidPushToken()).catch(() => undefined);
+  const refreshToken = (await restoreSession())?.refreshToken ?? initialSession?.refreshToken;
   try {
     if (refreshToken) await androidAuthApi.logout(refreshToken);
   } catch {
