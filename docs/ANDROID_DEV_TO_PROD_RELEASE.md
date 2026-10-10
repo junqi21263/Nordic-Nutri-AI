@@ -19,7 +19,7 @@
 
 1. 对比 Dev 与 Prod 的函数名单、运行时、触发器、超时、调用地址及变量**名称和是否存在**。不要把变量值打印到终端日志或发布包。Prod `get-login-ticket` 的 FCM 套件包括 `project_id`、`client_email`、`private_key`、`FCM_RELAY_URL`、`FCM_RELAY_SHARED_SECRET`；经批准可与 Dev 共享。`TCB_ENV`、数据库连接、开关和其他凭据仍逐项按环境确认。
 2. 在目标分支运行 `pnpm deploy:cloudbase test <function> --dry-run` 或 `pnpm deploy:cloudbase production <function> --dry-run`，核对输出的 EnvId 后才执行同样命令但去掉 `--dry-run`。仅部署本次涉及的函数。Prod 先迁移、再函数、再做只读或低风险 smoke；确认真实发送服务时要用专门的测试账号和受控收件人。
-3. 部署后回读函数状态、运行时、触发器、配置和代码版本/产物摘要。`Active` 只代表函数可用，不等于业务端到端通过。`nordic-ai-worker-prod` 是清单外的遗留依赖，见 `PROD_FUNCTION_INVENTORY.md`；改变其路由前必须取得源码和独立验收。
+3. 部署后回读函数状态、运行时、触发器、配置和代码版本/产物摘要。`Active` 只代表函数可用，不等于业务端到端通过。`nordic-ai-worker-prod` 是清单外的遗留依赖，其云端代码入口与仓库 `hunyuan-image-worker` 一致，但函数名和变量配置需单独核对，见 `PROD_FUNCTION_INVENTORY.md`；改变其路由前必须完成独立验收。
 4. 可用 `node scripts/release/create-production-release-bundle.mjs` 生成候选发布包。脚本中的 `NOT_VERIFIED` 字段必须用实际迁移历史、Prod 回读、测试和回滚证据补齐；不能把候选包直接称为完成发布。
 
 GitHub Actions 的 `Android release checks` 只核对分支/函数配置契约、类型和 Prod H5 构建；云端迁移、变量值、签名 APK 和真机验收仍按本清单单独回读。

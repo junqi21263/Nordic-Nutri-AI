@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const persisted = new Map<string, string>();
 const refresh = vi.fn();
 const logout = vi.fn();
+const unregisterPushToken = vi.hoisted(() => vi.fn());
+const cancelReminders = vi.hoisted(() => vi.fn());
 
 vi.mock("../src/platform/secure-token-storage", () => ({
   createSecureTokenStorage: () => ({
@@ -21,11 +23,21 @@ vi.mock("../src/api/android-auth-api", () => ({
   }),
 }));
 
+vi.mock("../src/features/smart-reminders/push-coordinator", () => ({
+  unregisterAndroidPushToken: unregisterPushToken,
+}));
+
+vi.mock("../src/features/smart-reminders/coordinator", () => ({
+  cancelAndroidSmartReminders: cancelReminders,
+}));
+
 describe("Android session manager", () => {
   beforeEach(async () => {
     persisted.clear();
     refresh.mockReset();
     logout.mockReset();
+    unregisterPushToken.mockReset().mockResolvedValue(true);
+    cancelReminders.mockReset().mockResolvedValue(true);
     const { clearInvalidSession } = await import("../src/auth/session-manager");
     await clearInvalidSession();
   });
@@ -76,12 +88,41 @@ describe("Android session manager", () => {
   it("revokes the current device refresh token before clearing local state", async () => {
     const { setNativeSession, signOut, restoreSession } = await import("../src/auth/session-manager");
     setNativeSession({ user: { id: "user-1" }, accessToken: "access", refreshToken: "refresh-current" });
+    unregisterPushToken.mockClear();
     logout.mockResolvedValue({ ok: true });
 
     await signOut();
 
     expect(logout).toHaveBeenCalledWith("refresh-current");
+    expect(unregisterPushToken).toHaveBeenCalledTimes(1);
+    expect(unregisterPushToken.mock.invocationCallOrder[0]).toBeLessThan(logout.mock.invocationCallOrder[0]);
     await expect(restoreSession()).resolves.toBeNull();
+  });
+
+  it("clears invalid local credentials without retrying authenticated push cleanup", async () => {
+    const { setNativeSession, clearInvalidSession } = await import("../src/auth/session-manager");
+    const { useAuthStore } = await import("../src/auth/auth-store");
+    setNativeSession({ user: { id: "user-1" }, accessToken: "invalid-access", refreshToken: "invalid-refresh" });
+    unregisterPushToken.mockClear();
+
+    await clearInvalidSession();
+
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(persisted.has("nordic-nutri:session:v1")).toBe(false);
+    expect(unregisterPushToken).not.toHaveBeenCalled();
+  });
+
+  it("logs out the rotated refresh token when push cleanup refreshes the session", async () => {
+    const { setNativeSession, signOut } = await import("../src/auth/session-manager");
+    setNativeSession({ user: { id: "user-1" }, accessToken: "access", refreshToken: "refresh-old" });
+    unregisterPushToken.mockImplementationOnce(async () => {
+      setNativeSession({ user: { id: "user-1" }, accessToken: "access-new", refreshToken: "refresh-new" });
+      return true;
+    });
+
+    await signOut();
+
+    expect(logout).toHaveBeenCalledWith("refresh-new");
   });
 
   it("still clears local state when remote logout is unavailable", async () => {

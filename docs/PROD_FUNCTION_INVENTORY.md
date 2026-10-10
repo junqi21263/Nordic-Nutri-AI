@@ -18,9 +18,16 @@ routing:
   no triggers, and are not used by the production caller. They are excluded
   from the production manifest.
 - `nordic-ai-worker-prod` is a legacy production HTTP dependency called by
-  `get-login-ticket`. Its source is not present in this release snapshot, so it
-  is deliberately retained outside `cloudbaserc.json` until its source and a
-  tested cutover are available.
+  `get-login-ticket`. On 2026-10-10, the downloaded production code ZIP matched
+  CloudBase's SHA-256 `5382b5d3015e74aaca007f3faeb436f1af78899ec7db80f31e4404707f777189`.
+  Its root `index.js`, test, README, package manifest, and bootstrap match the
+  tracked `cloudbase/functions/hunyuan-image-worker/` files byte for byte.
+  Production runs this code under a different function name; its seven variable
+  names include `CLOUDBASE_APIKEY` and `CLOUDBASE_APIKEY_ID`, although that
+  source README says not to set permanent API credentials in this worker.
+  Variable values and runtime behavior were not inspected. Keep this function
+  outside `cloudbaserc.json` until its caller, variable requirements, and a
+  tested cutover are independently reconciled; do not delete it as a stale copy.
 
 Production database reconciliation applied through the migration registry:
 
