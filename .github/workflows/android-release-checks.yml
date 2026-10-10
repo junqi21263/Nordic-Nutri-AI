@@ -1,0 +1,28 @@
+name: Android release checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - Android-dev
+      - Android-prod
+      - release/**
+
+permissions:
+  contents: read
+
+jobs:
+  contracts-and-prod-h5:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.0
+      - run: pnpm install --frozen-lockfile
+      - run: node --test scripts/cloudbase-deploy-config.test.mjs scripts/verify-cloudbase-function-manifest.test.mjs
+      - run: pnpm --dir mini-program typecheck
+      - run: pnpm --dir mini-program run build:android:prod

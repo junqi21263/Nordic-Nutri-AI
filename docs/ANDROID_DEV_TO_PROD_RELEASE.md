@@ -22,6 +22,8 @@
 3. 部署后回读函数状态、运行时、触发器、配置和代码版本/产物摘要。`Active` 只代表函数可用，不等于业务端到端通过。`nordic-ai-worker-prod` 是清单外的遗留依赖，见 `PROD_FUNCTION_INVENTORY.md`；改变其路由前必须取得源码和独立验收。
 4. 可用 `node scripts/release/create-production-release-bundle.mjs` 生成候选发布包。脚本中的 `NOT_VERIFIED` 字段必须用实际迁移历史、Prod 回读、测试和回滚证据补齐；不能把候选包直接称为完成发布。
 
+GitHub Actions 的 `Android release checks` 只核对分支/函数配置契约、类型和 Prod H5 构建；云端迁移、变量值、签名 APK 和真机验收仍按本清单单独回读。
+
 ## 4. 构建 Prod APK
 
 1. 将 `android/app/build.gradle` 的 `versionCode` 调高到高于所有已发布版本，按需要更新 `versionName`。确认 `.env.production` 的 API Base URL、Google Server Client ID、正式插画 CDN 和登录开关指向 Prod；不要把服务端密钥放进前端环境文件。
