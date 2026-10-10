@@ -989,8 +989,8 @@
         </section>
 
         <section id="modulePush" class="admin-module" hidden>
-          <div class="nn-page-header"><div><p class="eyebrow">Operations / Push</p><h2>推送测试</h2><p class="muted">仅向指定 DEV 用户发送一条提醒，用于验证 Android FCM 链路与通知文案。</p></div></div>
-          <section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">FCM delivery</p><h3>白名单测试</h3></div><span class="nn-status-badge nn-status-badge--warning">DEV only</span></div><div class="nn-filter-bar nn-push-test-bar"><label class="nn-field nn-push-test-field"><span>用户 ID</span><input id="pushTestUserId" class="nn-input" type="text" placeholder="输入内部用户 UUID" autocomplete="off" /></label><label class="nn-field nn-push-test-field"><span>推送场景</span><select id="pushTestScenario" class="nn-select"><option value="meal">餐次未记录</option><option value="missed_streak">连续多天未记录</option><option value="recorded_streak">已连续记录</option></select></label><label class="nn-field nn-push-test-field"><span>提醒餐次</span><select id="pushTestMealType" class="nn-select"><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option></select></label><button id="pushTestSend" class="button nn-push-test-send" type="button">发送测试 Push</button></div><p id="pushTestStatus" class="muted nn-push-test-status" aria-live="polite">请确认设备已登录 DEV 账号并完成通知授权。</p></section>
+          <div class="nn-page-header"><div><p class="eyebrow">Operations / Push</p><h2>推送测试</h2><p class="muted">仅向当前环境的指定用户发送一条提醒，用于验证 Android FCM 链路与通知文案。</p></div></div>
+          <section class="ops-panel nn-compact-panel"><div class="nn-section-heading"><div><p class="eyebrow">FCM delivery</p><h3>指定用户测试</h3></div><span class="nn-status-badge nn-status-badge--warning">管理员操作</span></div><div class="nn-filter-bar nn-push-test-bar"><label class="nn-field nn-push-test-field"><span>用户 ID</span><input id="pushTestUserId" class="nn-input" type="text" placeholder="输入内部用户 UUID" autocomplete="off" /></label><label class="nn-field nn-push-test-field"><span>推送场景</span><select id="pushTestScenario" class="nn-select"><option value="meal">餐次未记录</option><option value="missed_streak">连续多天未记录</option><option value="recorded_streak">已连续记录</option></select></label><label class="nn-field nn-push-test-field"><span>提醒餐次</span><select id="pushTestMealType" class="nn-select"><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option></select></label><button id="pushTestSend" class="button nn-push-test-send" type="button">发送测试 Push</button></div><p id="pushTestStatus" class="muted nn-push-test-status" aria-live="polite">请确认设备已登录当前环境账号并完成通知授权。</p></section>
         </section>
 
         <section id="moduleAuditLogs" class="admin-module" hidden>
@@ -3460,8 +3460,8 @@
       const scenario = $("pushTestScenario")?.value || "meal";
       const mealType = $("pushTestMealType")?.value || "";
       const status = $("pushTestStatus");
-      if (!userId) { if (status) status.textContent = "请先输入白名单用户 ID。"; return; }
-      if (!window.confirm("确认向这个 DEV 用户发送一次测试 Push？")) return;
+      if (!userId) { if (status) status.textContent = "请先输入用户 ID。"; return; }
+      if (!window.confirm("确认向当前环境的这个用户发送一次测试 Push？")) return;
       const button = $("pushTestSend");
       if (button) { button.disabled = true; button.textContent = "发送中…"; }
       if (status) status.textContent = "正在请求 FCM…";
