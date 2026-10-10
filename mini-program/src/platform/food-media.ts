@@ -5,8 +5,14 @@ export async function chooseFoodImage(source?: "camera" | "album"): Promise<stri
     const { Capacitor } = await import("@capacitor/core");
     if (Capacitor.isNativePlatform()) {
       const { Camera, CameraResultType, CameraSource } = await import("@capacitor/camera");
-      const photo = await Camera.getPhoto({
-        source: source === "camera" ? CameraSource.Camera : source === "album" ? CameraSource.Photos : CameraSource.Prompt,
+      const photo = source === "camera" ? await Camera.takePhoto({
+        quality: 85,
+        targetWidth: 1920,
+        targetHeight: 1920,
+        correctOrientation: true,
+        saveToGallery: false,
+      }) : await Camera.getPhoto({
+        source: source === "album" ? CameraSource.Photos : CameraSource.Prompt,
         resultType: CameraResultType.Uri,
         quality: 85,
         width: 1920,

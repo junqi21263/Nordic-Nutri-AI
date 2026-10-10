@@ -1791,7 +1791,9 @@
   line-height: $line-body;
   margin-top: $space-8;
   max-width: 480px;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .feedback-modal__actions {
   align-items: center;
