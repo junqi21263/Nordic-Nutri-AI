@@ -35,6 +35,10 @@ const isProductionBuild = process.env.NODE_ENV === "production" || process.env.T
 const appEnvironment = isProductionBuild
   ? "production"
   : process.env.TARO_APP_ENV ?? requestedNodeEnv;
+const productionApiBaseUrl = "https://lewis-healthy-d4glgqqzv73a5bc10.service.tcloudbase.com";
+if (isProductionBuild && (process.env.TARO_APP_API_BASE_URL ?? "").trim().replace(/\/$/, "") !== productionApiBaseUrl) {
+  throw new Error("生产构建的 TARO_APP_API_BASE_URL 必须指向 Prod CloudBase 环境。");
+}
 const isDevelopment = !isProductionBuild && appEnvironment === "development";
 const milestoneAssetCdn = (process.env.TARO_APP_MILESTONE_ASSET_CDN ?? "").trim().replace(/\/$/, "");
 if (isProductionBuild && !milestoneAssetCdn) {

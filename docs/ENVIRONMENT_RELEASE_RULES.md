@@ -4,8 +4,8 @@
 
 | Git 分支 | CloudBase 环境 | 用途 | 数据边界 |
 |---|---|---|---|
-| `develop` / `feature/*` | `test-dev-d4gyxnn0b5dfa2c8a` | 开发、联调、验收 | 只允许测试账号、测试数据、测试 Storage |
-| `main` / `release/*` | `lewis-healthy-d4glgqqzv73a5bc10` | 生产发布 | 真实用户、真实数据、生产 Storage |
+| `develop` / `feature/*` / `Android-dev` | `test-dev-d4gyxnn0b5dfa2c8a` | 开发、联调、验收 | 只允许测试账号、测试数据、测试 Storage |
+| `main` / `release/*` / `Android-prod` | `lewis-healthy-d4glgqqzv73a5bc10` | 生产发布 | 真实用户、真实数据、生产 Storage |
 
 分支名和 CloudBase 环境必须同时确认。Git merge 只改变代码，不会自动部署任何 CloudBase 环境。
 
@@ -18,7 +18,7 @@ pnpm deploy:cloudbase production get-login-ticket --dry-run
 pnpm deploy:cloudbase production get-login-ticket
 ```
 
-将函数名替换为目标函数；仅在确实需要全量更新时，将函数名改为 `--all`。脚本会校验分支与环境映射，测试仅允许 `develop` / `feature/*`，生产仅允许 `main` / `release/*`。`--dry-run` 只展示目标，不执行部署。`cloudbaserc.json` 是唯一函数清单，因此测试与生产配置不会因复制清单而漂移。
+将函数名替换为目标函数；仅在确实需要全量更新时，将函数名改为 `--all`。脚本会校验上表中的分支与环境映射。`--dry-run` 只展示目标，不执行部署。`cloudbaserc.json` 是仓库管理的生产函数清单；脚本仅对 Dev 加入 `hunyuan-image-worker` 和 `nutrition-insight-worker`。清单外生产依赖见 `docs/PROD_FUNCTION_INVENTORY.md`。
 
 ## 2. 开发规则
 
@@ -33,7 +33,7 @@ pnpm deploy:cloudbase production get-login-ticket
 
 测试环境部署前必须完成：
 
-- 确认当前分支是 `develop` 或 `feature/*`。
+- 确认当前分支是 `develop`、`feature/*` 或 `Android-dev`。
 - 确认目标 EnvId 是 `test-dev-d4gyxnn0b5dfa2c8a`。
 - 运行相关单元测试、类型检查或构建检查。
 - 检查 `git diff --check`。
@@ -55,7 +55,9 @@ pnpm deploy:cloudbase production get-login-ticket
 7. 用生产专用验证账号执行只读/低风险 Smoke Test。
 8. 验证通过后再发布生产 Hosting 或小程序版本。
 
-禁止直接在 `main` 上开发、直接修改生产函数代码、直接修改生产数据库结构，或把测试环境变量复制到生产。
+禁止直接在 `main` 上开发、直接修改生产函数代码或直接修改生产数据库结构。环境变量按名称和用途逐项核对，默认分别配置；经明确批准共享的 FCM 凭据可以复用，但 `TCB_ENV`、数据库连接和生产开关仍必须保持环境专属。不得将变量值写入 Git 或发布记录。
+
+Android APK 的具体构建、签名、配置回读和真机验收顺序见 `docs/ANDROID_DEV_TO_PROD_RELEASE.md`。
 
 ## 5. 云函数发布顺序
 

@@ -10,6 +10,8 @@ Nordic Nutri AI is a Taro + React WeChat Mini Program backed by a CloudBase HTTP
 - `cloudbase/pg/seeds/`: idempotent seed data (e.g. high-frequency foods).
 - `docs/`: current runbooks plus recent CloudBase plans/specs. See `docs/FOOD_CATALOG_BACKEND.md` for the unified food data model, API and image pipeline.
 
+For Android Dev → Prod promotion, use `docs/ANDROID_DEV_TO_PROD_RELEASE.md`.
+
 ## Runtime flow
 
 1. The Mini Program calls `wx.login()`.

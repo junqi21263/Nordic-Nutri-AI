@@ -9,6 +9,7 @@
     "build:weapp": "NODE_ENV=production TARO_APP_ENV=production taro build --type weapp --no-check",
     "build:h5": "taro build --type h5 --no-check",
     "build:android": "NODE_ENV=development TARO_APP_ENV=development TARO_APP_PLATFORM=android taro build --type h5 --no-check",
+    "build:android:prod": "NODE_ENV=production TARO_APP_ENV=production TARO_APP_PLATFORM=android taro build --type h5 --no-check",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"config/**/*.ts\"",
     "format:check": "prettier --check .",
