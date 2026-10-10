@@ -4,9 +4,9 @@
 
 ## 1. 冻结代码与回滚点
 
-1. 在 `Android-dev` 完成开发和 Dev 真机验收。提交本次要发布的改动；不要把未提交文件、日志、APK、密钥或 `google-services.json` 的 release 副本带入发布提交。
+1. 开始下一轮开发前，先把上一轮 Prod 的代码修正回流到 Dev 基线，再在 `Android-dev` 完成开发和 Dev 真机验收。提交本次要发布的改动；不要把未提交文件、日志、APK、密钥或 `google-services.json` 的 release 副本带入发布提交。
 2. 记录 Dev 验收的提交 SHA、功能范围、相关迁移文件与版本、函数名单、变量名称、当前 APK `versionCode` 和回滚提交。检查 `git status --short`、`git diff --check`、与远端的分叉及待合并提交。
-3. 将经过验收的 Dev 提交合入发布分支。发布分支可以是 `release/YYYY-MM-DD-<name>`；现有 Android 发布工作区使用 `Android-prod`，它跟踪 `origin/release/2026-10-09-android-prod`。确认发布分支包含 Dev 提交，也保留已有 Prod 修正。发布后把 Prod 专属代码修正回流到下一轮 Dev 基线，避免两条分支持续分叉。
+3. 将经过验收的 Dev 提交合入发布分支。发布分支可以是 `release/YYYY-MM-DD-<name>`；现有 Android 发布工作区使用 `Android-prod`，它跟踪 `origin/release/2026-10-09-android-prod`。确认发布分支包含 Dev 提交，也保留已有 Prod 修正。若合并时产生代码修复，应先将修复回流 Dev 并重新验收新的发布提交，避免把未在 Dev 验收的组合直接部署 Prod。
 4. 仅从干净、已提交的发布提交构建和部署。任何发布后修正都要形成新提交并更新发布记录，不要让 APK 与云函数对应不同的未记录源码。
 
 ## 2. Dev 验收与数据库迁移
