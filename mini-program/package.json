@@ -11,6 +11,7 @@
     "build:android": "NODE_ENV=development TARO_APP_ENV=development TARO_APP_PLATFORM=android taro build --type h5 --no-check",
     "build:android:prod": "NODE_ENV=production TARO_APP_ENV=production TARO_APP_PLATFORM=android taro build --type h5 --no-check",
     "typecheck": "tsc --noEmit",
+    "sync:legal": "node ../scripts/sync-legal-copy.mjs",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"config/**/*.ts\"",
     "format:check": "prettier --check .",
     "test:unit": "vitest run",

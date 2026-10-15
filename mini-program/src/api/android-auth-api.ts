@@ -229,6 +229,11 @@ function createApi(request: AndroidAuthRequest) {
     refresh: (refreshToken: string) => request("/auth/refresh", { refreshToken }),
     logout: (refreshToken: string) => request("/auth/logout", { refreshToken }),
     getMe: () => request("/auth/me", undefined, "GET"),
+    sendBindingCode: (type: "email" | "phone", input: { email?: string; phone?: string; captchaId: string; captchaAnswer: string }) =>
+      request(`/auth/bind/${type}/send-code`, input),
+    bindContact: (type: "email" | "phone", input: { email?: string; phone?: string; code: string; password?: string }) =>
+      request(`/auth/bind/${type}`, input),
+    bindGoogle: (idToken: string) => request("/auth/bind/google", { idToken }),
   };
 }
 

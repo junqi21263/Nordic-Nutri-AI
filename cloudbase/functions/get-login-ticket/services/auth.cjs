@@ -2,7 +2,7 @@ const { createHmac, randomBytes, randomInt, timingSafeEqual } = require("node:cr
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
-const VERIFICATION_PURPOSES = ["register", "reset_password"];
+const VERIFICATION_PURPOSES = ["register", "reset_password", "bind"];
 const VERIFICATION_LIMITS = {
   phone: { tenMinute: 3, daily: 10 },
   email: { tenMinute: 5, daily: 20 },
@@ -115,7 +115,7 @@ function createAuthRepository(db) {
   if (!db || typeof db.from !== "function" || typeof db.rpc !== "function") {
     throw new Error("Auth database client is unavailable");
   }
-  const userFields = "id,email,email_normalized,email_verified_at,phone_e164,phone_verified_at,password_hash,google_sub,status,token_version,created_platform,registration_channel,password_changed_at";
+  const userFields = "id,email,email_normalized,email_verified_at,email_login_enabled,phone_e164,phone_verified_at,password_hash,google_sub,status,token_version,created_platform,registration_channel,password_changed_at";
   const readUser = async (query) => {
     const result = await query.maybeSingle();
     if (result.error) throw new Error("Auth user lookup failed");
@@ -222,12 +222,51 @@ function createAuthRepository(db) {
       if (result.error) throw new Error("Verification failed");
       return rpcBoolean(result.data, "consume_auth_verification_code") ? { consumed: true } : null;
     },
-    async updatePassword(userId, passwordHash) {
-      const result = await db.rpc("update_app_user_password", {
+    async updatePassword(userId, passwordHash, targetType) {
+      const result = await db.rpc("update_android_password_after_reset", {
         p_user_id: userId,
         p_password_hash: passwordHash,
+        p_target_type: targetType,
       });
-      if (result.error || !rpcBoolean(result.data, "update_app_user_password")) throw new Error("Password update failed");
+      if (result.error || !rpcBoolean(result.data, "update_android_password_after_reset")) throw new Error("Password update failed");
+    },
+    async bindContact({ userId, target, targetHash, targetType, codeHash, passwordHash, now }) {
+      const result = await db.rpc("bind_android_contact", {
+        p_user_id: userId,
+        p_target: target,
+        p_target_hash: targetHash,
+        p_target_type: targetType,
+        p_code_hash: codeHash,
+        p_password_hash: passwordHash,
+        p_now: new Date(now).toISOString(),
+      });
+      if (result.error) {
+        // The RPC can commit even when the SDK reports a response error.
+        // Confirm the exact code was consumed and the identity was written before reporting failure.
+        const verification = await db.from("auth_verification_codes").select("id")
+          .eq("user_id", userId).eq("target", targetHash).eq("target_type", targetType)
+          .eq("purpose", "bind").eq("code_hash", codeHash).eq("status", "used")
+          .gte("used_at", new Date(now - 10 * 60_000).toISOString()).maybeSingle();
+        if (!verification.error && verification.data) {
+          const user = await readUser(db.from("app_users").select(userFields).eq("id", userId));
+          const matches = targetType === "email"
+            ? user?.email_normalized === target && user.email_login_enabled
+            : user?.phone_e164 === target;
+          if (matches && user.password_hash) return "bound";
+        }
+        throw new Error("Account binding failed");
+      }
+      return typeof result.data === "string" ? result.data : result.data?.bind_android_contact;
+    },
+    async bindGoogleSub(userId, sub) {
+      const result = await db.from("app_users").update({ google_sub: sub })
+        .eq("id", userId).eq("status", "active").eq("created_platform", "android_app")
+        .is("google_sub", null).select(userFields).maybeSingle();
+      if (result.error) {
+        if (["23505", "DATABASE_23505"].includes(result.error.code)) return "occupied";
+        throw new Error("Google binding failed");
+      }
+      return result.data ?? null;
     },
     async insertRefreshSession(row) {
       const result = await db.from("auth_refresh_sessions").insert(row).select("id").single();
@@ -295,6 +334,12 @@ function publicUser(user) {
     emailVerified: Boolean(user.email_verified_at),
     ...(user.phone_e164 ? { phoneE164: user.phone_e164, phoneVerified: Boolean(user.phone_verified_at) } : {}),
     createdPlatform: user.created_platform ?? null,
+    loginMethods: {
+      email: Boolean(user.email_normalized && user.password_hash && user.email_login_enabled !== false),
+      phone: Boolean(user.phone_e164 && user.password_hash),
+      google: Boolean(user.google_sub),
+    },
+    hasPassword: Boolean(user.password_hash),
   };
 }
 
@@ -402,12 +447,12 @@ function createAuthService({
     throw new AuthError("AUTH_INVALID_REQUEST", "认证参数无效");
   }
 
-  async function sendVerificationCode({ targetType, target, purpose = "register", captchaId, captchaAnswer, skipCaptcha = false, bypassCooldown = false, traceId = null }) {
+  async function sendVerificationCode({ targetType, target, purpose = "register", captchaId, captchaAnswer, skipCaptcha = false, captchaVerified = false, bypassCooldown = false, traceId = null, userId = null }) {
     const normalized = normalizeTarget(targetType, target);
-    if (purpose !== "register" && purpose !== "reset_password") {
+    if (!["register", "reset_password", "bind"].includes(purpose) || (purpose === "bind" && !userId)) {
       throw new AuthError("AUTH_INVALID_REQUEST", "验证码用途无效");
     }
-    if (!skipCaptcha) await verifyCaptcha(captchaId, captchaAnswer);
+    if (!skipCaptcha && !captchaVerified) await verifyCaptcha(captchaId, captchaAnswer);
     let linkedUserId = null;
     if (purpose === "reset_password") {
       const existing = await findUserByTarget(targetType, normalized);
@@ -453,7 +498,7 @@ function createAuthService({
       captcha_status: skipCaptcha ? "admin_resend" : "passed",
       rate_limit_status: bypassCooldown ? "admin_resend" : "allowed",
       send_attempt_count: 1,
-      user_id: linkedUserId,
+      user_id: purpose === "bind" ? userId : linkedUserId,
       trace_id: traceId,
       created_at: new Date(now()).toISOString(),
     });
@@ -529,7 +574,7 @@ function createAuthService({
     const normalized = await consumeCode({ targetType: "email", target: input.email, purpose: "register", code: input.code });
     validatePassword(input.password);
     const passwordHash = await hashPassword(input.password);
-    const fields = { email: normalized, email_normalized: normalized, email_verified_at: new Date(now()).toISOString(), password_hash: passwordHash, created_platform: "android_app", registration_channel: "email" };
+    const fields = { email: normalized, email_normalized: normalized, email_verified_at: new Date(now()).toISOString(), email_login_enabled: true, password_hash: passwordHash, created_platform: "android_app", registration_channel: "email" };
     try {
       return issueSession(await repo.insertUser(fields));
     } catch (error) {
@@ -561,7 +606,7 @@ function createAuthService({
     assertLoginRateAllowed(rateKeys);
     const user = await repo.findUserByEmail(normalized);
     const valid = await verifyPassword(input.password, user?.password_hash ?? null);
-    if (!user || user.status !== "active" || !valid) {
+    if (!user || user.status !== "active" || user.email_login_enabled === false || !valid) {
       recordLoginFailure(rateKeys);
       throw new AuthError("AUTH_INVALID_CREDENTIALS", "账号或密码错误");
     }
@@ -633,18 +678,84 @@ function createAuthService({
     validatePassword(password);
     const user = await findUserByTarget(targetType, normalized);
     if (!user || user.status !== "active") throw new AuthError("AUTH_OTP_INVALID", "验证码无效");
-    await repo.updatePassword(user.id, await hashPassword(password));
+    await repo.updatePassword(user.id, await hashPassword(password), targetType);
     return { reset: true };
   }
 
   async function getMe(token) {
+    const user = await currentUser(token);
+    return { user: publicUser(user) };
+  }
+
+  async function currentUser(token) {
     const session = verifyAccessToken(token, sessionSecret, { now });
     if (!session) throw new AuthError("AUTH_INVALID_CREDENTIALS", "登录状态已失效");
     const user = await repo.findUserById(session.sub);
     if (!user || user.status !== "active" || user.token_version !== session.ver) {
       throw new AuthError("AUTH_INVALID_CREDENTIALS", "登录状态已失效");
     }
-    return { user: publicUser(user) };
+    return user;
+  }
+
+  async function sendBindingCode(token, { targetType, target, captchaId, captchaAnswer, traceId }) {
+    const user = await currentUser(token);
+    if (user.created_platform !== "android_app") throw new AuthError("AUTH_INVALID_CREDENTIALS", "登录状态无效");
+    const normalized = normalizeTarget(targetType, target);
+    await verifyCaptcha(captchaId, captchaAnswer);
+    const current = targetType === "email" ? user.email_normalized : user.phone_e164;
+    if (current && current !== normalized) throw new AuthError("AUTH_METHOD_ALREADY_BOUND", "此登录方式已绑定");
+    if (current && user.password_hash) throw new AuthError("AUTH_METHOD_ALREADY_BOUND", "此登录方式已绑定");
+    const owner = await findUserByTarget(targetType, normalized);
+    if (owner && owner.id !== user.id) throw new AuthError("AUTH_IDENTITY_OCCUPIED", "此登录方式已被其他账号使用");
+    return sendVerificationCode({ targetType, target: normalized, purpose: "bind", captchaId, captchaAnswer, captchaVerified: true, traceId, userId: user.id });
+  }
+
+  async function bindContact(token, { targetType, target, code, password }) {
+    const user = await currentUser(token);
+    if (user.created_platform !== "android_app") throw new AuthError("AUTH_INVALID_CREDENTIALS", "登录状态无效");
+    const normalized = normalizeTarget(targetType, target);
+    if (!/^\d{6}$/.test(String(code || ""))) throw new AuthError("AUTH_OTP_INVALID", "验证码无效");
+    let passwordHash = null;
+    if (!user.password_hash) passwordHash = await hashPassword(validatePassword(password));
+    const result = await repo.bindContact({
+      userId: user.id,
+      target: normalized,
+      targetHash: hashAuthValue(normalized, authHmacSecret, `${targetType}-target`),
+      targetType,
+      codeHash: hashVerificationCode(normalized, "bind", code, authHmacSecret),
+      passwordHash,
+      now: now(),
+    });
+    const errors = {
+      occupied: ["AUTH_IDENTITY_OCCUPIED", "此登录方式已被其他账号使用"],
+      already_bound: ["AUTH_METHOD_ALREADY_BOUND", "此登录方式已绑定"],
+      password_required: ["AUTH_PASSWORD_REQUIRED", "请设置登录密码"],
+      expired_code: ["AUTH_OTP_EXPIRED", "验证码已过期"],
+      invalid_code: ["AUTH_OTP_INVALID", "验证码无效"],
+      unauthorized: ["AUTH_INVALID_CREDENTIALS", "登录状态已失效"],
+    };
+    if (result !== "bound") {
+      const [errorCode, message] = errors[result] || ["AUTH_INVALID_REQUEST", "认证参数无效"];
+      throw new AuthError(errorCode, message);
+    }
+    return { user: publicUser(await repo.findUserById(user.id)) };
+  }
+
+  async function bindGoogle(token, { idToken }) {
+    const user = await currentUser(token);
+    if (user.created_platform !== "android_app") throw new AuthError("AUTH_INVALID_CREDENTIALS", "登录状态无效");
+    if (user.google_sub) throw new AuthError("AUTH_METHOD_ALREADY_BOUND", "Google 已绑定");
+    if (typeof verifyGoogleToken !== "function") throw new AuthError("AUTH_PROVIDER_UNAVAILABLE", "Google 登录暂不可用");
+    let claims;
+    try { claims = await verifyGoogleToken(idToken); }
+    catch { throw invalidGoogleCredentials(); }
+    if (!claims?.sub || claims.email_verified !== true) throw invalidGoogleCredentials();
+    const owner = await repo.findUserByGoogleSub(claims.sub);
+    if (owner && owner.id !== user.id) throw new AuthError("AUTH_IDENTITY_OCCUPIED", "Google 已被其他账号使用");
+    const bound = await repo.bindGoogleSub(user.id, claims.sub);
+    if (bound === "occupied") throw new AuthError("AUTH_IDENTITY_OCCUPIED", "Google 已被其他账号使用");
+    if (!bound) throw new AuthError("AUTH_METHOD_ALREADY_BOUND", "Google 已绑定");
+    return { user: publicUser(bound) };
   }
 
   async function refresh(refreshToken) {
@@ -684,6 +795,9 @@ function createAuthService({
     sendVerificationCode,
     resendVerificationCode,
     getMe,
+    sendBindingCode,
+    bindContact,
+    bindGoogle,
     refresh,
     logout,
   };

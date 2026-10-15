@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createAuthRepository, createAuthService, hashAuthValue, hashVerificationCode } from "./services/auth.cjs";
+import { createAccessToken, createAuthRepository, createAuthService, hashAuthValue, hashVerificationCode } from "./services/auth.cjs";
 
 function createRepo(clock = () => 1_700_000_000_000) {
   const repo = {
@@ -127,6 +127,43 @@ test("passes the verification timestamp to the atomic OTP RPC", async () => {
       p_now: new Date(now).toISOString(),
     },
   }]);
+});
+
+test("recognizes a committed contact binding when the RPC response fails", async () => {
+  const now = 1_700_000_000_000;
+  const queries = [];
+  let codeConsumed = true;
+  const db = {
+    from(table) {
+      const filters = [];
+      const query = {
+        select() { return this; },
+        eq(key, value) { filters.push([key, value]); return this; },
+        gte(key, value) { filters.push([key, value]); return this; },
+        async maybeSingle() {
+          queries.push({ table, filters });
+          if (table === "auth_verification_codes") return { data: codeConsumed ? { id: "used-code" } : null, error: null };
+          return { data: { id: "user-1", email_normalized: "new@example.com", email_login_enabled: true, password_hash: "stored-hash" }, error: null };
+        },
+      };
+      return query;
+    },
+    async rpc() { return { data: null, error: { code: "PARSING_FAILED" } }; },
+  };
+  const repo = createAuthRepository(db);
+  const input = { userId: "user-1", target: "new@example.com", targetHash: "target-hash", targetType: "email", codeHash: "code-hash", passwordHash: "new-hash", now };
+
+  assert.equal(await repo.bindContact(input), "bound");
+  assert.deepEqual(queries[0], {
+    table: "auth_verification_codes",
+    filters: [
+      ["user_id", "user-1"], ["target", "target-hash"], ["target_type", "email"],
+      ["purpose", "bind"], ["code_hash", "code-hash"], ["status", "used"],
+      ["used_at", new Date(now - 10 * 60_000).toISOString()],
+    ],
+  });
+  codeConsumed = false;
+  await assert.rejects(repo.bindContact(input), /Account binding failed/);
 });
 
 test("does not send a verification code when CAPTCHA fails", async () => {
@@ -310,7 +347,7 @@ test("forgot-password for an unknown destination returns generic success without
   assert.equal(repo.verification.length, 0);
 });
 
-test("/auth/me returns only the minimal email account identity", async () => {
+test("/auth/me returns the current account and available login methods", async () => {
   const repo = createRepo();
   repo.users.push({
     id: "user-1",
@@ -330,8 +367,73 @@ test("/auth/me returns only the minimal email account identity", async () => {
       email: "user@example.com",
       emailVerified: true,
       createdPlatform: "android_app",
+      loginMethods: { email: true, phone: false, google: false },
+      hasPassword: true,
     },
   });
+});
+
+test("binding code requires the current Android session and rejects another account's email", async () => {
+  const repo = createRepo();
+  repo.users.push(
+    { id: "current", phone_e164: "+8613800138000", password_hash: "argon2id:password", status: "active", created_platform: "android_app", token_version: 1 },
+    { id: "other", email_normalized: "taken@example.com", status: "active", created_platform: "android_app", token_version: 1 },
+  );
+  const service = createService(repo);
+  const session = await service.loginPhone({ phone: "+8613800138000", password: "password" });
+  await assert.rejects(service.sendBindingCode("bad", { targetType: "email", target: "new@example.com" }), { code: "AUTH_INVALID_CREDENTIALS" });
+  await assert.rejects(service.sendBindingCode(session.session.accessToken, { targetType: "email", target: "taken@example.com" }), { code: "AUTH_IDENTITY_OCCUPIED" });
+  assert.equal(repo.verification.length, 0);
+  await service.sendBindingCode(session.session.accessToken, { targetType: "email", target: " NEW@example.com ", captchaId: "c1", captchaAnswer: "ok" });
+  assert.equal(repo.verification[0].user_id, "current");
+  assert.equal(repo.verification[0].purpose, "bind");
+  assert.equal(repo.verification[0].target_value, "new@example.com");
+});
+
+test("contact binding passes current user to the atomic repository and keeps the same account", async () => {
+  const repo = createRepo();
+  const user = { id: "current", google_sub: "google-1", status: "active", created_platform: "android_app", token_version: 1 };
+  repo.users.push(user);
+  repo.bindContact = async (input) => {
+    assert.equal(input.userId, "current");
+    assert.equal(input.target, "new@example.com");
+    assert.equal(input.targetHash, hashAuthValue("new@example.com", "auth-secret", "email-target"));
+    assert.equal(input.codeHash, hashVerificationCode("new@example.com", "bind", "123456", "auth-secret"));
+    assert.equal(input.passwordHash, "argon2id:password");
+    user.email_normalized = input.target;
+    user.password_hash = input.passwordHash;
+    return "bound";
+  };
+  const service = createService(repo);
+  const token = createAccessToken({ userId: "current", tokenVersion: 1, secret: "session-secret", now: () => 1_700_000_000_000 });
+  const result = await service.bindContact(token, { targetType: "email", target: "NEW@example.com", code: "123456", password: "password" });
+  assert.equal(result.user.id, "current");
+  assert.deepEqual(result.user.loginMethods, { email: true, phone: false, google: true });
+});
+
+test("Google binding rejects an occupied subject and never creates a second user", async () => {
+  const repo = createRepo();
+  repo.users.push(
+    { id: "current", phone_e164: "+8613800138000", password_hash: "argon2id:password", status: "active", created_platform: "android_app", token_version: 1 },
+    { id: "other", google_sub: "google-1", status: "active", created_platform: "android_app", token_version: 1 },
+  );
+  const service = createService(repo, { verifyGoogleToken: async () => ({ sub: "google-1", email_verified: true }) });
+  const session = await service.loginPhone({ phone: "+8613800138000", password: "password" });
+  await assert.rejects(service.bindGoogle(session.session.accessToken, { idToken: "token" }), { code: "AUTH_IDENTITY_OCCUPIED" });
+  assert.equal(repo.users.length, 2);
+});
+
+test("a Google account's email stays unavailable after it binds a phone", async () => {
+  const repo = createRepo();
+  repo.users.push({
+    id: "google-user", email_normalized: "google@example.com", email_verified_at: "2026-10-14T00:00:00Z",
+    email_login_enabled: false, google_sub: "google-1", phone_e164: "+8613800138000",
+    password_hash: "argon2id:password", status: "active", created_platform: "android_app", token_version: 1,
+  });
+  const service = createService(repo);
+  await assert.rejects(service.loginEmail({ email: "google@example.com", password: "password" }), { code: "AUTH_INVALID_CREDENTIALS" });
+  const phoneSession = await service.loginPhone({ phone: "+8613800138000", password: "password" });
+  assert.deepEqual(phoneSession.user.loginMethods, { email: false, phone: true, google: true });
 });
 
 test("issues only a hashed 30-day refresh session beside the seven-day access token", async () => {

@@ -1,0 +1,38 @@
+.page-layout--account-binding .page-layout__content { padding: 0; }
+.page-layout--account-binding .content-stack { gap: 0; }
+
+.account-binding {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16PX;
+  width: min(100%, 520PX);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 24PX 20PX calc(env(safe-area-inset-bottom) + 32PX);
+  background: #fbfaf7;
+  color: #193b2d;
+  font-size: 15PX;
+  line-height: 1.45;
+}
+.account-binding__back { align-self: flex-start; color: #17613f; cursor: pointer; font-size: 14PX; }
+.account-binding__title { font-size: 28PX; font-weight: 700; line-height: 1.2; }
+.account-binding__intro { margin-bottom: 8PX; color: #617266; font-size: 14PX; line-height: 1.5; }
+.account-binding__method {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12PX;
+  min-height: 76PX;
+  padding: 16PX;
+  border-radius: 16PX;
+  background: #fff;
+}
+.account-binding__method-details { display: flex; flex: 1; flex-direction: column; gap: 3PX; min-width: 0; }
+.account-binding__method-name { display: block; font-size: 16PX; font-weight: 600; line-height: 1.3; }
+.account-binding__method-status { display: block; overflow-wrap: anywhere; color: #617266; font-size: 13PX; line-height: 1.4; }
+.account-binding__action { flex: 0 0 auto; color: #17613f; cursor: pointer; font-size: 14PX; font-weight: 600; white-space: nowrap; }
+.account-binding__action--disabled { color: #8b9690; cursor: default; }
+.account-binding__form { display: flex; flex-direction: column; gap: 16PX; border-radius: 16PX; padding: 16PX; background: #fff; }
+.account-binding__message { color: #17613f; font-size: 14PX; line-height: 1.5; }

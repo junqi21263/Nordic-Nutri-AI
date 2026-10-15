@@ -1918,6 +1918,11 @@ function getAuthRoute(pathname) {
     "/auth/refresh",
     "/auth/logout",
     "/auth/me",
+    "/auth/bind/email/send-code",
+    "/auth/bind/phone/send-code",
+    "/auth/bind/email",
+    "/auth/bind/phone",
+    "/auth/bind/google",
   ]).has(path) ? path : null;
 }
 
@@ -1927,6 +1932,7 @@ function authErrorStatus(code) {
   if (code === "AUTH_RATE_LIMITED") return 429;
   if (code === "AUTH_EMAIL_ALREADY_REGISTERED") return 409;
   if (code === "AUTH_PHONE_ALREADY_REGISTERED") return 409;
+  if (code === "AUTH_IDENTITY_OCCUPIED" || code === "AUTH_METHOD_ALREADY_BOUND") return 409;
   if (code === "AUTH_PROVIDER_UNAVAILABLE") return 503;
   if (code === "AUTH_UNAVAILABLE") return 503;
   return 400;
@@ -1969,6 +1975,24 @@ async function handleAuthRoute({ req, res, route, service }) {
     else if (route === "/auth/password/reset") result = await service.auth.resetPassword(body);
     else if (route === "/auth/refresh") result = await service.auth.refresh(body.refreshToken);
     else if (route === "/auth/logout") result = await service.auth.logout(body.refreshToken);
+    else if (route === "/auth/bind/email/send-code" || route === "/auth/bind/phone/send-code") {
+      result = await service.auth.sendBindingCode(readBearerToken(req), {
+        targetType: route.includes("/email/") ? "email" : "phone",
+        target: route.includes("/email/") ? body.email : body.phone,
+        captchaId: body.captchaId,
+        captchaAnswer: body.captchaAnswer,
+        traceId: res.__traceId,
+      });
+    }
+    else if (route === "/auth/bind/email" || route === "/auth/bind/phone") {
+      result = await service.auth.bindContact(readBearerToken(req), {
+        targetType: route.endsWith("/email") ? "email" : "phone",
+        target: route.endsWith("/email") ? body.email : body.phone,
+        code: body.code,
+        password: body.password,
+      });
+    }
+    else if (route === "/auth/bind/google") result = await service.auth.bindGoogle(readBearerToken(req), { idToken: body.idToken });
     else result = await service.auth.getMe(readBearerToken(req));
     sendJson(res, 200, result);
   } catch (error) {

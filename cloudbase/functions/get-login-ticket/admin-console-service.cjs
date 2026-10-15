@@ -1,5 +1,6 @@
 const FEEDBACK_STATUSES = new Set(["new", "reviewing", "resolved", "closed"]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { userLoginMethods } = require("./user-login-methods.cjs");
 
 class AdminConsoleError extends Error {
   constructor(code) {
@@ -23,6 +24,7 @@ function createAdminConsoleService({ db, isAdmin }) {
       isAdmin: Boolean(row.is_admin),
       lastLoginAt: profile?.last_login_at ?? null,
       registrationChannel: row.registration_channel ?? null,
+      loginMethods: userLoginMethods(row),
       createdAt: row.created_at,
     };
   }
@@ -88,7 +90,7 @@ function createAdminConsoleService({ db, isAdmin }) {
 
       let userQuery = db
         .from("app_users")
-        .select("id,is_admin,status,registration_channel,created_at")
+        .select("id,is_admin,status,registration_channel,created_platform,email_normalized,email_login_enabled,phone_e164,password_hash,google_sub,created_at")
         .neq("status", "deleted")
         .order("created_at", { ascending: false })
         .limit(cap);

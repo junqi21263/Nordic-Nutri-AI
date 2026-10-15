@@ -1,4 +1,5 @@
 const USER_ID_MAX = 128;
+const { userLoginMethods } = require("./user-login-methods.cjs");
 
 class UserOpsError extends Error {
   constructor(code) {
@@ -104,7 +105,7 @@ function createUserOpsService({ db, isAdmin, hashUserId, listTraces } = {}) {
   }
 
   async function loadIdentity(userId) {
-    const userResult = await db.from("app_users").select("id,status,registration_channel,created_at,updated_at").eq("id", userId).maybeSingle();
+    const userResult = await db.from("app_users").select("id,status,registration_channel,created_platform,email_normalized,email_login_enabled,phone_e164,password_hash,google_sub,created_at,updated_at").eq("id", userId).maybeSingle();
     if (userResult?.error) throw new UserOpsError("USER_DETAIL_FAILED");
     if (!userResult?.data) throw new UserOpsError("USER_NOT_FOUND");
     const profileResult = await db.from("profiles").select("id,nickname,last_login_at,onboarding_completed_at").eq("id", userId).maybeSingle();
@@ -129,6 +130,7 @@ function createUserOpsService({ db, isAdmin, hashUserId, listTraces } = {}) {
         onboardingCompletedAt: profile?.onboarding_completed_at || null,
         status: user.status || null,
         registrationChannel: user.registration_channel || null,
+        loginMethods: userLoginMethods(user),
       },
       overview: {
         mealsCount: activeMeals.length,

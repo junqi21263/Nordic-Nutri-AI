@@ -391,6 +391,7 @@
     .ops-status-pill { display: inline-flex; width: fit-content; border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; color: var(--green); font-size: 11px; font-weight: 700; }
     .ops-status-pill.warning { border-color: #d9b56a; color: #855b16; }
     .ops-status-pill.danger { border-color: var(--danger); color: var(--danger); }
+    .login-methods { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; }
     @media (max-width: 900px) { .ops-page-grid.two, .ops-window-grid { grid-template-columns: 1fr; } .ops-component-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ops-user-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ops-timeline-item { grid-template-columns: 1fr 1fr; } }
     @media (max-width: 560px) { .ops-component-grid { grid-template-columns: 1fr; } .ops-user-summary { grid-template-columns: 1fr 1fr; } .ops-timeline-item { grid-template-columns: 1fr; } }
     .module-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.72); }
@@ -632,7 +633,7 @@
         </section>
 
         <section id="moduleVerification" class="admin-module" hidden>
-          <div class="module-toolbar">
+          <div class="module-toolbar nn-verification-toolbar">
             <h2>验证码中心</h2>
             <select id="verificationTypeFilter"><option value="">全部渠道</option><option value="email">Email</option><option value="phone">SMS</option></select>
             <select id="verificationPurposeFilter"><option value="">全部用途</option><option value="register">注册</option><option value="reset_password">找回密码</option></select>
@@ -640,8 +641,8 @@
             <button id="refreshVerification" class="button secondary" type="button">刷新</button>
           </div>
           <p class="muted" style="margin:0 0 12px">仅显示验证码生命周期、供应商返回和 Trace 关联。生产环境不会显示验证码明文；DEV 调试码仅在服务端显式开启时出现。</p>
+          <div id="verificationDetail" class="nn-compact-panel" hidden style="margin-bottom:16px"></div>
           <div id="verificationTable" class="data-table"><p class="muted" style="padding:18px">请先登录后台</p></div>
-          <div id="verificationDetail" class="nn-compact-panel" hidden style="margin-top:16px"></div>
         </section>
 
         <section id="moduleFeedback" class="admin-module" hidden>
@@ -2121,6 +2122,11 @@
     const feedbackCategoryLabel = (category) => ({ product: "产品", bug: "缺陷", feature: "功能", support: "支持" }[category] || category || "—");
     const registrationChannelLabels = { wechat: "微信小程序", email: "邮箱", phone: "手机号", google: "Google" };
     const registrationChannelLabel = (channel) => registrationChannelLabels[channel] || channel || "未知";
+    const loginMethodsHtml = (methods) => {
+      const labels = { wechat: "微信小程序", email: "邮箱", phone: "手机号", google: "Google" };
+      const known = Array.isArray(methods) ? methods.filter((method) => Object.hasOwn(labels, method)) : [];
+      return known.length ? `<span class="login-methods">${known.map((method) => `<span class="ops-status-pill">${labels[method]}</span>`).join("")}</span>` : "—";
+    };
     async function loadUsers({ force = false } = {}) {
       const host = $("userTable");
       if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
@@ -2136,7 +2142,7 @@
         const data = await api(`/users?q=${encodeURIComponent(q)}&limit=50`);
         const items = data.items || [];
         if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">未找到匹配用户</p>"; moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() }; return; }
-        host.innerHTML = `<table><thead><tr><th>昵称</th><th>注册渠道</th><th>最近登录</th><th>管理员</th><th>注册时间</th><th>用户 ID</th><th>排障</th></tr></thead><tbody>${items.map((user) => `<tr><td>${escapeHtml(user.nickname || "—")}</td><td>${escapeHtml(registrationChannelLabel(user.registrationChannel))}</td><td>${escapeHtml(formatTime(user.lastLoginAt))}</td><td>${user.isAdmin ? "是" : "否"}</td><td>${escapeHtml(formatTime(user.createdAt))}</td><td><code>${escapeHtml(user.id)}</code></td><td><button class="button secondary" type="button" data-user-detail="${escapeHtml(user.id)}">查看详情</button></td></tr>`).join("")}</tbody></table>`;
+        host.innerHTML = `<table><thead><tr><th>昵称</th><th>注册渠道</th><th>当前登录方式</th><th>最近登录</th><th>管理员</th><th>注册时间</th><th>用户 ID</th><th>排障</th></tr></thead><tbody>${items.map((user) => `<tr><td>${escapeHtml(user.nickname || "—")}</td><td>${escapeHtml(registrationChannelLabel(user.registrationChannel))}</td><td>${loginMethodsHtml(user.loginMethods)}</td><td>${escapeHtml(formatTime(user.lastLoginAt))}</td><td>${user.isAdmin ? "是" : "否"}</td><td>${escapeHtml(formatTime(user.createdAt))}</td><td><code>${escapeHtml(user.id)}</code></td><td><button class="button secondary" type="button" data-user-detail="${escapeHtml(user.id)}">查看详情</button></td></tr>`).join("")}</tbody></table>`;
         bindUserDetailButtons();
         moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() };
       } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
@@ -2159,6 +2165,7 @@
       if (item.debugCode) rows.push(["DEV 调试验证码", item.debugCode]);
       host.innerHTML = `<div class="nn-page-header"><div><p class="eyebrow">Verification detail</p><h3>验证码详情</h3></div><button class="button link" type="button" data-close-verification>关闭</button></div><div class="data-table"><table><tbody>${rows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value ?? "—")}</td></tr>`).join("")}</tbody></table></div>`;
       host.querySelector("[data-close-verification]").onclick = () => renderVerificationDetail(null);
+      host.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     function bindVerificationTable(host, items) {
       host.querySelectorAll("[data-verification-detail]").forEach((button) => { button.onclick = () => renderVerificationDetail(items.find((item) => item.id === button.dataset.verificationDetail)); });
@@ -3387,7 +3394,7 @@
     }
     function renderUserDetail(data) {
       const profile = data?.profile || {}; const overview = data?.overview || {};
-      $("userDetailSummary").innerHTML = `<div class="ops-user-summary"><div><span class="eyebrow">USER DETAIL</span><h3>${escapeHtml(profile.nickname || data.id)}</h3><code>${escapeHtml(data.id)}</code></div><div class="ops-window-grid">${[["餐食", overview.mealsCount], ["AI 使用", overview.aiUsageCount], ["图片", overview.imageCount], ["反馈", overview.feedbackCount], ["内容安全", overview.moderationCount], ["删除记录", overview.deletionCount]].map(([label, value]) => `<span>${label}<b>${escapeHtml(value ?? 0)}</b></span>`).join("")}</div></div><p class="muted">注册渠道 ${escapeHtml(registrationChannelLabel(profile.registrationChannel))} · 注册 ${escapeHtml(formatTime(profile.createdAt))} · 最近活跃 ${escapeHtml(formatTime(profile.lastActiveAt))}</p>`;
+      $("userDetailSummary").innerHTML = `<div class="ops-user-summary"><div><span class="eyebrow">USER DETAIL</span><h3>${escapeHtml(profile.nickname || data.id)}</h3><code>${escapeHtml(data.id)}</code></div><div class="ops-window-grid">${[["餐食", overview.mealsCount], ["AI 使用", overview.aiUsageCount], ["图片", overview.imageCount], ["反馈", overview.feedbackCount], ["内容安全", overview.moderationCount], ["删除记录", overview.deletionCount]].map(([label, value]) => `<span>${label}<b>${escapeHtml(value ?? 0)}</b></span>`).join("")}</div></div><p class="muted">注册渠道 ${escapeHtml(registrationChannelLabel(profile.registrationChannel))} · 注册 ${escapeHtml(formatTime(profile.createdAt))} · 最近活跃 ${escapeHtml(formatTime(profile.lastActiveAt))}</p><p class="muted">当前登录方式 ${loginMethodsHtml(profile.loginMethods)}</p>`;
       renderUserDetailPanels(data);
     }
     function renderUserTimeline(data) {

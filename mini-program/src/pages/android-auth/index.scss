@@ -81,7 +81,8 @@
 .auth-divider__line { height: 1PX; flex: 1; background: rgba(66, 72, 67, 0.18); }
 .auth-landing__providers { display: grid; grid-template-columns: 1fr 1fr; gap: 12PX; }
 .auth-terms { display: block; margin-top: 24PX; color: $color-neutral-gray; font-size: 12PX; line-height: 1.45; text-align: center; }
-.auth-terms Text { color: $color-text-secondary; text-decoration: underline; }
+.auth-terms__link { color: $color-text-secondary; cursor: pointer; text-decoration-line: underline; text-decoration-color: currentColor; text-underline-offset: 2PX; }
+.auth-terms__link:active { opacity: 0.72; }
 
 .auth-nav { display: flex; align-items: center; justify-content: space-between; width: min(100%, 520PX); box-sizing: border-box; margin: 0 auto; padding: 18PX 24PX 2PX; }
 .auth-nav__back { display: flex; align-items: center; gap: 7PX; min-height: 44PX; color: $color-text-secondary; font-size: 14PX; }
@@ -106,7 +107,7 @@
 .auth-phone-input__country Text:last-child { color: $color-neutral-gray; }
 .auth-phone-input__control { display: flex; flex: 1; align-items: center; box-sizing: border-box; min-width: 0; height: 48PX; padding: 0 16PX 0 12PX; border: 0; background: transparent; color: $color-dark-forest; font-size: 16PX; line-height: 48PX; }
 .auth-phone-input__control::placeholder { color: rgba(114, 121, 114, 0.72); }
-.auth-phone-input__control input { box-sizing: border-box; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; line-height: 48PX; }
+.auth-phone-input__control .weui-input { box-sizing: border-box; width: 100%; height: 46PX; min-height: 0; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; line-height: 46PX; }
 .auth-password { position: relative; }
 .auth-password__input { padding-right: 64PX; }
 .auth-password__toggle { position: absolute; top: 0; right: 16PX; display: flex; align-items: center; height: 48PX; color: $color-neutral-gray; font-size: 13PX; }
@@ -123,7 +124,7 @@
 
 .auth-otp { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8PX; margin: 4PX 0; }
 .auth-otp__cell { display: flex; align-items: center; justify-content: center; width: 100%; height: 48PX; box-sizing: border-box; padding: 0; border: 1PX solid rgba(22, 52, 34, 0.16); border-radius: 14PX; background: rgba(255, 255, 255, 0.78); color: $color-dark-forest; font-size: 22PX; line-height: 48PX; text-align: center; }
-.android-auth-page .auth-otp__cell input { box-sizing: border-box; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; line-height: 48PX; text-align: center; }
+.android-auth-page .auth-otp__cell .weui-input { box-sizing: border-box; width: 100%; height: 46PX; min-height: 0; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; line-height: 46PX; text-align: center; }
 .auth-country-trigger { display: flex; align-items: center; justify-content: space-between; padding: 0 16PX; }
 .auth-country-trigger Text:last-child { color: $color-neutral-gray; }
 .auth-form__links { display: flex; justify-content: space-between; gap: 16PX; color: $color-text-secondary; font-size: 13PX; line-height: 1.4; }
@@ -181,9 +182,11 @@
   .auth-methods__indicator, .android-auth-page .app-button { transition: none; }
 }
 
-/* Taro renders a host and an inner input; center the inner single-line control. */
-.android-auth-page .auth-field__input { display: flex; align-items: center; height: 48PX; min-height: 48PX; border-radius: 12PX; }
-.android-auth-page .auth-field__input input { box-sizing: border-box; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; font: inherit; line-height: normal; }
+/* Taro rewrites input tag selectors; target the inner H5 class directly. */
+.android-auth-page .auth-field__input,
+.account-binding .auth-field__input { display: flex; align-items: center; height: 48PX; min-height: 48PX; border-radius: 12PX; }
+.android-auth-page .auth-field__input .weui-input,
+.account-binding .auth-field__input .weui-input { box-sizing: border-box; width: 100%; height: 46PX; min-height: 0; margin: 0; padding: 0; font: inherit; line-height: 46PX; }
 .auth-captcha__placeholder { font-size: 12PX; color: $color-text-secondary; }
 .auth-button-content { display: flex; align-items: center; justify-content: center; position: relative; gap: 8PX; width: 100%; min-height: 22PX; }
 .auth-provider-content { display: flex; align-items: center; justify-content: center; gap: 4PX; width: 100%; min-height: 22PX; }

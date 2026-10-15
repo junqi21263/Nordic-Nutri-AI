@@ -6,7 +6,7 @@ const USER_ID = "11111111-2222-4333-8444-555555555555";
 
 function makeDb() {
   const rows = {
-    app_users: [{ id: USER_ID, status: "active", registration_channel: "google", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-15T00:00:00Z" }],
+    app_users: [{ id: USER_ID, status: "active", registration_channel: "google", created_platform: "android_app", email_normalized: "google@example.com", email_login_enabled: true, phone_e164: "+8613800000000", password_hash: "secret-hash", google_sub: "google-sub", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-15T00:00:00Z" }],
     profiles: [{ id: USER_ID, nickname: "北欧用户", last_login_at: "2026-08-15T10:00:00Z", onboarding_completed_at: "2026-08-01T01:00:00Z" }],
     meal_records: [{ id: "meal-1", user_id: USER_ID, recorded_at: "2026-08-15T09:00:00Z", deleted_at: null }],
     ai_analysis: [{ id: "analysis-1", user_id: USER_ID, client_request_id: "req-1", status: "succeeded", provider: "qwen", created_at: "2026-08-15T09:01:00Z" }],
@@ -62,6 +62,8 @@ test("returns bounded user summaries and a redacted operational timeline", async
   const detail = await service.getUserDetail("operator", USER_ID);
   assert.equal(detail.id, USER_ID);
   assert.equal(detail.profile.registrationChannel, "google");
+  assert.deepEqual(detail.profile.loginMethods, ["email", "phone", "google"]);
+  assert.equal("passwordHash" in detail.profile, false);
   assert.equal(detail.overview.mealsCount, 1);
   assert.equal(detail.aiUsage.visionCount, 1);
   assert.equal(detail.images.count, 1);

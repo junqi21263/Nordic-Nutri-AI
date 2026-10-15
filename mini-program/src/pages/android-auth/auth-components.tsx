@@ -78,7 +78,7 @@ export function PhoneInput({ value, onChange }: { value: string; onChange: (valu
         <Input
           className="auth-phone-input__control"
           value={value}
-          placeholder={t("androidAuth.phonePlaceholder")}
+          placeholder="13xxxxxxxxx"
           type="number"
           maxlength={11}
           onInput={(event) => onChange(event.detail?.value ?? "")}

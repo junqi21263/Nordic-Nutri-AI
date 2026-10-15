@@ -271,6 +271,7 @@ export default function ProfilePage() {
       variant: "error",
       title: t("profile.logoutQuestion"),
       description: t("profile.logoutWarning"),
+      preserveDescriptionLineBreaks: true,
       primaryText: t("profile.logout"),
       secondaryText: t("common.cancel"),
       onPrimary: performLogout,
@@ -406,6 +407,14 @@ export default function ProfilePage() {
 
         </>}
         <View className="profile-rhythm__entry-sections">
+          {isAndroidApp ? <View className="profile-rhythm__settings-section">
+            <Text className="profile-rhythm__settings-label">{t("accountBinding.title")}</Text>
+            <View className="profile-rhythm__settings-group">
+              <View onClick={() => openPage("/pages/account-binding/index")}>
+                <ListItem icon={<NordicIcon name="shield-check" size={20} ariaLabel={t("accountBinding.title")} />} title={t("accountBinding.title")} description={t("accountBinding.description")} trailing="›" />
+              </View>
+            </View>
+          </View> : null}
           <View className="profile-rhythm__settings-section">
             <Text className="profile-rhythm__settings-label">{t("profile.foodManagement")}</Text>
             <View className="profile-rhythm__settings-group">
@@ -459,6 +468,12 @@ export default function ProfilePage() {
                   icon={<NordicIcon name="shield-check" size={20} ariaLabel={t("profile.privacy")} />}
                   title={t("profile.privacy")}
                   description={t("profile.privacyDescription")}
+                />
+              </View>
+              <View onClick={() => openPage("/pages/terms-of-service/index")}>
+                <ListItem
+                  icon={<NordicIcon name="info" size={20} ariaLabel={t("termsOfServicePage.title")} />}
+                  title={t("termsOfServicePage.title")}
                 />
               </View>
               <LanguageSettings />

@@ -58,7 +58,7 @@ export function getProductAccount() {
 }
 
 export function cancelProductAccount(clientRequestId = createClientRequestId()) {
-  return requestProductApi<{ deleted: boolean }>("/account/cancel", {
+  return requestProductApi<{ deleted: boolean; requested: boolean; status: "pending" | "processing" | "retry" }>("/account/cancel", {
     method: "POST",
     data: {
       confirmation: "DELETE_MY_NORDIC_NUTRI_ACCOUNT",
