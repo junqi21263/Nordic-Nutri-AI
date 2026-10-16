@@ -3,7 +3,7 @@ import type { NativeAppInfo } from "./types";
 type NativeUpdateBridge = {
   getInfo: () => string;
   openMarket: (url: string) => boolean;
-  downloadAndInstall: (url: string, sha256: string) => boolean;
+  downloadAndInstall: (url: string, sha256: string, versionCode: number, versionName: string) => boolean;
 };
 
 function bridge() {
@@ -26,6 +26,6 @@ export function openNativeMarket(url: string) {
   return bridge()?.openMarket(url) === true;
 }
 
-export function installVerifiedApk(url: string, sha256: string) {
-  return bridge()?.downloadAndInstall(url, sha256) === true;
+export function installVerifiedApk(url: string, sha256: string, versionCode: number, versionName: string) {
+  return bridge()?.downloadAndInstall(url, sha256, versionCode, versionName) === true;
 }

@@ -20,7 +20,7 @@ export function AppUpdateDialog() {
             : "";
   const download = () => {
     if (!release.apkUrl || !release.apkSha256) return;
-    if (installVerifiedApk(release.apkUrl, release.apkSha256)) setProgress("downloading", 0);
+    if (installVerifiedApk(release.apkUrl, release.apkSha256, release.versionCode, release.versionName)) setProgress("downloading", 0);
     else setProgress("failed", 0);
   };
   return (

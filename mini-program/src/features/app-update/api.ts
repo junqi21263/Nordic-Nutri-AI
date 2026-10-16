@@ -6,7 +6,7 @@ export async function fetchLatestAndroidRelease(channel: AppUpdateChannel): Prom
   const response = await productTransport<AppVersionResponse>({
     url: `${productApiEndpoint}/app/version?channel=${channel}`,
     method: "GET",
-    header: { "cache-control": "no-cache" },
+    header: { "cache-control": "no-store, no-cache", pragma: "no-cache" },
     timeout: 10_000,
     enableCache: false,
   });

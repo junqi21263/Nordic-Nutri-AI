@@ -99,17 +99,20 @@ final class AppUpdateBridge {
     }
 
     @JavascriptInterface
-    public boolean downloadAndInstall(String apkUrl, String expectedSha256) {
-        if (!isSafeApkUrl(apkUrl) || !isSha256(expectedSha256) || !downloading.compareAndSet(false, true)) return false;
+    public boolean downloadAndInstall(String apkUrl, String expectedSha256, long expectedVersionCode, String expectedVersionName) {
+        if (!isSafeApkUrl(apkUrl) || !isSha256(expectedSha256) || expectedVersionCode < 1
+                || expectedVersionName == null || expectedVersionName.trim().isEmpty()
+                || !downloading.compareAndSet(false, true)) return false;
         new Thread(() -> {
             File target = null;
             try {
                 emit("downloading", 0, "");
                 File directory = new File(activity.getCacheDir(), "app-updates");
                 if (!directory.exists() && !directory.mkdirs()) throw new IllegalStateException("update directory unavailable");
-                target = new File(directory, "update.apk");
+                target = new File(directory, "update-" + expectedVersionCode + "-" + expectedSha256.substring(0, 12) + ".apk");
                 download(apkUrl, target);
                 if (!expectedSha256.equals(sha256(target))) throw new SecurityException("sha256 mismatch");
+                verifyApkVersion(target, expectedVersionCode, expectedVersionName);
                 emit("verified", 100, "");
                 install(target);
             } catch (Exception error) {
@@ -122,11 +125,28 @@ final class AppUpdateBridge {
         return true;
     }
 
+    private void verifyApkVersion(File apk, long expectedVersionCode, String expectedVersionName) {
+        PackageInfo info = activity.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), 0);
+        if (info == null) throw new SecurityException("invalid apk");
+        long actualVersionCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? info.getLongVersionCode()
+                : info.versionCode;
+        String actualVersionName = info.versionName == null ? "" : info.versionName;
+        if (!activity.getPackageName().equals(info.packageName)
+                || actualVersionCode != expectedVersionCode
+                || !expectedVersionName.equals(actualVersionName)) {
+            throw new SecurityException("apk metadata does not match release metadata");
+        }
+    }
+
     private void download(String source, File target) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(source).openConnection();
+        connection.setUseCaches(false);
         connection.setConnectTimeout(15_000);
         connection.setReadTimeout(30_000);
         connection.setRequestProperty("Accept", "application/vnd.android.package-archive");
+        connection.setRequestProperty("Cache-Control", "no-cache, no-store");
+        connection.setRequestProperty("Pragma", "no-cache");
         connection.connect();
         if (connection.getResponseCode() < 200 || connection.getResponseCode() >= 300) throw new IllegalStateException("download status");
         long total = connection.getContentLengthLong();
