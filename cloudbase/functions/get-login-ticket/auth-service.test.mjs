@@ -8,6 +8,15 @@ function createRepo(clock = () => 1_700_000_000_000) {
     users: [],
     verification: [],
     refreshSessions: [],
+    loginAttempts: new Map(),
+    async consumeLoginAttempt(key, limit) {
+      const entry = this.loginAttempts.get(key);
+      if (entry && clock() - entry.startedAt < 15 * 60 * 1000 && entry.count >= limit) return false;
+      if (!entry || clock() - entry.startedAt >= 15 * 60 * 1000) this.loginAttempts.set(key, { count: 1, startedAt: clock() });
+      else entry.count += 1;
+      return true;
+    },
+    async clearLoginAttempt(key) { this.loginAttempts.delete(key); },
     async insertVerification(row) { const created = { id: `verification-${this.verification.length + 1}`, ...row }; this.verification.push(created); return created; },
     async updateVerification(id, patch) { const row = this.verification.find((item) => item.id === id); if (row) Object.assign(row, patch); },
     async invalidateVerification({ target, targetType, purpose }) {
@@ -65,6 +74,15 @@ function createRateLimitRepo(clock) {
   return {
     users: [],
     verification,
+    loginAttempts: new Map(),
+    async consumeLoginAttempt(key, limit) {
+      const entry = this.loginAttempts.get(key);
+      if (entry && clock() - entry.startedAt < 15 * 60 * 1000 && entry.count >= limit) return false;
+      if (!entry || clock() - entry.startedAt >= 15 * 60 * 1000) this.loginAttempts.set(key, { count: 1, startedAt: clock() });
+      else entry.count += 1;
+      return true;
+    },
+    async clearLoginAttempt(key) { this.loginAttempts.delete(key); },
     async insertVerification(row) {
       const created = { id: `verification-${verification.length + 1}`, ...row };
       verification.push(created);
@@ -315,6 +333,17 @@ test("rate-limits repeated Email login failures by email and IP", async () => {
     () => service.loginEmail({ email: "user@example.com", password: "wrong", ip: "127.0.0.1" }),
     (error) => error.code === "AUTH_RATE_LIMITED",
   );
+});
+
+test("password login shares its rate limit across service instances and fails closed on store errors", async () => {
+  const repo = createRepo();
+  repo.users.push({ id: "user-1", email_normalized: "user@example.com", password_hash: "argon2id:correct", status: "active", token_version: 1 });
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await assert.rejects(() => createService(repo).loginEmail({ email: "user@example.com", password: "wrong", ip: "127.0.0.1" }), { code: "AUTH_INVALID_CREDENTIALS" });
+  }
+  await assert.rejects(() => createService(repo).loginEmail({ email: "user@example.com", password: "wrong", ip: "127.0.0.1" }), { code: "AUTH_RATE_LIMITED" });
+  repo.consumeLoginAttempt = async () => { throw new Error("database unavailable"); };
+  await assert.rejects(() => createService(repo).loginEmail({ email: "user@example.com", password: "correct", ip: "127.0.0.1" }), { code: "AUTH_UNAVAILABLE" });
 });
 
 test("password reset changes the password and increments token_version", async () => {

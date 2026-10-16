@@ -109,7 +109,9 @@ test("creates a meal and items under the authenticated product user", async () =
 
   const meal = await service.createMeal("user-1", validMeal);
 
-  assert.equal(meal.userId, "user-1");
+  assert.equal(Object.hasOwn(meal, "userId"), false);
+  assert.equal(Object.hasOwn(meal, "analysisId"), false);
+  assert.equal(Object.hasOwn(meal, "clientRequestId"), false);
   assert.equal(meal.items[0].name, "鸡胸肉");
   assert.deepEqual(calls.map((call) => call.table), ["meal_records", "meal_items"]);
   assert.equal(calls[0].payload.user_id, "user-1");

@@ -125,13 +125,13 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
       if (existing.error) throw new Error("Profile lookup failed");
       if (existing.data?.id) {
         record({ table: "profiles", operation: "update", userId });
-        result = await table.update({ nickname }).eq("id", userId).select().single();
+        result = await table.update({ nickname }).eq("id", userId).select("id,nickname").single();
       } else {
         record({ table: "profiles", operation: "insert", userId });
-        result = await table.insert({ id: userId, nickname }).select().single();
+        result = await table.insert({ id: userId, nickname }).select("id,nickname").single();
       }
       if (result.error || !result.data) throw new Error("Profile save failed");
-      return result.data;
+      return { id: result.data.id, nickname: result.data.nickname };
     },
 
     async saveAvatarPath(userId, avatarPath) {
@@ -164,9 +164,9 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
         user_id: userId, age: input.age, birth_date: input.birthDate ?? null, sex: input.sex,
         height_cm: input.heightCm, weight_kg: input.weightKg, activity_level: input.activityLevel,
         training_days_per_week: input.trainingDays, is_current: true,
-      }).select().single();
+      }).select("id").single();
       if (result.error || !result.data) throw new Error("Body profile save failed");
-      return result.data;
+      return { id: result.data.id };
     },
 
     async saveGoal(userId, input) {
@@ -179,9 +179,9 @@ function createProductDataService({ db, record = () => {}, resolveAvatarUrl = as
       const result = await table.insert({
         user_id: userId, goal_type: input.goalType, target_weight_kg: input.targetWeightKg,
         target_calories_kcal: input.targetCaloriesKcal, target_date: input.targetDate, is_current: true,
-      }).select().single();
+      }).select("id").single();
       if (result.error || !result.data) throw new Error("Goal save failed");
-      return result.data;
+      return { id: result.data.id };
     },
 
     async saveOnboarding(userId, input) {

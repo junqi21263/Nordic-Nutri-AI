@@ -8,14 +8,14 @@ test("writes a profile for the authenticated business user only", async () => {
   const db = {
     from: (table) => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "user-1" }, error: null }) }) }),
-      update: (payload) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: { id: "user-1", ...payload }, error: null }) }) }) }),
+      update: (payload) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: { id: "user-1", ...payload, internal_marker: "must-not-leak" }, error: null }) }) }) }),
     }),
   };
   const service = createProductDataService({ db, record: (call) => calls.push(call) });
 
   const result = await service.saveProfile("user-1", { nickname: "Lewis" });
 
-  assert.equal(result.nickname, "Lewis");
+  assert.deepEqual(result, { id: "user-1", nickname: "Lewis" });
   assert.deepEqual(calls, [{ table: "profiles", operation: "update", userId: "user-1" }]);
 });
 
@@ -40,7 +40,7 @@ test("versions a body profile instead of trusting a caller-supplied user ID", as
   const db = {
     from: (table) => ({
       update: (payload) => ({ eq: () => ({ eq: () => ({ then: (resolve) => resolve({ error: null }), payload }) }) }),
-      insert: (payload) => ({ select: () => ({ single: async () => ({ data: { id: "body-1", ...payload }, error: null }) }) }),
+      insert: (payload) => ({ select: () => ({ single: async () => ({ data: { id: "body-1", ...payload, internal_marker: "must-not-leak" }, error: null }) }) }),
     }),
   };
   const service = createProductDataService({ db, record: (call) => calls.push(call) });
@@ -49,7 +49,7 @@ test("versions a body profile instead of trusting a caller-supplied user ID", as
     age: 28, sex: "male", heightCm: 175, weightKg: 70, activityLevel: "moderate", trainingDays: 4,
   });
 
-  assert.equal(result.user_id, "user-1");
+  assert.deepEqual(result, { id: "body-1" });
   assert.deepEqual(calls, [
     { table: "body_profiles", operation: "clear-current", userId: "user-1" },
     { table: "body_profiles", operation: "insert-current", userId: "user-1" },
@@ -61,7 +61,7 @@ test("versions a health goal and persists its daily calorie target for the authe
   const db = {
     from: () => ({
       update: () => ({ eq: () => ({ eq: () => ({ then: (resolve) => resolve({ error: null }) }) }) }),
-      insert: (payload) => ({ select: () => ({ single: async () => ({ data: { id: "goal-1", ...payload }, error: null }) }) }),
+      insert: (payload) => ({ select: () => ({ single: async () => ({ data: { id: "goal-1", ...payload, internal_marker: "must-not-leak" }, error: null }) }) }),
     }),
   };
   const service = createProductDataService({ db, record: (call) => calls.push(call) });
@@ -70,9 +70,7 @@ test("versions a health goal and persists its daily calorie target for the authe
     goalType: "maintain", targetWeightKg: 68, targetCaloriesKcal: 2200, targetDate: null,
   });
 
-  assert.equal(result.user_id, "user-1");
-  assert.equal(result.goal_type, "maintain");
-  assert.equal(result.target_calories_kcal, 2200);
+  assert.deepEqual(result, { id: "goal-1" });
   assert.deepEqual(calls, [
     { table: "user_goals", operation: "clear-current", userId: "user-1" },
     { table: "user_goals", operation: "insert-current", userId: "user-1" },

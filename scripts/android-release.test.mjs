@@ -103,7 +103,7 @@ test("writes versioned same-origin metadata only for verified APK attributes", (
 });
 
 test("rejects APKs with a different package, app version, signer, or unsupported size", () => {
-  const apk = { packageId: "com.lewislee.nordicnutri", versionName: "1.1.10", versionCode: "12", signerSha1: "9a31a756352c92f000b567e29df5a4e6dae7e1ee", fileSize: 1024 };
+  const apk = { packageId: "com.lewislee.nordicnutri", ...readReleaseVersion(), signerSha1: "9a31a756352c92f000b567e29df5a4e6dae7e1ee", fileSize: 1024 };
   assert.equal(assertReleaseApk(apk), true);
   assert.throws(() => assertReleaseApk({ ...apk, packageId: "other.app" }), /release target/i);
   assert.throws(() => assertReleaseApk({ ...apk, signerSha1: "0".repeat(40) }), /release target/i);

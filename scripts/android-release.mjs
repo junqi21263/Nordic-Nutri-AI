@@ -140,11 +140,12 @@ function verifyApk(apkPath) {
 export function buildRelease({ profilePath = process.env.NORDIC_SIGNING_PROFILE || join(projectRoot, "android/signing.local.json") } = {}) {
   assertNodeRuntime();
   const branch = capture("git", ["branch", "--show-current"], { cwd: androidRoot, label: "Release source branch" }).trim();
-  if (branch !== "Android-prod") throw new Error("Release source must be the Android-prod branch");
+  const commit = capture("git", ["rev-parse", "HEAD"], { cwd: androidRoot, label: "Release source commit" }).trim();
+  const prodCommit = capture("git", ["rev-parse", "origin/Android-prod"], { cwd: androidRoot, label: "Android-prod source commit" }).trim();
+  if (commit !== prodCommit) throw new Error(`Release source must match the pushed Android-prod commit (current branch: ${branch})`);
   if (capture("git", ["status", "--porcelain"], { cwd: androidRoot, label: "Release source status" }).trim()) {
     throw new Error("Release source must be committed before packaging");
   }
-  capture("git", ["rev-parse", "HEAD"], { cwd: androidRoot, label: "Release source commit" });
   if (!existsSync(resolveAndroidSdkRoot())) throw new Error("Android SDK is unavailable; configure ANDROID_HOME or ANDROID_SDK_ROOT");
   const profile = loadSigningProfile(profilePath);
   const signing = createSigningEnvironment(profile);

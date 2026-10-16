@@ -134,6 +134,21 @@ function createAuthRepository(db) {
     async findUserById(id) {
       return readUser(db.from("app_users").select(userFields).eq("id", id));
     },
+    async consumeLoginAttempt(attemptKey, limit) {
+      const result = await db.rpc("consume_auth_login_attempt", {
+        p_attempt_key: attemptKey,
+        p_limit: limit,
+        p_window_seconds: 900,
+      });
+      if (result?.error) throw new Error("Login rate limit unavailable");
+      const record = Array.isArray(result?.data) ? result.data[0] : result?.data;
+      if (typeof record?.allowed !== "boolean") throw new Error("Login rate limit unavailable");
+      return record.allowed;
+    },
+    async clearLoginAttempt(attemptKey) {
+      const result = await db.rpc("clear_auth_login_attempt", { p_attempt_key: attemptKey });
+      if (result?.error) throw new Error("Login rate limit cleanup failed");
+    },
     async insertUser(fields) {
       const result = await db.from("app_users").insert(fields).select(userFields).single();
       if (result.error || !result.data) {
@@ -360,40 +375,32 @@ function createAuthService({
 } = {}) {
   if (!repo) throw new Error("Auth repository is unavailable");
   if (!authHmacSecret || !sessionSecret) throw new Error("Auth secrets are unavailable");
-  // ponytail: process-local login limiter; use a shared store only if abuse or scale requires it.
-  const loginFailures = new Map();
-  const LOGIN_FAILURE_WINDOW_MS = 15 * 60 * 1000;
-  const LOGIN_FAILURE_LIMIT = 5;
-
   function loginRateKeys(email, ip) {
-    return [`email:${email}`, `ip:${typeof ip === "string" && ip.trim() ? ip.trim() : "unknown"}`];
+    return [
+      { key: hashAuthValue(`email:${email}`, authHmacSecret, "login-attempt"), limit: 5 },
+      { key: hashAuthValue(`ip:${typeof ip === "string" && ip.trim() ? ip.trim() : "unknown"}`, authHmacSecret, "login-attempt"), limit: 20 },
+    ];
   }
 
-  function assertLoginRateAllowed(keys) {
-    const timestamp = now();
-    for (const key of keys) {
-      const entry = loginFailures.get(key);
-      if (entry && timestamp - entry.firstAttemptAt < LOGIN_FAILURE_WINDOW_MS && entry.count >= LOGIN_FAILURE_LIMIT) {
-        throw new AuthError("AUTH_RATE_LIMITED", "操作过于频繁，请稍后重试");
+  async function assertLoginRateAllowed(keys) {
+    try {
+      for (const { key, limit } of keys) {
+        if (!await repo.consumeLoginAttempt(key, limit)) {
+          throw new AuthError("AUTH_RATE_LIMITED", "操作过于频繁，请稍后重试");
+        }
       }
-      if (entry && timestamp - entry.firstAttemptAt >= LOGIN_FAILURE_WINDOW_MS) loginFailures.delete(key);
+    } catch (error) {
+      if (error instanceof AuthError) throw error;
+      throw new AuthError("AUTH_UNAVAILABLE", "登录服务暂时不可用");
     }
   }
 
-  function recordLoginFailure(keys) {
-    const timestamp = now();
-    for (const key of keys) {
-      const entry = loginFailures.get(key);
-      if (!entry || timestamp - entry.firstAttemptAt >= LOGIN_FAILURE_WINDOW_MS) {
-        loginFailures.set(key, { count: 1, firstAttemptAt: timestamp });
-      } else {
-        entry.count += 1;
-      }
+  async function clearLoginFailures(keys) {
+    try {
+      for (const { key } of keys) await repo.clearLoginAttempt(key);
+    } catch {
+      throw new AuthError("AUTH_UNAVAILABLE", "登录服务暂时不可用");
     }
-  }
-
-  function clearLoginFailures(keys) {
-    for (const key of keys) loginFailures.delete(key);
   }
 
   const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -603,28 +610,26 @@ function createAuthService({
   async function loginEmail(input) {
     const normalized = normalizeEmail(input.email);
     const rateKeys = loginRateKeys(normalized, input.ip);
-    assertLoginRateAllowed(rateKeys);
+    await assertLoginRateAllowed(rateKeys);
     const user = await repo.findUserByEmail(normalized);
     const valid = await verifyPassword(input.password, user?.password_hash ?? null);
     if (!user || user.status !== "active" || user.email_login_enabled === false || !valid) {
-      recordLoginFailure(rateKeys);
       throw new AuthError("AUTH_INVALID_CREDENTIALS", "账号或密码错误");
     }
-    clearLoginFailures(rateKeys);
+    await clearLoginFailures(rateKeys);
     return issueSession(user);
   }
 
   async function loginPhone(input) {
     const normalized = normalizePhone(input.phone);
     const rateKeys = loginRateKeys(normalized, input.ip);
-    assertLoginRateAllowed(rateKeys);
+    await assertLoginRateAllowed(rateKeys);
     const user = await repo.findUserByPhone(normalized);
     const valid = await verifyPassword(input.password, user?.password_hash ?? null);
     if (!user || user.status !== "active" || !valid) {
-      recordLoginFailure(rateKeys);
       throw new AuthError("AUTH_INVALID_CREDENTIALS", "账号或密码错误");
     }
-    clearLoginFailures(rateKeys);
+    await clearLoginFailures(rateKeys);
     return issueSession(user);
   }
 

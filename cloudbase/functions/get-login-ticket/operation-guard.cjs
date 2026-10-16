@@ -25,49 +25,6 @@ function createOperationGuard({ db }) {
     return normalizeQuotaRecord(result);
   }
 
-  async function upsertRateLimitWindow(userId, operation, { limit, windowSeconds }) {
-    const startedAt = windowStartedAt(windowSeconds);
-    const existing = await db
-      .from("rate_limit_windows")
-      .select("request_count")
-      .eq("user_id", userId)
-      .eq("operation", operation)
-      .eq("window_started_at", startedAt)
-      .maybeSingle();
-    if (existing?.error) throw new Error("Rate limit read failed");
-
-    const current = Number(existing?.data?.request_count ?? 0);
-    if (current >= limit) {
-      return { allowed: false, usedCount: current };
-    }
-
-    if (existing?.data) {
-      const updated = await db
-        .from("rate_limit_windows")
-        .update({ request_count: current + 1, updated_at: new Date().toISOString() })
-        .eq("user_id", userId)
-        .eq("operation", operation)
-        .eq("window_started_at", startedAt)
-        .select("request_count")
-        .single();
-      if (updated?.error) throw new Error("Rate limit update failed");
-      return { allowed: true, usedCount: Number(updated.data?.request_count ?? current + 1) };
-    }
-
-    const inserted = await db
-      .from("rate_limit_windows")
-      .insert({
-        user_id: userId,
-        operation,
-        window_started_at: startedAt,
-        request_count: 1,
-      })
-      .select("request_count")
-      .single();
-    if (inserted?.error) throw new Error("Rate limit insert failed");
-    return { allowed: true, usedCount: Number(inserted.data?.request_count ?? 1) };
-  }
-
   async function readRateLimitUsage(userId, operation, windowSeconds) {
     const rpcRecord = await callRpc("get_rate_limit_window_usage", {
       p_user_id: userId,
@@ -94,14 +51,14 @@ function createOperationGuard({ db }) {
       p_operation: operation,
       p_limit: limit,
       p_window_seconds: windowSeconds,
-    }).catch(() => null);
-    if (rpcRecord) {
-      return {
-        allowed: Boolean(rpcRecord.allowed),
-        usedCount: Number(rpcRecord.used_count ?? rpcRecord.usedCount ?? 0),
-      };
+    });
+    if (!rpcRecord || typeof rpcRecord.allowed !== "boolean") {
+      throw new Error("Atomic rate limit service is unavailable");
     }
-    return upsertRateLimitWindow(userId, operation, { limit, windowSeconds });
+    return {
+      allowed: rpcRecord.allowed,
+      usedCount: Number(rpcRecord.used_count ?? rpcRecord.usedCount ?? 0),
+    };
   }
 
   async function call(name, input) {

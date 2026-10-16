@@ -103,9 +103,6 @@ function mapItem(row, imageUrl = null) {
 function mapMeal(row, itemRows, imageByFoodId = new Map()) {
   return {
     id: row.id,
-    userId: row.user_id,
-    analysisId: row.analysis_id ?? null,
-    clientRequestId: row.client_request_id ?? null,
     mealType: row.meal_type,
     name: row.name,
     recordedAt: row.recorded_at,
