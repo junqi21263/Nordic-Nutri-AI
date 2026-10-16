@@ -6,7 +6,7 @@
 
 1. 开始下一轮开发前，先把上一轮 Prod 的代码修正回流到 Dev 基线，再在 `Android-dev` 完成开发和 Dev 真机验收。提交本次要发布的改动；不要把未提交文件、日志、APK、密钥或 `google-services.json` 的 release 副本带入发布提交。
 2. 记录 Dev 验收的提交 SHA、功能范围、相关迁移文件与版本、函数名单、变量名称、当前 APK `versionCode` 和回滚提交。检查 `git status --short`、`git diff --check`、与远端的分叉及待合并提交。
-3. 将经过验收的 Dev 提交合入发布分支。发布分支可以是 `release/YYYY-MM-DD-<name>`；现有 Android 发布工作区使用 `Android-prod`，它跟踪 `origin/release/2026-10-09-android-prod`。确认发布分支包含 Dev 提交，也保留已有 Prod 修正。若合并时产生代码修复，应先将修复回流 Dev 并重新验收新的发布提交，避免把未在 Dev 验收的组合直接部署 Prod。
+3. 将经过验收的 Dev 提交合入正式 `Android-prod` 分支，并确认它跟踪 `origin/Android-prod`。临时集成分支仅在本地使用，完成后删除，不作为远端长期分支。确认发布分支包含 Dev 提交，也保留已有 Prod 修正。若合并时产生代码修复，应先将修复回流 Dev 并重新验收新的发布提交，避免把未在 Dev 验收的组合直接部署 Prod。
 4. 仅从干净、已提交的发布提交构建和部署。任何发布后修正都要形成新提交并更新发布记录，不要让 APK 与云函数对应不同的未记录源码。
 
 ## 2. Dev 验收与数据库迁移
@@ -27,7 +27,7 @@ GitHub Actions 的 `Android release checks` 只核对分支/函数配置契约�
 ## 4. 构建 Prod APK
 
 1. 将 `android/app/build.gradle` 的 `versionCode` 调高到高于所有已发布版本，按需要更新 `versionName`。确认 `.env.production` 的 API Base URL、Google Server Client ID、正式插画 CDN 和登录开关指向 Prod；不要把服务端密钥放进前端环境文件。
-2. 在本机配置 Prod 签名所需的 `NORDIC_PROD_KEYSTORE_PATH`、`NORDIC_PROD_KEYSTORE_PASSWORD`、`NORDIC_PROD_KEY_ALIAS`、`NORDIC_PROD_KEY_PASSWORD`。密码只在本机隐藏输入或安全密钥管理器中保存，不能写进命令行参数、Git 或聊天。
+2. 将非秘密签名元数据写入被 Git 忽略的 `android/signing.local.json`，密码从本机 Keychain 读取。密码不能写进命令行参数、Git 或聊天。使用项目要求的 Node 24.18.x 和 `node scripts/android-release.mjs` 从干净的 `Android-prod` 提交构建、验签并同步官网 APK/版本元数据。
 3. 在 `android/app/src/release/google-services.json` 放入包含 `com.lewislee.nordicnutri` 的 Firebase 配置，并确认该 Android 应用登记了 Prod 签名证书 SHA-1/SHA-256。此文件被 Git 忽略；新工作区需重新安全配置。仓库根目录下的 `android/app/google-services.json` 当前仅含 Dev 包名，不可代替 release 文件。
 4. 从仓库根目录依次运行：
 
@@ -38,6 +38,7 @@ GitHub Actions 的 `Android release checks` 只核对分支/函数配置契约�
    ```
 
 5. 用 Android SDK `apksigner verify --print-certs` 核对 APK 签名证书、`aapt dump badging` 核对包名和版本，并计算 `shasum -a 256`。检查包内 Prod API 地址与原生 `push_receipt_api_base_url`，记录 APK 路径、SHA-256、源码提交、构建时间和回滚 APK。不要只根据 `BUILD SUCCESSFUL` 判断配置正确。
+6. 给实际签名 APK 对应的源码提交打 `android-v<versionName>` 标签并推送；后续文档或脚本提交不得代替这个回溯点。官网发布和 CloudBase 版本登记分别核对相同的 APK SHA-256。
 
 ## 5. 安装、发布与回滚
 

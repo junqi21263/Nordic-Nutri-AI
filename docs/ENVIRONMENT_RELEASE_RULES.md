@@ -4,10 +4,11 @@
 
 | Git 分支 | CloudBase 环境 | 用途 | 数据边界 |
 |---|---|---|---|
-| `develop` / `feature/*` / `Android-dev` | `test-dev-d4gyxnn0b5dfa2c8a` | 开发、联调、验收 | 只允许测试账号、测试数据、测试 Storage |
-| `main` / `release/*` / `Android-prod` | `lewis-healthy-d4glgqqzv73a5bc10` | 生产发布 | 真实用户、真实数据、生产 Storage |
+| `develop` / `Android-dev` | `test-dev-d4gyxnn0b5dfa2c8a` | 开发、联调、验收 | 只允许测试账号、测试数据、测试 Storage |
+| `main` / `Android-prod` | `lewis-healthy-d4glgqqzv73a5bc10` | 生产发布 | 真实用户、真实数据、生产 Storage |
 
 分支名和 CloudBase 环境必须同时确认。Git merge 只改变代码，不会自动部署任何 CloudBase 环境。
+GitHub 长期分支仅保留 `main`、`develop`、`Android-dev`、`Android-prod`。功能或发布集成分支可以在本地短暂使用，完成后合回相应长期分支并删除。已签名 Android APK 的精确源码提交用 `android-v<versionName>` 标签固定；`main` 的后续管理提交不改变已发布 APK 的源码身份。
 
 仓库中的 `cloudbaserc.json` 保持生产 EnvId，供生产发布包和既有发布流程使用。部署云函数时，通过统一入口显式选择目标；脚本从该清单生成临时目标配置，不修改仓库清单：
 
@@ -44,12 +45,12 @@ pnpm deploy:cloudbase production get-login-ticket
 
 ## 4. 生产合并与发布规则
 
-以下是小程序主线的合并路径。Android 当前使用 `Android-dev` → `Android-prod` / `release/*`，具体步骤见 Android 发布清单；合并到 `main` 是单独的受控操作，不能由 APK 构建或云函数部署代替。
+以下是小程序主线的合并路径。Android 使用 `Android-dev` → `Android-prod`，具体步骤见 Android 发布清单；确认生产版本后将已发布提交同步到 `main`，再回流 Dev。合并代码不会自动构建 APK 或部署云函数。
 
 只有测试环境验收通过后，才允许：
 
 1. 将 `feature/*` 合并到 `develop`。
-2. 在 `develop` 创建 `release/YYYY-MM-DD-<name>`。
+2. 如需冻结发布范围，在本地创建短期发布集成分支，验收后删除。
 3. 冻结本次发布范围，记录代码提交号、数据库迁移、环境变量变化和回滚点。
 4. 将 release 分支合并到 `main`。
 5. 明确执行生产数据库迁移（如有）。
@@ -108,11 +109,11 @@ Android APK 的具体构建、签名、配置回读和真机验收顺序见 `doc
 ## 9. 当前项目的最短发布路径
 
 ```text
-feature/*
+本地功能分支
   → develop
   → 部署 test-dev
   → 测试账号/测试数据验收
-  → release 分支
+  → 本地短期发布集成分支（如需要）
   → main
   → 生产迁移与云函数
   → 生产专用 Smoke Test

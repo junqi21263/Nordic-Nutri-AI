@@ -8,7 +8,14 @@ import { fileURLToPath } from "node:url";
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const siteRoot = process.env.NORDIC_PUBLIC_SITE_DIR || join(projectRoot, "sites/nordic-public");
 const androidRoot = projectRoot;
-const expected = Object.freeze({ packageId: "com.lewislee.nordicnutri", versionName: "1.1.10", versionCode: "12", signerSha1: "9a31a756352c92f000b567e29df5a4e6dae7e1ee" });
+const expected = Object.freeze({ packageId: "com.lewislee.nordicnutri", signerSha1: "9a31a756352c92f000b567e29df5a4e6dae7e1ee" });
+
+export function readReleaseVersion(gradle = readFileSync(join(projectRoot, "android/app/build.gradle"), "utf8")) {
+  const versionCode = gradle.match(/^\s*versionCode\s+(\d+)\s*$/m)?.[1];
+  const versionName = gradle.match(/^\s*versionName\s+["'](\d+\.\d+\.\d+)["']\s*$/m)?.[1];
+  if (!versionCode || Number(versionCode) < 1 || !versionName) throw new Error("Android release version is missing or invalid in build.gradle");
+  return { versionCode, versionName };
+}
 
 export function assertNodeRuntime(version = process.versions.node) {
   const [major, minor] = version.split(".").map(Number);
@@ -88,8 +95,8 @@ export function formatReleaseModule({ versionName, fileSize, updated = new Date(
   return `// This version is signed with the production certificate and checked by the build.\nexport const release = Object.freeze({\n  url: "/downloads/${file}",\n  file: "${file}",\n  version: "v${versionName}",\n  size: "${size}",\n  updated: "${updated}",\n  sha256: "${sha256}"\n});\n`;
 }
 
-export function assertReleaseApk({ packageId, versionName, versionCode, signerSha1, fileSize }) {
-  if (packageId !== expected.packageId || versionName !== expected.versionName || String(versionCode) !== expected.versionCode || signerSha1?.replaceAll(":", "").toLowerCase() !== expected.signerSha1) {
+export function assertReleaseApk({ packageId, versionName, versionCode, signerSha1, fileSize }, releaseVersion = readReleaseVersion()) {
+  if (packageId !== expected.packageId || versionName !== releaseVersion.versionName || String(versionCode) !== releaseVersion.versionCode || signerSha1?.replaceAll(":", "").toLowerCase() !== expected.signerSha1) {
     throw new Error("APK package, version, or signer does not match the release target");
   }
   if (!Number.isSafeInteger(fileSize) || fileSize <= 0 || fileSize > 25 * 1024 * 1024) throw new Error("APK size is outside the supported range");
@@ -133,7 +140,7 @@ function verifyApk(apkPath) {
 export function buildRelease({ profilePath = process.env.NORDIC_SIGNING_PROFILE || join(projectRoot, "android/signing.local.json") } = {}) {
   assertNodeRuntime();
   const branch = capture("git", ["branch", "--show-current"], { cwd: androidRoot, label: "Release source branch" }).trim();
-  if (branch !== "codex/android-prod-1.1.10") throw new Error("Release source must be the reviewed production release branch");
+  if (branch !== "Android-prod") throw new Error("Release source must be the Android-prod branch");
   if (capture("git", ["status", "--porcelain"], { cwd: androidRoot, label: "Release source status" }).trim()) {
     throw new Error("Release source must be committed before packaging");
   }

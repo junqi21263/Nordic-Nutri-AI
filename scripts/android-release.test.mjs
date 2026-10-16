@@ -10,6 +10,7 @@ import {
   formatReleaseModule,
   loadSigningProfile,
   lookupKeychainPassword,
+  readReleaseVersion,
   resolveAndroidSdkRoot,
   redact
 } from "./android-release.mjs";
@@ -29,6 +30,11 @@ test("requires a local signing profile without displaying profile contents", asy
 test("requires Node.js 24.18.x for Android release builds", () => {
   assert.equal(assertNodeRuntime("24.18.0"), true);
   assert.throws(() => assertNodeRuntime("25.0.0"), /24\.18/);
+});
+
+test("reads the release version from Gradle and rejects missing version metadata", () => {
+  assert.deepEqual(readReleaseVersion('versionCode 13\nversionName "1.1.11"'), { versionCode: "13", versionName: "1.1.11" });
+  assert.throws(() => readReleaseVersion('versionCode 13'), /version.*build\.gradle/i);
 });
 
 test("resolves Android SDK from the configured variables or the standard macOS path", () => {
@@ -101,5 +107,6 @@ test("rejects APKs with a different package, app version, signer, or unsupported
   assert.equal(assertReleaseApk(apk), true);
   assert.throws(() => assertReleaseApk({ ...apk, packageId: "other.app" }), /release target/i);
   assert.throws(() => assertReleaseApk({ ...apk, signerSha1: "0".repeat(40) }), /release target/i);
+  assert.throws(() => assertReleaseApk({ ...apk, versionCode: "11" }), /release target/i);
   assert.throws(() => assertReleaseApk({ ...apk, fileSize: 26 * 1024 * 1024 }), /size/i);
 });
