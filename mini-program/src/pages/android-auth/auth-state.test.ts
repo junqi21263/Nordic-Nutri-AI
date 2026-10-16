@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { getAuthBackState, getAuthInputError, type AuthView } from "./auth-state";
+import { getAuthBackState, getAuthInputError, getForgotPasswordView, type AuthView } from "./auth-state";
 
 describe("Android auth navigation", () => {
+  it("routes password recovery to the selected sign-in method", () => {
+    expect(getForgotPasswordView("email")).toBe("forgot-email");
+    expect(getForgotPasswordView("phone")).toBe("forgot-phone");
+  });
+
   it("rejects malformed targets before a verification request", () => {
     for (const email of ["", "name.example.com", "name@example", "name＠example.com", "name @example.com"]) {
       expect(getAuthInputError("email", email, "captcha", "abcd")).toBe("androidAuth.validation.email");

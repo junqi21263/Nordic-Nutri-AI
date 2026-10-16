@@ -1253,8 +1253,10 @@
 }
 .coach-chat__hero-kicker {
   color: $color-forest-green;
+  flex: 0 0 auto;
   font-size: $font-h3;
   font-weight: $font-weight-semibold;
+  white-space: nowrap;
 }
 .coach-chat__progress-kicker {
   color: $color-forest-green;
@@ -8665,8 +8667,19 @@
   gap: $space-12;
   padding: $space-16 $space-16 calc(#{$space-24} + env(safe-area-inset-bottom));
 }
-.page-layout--privacy-policy .app-top-bar__btn {
+.app-safe-area.page-layout--privacy-policy {
+  padding-top: 0;
+}
+.page-layout--privacy-policy .privacy-policy-page {
+  padding-top: calc(env(safe-area-inset-top) + #{$space-16});
+}
+.privacy-policy-page__back {
+  align-items: center;
+  align-self: flex-start;
+  display: flex;
   height: 44px;
+  justify-content: center;
+  margin-left: -$space-8;
   width: 44px;
 }
 .privacy-policy-page__title {

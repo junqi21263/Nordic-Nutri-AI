@@ -2,6 +2,7 @@ import { Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useTranslation } from "react-i18next";
 import { PageLayout } from "../../layouts/page-layout";
+import { NordicIcon } from "../../components/nordic-icon";
 import { navigateBackOrHome } from "../../utils/navigation";
 
 export default function PrivacyPolicyPage() {
@@ -12,16 +13,22 @@ export default function PrivacyPolicyPage() {
       title={t("privacyPolicy.title")}
       showTabs={false}
       hideNavigation
-      showBack
-      onTopBarBack={() => navigateBackOrHome("/pages/profile/index")}
+      showBrandHeader={false}
       className="page-layout--privacy-policy"
     >
       <View className="privacy-policy-page">
+        <View
+          className="privacy-policy-page__back"
+          ariaLabel="返回"
+          onClick={() => navigateBackOrHome("/pages/profile/index")}
+        >
+          <NordicIcon name="back" size={24} ariaLabel="返回" />
+        </View>
         <Text className="privacy-policy-page__title">{t("privacyPolicy.title")}</Text>
         <Text className="privacy-policy-page__lead">{t("privacyPolicy.lead")}</Text>
         <Text className="privacy-policy-page__contact">{t("privacyPolicy.contact")}</Text>
 
-        {sections.map((section, index) => (
+        {sections.map((section) => (
           <View key={section.title} className="privacy-policy-page__section">
             <Text className="privacy-policy-page__section-title">{section.title}</Text>
             <Text className="privacy-policy-page__section-content">{section.content}</Text>

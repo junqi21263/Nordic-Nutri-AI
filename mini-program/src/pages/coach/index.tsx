@@ -8,7 +8,6 @@ import {
   getProductCoachMessages,
   getProductCoachBrief,
   getProductCoachDailyTip,
-  deleteProductCoachConversation,
   deleteAllProductCoachConversations,
   restartProductCoachConversation,
   sendProductCoachMessage,
@@ -125,7 +124,6 @@ export default function CoachPage() {
   const [sending, setSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [restartDialogOpen, setRestartDialogOpen] = useState(false);
-  const [deleteCurrentDialogOpen, setDeleteCurrentDialogOpen] = useState(false);
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [deletingConversation, setDeletingConversation] = useState(false);
   const [quickPrompts, setQuickPrompts] = useState(() => [t("coachPage.quick1"), t("coachPage.quick2"), t("coachPage.quick3")]);
@@ -269,18 +267,16 @@ export default function CoachPage() {
     }
   };
 
-  const handleDeleteConversation = async (all = false) => {
+  const handleDeleteAllConversations = async () => {
     if (sending || restarting || deletingConversation) return;
-    setDeleteCurrentDialogOpen(false);
     setDeleteAllDialogOpen(false);
     setDeletingConversation(true);
     try {
-      if (all) await deleteAllProductCoachConversations();
-      else await deleteProductCoachConversation();
+      await deleteAllProductCoachConversations();
       setMessages([createProactiveMessage()]);
       setDraft("");
       setSelectedImagePath(null);
-      feedback.show({ message: t(all ? "coachPage.deleteAllSuccess" : "coachPage.deleteCurrentSuccess"), tone: "success" });
+      feedback.show({ message: t("coachPage.deleteAllSuccess"), tone: "success" });
     } catch {
       feedback.show({ message: t("coachPage.deleteFailed"), tone: "error" });
     } finally {
@@ -523,7 +519,7 @@ export default function CoachPage() {
       activeTab="coach"
       hideNavigation
       title={t("coachPage.title")}
-      scrollLocked={restartDialogOpen || deleteCurrentDialogOpen || deleteAllDialogOpen}
+      scrollLocked={restartDialogOpen || deleteAllDialogOpen}
       overlay={
         <>
           <ConfirmDialog
@@ -535,19 +531,11 @@ export default function CoachPage() {
             onCancel={() => setRestartDialogOpen(false)}
           />
           <ConfirmDialog
-            open={deleteCurrentDialogOpen}
-            title={t("coachPage.deleteCurrentTitle")}
-            description={t("coachPage.deleteCurrentQuestion")}
-            confirmLabel={t("coachPage.deleteCurrent")}
-            onConfirm={() => void handleDeleteConversation(false)}
-            onCancel={() => setDeleteCurrentDialogOpen(false)}
-          />
-          <ConfirmDialog
             open={deleteAllDialogOpen}
             title={t("coachPage.deleteAllTitle")}
             description={t("coachPage.deleteAllQuestion")}
             confirmLabel={t("coachPage.deleteAll")}
-            onConfirm={() => void handleDeleteConversation(true)}
+            onConfirm={() => void handleDeleteAllConversations()}
             onCancel={() => setDeleteAllDialogOpen(false)}
           />
           <CoachComposer
@@ -579,9 +567,6 @@ export default function CoachPage() {
                 <View className="coach-chat__restart-action" ariaLabel={t("coachPage.newChat")} onClick={() => setRestartDialogOpen(true)}>
                   <NordicIcon name="refresh-cw" size={15} ariaLabel={t("coachPage.newChat")} />
                   <Text>{t("coachPage.newChat")}</Text>
-                </View>
-                <View className="coach-chat__restart-action" ariaLabel={t("coachPage.deleteCurrent")} onClick={() => setDeleteCurrentDialogOpen(true)}>
-                  <Text>{t("coachPage.deleteCurrent")}</Text>
                 </View>
                 <View className="coach-chat__restart-action" ariaLabel={t("coachPage.deleteAll")} onClick={() => setDeleteAllDialogOpen(true)}>
                   <Text>{t("coachPage.deleteAll")}</Text>

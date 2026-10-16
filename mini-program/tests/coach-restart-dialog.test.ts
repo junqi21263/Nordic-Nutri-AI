@@ -8,7 +8,15 @@ describe("coach restart dialog", () => {
   it("locks the coach page while the new-conversation dialog is open", () => {
     const page = read("src/pages/coach/index.tsx");
 
-    expect(page).toContain("scrollLocked={restartDialogOpen || deleteCurrentDialogOpen || deleteAllDialogOpen}");
+    expect(page).toContain("scrollLocked={restartDialogOpen || deleteAllDialogOpen}");
+    expect(page).not.toContain("deleteCurrentDialogOpen");
+    expect(page).toContain("t(\"coachPage.deleteAll\")");
+  });
+
+  it("keeps the today reminder label on one line", () => {
+    const styles = read("src/styles/page.scss");
+
+    expect(styles).toMatch(/\.coach-chat__hero-kicker\s*\{[^}]*white-space:\s*nowrap;/);
   });
 
   it("enables touch scrolling protection for confirmation dialogs", () => {

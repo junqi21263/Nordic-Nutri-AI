@@ -28,7 +28,7 @@ import {
   PasswordInput,
   PhoneInput,
 } from "./auth-components";
-import { getAuthBackState, getAuthInputError, type AuthView } from "./auth-state";
+import { getAuthBackState, getAuthInputError, getForgotPasswordView, type AuthView } from "./auth-state";
 import "./index.scss";
 
 declare global {
@@ -418,6 +418,18 @@ export default function AndroidAuthPage() {
           <Text>{t("androidAuth.noAccount")}</Text>
           <Text className="auth-create-account__link" onClick={() => navigate("email-register")}>{t("androidAuth.registerNow")}</Text>
         </View>
+        <Text
+          className="auth-landing__forgot-password"
+          onClick={() => {
+            void Taro.showActionSheet({
+              itemList: [t("androidAuth.email"), t("androidAuth.phone")],
+            }).then(({ tapIndex }) => {
+              navigate(getForgotPasswordView(tapIndex === 1 ? "phone" : "email"));
+            }).catch(() => undefined);
+          }}
+        >
+          {t("androidAuth.forgotPassword")}
+        </Text>
         {error ? <InlineMessage message={error} kind="error" onRetry={error === t("androidAuth.errors.googleLoginFailed") ? () => void signInWithGoogle() : undefined} /> : null}
         <Text className="auth-terms">
           {t("androidAuth.termsLead")}

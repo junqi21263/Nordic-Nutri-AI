@@ -1,5 +1,6 @@
 import { Text, View } from "@tarojs/components";
 import { useTranslation } from "react-i18next";
+import { NordicIcon } from "../../components/nordic-icon";
 import { PageLayout } from "../../layouts/page-layout";
 import { navigateBackOrHome } from "../../utils/navigation";
 
@@ -12,11 +13,17 @@ export default function TermsOfServicePage() {
       title={t("termsOfServicePage.title")}
       showTabs={false}
       hideNavigation
-      showBack
-      onTopBarBack={() => navigateBackOrHome("/pages/android-auth/index")}
+      showBrandHeader={false}
       className="page-layout--privacy-policy"
     >
       <View className="privacy-policy-page">
+        <View
+          className="privacy-policy-page__back"
+          ariaLabel="返回"
+          onClick={() => navigateBackOrHome("/pages/android-auth/index")}
+        >
+          <NordicIcon name="back" size={24} ariaLabel="返回" />
+        </View>
         <Text className="privacy-policy-page__title">{t("termsOfServicePage.title")}</Text>
         <Text className="privacy-policy-page__lead">{t("termsOfServicePage.lead")}</Text>
         <Text className="privacy-policy-page__contact">{t("termsOfServicePage.contact")}</Text>

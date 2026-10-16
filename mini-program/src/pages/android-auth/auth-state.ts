@@ -14,6 +14,10 @@ export type AuthView =
   | "google-connecting"
   | "success";
 
+export function getForgotPasswordView(method: "email" | "phone"): AuthView {
+  return method === "phone" ? "forgot-phone" : "forgot-email";
+}
+
 export function getAuthInputError(
   type: "email" | "phone",
   target: string,
