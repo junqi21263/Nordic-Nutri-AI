@@ -3,5 +3,4 @@
     <external-files-path name="camera_photos" path="Pictures/" />
     <cache-path name="app_updates" path="app-updates/" />
     <cache-path name="shared_posters" path="shared-posters/" />
-    <external-files-path name="camera_photos" path="Pictures/" />
 </paths>
