@@ -17,6 +17,7 @@ import androidx.credentials.exceptions.GetCredentialException;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 import org.json.JSONObject;
@@ -40,19 +41,33 @@ final class GoogleAuthBridge {
             resolve(callbackId, null, "Google sign-in is not configured");
             return;
         }
-        activity.runOnUiThread(() -> requestCredential(serverClientId, callbackId));
+        activity.runOnUiThread(() -> requestCredential(serverClientId, callbackId, false));
     }
 
-    private void requestCredential(String serverClientId, String callbackId) {
-        GetGoogleIdOption googleOption = new GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(serverClientId)
-                .setAutoSelectEnabled(false)
-                .setNonce(randomNonce())
-                .build();
-        GetCredentialRequest request = new GetCredentialRequest.Builder()
-                .addCredentialOption(googleOption)
-                .build();
+    @JavascriptInterface
+    public void signInForBinding(String serverClientId, String callbackId) {
+        if (serverClientId == null || serverClientId.trim().isEmpty() || callbackId == null || callbackId.trim().isEmpty()) {
+            resolve(callbackId, null, "Google sign-in is not configured");
+            return;
+        }
+        activity.runOnUiThread(() -> requestCredential(serverClientId, callbackId, true));
+    }
+
+    private void requestCredential(String serverClientId, String callbackId, boolean binding) {
+        GetCredentialRequest.Builder requestBuilder = new GetCredentialRequest.Builder();
+        if (binding) {
+            requestBuilder.addCredentialOption(new GetSignInWithGoogleOption.Builder(serverClientId)
+                    .setNonce(randomNonce())
+                    .build());
+        } else {
+            requestBuilder.addCredentialOption(new GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(serverClientId)
+                    .setAutoSelectEnabled(false)
+                    .setNonce(randomNonce())
+                    .build());
+        }
+        GetCredentialRequest request = requestBuilder.build();
         credentialManager.getCredentialAsync(
                 activity,
                 request,

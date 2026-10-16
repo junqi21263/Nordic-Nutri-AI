@@ -75,6 +75,25 @@ test("maps unexpected auth dependency failures to service unavailable", async ()
   assert.deepEqual(response.body, { code: "AUTH_UNAVAILABLE" });
 });
 
+test("binding routes forward the Bearer token and ignore client-supplied user IDs", async () => {
+  assert.equal(getAuthRoute("/auth/bind/email/send-code"), "/auth/bind/email/send-code");
+  assert.equal(getAuthRoute("/auth/bind/google"), "/auth/bind/google");
+  const calls = [];
+  const auth = {
+    async sendBindingCode(token, input) { calls.push({ route: "send", token, input }); return { sent: true }; },
+    async bindContact(token, input) { calls.push({ route: "contact", token, input }); return { user: { id: "current" } }; },
+    async bindGoogle(token, input) { calls.push({ route: "google", token, input }); return { user: { id: "current" } }; },
+  };
+  const headers = { authorization: "Bearer current-token", "content-type": "application/json" };
+  await invoke("/auth/bind/email/send-code", "POST", { email: "new@example.com", captchaId: "c1", captchaAnswer: "ok", userId: "other" }, headers, auth);
+  await invoke("/auth/bind/phone", "POST", { phone: "+8613800138000", code: "123456", userId: "other" }, headers, auth);
+  await invoke("/auth/bind/google", "POST", { idToken: "google-token", userId: "other" }, headers, auth);
+  assert.equal(calls.length, 3);
+  assert.ok(calls.every((call) => call.token === "current-token" && !Object.hasOwn(call.input, "userId")));
+  assert.equal(calls[0].input.targetType, "email");
+  assert.equal(calls[1].input.targetType, "phone");
+});
+
 test("captures auth failures in the request trace", async () => {
   const { response, traceContext } = await invokeWithTrace(
     "/auth/login/google",

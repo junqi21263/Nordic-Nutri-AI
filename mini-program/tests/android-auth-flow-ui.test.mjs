@@ -53,7 +53,7 @@ describe("Android auth flow UI contract", () => {
   it("centers each OTP digit in the Taro input host and its native input", () => {
     const styles = readFileSync(resolve(root, "pages/android-auth/index.scss"), "utf8");
     expect(styles).toContain(".auth-otp__cell { display: flex; align-items: center; justify-content: center;");
-    expect(styles).toContain(".android-auth-page .auth-otp__cell input");
-    expect(styles).toContain("line-height: normal;");
+    expect(styles).toContain(".android-auth-page .auth-otp__cell .weui-input");
+    expect(styles).toContain("line-height: 46PX;");
   });
 });

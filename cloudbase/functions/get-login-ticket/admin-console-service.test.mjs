@@ -107,6 +107,22 @@ test("lists users with profile nickname and login time", async () => {
   assert.equal(result.items[0].registrationChannel, "phone");
 });
 
+test("lists current login methods without exposing credentials or treating Google email as email login", async () => {
+  const svc = createAdminConsoleService({
+    db: makeDb({ users: [
+      { id: "google-user", status: "active", registration_channel: "google", created_platform: "android_app", email_normalized: "google@example.com", email_login_enabled: false, password_hash: "secret-hash", phone_e164: "+8613800000000", google_sub: "google-sub" },
+      { id: "wechat-user", status: "active", registration_channel: "wechat", created_platform: "wechat_mini_program" },
+    ] }),
+    isAdmin: async () => true,
+  });
+  const { items } = await svc.listUsers("admin", {});
+  assert.deepEqual(items[0].loginMethods, ["phone", "google"]);
+  assert.deepEqual(items[1].loginMethods, ["wechat"]);
+  assert.equal("passwordHash" in items[0], false);
+  assert.equal("email" in items[0], false);
+  assert.equal("phoneE164" in items[0], false);
+});
+
 test("lists feedback and updates status", async () => {
   const feedbackId = "11111111-2222-4333-8444-555555555555";
   const rows = [{

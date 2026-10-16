@@ -28,4 +28,15 @@ describe("Android auth API refresh sessions", () => {
       refreshToken: "refresh-1",
     });
   });
+
+  it("exposes authenticated contact and Google binding endpoints", async () => {
+    const request = vi.fn().mockResolvedValue({ user: { id: "current" } });
+    const api = createAndroidAuthApi({ request });
+    await api.sendBindingCode("email", { email: "new@example.com", captchaId: "c1", captchaAnswer: "ok" });
+    await api.bindContact("phone", { phone: "+8613800138000", code: "123456" });
+    await api.bindGoogle("google-token");
+    expect(request).toHaveBeenNthCalledWith(1, "/auth/bind/email/send-code", { email: "new@example.com", captchaId: "c1", captchaAnswer: "ok" });
+    expect(request).toHaveBeenNthCalledWith(2, "/auth/bind/phone", { phone: "+8613800138000", code: "123456" });
+    expect(request).toHaveBeenNthCalledWith(3, "/auth/bind/google", { idToken: "google-token" });
+  });
 });

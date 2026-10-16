@@ -16,6 +16,7 @@ export interface FeedbackModalOptions {
   presentation?: "recognition";
   title: string;
   description?: string;
+  preserveDescriptionLineBreaks?: boolean;
   primaryText: string;
   secondaryText?: string;
   onPrimary?: () => void;

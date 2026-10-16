@@ -37,6 +37,8 @@ import { useMealStore } from "../../stores/meal-store";
 import { useProfileStore } from "../../stores/profile-store";
 import { useTabBarStore } from "../../stores/tab-bar-store";
 import { refreshAndroidSmartReminders } from "../../features/smart-reminders/coordinator";
+import { checkAndroidAppUpdateNow } from "../../features/app-update/runtime";
+import { getNativeAppInfo } from "../../features/app-update/native";
 import { AndroidProfileOverview } from "./android-overview";
 import "./android-profile.scss";
 
@@ -73,6 +75,8 @@ export default function ProfilePage() {
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [profileMotion, setProfileMotion] = useState(false);
   const [accountError, setAccountError] = useState(false);
+  const [androidVersionName, setAndroidVersionName] = useState("");
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const isPageScrollLocked = activeModal !== null
     || selectedAchievement !== null
     || achievements.manualAchievementCelebration !== null
@@ -192,6 +196,7 @@ export default function ProfilePage() {
   useDidShow(() => {
     refreshFeedbackHistory();
     syncProfileFromAccount();
+    if (isAndroidApp) void getNativeAppInfo().then((info) => setAndroidVersionName(info.versionName)).catch(() => undefined);
     void refreshAndroidSmartReminders();
     if (!isAndroidApp) void getProductWeeklyReview(date, { preferFast: true })
       .then(setWeeklyReview)
@@ -199,6 +204,22 @@ export default function ProfilePage() {
   });
 
   const openPage = (url: string) => void Taro.navigateTo({ url });
+  const checkForAndroidUpdate = async () => {
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    try {
+      const release = await checkAndroidAppUpdateNow();
+      if (!release) Taro.showToast({ title: t("appUpdate.alreadyLatest"), icon: "none" });
+    } catch {
+      Taro.showToast({ title: t("appUpdate.checkFailed"), icon: "none" });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+  const openLegalPage = (url: string) => {
+    setActiveModal(null);
+    setTimeout(() => openPage(url), bottomSheetExitDuration);
+  };
   const openCoach = () => {
     setActiveKey("coach");
     void Taro.switchTab({ url: "/pages/coach/index" });
@@ -271,6 +292,7 @@ export default function ProfilePage() {
       variant: "error",
       title: t("profile.logoutQuestion"),
       description: t("profile.logoutWarning"),
+      preserveDescriptionLineBreaks: true,
       primaryText: t("profile.logout"),
       secondaryText: t("common.cancel"),
       onPrimary: performLogout,
@@ -406,6 +428,14 @@ export default function ProfilePage() {
 
         </>}
         <View className="profile-rhythm__entry-sections">
+          {isAndroidApp ? <View className="profile-rhythm__settings-section">
+            <Text className="profile-rhythm__settings-label">{t("accountBinding.title")}</Text>
+            <View className="profile-rhythm__settings-group">
+              <View onClick={() => openPage("/pages/account-binding/index")}>
+                <ListItem icon={<NordicIcon name="shield-check" size={20} ariaLabel={t("accountBinding.title")} />} title={t("accountBinding.title")} description={t("accountBinding.description")} trailing="›" />
+              </View>
+            </View>
+          </View> : null}
           <View className="profile-rhythm__settings-section">
             <Text className="profile-rhythm__settings-label">{t("profile.foodManagement")}</Text>
             <View className="profile-rhythm__settings-group">
@@ -454,13 +484,15 @@ export default function ProfilePage() {
                   description={t("profile.aboutDescription")}
                 />
               </View>
-              <View onClick={() => openPage("/pages/privacy-policy/index")}>
-                <ListItem
-                  icon={<NordicIcon name="shield-check" size={20} ariaLabel={t("profile.privacy")} />}
-                  title={t("profile.privacy")}
-                  description={t("profile.privacyDescription")}
-                />
-              </View>
+              {isAndroidApp ? (
+                <View onClick={() => void checkForAndroidUpdate()}>
+                  <ListItem
+                    icon={<NordicIcon name="refresh-cw" size={20} ariaLabel={t("appUpdate.checkForUpdates")} />}
+                    title={t("appUpdate.currentVersion", { version: androidVersionName || "—" })}
+                    description={checkingUpdate ? t("appUpdate.checking") : t("appUpdate.checkForUpdates")}
+                  />
+                </View>
+              ) : null}
               <LanguageSettings />
             </View>
           </View>
@@ -597,6 +629,21 @@ export default function ProfilePage() {
             <Text>{t("profile.about2")}</Text>
             <Text>{t("profile.about3")}</Text>
             <Text>{t("profile.about4")}</Text>
+          </View>
+          <View className="profile-rhythm__settings-group profile-about__legal-links">
+            <View onClick={() => openLegalPage("/pages/privacy-policy/index")}>
+              <ListItem
+                icon={<NordicIcon name="shield-check" size={20} ariaLabel={t("profile.privacy")} />}
+                title={t("profile.privacy")}
+                description={t("profile.privacyDescription")}
+              />
+            </View>
+            <View onClick={() => openLegalPage("/pages/terms-of-service/index")}>
+              <ListItem
+                icon={<NordicIcon name="info" size={20} ariaLabel={t("termsOfServicePage.title")} />}
+                title={t("termsOfServicePage.title")}
+              />
+            </View>
           </View>
         </View>
       </BottomSheet>

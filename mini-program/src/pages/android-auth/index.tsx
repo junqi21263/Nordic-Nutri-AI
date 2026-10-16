@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { t } from "../../i18n";
+import Taro from "@tarojs/taro";
 import { Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
 import {
@@ -418,7 +419,13 @@ export default function AndroidAuthPage() {
           <Text className="auth-create-account__link" onClick={() => navigate("email-register")}>{t("androidAuth.registerNow")}</Text>
         </View>
         {error ? <InlineMessage message={error} kind="error" onRetry={error === t("androidAuth.errors.googleLoginFailed") ? () => void signInWithGoogle() : undefined} /> : null}
-        <Text className="auth-terms">{t("androidAuth.termsLead")}<Text>{t("androidAuth.termsOfService")}</Text>{t("androidAuth.termsJoin")}<Text>{t("androidAuth.privacyPolicy")}</Text>{t("androidAuth.termsTail")}</Text>
+        <Text className="auth-terms">
+          {t("androidAuth.termsLead")}
+          <Text className="auth-terms__link" onClick={() => void Taro.navigateTo({ url: "/pages/terms-of-service/index" })}>{t("androidAuth.termsOfService")}</Text>
+          {t("androidAuth.termsJoin")}
+          <Text className="auth-terms__link" onClick={() => void Taro.navigateTo({ url: "/pages/privacy-policy/index" })}>{t("androidAuth.privacyPolicy")}</Text>
+          {t("androidAuth.termsTail")}
+        </Text>
       </View>
     </View>
   );

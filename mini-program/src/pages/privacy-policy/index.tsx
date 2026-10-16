@@ -6,6 +6,7 @@ import { navigateBackOrHome } from "../../utils/navigation";
 
 export default function PrivacyPolicyPage() {
   const { t } = useTranslation();
+  const sections = t("privacyPolicy.sections", { returnObjects: true }) as Array<{ title: string; content: string }>;
   return (
     <PageLayout
       title={t("privacyPolicy.title")}
@@ -20,10 +21,10 @@ export default function PrivacyPolicyPage() {
         <Text className="privacy-policy-page__lead">{t("privacyPolicy.lead")}</Text>
         <Text className="privacy-policy-page__contact">{t("privacyPolicy.contact")}</Text>
 
-        {[0, 1, 2, 3, 4, 5].map((index) => (
-          <View key={index} className="privacy-policy-page__section">
-            <Text className="privacy-policy-page__section-title">{t(`privacyPolicy.sections.${index}.title`)}</Text>
-            <Text className="privacy-policy-page__section-content">{t(`privacyPolicy.sections.${index}.content`)}</Text>
+        {sections.map((section, index) => (
+          <View key={section.title} className="privacy-policy-page__section">
+            <Text className="privacy-policy-page__section-title">{section.title}</Text>
+            <Text className="privacy-policy-page__section-content">{section.content}</Text>
           </View>
         ))}
 
@@ -32,7 +33,8 @@ export default function PrivacyPolicyPage() {
           <Text className="privacy-policy-page__section-content">
             {t("privacyPolicy.operator")}{ "\n" }
             {t("privacyPolicy.version")}{ "\n" }
-            {t("privacyPolicy.effective")}
+            {t("privacyPolicy.effective")}{ "\n" }
+            {t("privacyPolicy.lastUpdated")}
           </Text>
         </View>
 

@@ -34,4 +34,32 @@ describe("Android app update coordinator", () => {
     });
     await expect(coordinator.check()).resolves.toBeUndefined();
   });
+
+  it("allows a manual check to fetch again after an automatic no-update result", async () => {
+    const fetchLatest = vi.fn()
+      .mockResolvedValueOnce({ update: null })
+      .mockResolvedValueOnce({ update: { versionCode: 3, versionName: "1.2.0", releaseNotes: [] } });
+    const onUpdate = vi.fn();
+    const coordinator = createAppUpdateCoordinator({
+      getNativeInfo: vi.fn().mockResolvedValue({ versionCode: 2, versionName: "1.1.0", installerPackage: null }),
+      fetchLatest,
+      onUpdate,
+    });
+
+    await coordinator.check();
+    await expect(coordinator.checkNow()).resolves.toMatchObject({ versionCode: 3 });
+
+    expect(fetchLatest).toHaveBeenCalledTimes(2);
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates manual lookup errors so the profile can report the failure", async () => {
+    const coordinator = createAppUpdateCoordinator({
+      getNativeInfo: vi.fn().mockResolvedValue({ versionCode: 2, versionName: "1.1.0", installerPackage: null }),
+      fetchLatest: vi.fn().mockRejectedValue(new Error("offline")),
+      onUpdate: vi.fn(),
+    });
+
+    await expect(coordinator.checkNow()).rejects.toThrow("offline");
+  });
 });

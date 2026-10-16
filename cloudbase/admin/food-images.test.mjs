@@ -41,7 +41,7 @@ test("admin API requests fail visibly instead of hanging forever", async () => {
 
 test("verification filters stay in one desktop row despite global select width", async () => {
   const source = await pageSource();
-  assert.match(source, /class="module-toolbar nn-verification-toolbar"[\s\S]*id="verificationTypeFilter"[\s\S]*id="verificationStatusFilter"/);
+  assert.match(source, /<section id="moduleVerification"[^>]*>\s*<div class="module-toolbar nn-verification-toolbar">[\s\S]*?id="verificationTypeFilter"[\s\S]*?id="verificationStatusFilter"/);
   assert.match(source, /\.nn-verification-toolbar > select \{[^}]*width: auto;[^}]*flex: 0 1 190px;[^}]*min-width: 160px;/s);
   assert.match(source, /\.nn-verification-toolbar \{[^}]*flex-wrap: nowrap;/s);
   assert.match(source, /@media \(max-width: 760px\)[\s\S]*?\.nn-verification-toolbar \{ flex-wrap: wrap; \}/s);
@@ -326,6 +326,9 @@ test("user operations display a readable registration channel", async () => {
   assert.match(source, /<th>注册渠道<\/th>/);
   assert.match(source, /registrationChannelLabel\(user\.registrationChannel\)/);
   assert.match(source, /registrationChannelLabel\(profile\.registrationChannel\)/);
+  assert.match(source, /<th>当前登录方式<\/th>/);
+  assert.match(source, /loginMethodsHtml\(user\.loginMethods\)/);
+  assert.match(source, /loginMethodsHtml\(profile\.loginMethods\)/);
 });
 
 test("old image audit is a standalone admin module with explicit latest-prompt regeneration copy", async () => {

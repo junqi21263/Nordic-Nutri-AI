@@ -71,7 +71,11 @@ export function FeedbackModal({ modal, onDismiss }: FeedbackModalProps) {
           )}
         </View>
         <Text className="feedback-modal__title">{modal.title}</Text>
-        {modal.description ? <Text className="feedback-modal__description">{modal.description}</Text> : null}
+        {modal.description ? (
+          <Text className={`feedback-modal__description ${modal.preserveDescriptionLineBreaks ? "feedback-modal__description--preserve-breaks" : ""}`}>
+            {modal.description}
+          </Text>
+        ) : null}
         <View className="feedback-modal__actions">
           <View
             className={`feedback-modal__button feedback-modal__button--${modal.variant} ${modal.primaryText === t("feedback.okay") ? "feedback-modal__button--short" : ""}`}

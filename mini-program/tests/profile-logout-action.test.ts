@@ -17,7 +17,7 @@ describe("profile logout action", () => {
     );
     expect(page).toContain("url: loginEntryPath");
     expectLocalizedCopy(page, "退出登录？");
-    expectLocalizedCopy(page, "仅退出当前设备，不会删除你的饮食记录。");
+    expectLocalizedCopy(page, "仅退出当前设备，\n不会删除你的饮食记录。");
     expectLocalizedCopy(page, "退出登录");
     expectLocalizedCopy(page, "取消");
   });

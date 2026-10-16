@@ -2,10 +2,10 @@ import { afterEach, expect, it, vi } from "vitest";
 import { productTransport } from "../src/platform/product-transport";
 import { chooseFoodImage } from "../src/platform/food-media";
 
-const mocks = vi.hoisted(() => ({ native: vi.fn(), taro: vi.fn(), photo: vi.fn() }));
+const mocks = vi.hoisted(() => ({ native: vi.fn(), taro: vi.fn(), photo: vi.fn(), takePhoto: vi.fn() }));
 vi.mock("@tarojs/taro", () => ({ default: { request: mocks.taro } }));
 vi.mock("@capacitor/core", () => ({ Capacitor: { isNativePlatform: () => true }, CapacitorHttp: { request: mocks.native } }));
-vi.mock("@capacitor/camera", () => ({ Camera: { getPhoto: mocks.photo }, CameraResultType: { Uri: "uri" }, CameraSource: { Camera: "CAMERA", Photos: "PHOTOS", Prompt: "PROMPT" } }));
+vi.mock("@capacitor/camera", () => ({ Camera: { getPhoto: mocks.photo, takePhoto: mocks.takePhoto }, CameraResultType: { Uri: "uri" }, CameraSource: { Camera: "CAMERA", Photos: "PHOTOS", Prompt: "PROMPT" } }));
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 it("preserves native HTTP status, bearer and timeout without retrying errors", async () => {
@@ -52,8 +52,9 @@ it("retains Taro transport for Mini Program", async () => {
 it("selects the requested native camera or album and returns a WebView-readable path", async () => {
   vi.stubEnv("TARO_APP_PLATFORM", "android");
   mocks.photo.mockResolvedValue({ webPath: "https://localhost/_capacitor_file_/photo.jpg" });
+  mocks.takePhoto.mockResolvedValue({ webPath: "https://localhost/_capacitor_file_/photo.jpg" });
   expect(await chooseFoodImage("camera")).toContain("_capacitor_file_");
-  expect(mocks.photo).toHaveBeenLastCalledWith(expect.objectContaining({ source: "CAMERA", correctOrientation: true, saveToGallery: false }));
+  expect(mocks.takePhoto).toHaveBeenLastCalledWith(expect.objectContaining({ correctOrientation: true, saveToGallery: false }));
   await chooseFoodImage("album");
   expect(mocks.photo).toHaveBeenLastCalledWith(expect.objectContaining({ source: "PHOTOS" }));
 });

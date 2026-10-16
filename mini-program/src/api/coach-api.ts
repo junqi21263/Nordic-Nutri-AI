@@ -333,6 +333,21 @@ export function restartProductCoachConversation() {
   });
 }
 
+export function deleteProductCoachConversation(conversationId?: string) {
+  return requestProductApi<{ deleted: boolean }>("/coach/conversation/delete", {
+    method: "POST",
+    data: conversationId ? { conversationId } : {},
+    fallbackMessage: "无法删除这段对话，请稍后重试",
+  });
+}
+
+export function deleteAllProductCoachConversations() {
+  return requestProductApi<{ deletedMessages: number; deletedConversations: number }>("/coach/conversations/delete-all", {
+    method: "POST",
+    fallbackMessage: "无法删除对话历史，请稍后重试",
+  });
+}
+
 export function sendProductCoachMessage(
   prompt: string,
   date: string,

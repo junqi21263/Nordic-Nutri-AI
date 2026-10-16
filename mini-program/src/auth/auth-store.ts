@@ -7,6 +7,10 @@ export interface AppAuthUser {
   email?: string | null;
   emailVerified?: boolean;
   createdPlatform?: string | null;
+  phoneE164?: string;
+  phoneVerified?: boolean;
+  loginMethods?: { email: boolean; phone: boolean; google: boolean };
+  hasPassword?: boolean;
 }
 
 export interface AppAuthSession {

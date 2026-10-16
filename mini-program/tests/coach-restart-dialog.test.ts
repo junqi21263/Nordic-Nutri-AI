@@ -8,7 +8,7 @@ describe("coach restart dialog", () => {
   it("locks the coach page while the new-conversation dialog is open", () => {
     const page = read("src/pages/coach/index.tsx");
 
-    expect(page).toContain("scrollLocked={restartDialogOpen}");
+    expect(page).toContain("scrollLocked={restartDialogOpen || deleteCurrentDialogOpen || deleteAllDialogOpen}");
   });
 
   it("enables touch scrolling protection for confirmation dialogs", () => {

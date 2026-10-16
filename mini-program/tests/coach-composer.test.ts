@@ -118,8 +118,8 @@ describe("coach restart action placement", () => {
     expect(page).toContain("onConfirm={() => void handleRestartConversation()}");
     expect(page).not.toContain("Taro.showModal");
     const restartAction = pageStyles.match(/\.coach-chat__restart-action\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
-    expect(restartAction).toContain("margin-left: auto;");
-    expect(restartAction).toContain("margin-right: $space-12;");
+    expect(restartAction).toContain("margin: 0;");
+    expect(pageStyles).toContain(".coach-chat__chat-actions");
   });
 
   it("keeps project modals above the fixed coach composer", () => {

@@ -13,24 +13,38 @@ export function createAppUpdateCoordinator(dependencies: {
   onUpdate: (release: AndroidRelease) => void;
 }) {
   let checked = false;
-  let inFlight: Promise<void> | null = null;
+  let inFlight: Promise<AndroidRelease | null> | null = null;
+  const runCheck = async () => {
+    const installed = await dependencies.getNativeInfo();
+    const channel: AppUpdateChannel = installed.installerPackage ? "market" : "direct";
+    const release = selectUpdate(installed, await dependencies.fetchLatest(channel));
+    if (release) dependencies.onUpdate(release);
+    checked = true;
+    return release;
+  };
   return {
     check() {
-      if (checked) return inFlight ?? Promise.resolve();
+      if (checked) return inFlight?.then(() => undefined) ?? Promise.resolve();
       if (!inFlight) {
-        inFlight = (async () => {
-          const installed = await dependencies.getNativeInfo();
-          const channel: AppUpdateChannel = installed.installerPackage ? "market" : "direct";
-          const release = selectUpdate(installed, await dependencies.fetchLatest(channel));
-          if (release) dependencies.onUpdate(release);
-          checked = true;
-        })().catch(() => {
+        inFlight = runCheck().catch(() => {
           // Update discovery is optional and must never block Home.
+          return null;
         }).finally(() => {
           inFlight = null;
         });
       }
-      return inFlight;
+      return inFlight.then(() => undefined);
+    },
+    async checkNow() {
+      if (inFlight) {
+        const current = await inFlight;
+        if (current) return current;
+      }
+      const request = runCheck().finally(() => {
+        if (inFlight === request) inFlight = null;
+      });
+      inFlight = request;
+      return request;
     },
   };
 }

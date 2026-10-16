@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { expectLocalizedCopy } from "./i18n-source-assertions";
+import zhCN from "../src/i18n/locales/zh-CN.json";
 
 const srcRoot = resolve(import.meta.dirname, "../src");
 const read = (path: string) => readFileSync(resolve(srcRoot, path), "utf8");
@@ -11,33 +12,34 @@ describe("privacy policy and disclaimer", () => {
     expect(read("app.config.ts")).toContain('"pages/privacy-policy/index"');
     const profile = read("pages/profile/index.tsx");
     expectLocalizedCopy(profile, "隐私政策与免责声明");
-    expect(profile).toContain('openPage("/pages/privacy-policy/index")');
+    expect(profile).toContain('openLegalPage("/pages/privacy-policy/index")');
     expect(profile).not.toContain('title="隐私与数据"');
   });
 
   it("discloses collection, purpose, retention, rights, deletion and medical boundary", () => {
     const policy = read("pages/privacy-policy/index.tsx");
+    expect(policy).toContain('t("privacyPolicy.sections", { returnObjects: true })');
+    expect(policy).toContain("{section.title}");
+    expect(policy).toContain("{section.content}");
     for (const copy of [
-      "收集的信息",
-      "使用目的",
-      "存储与保留",
-      "智能处理",
-      "你的权利",
-      "注销 Nordic Nutri AI 产品账号",
-      "不影响你的微信账号",
-      "不构成医疗诊断、治疗或处方",
-      "反馈与帮助",
+      "我们处理哪些信息",
+      "为什么使用这些信息",
+      "信息保存与删除",
+      "你的选择与权利",
+      "账号注销或记录删除",
+      "模型生成的食物名称和营养数据只是估算",
     ]) {
-      expectLocalizedCopy(policy, copy);
+      expect(zhCN.privacyPolicy.sections.some((section) => `${section.title} ${section.content}`.includes(copy))).toBe(true);
     }
+    expectLocalizedCopy(policy, "注销 Nordic Nutri 账号");
   });
 
   it("discloses the approved policy metadata", () => {
     const policy = read("pages/privacy-policy/index.tsx");
     for (const copy of [
-      "运营主体：李某某（个人开发者）",
-      "政策版本号：1.0.0",
-      "生效日期：2026-08-16",
+      "运营者: LewisLee",
+      "正式版",
+      "生效日期: 2026-10-14",
     ]) {
       expectLocalizedCopy(policy, copy);
     }
@@ -45,7 +47,7 @@ describe("privacy policy and disclaimer", () => {
 
   it("places policy metadata after the disclaimer section", () => {
     const policy = read("pages/privacy-policy/index.tsx");
-    expect(policy.indexOf('t(`privacyPolicy.sections.${index}.title`)')).toBeLessThan(
+    expect(policy.indexOf("{sections.map((section, index) => (")).toBeLessThan(
       policy.indexOf('t("privacyPolicy.metadata")'),
     );
   });
