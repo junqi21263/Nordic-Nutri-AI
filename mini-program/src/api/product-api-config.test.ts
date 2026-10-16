@@ -21,4 +21,11 @@ describe("product API environment routing", () => {
       appEnvironment: "development",
     })).toBe("https://example.test");
   });
+
+  it("rejects an HTTP endpoint in production", () => {
+    expect(() => resolveProductApiBaseUrl({
+      configuredApiBaseUrl: "http://api.example.test",
+      appEnvironment: "production",
+    })).toThrow(/HTTPS/);
+  });
 });

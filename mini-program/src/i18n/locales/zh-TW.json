@@ -273,6 +273,7 @@
   },
   "appUpdate": {
     "title": "發現新版本 {{version}}", "defaultNote": "體驗與穩定性改善", "market": "前往應用程式商店", "download": "直接下載 APK", "retryInstall": "重新下載並安裝", "later": "稍後再說",
+    "currentVersion": "目前版本 {{version}}", "checkForUpdates": "點擊檢查新版本", "checking": "正在檢查新版本…", "alreadyLatest": "目前已是最新版本", "checkFailed": "檢查失敗，請稍後再試",
     "status": { "downloading": "正在安全下載 {{progress}}%", "verified": "安裝套件驗證完成", "installing": "正在開啟系統安裝程式", "permission": "請允許安裝此來源的應用程式後再試", "failed": "下載或安裝尚未完成，請再試一次" }
   },
   "records": {

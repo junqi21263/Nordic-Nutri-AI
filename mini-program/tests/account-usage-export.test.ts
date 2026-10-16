@@ -71,6 +71,6 @@ describe("account usage HTTPS boundary", () => {
     expect(page).not.toContain("exportProductAccount");
     expect(page).not.toContain("导出我的数据");
     expect(page).not.toContain('activeModal === "privacy"');
-    expect(page).toContain('openPage("/pages/privacy-policy/index")');
+    expect(page).toContain('openLegalPage("/pages/privacy-policy/index")');
   });
 });

@@ -292,6 +292,7 @@
   },
   "appUpdate": {
     "title": "New version {{version}}", "defaultNote": "Experience and stability improvements", "market": "Open app market", "download": "Download APK", "retryInstall": "Download and install again", "later": "Not now",
+    "currentVersion": "Current version {{version}}", "checkForUpdates": "Tap to check for updates", "checking": "Checking for updates…", "alreadyLatest": "You have the latest version", "checkFailed": "Could not check for updates. Try again later.",
     "status": { "downloading": "Secure download {{progress}}%", "verified": "Package verification complete", "installing": "Opening system installer", "permission": "Allow installs from this source, then try again", "failed": "Download or installation incomplete. Please try again." }
   },
   "records": {

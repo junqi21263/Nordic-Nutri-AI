@@ -28,3 +28,9 @@ export async function checkAndroidAppUpdate() {
   startNativeUpdateEvents();
   await coordinator.check();
 }
+
+export async function checkAndroidAppUpdateNow() {
+  if (process.env.TARO_APP_PLATFORM !== "android") return null;
+  startNativeUpdateEvents();
+  return coordinator.checkNow();
+}

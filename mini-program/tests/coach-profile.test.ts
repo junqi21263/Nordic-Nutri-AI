@@ -307,8 +307,8 @@ describe("local coach and profile", () => {
       "utf8",
     );
     expect(source).not.toContain('activeModal === "privacy"');
-    expect(policy).toContain('t(`privacyPolicy.sections.${index}.content`)');
-    expectLocalizedCopy(policy, "注销 Nordic Nutri AI 产品账号");
+    expect(policy).toContain("{section.content}");
+    expectLocalizedCopy(policy, "注销 Nordic Nutri 账号");
     expect(source).toContain('activeModal === "feedback"');
     expectLocalizedCopy(source, "提交反馈");
     expect(source).toContain('activeModal === "about"');

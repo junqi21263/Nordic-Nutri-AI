@@ -6,8 +6,11 @@ export function resolveProductApiBaseUrl({ configuredApiBaseUrl, appEnvironment 
   appEnvironment: string;
 }) {
   const configured = configuredApiBaseUrl.trim().replace(/\/$/, "");
-  if (configured) return configured;
-  return appEnvironment === "production" ? PRODUCTION_API_BASE_URL : DEVELOPMENT_API_BASE_URL;
+  const endpoint = configured || (appEnvironment === "production" ? PRODUCTION_API_BASE_URL : DEVELOPMENT_API_BASE_URL);
+  if (appEnvironment === "production" && new URL(endpoint).protocol !== "https:") {
+    throw new Error("生产 API 必须使用 HTTPS。");
+  }
+  return endpoint;
 }
 
 const configuredApiBaseUrl = resolveProductApiBaseUrl({
