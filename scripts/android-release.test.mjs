@@ -96,7 +96,7 @@ test("reuses the legacy Keychain service when new service names are unavailable"
 
 test("writes versioned same-origin metadata only for verified APK attributes", () => {
   const content = formatReleaseModule({ versionName: "1.1.9", fileSize: 1024 * 1024, updated: "2026-10-16", sha256: "a".repeat(64) });
-  assert.match(content, /url: "\/downloads\/nordic-nutri-android-1\.1\.9\.apk"/);
+  assert.match(content, /url: "\/downloads\/nordic-nutri-android-1\.1\.9-aaaaaaaaaaaa\.apk"/);
   assert.match(content, /version: "v1\.1\.9"/);
   assert.ok(content.includes(`sha256: "${"a".repeat(64)}"`));
   assert.throws(() => formatReleaseModule({ versionName: "1.1.8", fileSize: 0, sha256: "bad" }), /metadata/i);

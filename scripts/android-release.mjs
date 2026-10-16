@@ -90,7 +90,7 @@ export function formatReleaseModule({ versionName, fileSize, updated = new Date(
   if (!/^\d+\.\d+\.\d+$/.test(versionName ?? "") || !Number.isSafeInteger(fileSize) || fileSize <= 0 || fileSize > 25 * 1024 * 1024 || !/^\d{4}-\d{2}-\d{2}$/.test(updated ?? "") || !/^[0-9a-f]{64}$/.test(sha256 ?? "")) {
     throw new Error("Verified APK metadata is incomplete or invalid");
   }
-  const file = `nordic-nutri-android-${versionName}.apk`;
+  const file = `nordic-nutri-android-${versionName}-${sha256.slice(0, 12)}.apk`;
   const size = `${(fileSize / (1024 * 1024)).toFixed(1)} MB`;
   return `// This version is signed with the production certificate and checked by the build.\nexport const release = Object.freeze({\n  url: "/downloads/${file}",\n  file: "${file}",\n  version: "v${versionName}",\n  size: "${size}",\n  updated: "${updated}",\n  sha256: "${sha256}"\n});\n`;
 }
@@ -156,7 +156,7 @@ export function buildRelease({ profilePath = process.env.NORDIC_SIGNING_PROFILE 
   capture(gradle, ["-p", "android", "assembleRelease"], { cwd: androidRoot, env: signing.env, secrets: signing.secrets, label: "Signed Android release build" });
   if (!existsSync(apkPath)) throw new Error("Gradle completed without producing the release APK");
   const metadata = verifyApk(apkPath);
-  const file = `nordic-nutri-android-${metadata.versionName}.apk`;
+  const file = `nordic-nutri-android-${metadata.versionName}-${metadata.sha256.slice(0, 12)}.apk`;
   const destination = join(siteRoot, "public/downloads", file);
   if (!existsSync(join(siteRoot, "wrangler.jsonc"))) throw new Error("Production website source is unavailable");
   const temporaryApk = `${destination}.tmp`;
