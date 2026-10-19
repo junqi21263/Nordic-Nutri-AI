@@ -55,7 +55,14 @@ public final class NordicFirebaseMessagingService extends FirebaseMessagingServi
         if (title.isEmpty()) title = mealLabel(mealType) + "还没记录吗？";
         if (body.isEmpty()) body = "拍一下就好 📷";
 
-        ensureChannel();
+        String kind = value(data, "kind");
+        if (!kind.isEmpty() && MainActivity.appVisible) {
+            PushNotificationsPlugin.sendRemoteMessage(message);
+            acknowledgeWithCurrentToken(deliveryId, "received");
+            return;
+        }
+        String channelId = "feedback".equals(kind) ? "feedback-replies" : "system".equals(kind) ? "system-announcements" : CHANNEL_ID;
+        ensureChannel(channelId);
         boolean permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                 || ContextCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS")
                 == PackageManager.PERMISSION_GRANTED;
@@ -66,6 +73,9 @@ public final class NordicFirebaseMessagingService extends FirebaseMessagingServi
                         .putExtra("deliveryId", deliveryId)
                         .putExtra("traceId", traceId)
                         .putExtra("mealType", mealType)
+                        .putExtra("notificationId", value(data, "notificationId"))
+                        .putExtra("userId", value(data, "userId"))
+                        .putExtra("kind", kind)
                         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 PendingIntent pendingIntent = PendingIntent.getActivity(
                         this,
@@ -73,13 +83,14 @@ public final class NordicFirebaseMessagingService extends FirebaseMessagingServi
                         intent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                 );
-                NotificationCompat.Builder notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                NotificationCompat.Builder notification = new NotificationCompat.Builder(this, channelId)
                         .setSmallIcon(R.drawable.nordic_notification_icon)
                         .setContentTitle(title)
                         .setContentText(body)
                         .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                         .setPriority(NotificationCompat.PRIORITY_HIGH)
-                        .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                        .setCategory("message".equals(mealType) ? NotificationCompat.CATEGORY_MESSAGE : NotificationCompat.CATEGORY_REMINDER)
                         .setAutoCancel(true)
                         .setContentIntent(pendingIntent);
                 NotificationManagerCompat.from(this).notify(stableNotificationId(deliveryId), notification.build());
@@ -109,13 +120,13 @@ public final class NordicFirebaseMessagingService extends FirebaseMessagingServi
         });
     }
 
-    private void ensureChannel() {
+    private void ensureChannel(String channelId) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager == null) return;
         NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.push_notification_channel_name),
+                channelId,
+                "feedback-replies".equals(channelId) ? "反馈回复" : "system-announcements".equals(channelId) ? "系统公告" : getString(R.string.push_notification_channel_name),
                 NotificationManager.IMPORTANCE_HIGH
         );
         channel.setDescription(getString(R.string.push_notification_channel_description));

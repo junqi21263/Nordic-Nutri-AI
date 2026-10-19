@@ -1,3 +1,4 @@
+import { getNotifications } from "../../api/notification-api";
 import { useTranslation } from "react-i18next";
 import { t } from "../../i18n";
 import { Text, Textarea, View } from "@tarojs/components";
@@ -66,6 +67,7 @@ export default function ProfilePage() {
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState("");
   const [feedbackMode, setFeedbackMode] = useState<"submit" | "history">("submit");
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [feedbackItems, setFeedbackItems] = useState<ProductFeedbackItem[]>([]);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [unreadReplyCount, setUnreadReplyCount] = useState(0);
@@ -194,6 +196,8 @@ export default function ProfilePage() {
   };
 
   useDidShow(() => {
+    setUnreadNotifications(0);
+    void getNotifications().then(result => setUnreadNotifications(result.unreadCount)).catch(() => undefined);
     refreshFeedbackHistory();
     syncProfileFromAccount();
     if (isAndroidApp) void getNativeAppInfo().then((info) => setAndroidVersionName(info.versionName)).catch(() => undefined);
@@ -460,6 +464,7 @@ export default function ProfilePage() {
           <View className="profile-rhythm__settings-section">
             <Text className="profile-rhythm__settings-label">{t("profile.helpInformation")}</Text>
             <View className="profile-rhythm__settings-group">
+              <View onClick={() => openPage("/pages/notifications/index")}><ListItem icon={<NordicIcon name="bell" size={20} />} title={t("notifications.title")} trailing={unreadNotifications > 0 ? "●" : "›"} /></View>
               <View onClick={openFeedback}>
                 <ListItem
                   icon={<NordicIcon name="message-circle" size={20} ariaLabel={t("profile.feedback")} />}

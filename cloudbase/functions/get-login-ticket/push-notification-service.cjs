@@ -253,13 +253,14 @@ function createFcmPushService({
     if (result?.error) throw new PushNotificationError("PUSH_DATABASE_FAILED");
   }
 
-  async function createDeliveryAttempt({ userId, tokenId, token, mealType, traceId, nowIso }) {
+  async function createDeliveryAttempt({ userId, tokenId, token, mealType, traceId, nowIso, notificationId }) {
     const result = await db.from("push_delivery_attempts").insert({
       user_id: userId,
       token_id: tokenId,
       token_hash: tokenHash(token),
       trace_id: requiredString(traceId) || null,
       meal_type: mealType,
+      ...(notificationId ? { notification_id: notificationId } : {}),
       status: "pending",
       created_at: nowIso,
       expires_at: new Date(new Date(nowIso).getTime() + 60_000).toISOString(),
@@ -276,9 +277,9 @@ function createFcmPushService({
     if (result?.error) throw new PushNotificationError("PUSH_DATABASE_FAILED");
   }
 
-  async function sendReminder({ userId: userIdInput, mealType: mealTypeInput, copy, source = "scheduled", traceId = null }) {
+  async function sendReminder({ userId: userIdInput, mealType: mealTypeInput, copy, source = "scheduled", traceId = null, notificationId = null, kind = null }) {
     const userId = normalizeUserId(userIdInput);
-    const mealType = normalizeMealType(mealTypeInput);
+    const mealType = notificationId ? "message" : normalizeMealType(mealTypeInput);
     const safeCopy = {
       title: requiredString(copy?.title),
       body: requiredString(copy?.body),
@@ -325,8 +326,18 @@ function createFcmPushService({
     const deliveryIds = [];
     let invalidated = 0;
     for (const row of tokens) {
+      if (notificationId) {
+        const previous = await db.from("push_delivery_attempts").select("id,fcm_message_id").eq("notification_id", notificationId).eq("trace_id", traceId).eq("token_hash", tokenHash(row.token)).in("status", ["accepted", "received", "displayed", "opened"]).limit(1);
+        if (previous.error) throw new PushNotificationError("PUSH_DATABASE_FAILED");
+        if (previous.data?.length) {
+          deliveryIds.push(previous.data[0].id);
+          messageIds.push(previous.data[0].fcm_message_id || "previously_accepted");
+          continue;
+        }
+      }
       const deliveryId = await createDeliveryAttempt({
         userId,
+        notificationId,
         tokenId: row.id,
         token: row.token,
         mealType,
@@ -350,7 +361,7 @@ function createFcmPushService({
                   android: {
                     priority: "HIGH",
                   },
-                  data: { deliveryId, traceId: requiredString(traceId), mealType, reminder: "1", source, title: safeCopy.title, body: safeCopy.body },
+                  data: { deliveryId, traceId: requiredString(traceId), mealType, reminder: notificationId ? "0" : "1", ...(notificationId ? { notificationId, kind, userId } : {}), source, title: safeCopy.title, body: safeCopy.body },
                 },
               }
             : {
@@ -359,7 +370,7 @@ function createFcmPushService({
                 android: {
                   priority: "HIGH",
                 },
-                data: { deliveryId, traceId: requiredString(traceId), mealType, reminder: "1", source, title: safeCopy.title, body: safeCopy.body },
+                data: { deliveryId, traceId: requiredString(traceId), mealType, reminder: notificationId ? "0" : "1", ...(notificationId ? { notificationId, kind, userId } : {}), source, title: safeCopy.title, body: safeCopy.body },
               },
             }),
         }, { timeoutMs: fcmRequestTimeoutMs, setTimeoutImpl, clearTimeoutImpl, AbortControllerImpl });
@@ -494,7 +505,8 @@ function createFcmPushService({
     };
   }
 
-  return { registerToken, unregisterToken, sendReminder, sendTest, acknowledgeDelivery, acknowledgeNativeDelivery, getDeliveryStatus, config: { packageName: config.packageName, environment: config.environment, configured: config.configured, relayConfigured: Boolean(config.relayUrl && config.relaySharedSecret) } };
+  const sendNotification = ({ userId, notificationId, generation = 0, kind, copy }) => sendReminder({ userId, notificationId, kind, copy, traceId: `${notificationId}:${generation}`, source: "message_center" });
+  return { registerToken, unregisterToken, sendNotification, sendReminder, sendTest, acknowledgeDelivery, acknowledgeNativeDelivery, getDeliveryStatus, config: { packageName: config.packageName, environment: config.environment, configured: config.configured, relayConfigured: Boolean(config.relayUrl && config.relaySharedSecret) } };
 }
 
 module.exports = { ANDROID_PACKAGE, FCM_AUTH_TIMEOUT_MS, FCM_REQUEST_TIMEOUT_MS, PushNotificationError, createFcmPushService, createServiceAccountJwt, normalizeMealType };

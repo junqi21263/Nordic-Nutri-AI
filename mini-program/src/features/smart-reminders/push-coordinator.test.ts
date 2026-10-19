@@ -47,3 +47,16 @@ describe("Android push coordinator", () => {
     expect(navigate).toHaveBeenCalledWith("/pages/meal-records/index");
   });
 });
+
+it('opens a message only for its authenticated owner after startup', async () => {
+ vi.resetModules();
+ const {createAndroidPushCoordinator: create}=await import('./push-coordinator');
+ let launch: ((intent:NativePushIntent)=>void|Promise<void>)|undefined;
+ const navigate=vi.fn();let currentOwner='other';
+ const adapter:AndroidPushNotificationAdapter={isAvailable:()=>true,initialize:vi.fn(async listeners=>{launch=listeners.onLaunchIntent;return true;})};
+ const coordinator=create(adapter,{getSession:()=>({accessToken:'session'}) as never,registerToken:vi.fn(async()=>({registered:true})),unregisterToken:vi.fn(async()=>({removed:true})),acknowledgeDelivery:vi.fn(async(deliveryId,event)=>({acknowledged:true,deliveryId,event,status:event})),savePendingReminder:vi.fn(),prepareNavigation:async()=>{},navigate},()=>currentOwner);
+ await coordinator.initialize();
+ const intent={deliveryId:'d',mealType:'message',notificationId:'11111111-1111-4111-8111-111111111111',userId:'owner'};
+ await launch?.(intent);expect(navigate).not.toHaveBeenCalled();
+ currentOwner='owner';await launch?.(intent);expect(navigate).toHaveBeenCalledWith('/pages/notifications/index?id=11111111-1111-4111-8111-111111111111');
+});

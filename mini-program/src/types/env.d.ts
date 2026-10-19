@@ -13,5 +13,7 @@ declare namespace NodeJS {
 interface Window {
   NordicPushIntent?: {
     consume?: () => string;
+    openSettings?: () => void;
+    openLink?: (url: string) => void;
   };
 }

@@ -18,6 +18,14 @@ import androidx.core.graphics.Insets;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    public static volatile boolean appVisible = false;
+
+    @Override
+    public void onResume() { super.onResume(); appVisible = true; }
+
+    @Override
+    public void onPause() { appVisible = false; super.onPause(); }
+
     private boolean welcomeVisible = false;
     private boolean authLandingVisible = false;
     private JSONObject pendingPushIntent;
@@ -42,6 +50,20 @@ public class MainActivity extends BridgeActivity {
 
     public class PushIntentBridge {
         @JavascriptInterface
+        public void openLink(String url) {
+            android.net.Uri uri = android.net.Uri.parse(url == null ? "" : url);
+            if (!"https".equals(uri.getScheme()) || uri.getHost() == null) return;
+            runOnUiThread(() -> {
+                try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
+                catch (android.content.ActivityNotFoundException ignored) { /* No browser installed. */ }
+            });
+        }
+        @JavascriptInterface
+        public void openSettings() {
+            runOnUiThread(() -> startActivity(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())));
+        }
+        @JavascriptInterface
         public synchronized String consume() {
             if (pendingPushIntent == null) return "";
             String result = pendingPushIntent.toString();
@@ -59,7 +81,10 @@ public class MainActivity extends BridgeActivity {
             pendingPushIntent = new JSONObject()
                     .put("deliveryId", deliveryId.trim())
                     .put("traceId", intent.getStringExtra("traceId"))
-                    .put("mealType", mealType.trim());
+                    .put("mealType", mealType.trim())
+                    .put("notificationId", intent.getStringExtra("notificationId"))
+                    .put("userId", intent.getStringExtra("userId"))
+                    .put("kind", intent.getStringExtra("kind"));
         } catch (Exception ignored) {
             pendingPushIntent = null;
         }

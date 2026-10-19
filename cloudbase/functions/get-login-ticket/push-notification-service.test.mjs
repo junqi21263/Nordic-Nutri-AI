@@ -12,6 +12,7 @@ function createDb({ tokens = [], deliveryId = "11111111-1111-4111-8111-111111111
       const chain = {
         select(columns) { state.columns = columns; return chain; },
         eq(column, value) { state.filters.push([column, value]); return chain; },
+        limit() { return chain; },
         is(column, value) { state.filters.push([column, value]); return chain; },
         delete() { state.delete = true; return chain; },
         update(payload) { state.update = payload; calls.push({ type: "update", table, payload }); return chain; },
@@ -310,4 +311,13 @@ test("accepts a native receipt only when the FCM token proof matches the deliver
   });
   const select = db.calls.find((call) => call.type === "update-select");
   assert.ok(select?.filters.some(([column, value]) => column === "token_hash" && value === createHash("sha256").update(token).digest("hex")));
+});
+
+
+test("message pushes carry owner and message identity without masquerading as meal reminders", async () => {
+ const db=createDb({tokens:[{id:"token-1",token:"device-token"}]});let payload;
+ const service=createFcmPushService({db,env:{TCB_ENV:"test-dev-d4gyxnn0b5dfa2c8a",FCM_PROJECT_ID:"project",FCM_CLIENT_EMAIL:"test@example.com",FCM_PRIVATE_KEY:"test"},authClientFactory:()=>({getAccessToken:async()=>"access"}),fetchImpl:async(url,init)=>{payload=JSON.parse(init.body);return {ok:true,json:async()=>({name:"accepted"})};}});
+ const result=await service.sendNotification({userId:"owner",notificationId:"11111111-1111-4111-8111-111111111111",generation:2,kind:"feedback",copy:{title:"Feedback reply",body:"Open to view"}});
+ assert.equal(result.accepted,1);assert.equal(payload.message.data.reminder,"0");assert.equal(payload.message.data.mealType,"message");assert.equal(payload.message.data.userId,"owner");assert.equal(payload.message.data.traceId,"11111111-1111-4111-8111-111111111111:2");
+ assert.ok(db.calls.some(c=>c.type==="insert"&&c.payload.notification_id==="11111111-1111-4111-8111-111111111111"));
 });

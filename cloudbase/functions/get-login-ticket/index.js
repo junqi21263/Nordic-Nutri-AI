@@ -1,3 +1,4 @@
+const { createNotificationService, NotificationError } = require("./notification-service.cjs");
 const http = require("node:http");
 const https = require("node:https");
 const crypto = require("node:crypto");
@@ -1320,6 +1321,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   // Password-gated admin console sessions already prove operator access; skip the
   // legacy app_users.is_admin flag so ops no longer depends on manually promoting a WeChat user.
   const allowAdminConsole = async () => true;
+  const notifications = createNotificationService({ db, push, isAdmin: allowAdminConsole });
   const adminConsoleService = createAdminConsoleService({
     db,
     isAdmin: allowAdminConsole,
@@ -1791,6 +1793,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
       dailyTip,
       proactiveDailyBrief,
     }),
+    notifications,
     feedback: createFeedbackDataService({ db }),
     recognitionFeedback: createRecognitionFeedbackDataService({ db }),
     foodCatalog,
@@ -2161,7 +2164,12 @@ function getAdminFoodRoute(pathname) {
   if (visionAnalysisReviewMatch) return { operation: "opsVisionImageItem", analysisId: visionAnalysisReviewMatch[1] };
   const moderationFlagMatch = path.match(/^\/ops\/moderation-flags\/([0-9a-f-]{36})$/i);
   if (moderationFlagMatch) return { operation: "opsModerationFlagItem", flagId: moderationFlagMatch[1] };
+  if (path === "/announcements") return { operation: "announcements" };
+  const announcementMatch = path.match(/^\/announcements\/([0-9a-f-]{36})(?:\/(publish|remind|retract|stats|retry))?$/i);
+  if (announcementMatch) return { operation: "announcementItem", announcementId: announcementMatch[1], action: announcementMatch[2] };
   if (path === "/feedback") return { operation: "listFeedback" };
+  const feedbackPushMatch = path.match(/^\/feedback\/([0-9a-f-]{36})\/push$/i);
+  if (feedbackPushMatch) return { operation: "feedbackPush", feedbackId: feedbackPushMatch[1] };
   const feedbackMatch = path.match(/^\/feedback\/([0-9a-f-]{36})$/i);
   if (feedbackMatch) return { operation: "patchFeedback", feedbackId: feedbackMatch[1] };
   if (path === "/foods/missing-images") return { operation: "missingImages" };
@@ -2255,6 +2263,10 @@ function normalizeFoodImageDispatchPath(pathname) {
 
 function getFeedbackRoute(pathname) {
   const path = pathname.replace(/^\/get-login-ticket/, "");
+  if (path === "/notifications") return { operation: "notifications" };
+  if (path === "/notification-preferences") return { operation: "notificationPreferences" };
+  const notificationMatch = path.match(/^\/notifications\/([0-9a-f-]{36})(\/read)?$/i);
+  if (notificationMatch) return { operation: "notificationItem", notificationId: notificationMatch[1], read: Boolean(notificationMatch[2]) };
   if (path === "/feedback") return { operation: "feedback" };
   if (path === "/feedback/read") return { operation: "markRepliesRead" };
   return null;
@@ -2409,7 +2421,9 @@ function createHttpServer({ service }) {
         if (!verifyReminderDispatchSignature(service?.reminderDispatchSecret, req, { path, body: payload.raw })) {
           return sendJson(res, 401, { code: "UNAUTHORIZED" });
         }
-        return sendJson(res, 200, await service.scheduledReminders.dispatch({ limit: payload.body?.limit }));
+        const reminders = await service.scheduledReminders.dispatch({ limit: payload.body?.limit });
+        const notifications = await service.notifications?.dispatch(5);
+        return sendJson(res, 200, { ...reminders, notifications });
       } catch (error) {
         captureTraceError(res, error);
         console.error("[push-reminder-dispatch] failed:", error?.code || error?.message || error);
@@ -3155,6 +3169,24 @@ function createHttpServer({ service }) {
             body?.reviewStatus || body?.status,
           ));
         }
+        if (["announcements", "announcementItem"].includes(adminFoodRoute.operation)) {
+          if (!service.notifications) return sendJson(res, 503, { code: "NOTIFICATIONS_UNAVAILABLE" });
+          const n = service.notifications;
+          const a = adminFoodRoute;
+          if (a.operation === "announcements" && req.method === "GET") return sendJson(res, 200, await n.adminList(session.sub));
+          if (a.operation === "announcements" && req.method === "POST") return sendJson(res, 200, await n.save(session.sub, null, await readJsonBody(req)));
+          if (a.operation === "announcementItem" && !a.action && req.method === "PATCH") return sendJson(res, 200, await n.save(session.sub, a.announcementId, await readJsonBody(req)));
+          if (a.action === "stats" && req.method === "GET") return sendJson(res, 200, await n.stats(session.sub, a.announcementId));
+          if (a.action && req.method === "POST") {
+            const result = a.action === "retry" ? await n.retry(session.sub, a.announcementId) : await n.act(session.sub, a.announcementId, a.action);
+            return sendJson(res, 200, result);
+          }
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        }
+        if (adminFoodRoute.operation === "feedbackPush") {
+          if (!["GET", "POST"].includes(req.method)) return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          return sendJson(res, 200, await service.notifications.feedbackPush(session.sub, adminFoodRoute.feedbackId, req.method === "POST"));
+        }
         if (adminFoodRoute.operation === "patchFeedback") {
           if (req.method !== "PATCH") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.adminConsole) return sendJson(res, 503, { code: "FOOD_ADMIN_UNAVAILABLE" });
@@ -3487,6 +3519,7 @@ function createHttpServer({ service }) {
             : error.code === "USER_NOT_FOUND" ? 404 : 503;
           return sendJson(res, status, { code: error.code });
         }
+        if (error instanceof NotificationError) return sendJson(res, error.code === "FORBIDDEN" ? 403 : error.code.endsWith("FAILED") ? 503 : 400, { code: error.code });
         if (error instanceof AdminConsoleError) {
           const code = error.code;
           const status = code === "FORBIDDEN" ? 403
@@ -3889,6 +3922,20 @@ function createHttpServer({ service }) {
     if (feedbackRoute) {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
+      if (["notifications", "notificationItem", "notificationPreferences"].includes(feedbackRoute.operation)) {
+        if (!service.notifications) return sendJson(res, 503, { code: "NOTIFICATIONS_UNAVAILABLE" });
+        try {
+          const n = service.notifications;
+          if (feedbackRoute.operation === "notifications" && req.method === "GET") return sendJson(res, 200, await n.list(session.sub, { offset: url.searchParams.get("offset"), kind: url.searchParams.get("kind") }));
+          if (feedbackRoute.operation === "notificationPreferences" && ["GET", "PUT"].includes(req.method)) return sendJson(res, 200, await n.preferences(session.sub, req.method === "PUT" ? await readJsonBody(req) : undefined));
+          if (feedbackRoute.operation === "notificationItem" && !feedbackRoute.read && req.method === "GET") return sendJson(res, 200, await n.detail(session.sub, feedbackRoute.notificationId));
+          if (feedbackRoute.operation === "notificationItem" && feedbackRoute.read && req.method === "POST") return sendJson(res, 200, await n.read(session.sub, feedbackRoute.notificationId));
+          return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+        } catch (error) {
+          const code = error instanceof NotificationError ? error.code : "NOTIFICATIONS_UNAVAILABLE";
+          return sendJson(res, code.endsWith("NOT_FOUND") ? 404 : code.endsWith("INVALID") ? 400 : 503, { code });
+        }
+      }
       if (feedbackRoute.operation === "feedback" && req.method === "GET") {
         if (!service.feedback?.listFeedbackForUser) return sendJson(res, 503, { code: "FEEDBACK_LIST_UNAVAILABLE" });
         try {

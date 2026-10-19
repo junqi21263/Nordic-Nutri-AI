@@ -588,7 +588,11 @@
       .utility-panel { margin-top: 12px; }
       .inspector-actions { position: sticky; bottom: 0; padding: 12px 0; background: rgba(250,248,243,.96); }
     }
-  </style>
+  #announcementForm label{display:grid;gap:8px;font-size:13px;color:var(--ink)}
+#announcementForm input:not([type=checkbox]),#announcementForm textarea{box-sizing:border-box;border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:12px;font:inherit;color:var(--ink);line-height:1.7;min-height:44px}
+#announcementForm input:focus,#announcementForm textarea:focus{outline:2px solid #a7b7a5;outline-offset:2px}
+#announcementForm label:has(input[type=checkbox]){display:flex;align-items:center;gap:10px}
+</style>
 </head>
 <body>
   <section id="loginGate" class="login-gate" aria-label="后台登录">
@@ -618,7 +622,7 @@
         <div class="admin-nav__group" data-nav-domain="ai-operations"><span class="admin-nav__label">AI 运营</span><button type="button" class="admin-nav__item" data-module="ops">运营总览</button><button type="button" class="admin-nav__item" data-module="quota">额度管理</button></div>
         <div class="admin-nav__group" data-nav-domain="jobs"><span class="admin-nav__label">任务</span><button type="button" class="admin-nav__item" data-module="jobs">Jobs</button><button type="button" class="admin-nav__item" data-module="push">推送测试</button></div>
         <div class="admin-nav__group" data-nav-domain="moderation"><span class="admin-nav__label">内容安全</span><button type="button" class="admin-nav__item" data-module="moderation">内容安全</button><button type="button" class="admin-nav__item" data-module="user-images">用户图片</button></div>
-        <div class="admin-nav__group" data-nav-domain="feedback"><span class="admin-nav__label">反馈</span><button type="button" class="admin-nav__item" data-module="feedback">问题反馈</button></div>
+        <div class="admin-nav__group" data-nav-domain="feedback"><span class="admin-nav__label">反馈</span><button type="button" class="admin-nav__item" data-module="feedback">问题反馈</button><button type="button" class="admin-nav__item" data-module="announcements">系统通知公告</button></div>
         <div class="admin-nav__group" data-nav-domain="system"><span class="admin-nav__label">系统</span><button type="button" class="admin-nav__item" data-module="health">系统健康</button><button type="button" class="admin-nav__item" data-module="traces">Traces</button><button type="button" class="admin-nav__item" data-module="audit-logs">审计日志</button><button type="button" class="admin-nav__item" data-module="system">系统配置</button></div>
       </nav>
 
@@ -660,6 +664,23 @@
           <div id="feedbackTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
         </section>
 
+        <section id="moduleAnnouncements" class="admin-module" hidden>
+          <div class="nn-page-header"><div><p class="eyebrow">System / Announcements</p><h2>系统通知公告</h2><p class="muted">先保存草稿，再预览发布。编辑已发布内容不会自动重复推送。</p></div><div><button id="announcementNew" class="button secondary" type="button">新建草稿</button><button id="announcementRefresh" class="button secondary" type="button">刷新</button></div></div>
+          <div id="announcementList" class="data-table"></div>
+          <section class="ops-panel" style="margin-top:24px"><h3 id="announcementEditorTitle">新建公告</h3>
+          <form id="announcementForm" style="display:grid;gap:16px;max-width:850px">
+            <label>标题<input id="announcementTitle" required maxlength="80" style="width:100%" /></label>
+            <label>摘要（用于通知列表和 Push）<input id="announcementSummary" required maxlength="200" style="width:100%" /></label>
+            <label>正文<textarea id="announcementBody" required maxlength="10000" rows="10" style="width:100%" placeholder="支持分段、列表文本和 https 链接"></textarea></label>
+            <label>接收范围<select id="announcementAudience"><option value="all">全部现有用户</option><option value="selected">指定用户</option></select></label>
+            <label id="announcementRecipientsLabel" hidden>用户 ID（逗号或换行分隔，最多 500 人）<textarea id="announcementRecipients" rows="3" style="width:100%"></textarea></label>
+            <label><input id="announcementPush" type="checkbox" /> 发布时同时发送安卓 Push</label>
+            <p class="muted">接收范围发布后锁定。再次提醒只针对未读用户；撤回无法保证移除已到达手机的通知。</p>
+            <div style="display:flex;gap:12px;flex-wrap:wrap"><button id="announcementSave" class="button" type="submit">保存草稿</button><button id="announcementPreview" class="button secondary" type="button">预览与发布</button></div>
+          </form></section>
+          <pre id="announcementStats" style="white-space:pre-wrap;padding:20px" aria-live="polite"></pre>
+          <dialog id="announcementPreviewDialog" style="max-width:560px;width:90%;border:1px solid #dce6dc;border-radius:20px;padding:28px;background:#f4fbf5;color:#30483d"><h3 id="announcementPreviewTitle"></h3><p id="announcementPreviewSummary"></p><div id="announcementPreviewBody" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8"></div><hr/><p id="announcementPreviewTarget"></p><p id="announcementPreviewPush"></p><button id="announcementPublish" class="button" type="button">确认发布</button><button id="announcementPreviewClose" class="button secondary" type="button">关闭</button></dialog>
+        </section>
         <section id="moduleFoods" class="admin-module nn-food-operations" hidden>
           <div class="nn-page-header"><div><p class="eyebrow">Food Library / Explorer</p><h2>食材管理</h2><p class="muted">维护食材基础资料、营养摘要和主图状态。</p></div><div class="nn-filter-bar"><span class="nn-status-badge nn-status-badge--healthy">数据目录</span><button id="refreshFoodAdmin" class="button secondary" type="button">刷新</button><button id="createFoodAdmin" class="button" type="button">新建食材</button></div></div>
           <div class="nn-filter-bar nn-status-filter nn-food-filter-bar">
@@ -1109,6 +1130,7 @@
     <section class="food-admin-modal__panel" role="dialog" aria-modal="true" aria-labelledby="feedbackReplyTitle">
       <div class="food-admin-editor__head"><h3 id="feedbackReplyTitle">回复反馈</h3><button id="feedbackReplyClose" class="button link" type="button">关闭</button></div>
       <div id="feedbackReplyContext" class="food-admin-editor__grid span-2"></div>
+      <p id="feedbackPushStatus" class="muted" aria-live="polite"></p><button id="feedbackPushRetry" class="button secondary" type="button" hidden>重试失败的 Push</button>
       <label style="display:grid;gap:6px;margin-top:12px">回复内容<textarea id="feedbackReplyInput" rows="5" maxlength="2000" placeholder="输入回复内容"></textarea></label>
       <div class="food-admin-editor__actions"><button id="feedbackReplyCancel" class="button secondary" type="button">取消</button><button id="feedbackReplySave" class="button" type="button">保存回复并通知用户</button></div>
     </section>
@@ -2202,11 +2224,31 @@
       $("feedbackReplyContext").innerHTML = `<p class="muted">用户：${escapeHtml(item.nickname || item.userId || "—")}</p><p class="muted">分类：${escapeHtml(feedbackCategoryLabel(item.category))} · ${escapeHtml(feedbackStatusLabels[item.status] || item.status)}</p><p>原反馈：${escapeHtml(item.content)}</p>${item.repliedAt ? `<p class="muted">最近回复：${escapeHtml(formatTime(item.repliedAt))}</p>` : ""}`;
       $("feedbackReplyInput").value = item.adminReply || "";
       $("feedbackReplyModal").hidden = false;
+      $("feedbackPushStatus").textContent = "首次回复会创建消息并发送 Push；编辑回复默认不重复推送。";
+      $("feedbackPushRetry").hidden = true;
+      void loadFeedbackPushStatus(item.id);
     }
+    async function loadFeedbackPushStatus(id) {
+      try {
+        const result = await api(`/feedback/${id}/push`);
+        if (state.feedbackReplyItem?.id !== id) return;
+        const item = result.item;
+        const labels = { pending: "待发送", sending: "发送中", accepted: "FCM 已接受（不代表设备收到）", skipped: "未发送：无可用设备、已读或提醒已关闭", failed: "发送失败，可重试" };
+        $("feedbackPushStatus").textContent = item ? `Push：${labels[item.push_status] || item.push_status}${item.read_at ? " · 站内已读" : ""}` : "暂无 Push 记录；首次回复后会创建。";
+        $("feedbackPushRetry").hidden = item?.push_status !== "failed";
+      } catch { if (state.feedbackReplyItem?.id === id) $("feedbackPushStatus").textContent = "推送状态加载失败，请重新打开查看。"; }
+    }
+    $("feedbackPushRetry").onclick = async () => {
+      const item = state.feedbackReplyItem; if (!item) return;
+      $("feedbackPushRetry").disabled = true;
+      try { await api(`/feedback/${item.id}/push`, { method: "POST", body: {} }); await loadFeedbackPushStatus(item.id); }
+      catch (error) { toast(apiErrorMessage(error), true); }
+      finally { $("feedbackPushRetry").disabled = false; }
+    };
     async function saveFeedbackReply() {
       const item = state.feedbackReplyItem; const reply = ($("feedbackReplyInput").value || "").trim();
       if (!item || !reply) return toast("请填写回复内容", true);
-      try { await api(`/feedback/${item.id}`, { method: "PATCH", body: { reply } }); moduleCache.feedback = null; closeFeedbackReply(); toast("回复已保存并通知用户"); await loadFeedback({ force: true }); }
+      try { await api(`/feedback/${item.id}`, { method: "PATCH", body: { reply } }); moduleCache.feedback = null; closeFeedbackReply(); toast("回复已保存；首次回复的 Push 已加入发送队列"); await loadFeedback({ force: true }); }
       catch (error) { toast(apiErrorMessage(error), true); }
     }
     function bindFeedbackTable(host, items) {
@@ -3408,13 +3450,14 @@
       try { const [detail, timeline] = await Promise.all([api(`/users/${encodeURIComponent(id)}`), api(`/users/${encodeURIComponent(id)}/timeline`)]); renderUserDetail(detail); renderUserTimeline(timeline); } catch (error) { setOpsMessage($("userDetailSummary"), apiErrorMessage(error), "danger"); setOpsMessage($("userTimeline"), "Timeline 暂时不可用", "danger"); }
     }
     function openUserDetail(userId) { $("userDetailId").value = userId || ""; setModule("user-detail"); loadUserDetailModule().catch(() => {}); }
-    const MODULE_LABELS = { dashboard: "总览", users: "用户数据", verification: "验证码中心", "user-detail": "用户详情", foods: "食材管理", images: "食材生图", audit: "旧图审计", ops: "运营总览", quota: "额度管理", jobs: "Jobs", push: "推送测试", moderation: "内容安全", "user-images": "用户图片", feedback: "问题反馈", health: "系统健康", traces: "Traces", "audit-logs": "审计日志", system: "系统配置" };
+    const MODULE_LABELS = { dashboard: "总览", users: "用户数据", verification: "验证码中心", "user-detail": "用户详情", foods: "食材管理", images: "食材生图", audit: "旧图审计", ops: "运营总览", quota: "额度管理", jobs: "Jobs", push: "推送测试", moderation: "内容安全", "user-images": "用户图片", feedback: "问题反馈", announcements: "系统通知公告", health: "系统健康", traces: "Traces", "audit-logs": "审计日志", system: "系统配置" };
     function setModule(name) {
       document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.classList.toggle("active", btn.dataset.module === name); });
       if ($("currentArea")) $("currentArea").textContent = MODULE_LABELS[name] || "管理后台";
       $("moduleUsers").hidden = name !== "users";
       $("moduleVerification").hidden = name !== "verification";
       $("moduleFeedback").hidden = name !== "feedback";
+      $("moduleAnnouncements").hidden = name !== "announcements";
       $("moduleFoods").hidden = name !== "foods";
       $("moduleImages").hidden = name !== "images";
       $("moduleAudit").hidden = name !== "audit";
@@ -3433,6 +3476,7 @@
       $("moduleSystem").hidden = name !== "system";
       if (name === "users") loadUsers().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "verification") loadVerifications().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "announcements") loadAnnouncements().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "feedback") loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "foods") loadFoodAdminList().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "audit") refreshAuditRun().catch((error) => toast(apiErrorMessage(error), true));
@@ -3774,5 +3818,6 @@
     showLoginGate();
     if (hasToken()) connect().catch(() => {});
   </script>
+  <script src="./announcements.js?v=20261019"></script>
 </body>
 </html>

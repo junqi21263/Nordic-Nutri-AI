@@ -153,5 +153,10 @@ export function startApplicationAuth(options?: {
   force?: boolean;
   allowSilentLogin?: boolean;
 }) {
-  return applicationLaunch.start(options);
+  return applicationLaunch.start(options).then(async () => {
+    if (isAndroidApp) {
+      const { resumePendingNotification } = await import("../features/smart-reminders/push-coordinator");
+      await resumePendingNotification();
+    }
+  });
 }

@@ -2,7 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { PushNotifications, type ActionPerformed, type PermissionStatus, type PushNotificationSchema, type Token } from "@capacitor/push-notifications";
 
 type ListenerHandle = { remove: () => Promise<void> };
-export type NativePushIntent = { deliveryId: string; mealType: string; traceId?: string };
+export type NativePushIntent = { deliveryId: string; mealType: string; traceId?: string; notificationId?: string; userId?: string; kind?: string };
 type PushAdapterDependencies = {
   isAvailable: () => boolean;
   checkPermissions: () => Promise<PermissionStatus>;
@@ -37,7 +37,7 @@ function consumeNativePushIntent(): NativePushIntent | null {
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<NativePushIntent>;
     if (typeof value.deliveryId !== "string" || typeof value.mealType !== "string") return null;
-    return { deliveryId: value.deliveryId, mealType: value.mealType, traceId: value.traceId };
+    return { deliveryId: value.deliveryId, mealType: value.mealType, traceId: value.traceId, notificationId: value.notificationId, userId: value.userId, kind: value.kind };
   } catch {
     return null;
   }

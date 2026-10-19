@@ -22,6 +22,7 @@ const pages = [
   "pages/language-settings/index",
   "pages/coach/index",
   "pages/profile/index",
+  "pages/notifications/index",
   "pages/privacy-policy/index",
   "pages/terms-of-service/index",
   "pages/recommend-friends/index",
