@@ -334,6 +334,7 @@ export default function ProfilePage() {
           onMotionChange={setProfileMotion}
           accountError={accountError}
           retryAccount={syncProfileFromAccount}
+          unreadNotifications={unreadNotifications}
         /> : <>
         <View ariaLabel={t("profile.editProfile")} onClick={() => openPage("/pages/profile-edit/index")}>
           <AppCard tone="dark" className="profile-hero profile-rhythm__identity">
@@ -464,7 +465,7 @@ export default function ProfilePage() {
           <View className="profile-rhythm__settings-section">
             <Text className="profile-rhythm__settings-label">{t("profile.helpInformation")}</Text>
             <View className="profile-rhythm__settings-group">
-              <View onClick={() => openPage("/pages/notifications/index")}><ListItem icon={<NordicIcon name="bell" size={20} />} title={t("notifications.title")} trailing={unreadNotifications > 0 ? "●" : "›"} /></View>
+              {!isAndroidApp ? <View onClick={() => openPage("/pages/notifications/index")}><ListItem icon={<NordicIcon name="bell" size={20} />} title={t("notifications.title")} trailing={unreadNotifications > 0 ? "●" : "›"} /></View> : null}
               <View onClick={openFeedback}>
                 <ListItem
                   icon={<NordicIcon name="message-circle" size={20} ariaLabel={t("profile.feedback")} />}

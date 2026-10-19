@@ -42,9 +42,10 @@ interface Props {
   onMotionChange: (enabled: boolean) => void;
   accountError: boolean;
   retryAccount: () => void;
+  unreadNotifications: number;
 }
 
-export function AndroidProfileOverview({ profile, refreshVersion, openPage, openCoach, openMealRecords, openAchievement, onMotionChange, accountError, retryAccount }: Props) {
+export function AndroidProfileOverview({ profile, refreshVersion, openPage, openCoach, openMealRecords, openAchievement, onMotionChange, accountError, retryAccount, unreadNotifications }: Props) {
   useTranslation();
   const [daily, setDaily] = useState<ProductDailySummary | null>(null);
   const [weekly, setWeekly] = useState<ProductWeeklyReview | null>(null);
@@ -117,6 +118,10 @@ export function AndroidProfileOverview({ profile, refreshVersion, openPage, open
   return <View className={`profile-stitch__overview${animate ? " profile-stitch__overview--animated" : ""}${animate && reveal ? " profile-stitch__overview--motion" : ""}`}>
     <View className="profile-stitch__header">
       <View><Text className="profile-stitch__brand">NORDIC</Text><Text className="profile-stitch__space"> / MY SPACE</Text></View>
+      <Button className="profile-stitch__inbox" ariaLabel={t("notifications.title")} onClick={() => openPage("/pages/notifications/index")}>
+        <NordicIcon name="mail" size={22} ariaLabel={t("notifications.title")} />
+        {unreadNotifications > 0 ? <View className="profile-stitch__inbox-dot" /> : null}
+      </Button>
     </View>
     <View className="profile-stitch__hero profile-stitch__reveal">
       <Button className="profile-stitch__identity" onClick={() => openPage("/pages/profile-edit/index")} ariaLabel={t("profileOverview.editProfile")}>

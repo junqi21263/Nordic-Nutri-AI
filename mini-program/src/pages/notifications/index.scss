@@ -80,10 +80,16 @@
   flex-direction: column;
   gap: 12px;
 }
-.notifications__settings-link {
-  align-self: flex-end;
-  font-size: 13px;
+.page-layout--notifications .top-navigation__actions {
+  align-self: center;
+}
+.page-layout--notifications .top-navigation__action {
+  width: auto;
+  height: auto;
   padding: 10px;
+  border: 0;
+  background: none;
+  font-size: 13px;
   color: #536253;
 }
 

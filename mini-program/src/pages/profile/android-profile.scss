@@ -21,6 +21,8 @@
   }
   .profile-stitch__overview { font-size: 12PX; line-height: 1.5; }
   .profile-stitch__header { display: flex; align-items: center; justify-content: space-between; padding: max(24PX, env(safe-area-inset-top)) 0 20PX; min-height: 36PX; gap: 12PX; }
+  taro-button-core.profile-stitch__inbox { position: relative; display: flex; align-items: center; justify-content: center; width: 36PX; height: 36PX; flex: 0 0 36PX; margin-left: auto; }
+  .profile-stitch__inbox-dot { position: absolute; top: 4PX; right: 3PX; width: 7PX; height: 7PX; border-radius: 50%; background: #b86851; box-shadow: 0 0 0 2PX #f9f8f4; }
   .profile-stitch__brand { font-family: Georgia, serif; font-size: 14PX; letter-spacing: 3PX; color: #10241d; }
   .profile-stitch__space { font-size: 10PX; letter-spacing: 1.5PX; color: var(--profile-muted); }
   .profile-stitch__hero { border-radius: 24PX; padding: 20PX; color: #f9f8f4; background: radial-gradient(ellipse at right bottom, #154332, transparent 70%), #18352a; box-shadow: 0 12PX 30PX -4PX rgba(24,53,42,.07); }

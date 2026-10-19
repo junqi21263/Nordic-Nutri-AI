@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { PageLayout } from "../../layouts/page-layout";
 import { AppButton } from "../../components/app-button";
+import { navigateBackOrHome } from "../../utils/navigation";
 import { useAuthStore } from "../../auth/auth-store";
 import {
   getNotification,
@@ -98,6 +99,10 @@ export default function NotificationsPage() {
       title={t(settings ? "notifications.settings" : "notifications.title")}
       showBack
       showTabs={false}
+      action={android && !settings && !detailId ? `${t("notifications.settings")} ›` : undefined}
+      onActionClick={() => void Taro.navigateTo({ url: "/pages/notifications/index?settings=1" })}
+      onTopBarBack={() => navigateBackOrHome(detailId || settings ? "/pages/notifications/index" : "/pages/profile/index")}
+      className="page-layout--notifications"
     >
       <View className="notifications">
         {error ? (
@@ -208,16 +213,6 @@ export default function NotificationsPage() {
                 </AppButton>
               ))}
             </View>
-            {android ? (
-              <View
-                className="notifications__settings-link"
-                onClick={() =>
-                  void Taro.navigateTo({ url: "/pages/notifications/index?settings=1" })
-                }
-              >
-                <Text>{t("notifications.settings")} ›</Text>
-              </View>
-            ) : null}
             {!loading && !error && !items.length ? (
               <Text className="notifications__muted">{t("notifications.empty")}</Text>
             ) : null}
