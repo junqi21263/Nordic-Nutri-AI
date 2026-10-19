@@ -90,13 +90,6 @@ export function createAndroidPushCoordinator(
           await sync();
         },
         onNotification: async (notification) => {
-          const data = notification.data as { notificationId?: string } | undefined;
-          if (data?.notificationId) {
-            const { useFeedbackStore } = await import("../../stores/feedback-store");
-            useFeedbackStore
-              .getState()
-              .show({ message: notification.title || "Nordic Nutri", tone: "success" });
-          }
           const deliveryId = deliveryIdFrom(notification);
           if (deliveryId) await deps.acknowledgeDelivery(deliveryId, "received").catch(() => {});
         },

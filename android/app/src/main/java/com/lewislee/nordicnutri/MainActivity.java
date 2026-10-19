@@ -18,14 +18,6 @@ import androidx.core.graphics.Insets;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    public static volatile boolean appVisible = false;
-
-    @Override
-    public void onResume() { super.onResume(); appVisible = true; }
-
-    @Override
-    public void onPause() { appVisible = false; super.onPause(); }
-
     private boolean welcomeVisible = false;
     private boolean authLandingVisible = false;
     private JSONObject pendingPushIntent;

@@ -56,11 +56,6 @@ public final class NordicFirebaseMessagingService extends FirebaseMessagingServi
         if (body.isEmpty()) body = "拍一下就好 📷";
 
         String kind = value(data, "kind");
-        if (!kind.isEmpty() && MainActivity.appVisible) {
-            PushNotificationsPlugin.sendRemoteMessage(message);
-            acknowledgeWithCurrentToken(deliveryId, "received");
-            return;
-        }
         String channelId = "feedback".equals(kind) ? "feedback-replies" : "system".equals(kind) ? "system-announcements" : CHANNEL_ID;
         ensureChannel(channelId);
         boolean permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU

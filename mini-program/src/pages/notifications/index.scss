@@ -15,6 +15,8 @@
   flex-direction: column;
   gap: 14px;
   box-shadow: 0 4px 16px #30483d08;
+  font-size: 15px;
+  line-height: 1.5;
 }
 .notifications__title {
   font-size: 19px;
@@ -66,7 +68,11 @@
   padding: 18px;
   background: #edf3eb;
   border-radius: 16px;
+  font-size: 15px;
+  line-height: 1.5;
 }
+.notifications__setting > taro-text-core { flex: 1; min-width: 0; }
+.notifications__setting > taro-switch-core { flex: none; }
 .notifications__label {
   font-size: 12px;
   color: #59725e;
