@@ -670,16 +670,14 @@
           <section class="ops-panel" style="margin-top:24px"><h3 id="announcementEditorTitle">新建公告</h3>
           <form id="announcementForm" style="display:grid;gap:16px;max-width:850px">
             <label>标题<input id="announcementTitle" required maxlength="80" style="width:100%" /></label>
-            <label>摘要（用于通知列表和 Push）<input id="announcementSummary" required maxlength="200" style="width:100%" /></label>
             <label>正文<textarea id="announcementBody" required maxlength="10000" rows="10" style="width:100%" placeholder="支持分段、列表文本和 https 链接"></textarea></label>
-            <label>接收范围<select id="announcementAudience"><option value="all">全部现有用户</option><option value="selected">指定用户</option></select></label>
-            <label id="announcementRecipientsLabel" hidden>用户 ID（逗号或换行分隔，最多 500 人）<textarea id="announcementRecipients" rows="3" style="width:100%"></textarea></label>
+            <label>用户 ID（留空发送给全部现有用户；填写后仅发送给指定用户，逗号或换行分隔，最多 500 人）<textarea id="announcementRecipients" rows="3" style="width:100%"></textarea></label>
             <label><input id="announcementPush" type="checkbox" /> 发布时同时发送安卓 Push</label>
-            <p class="muted">接收范围发布后锁定。再次提醒只针对未读用户；撤回无法保证移除已到达手机的通知。</p>
+            <p class="muted">发布后不可修改接收用户。Push 文案自动取正文开头；再次提醒只针对未读用户。撤回无法保证移除已到达手机的通知。</p>
             <div style="display:flex;gap:12px;flex-wrap:wrap"><button id="announcementSave" class="button" type="submit">保存草稿</button><button id="announcementPreview" class="button secondary" type="button">预览与发布</button></div>
           </form></section>
           <pre id="announcementStats" style="white-space:pre-wrap;padding:20px" aria-live="polite"></pre>
-          <dialog id="announcementPreviewDialog" style="max-width:560px;width:90%;border:1px solid #dce6dc;border-radius:20px;padding:28px;background:#f4fbf5;color:#30483d"><h3 id="announcementPreviewTitle"></h3><p id="announcementPreviewSummary"></p><div id="announcementPreviewBody" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8"></div><hr/><p id="announcementPreviewTarget"></p><p id="announcementPreviewPush"></p><button id="announcementPublish" class="button" type="button">确认发布</button><button id="announcementPreviewClose" class="button secondary" type="button">关闭</button></dialog>
+          <dialog id="announcementPreviewDialog" style="max-width:560px;width:90%;border:1px solid #dce6dc;border-radius:20px;padding:28px;background:#f4fbf5;color:#30483d"><h3 id="announcementPreviewTitle"></h3><div id="announcementPreviewBody" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8"></div><hr/><p id="announcementPreviewTarget"></p><p id="announcementPreviewPush"></p><button id="announcementPublish" class="button" type="button">确认发布</button><button id="announcementPreviewClose" class="button secondary" type="button">关闭</button></dialog>
         </section>
         <section id="moduleFoods" class="admin-module nn-food-operations" hidden>
           <div class="nn-page-header"><div><p class="eyebrow">Food Library / Explorer</p><h2>食材管理</h2><p class="muted">维护食材基础资料、营养摘要和主图状态。</p></div><div class="nn-filter-bar"><span class="nn-status-badge nn-status-badge--healthy">数据目录</span><button id="refreshFoodAdmin" class="button secondary" type="button">刷新</button><button id="createFoodAdmin" class="button" type="button">新建食材</button></div></div>
@@ -3818,6 +3816,6 @@
     showLoginGate();
     if (hasToken()) connect().catch(() => {});
   </script>
-  <script src="./announcements.js?v=20261019"></script>
+  <script src="./announcements.js?v=20261019-2"></script>
 </body>
 </html>

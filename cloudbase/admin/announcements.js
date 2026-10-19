@@ -4,17 +4,16 @@ let announcementEditingId = null;
 let announcementDirty = false;
 let announcementBusy = false;
 function announcementFormData() {
+  const body = $("announcementBody").value.trim();
+  const recipientIds = $("announcementRecipients")
+    .value.split(/[\s,，]+/)
+    .filter(Boolean);
   return {
     title: $("announcementTitle").value.trim(),
-    summary: $("announcementSummary").value.trim(),
-    body: $("announcementBody").value.trim(),
-    audience: $("announcementAudience").value,
-    recipientIds:
-      $("announcementAudience").value === "selected"
-        ? $("announcementRecipients")
-            .value.split(/[\s,，]+/)
-            .filter(Boolean)
-        : [],
+    summary: body.replace(/\s+/g, " ").slice(0, 200),
+    body,
+    audience: recipientIds.length ? "selected" : "all",
+    recipientIds,
     pushEnabled: $("announcementPush").checked,
   };
 }
@@ -22,17 +21,12 @@ function editAnnouncement(item) {
   announcementEditingId = item?.id || null;
   announcementDirty = false;
   $("announcementTitle").value = item?.title || "";
-  $("announcementSummary").value = item?.summary || "";
   $("announcementBody").value = item?.body || "";
-  $("announcementAudience").value = item?.audience || "all";
   $("announcementRecipients").value = (item?.recipient_ids || []).join("\n");
   $("announcementPush").checked = Boolean(item?.push_enabled);
-  $("announcementAudience").disabled = Boolean(item && item.status !== "draft");
   $("announcementRecipients").disabled = Boolean(
     item && item.status !== "draft",
   );
-  $("announcementRecipientsLabel").hidden =
-    $("announcementAudience").value !== "selected";
   $("announcementEditorTitle").textContent = item
     ? `编辑公告 · ${announcementStatus(item.status)}`
     : "新建公告";
@@ -125,10 +119,6 @@ $("announcementForm").addEventListener(
   "input",
   () => (announcementDirty = true),
 );
-$("announcementAudience").onchange = () => {
-  $("announcementRecipientsLabel").hidden =
-    $("announcementAudience").value !== "selected";
-};
 $("announcementNew").onclick = () => {
   if (announcementDirty && !confirm("放弃尚未保存的编辑？")) return;
   editAnnouncement(null);
@@ -162,7 +152,6 @@ $("announcementPreview").onclick = () => {
   );
   if (!item) return;
   $("announcementPreviewTitle").textContent = item.title;
-  $("announcementPreviewSummary").textContent = item.summary;
   $("announcementPreviewBody").textContent = item.body;
   $("announcementPreviewTarget").textContent =
     `接收范围：${item.audience === "all" ? "全部现有用户" : `${item.recipient_ids.length} 位指定用户`}`;
