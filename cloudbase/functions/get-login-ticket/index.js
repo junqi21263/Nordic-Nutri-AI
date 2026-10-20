@@ -2886,6 +2886,7 @@ function createHttpServer({ service }) {
           return sendJson(res, 200, await service.adminConsole.listUsers(session.sub, {
             q: url.searchParams.get("q") || "",
             limit: url.searchParams.get("limit"),
+            page: url.searchParams.get("page"),
           }));
         }
         if (adminFoodRoute.operation === "listFeedback") {

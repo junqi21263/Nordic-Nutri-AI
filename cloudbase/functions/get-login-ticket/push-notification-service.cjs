@@ -360,9 +360,9 @@ function createFcmPushService({
                   token: row.token,
                   android: {
                     priority: "HIGH",
-                    ...(notificationId ? { notification: { channel_id: kind === "feedback" ? "feedback-replies" : "system-announcements" } } : {}),
+                    notification: { channel_id: notificationId ? (kind === "feedback" ? "feedback-replies" : "system-announcements") : "meal-reminders" },
                   },
-                  ...(notificationId ? { notification: { title: safeCopy.title, body: safeCopy.body } } : {}),
+                  notification: { title: safeCopy.title, body: safeCopy.body },
                   data: { deliveryId, traceId: requiredString(traceId), mealType, reminder: notificationId ? "0" : "1", ...(notificationId ? { notificationId, kind, userId } : {}), source, title: safeCopy.title, body: safeCopy.body },
                 },
               }
@@ -371,14 +371,15 @@ function createFcmPushService({
                 token: row.token,
                 android: {
                   priority: "HIGH",
-                  ...(notificationId ? { notification: { channel_id: kind === "feedback" ? "feedback-replies" : "system-announcements" } } : {}),
+                  notification: { channel_id: notificationId ? (kind === "feedback" ? "feedback-replies" : "system-announcements") : "meal-reminders" },
                 },
-                ...(notificationId ? { notification: { title: safeCopy.title, body: safeCopy.body } } : {}),
+                notification: { title: safeCopy.title, body: safeCopy.body },
                 data: { deliveryId, traceId: requiredString(traceId), mealType, reminder: notificationId ? "0" : "1", ...(notificationId ? { notificationId, kind, userId } : {}), source, title: safeCopy.title, body: safeCopy.body },
               },
             }),
         }, { timeoutMs: fcmRequestTimeoutMs, setTimeoutImpl, clearTimeoutImpl, AbortControllerImpl });
       } catch (error) {
+        await updateDeliveryAttempt(deliveryId, { status: "failed", last_event: error?.name === "AbortError" ? "timeout" : "unavailable", last_event_at: now().toISOString() });
         if (error?.name === "AbortError") throw new PushNotificationError("FCM_TIMEOUT", "FCM 请求超时");
         throw new PushNotificationError("FCM_UNAVAILABLE", "FCM 服务暂时不可用");
       }
@@ -404,6 +405,7 @@ function createFcmPushService({
         invalidated += 1;
         continue;
       }
+      await updateDeliveryAttempt(deliveryId, { status: "failed", last_event: safeErrorCode(body?.error || body), last_event_at: now().toISOString() });
       throw new PushNotificationError("FCM_SEND_FAILED", safeErrorCode(body?.error || body));
     }
     return {

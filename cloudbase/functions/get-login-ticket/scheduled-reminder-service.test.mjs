@@ -45,3 +45,21 @@ test("stores the current supported locale with every synced schedule", async () 
   assert.equal(scheduledRows.length, 3);
   assert.deepEqual(scheduledRows.map((row) => row.locale), ["zh-TW", "zh-TW", "zh-TW"]);
 });
+
+test("returns a failed reminder to the due queue when push delivery throws", async () => {
+  const schedule = { id: "schedule-1", user_id: "user-1", meal_type: "lunch", reminder_time: "12:30:00", time_zone: "UTC", locale: "zh-CN", next_run_at: "2026-09-15T12:30:00.000Z" };
+  const updates = [];
+  const db = { from(table) {
+    let payload;
+    const query = {
+      select() { return query; }, eq() { return query; }, lte() { return query; }, order() { return query; }, limit() { return query; }, is() { return query; }, gte() { return query; }, lt() { return query; },
+      update(value) { payload = value; updates.push(value); return query; },
+      then(resolve) { return Promise.resolve({ data: table === "meal_records" ? [] : payload ? [{ id: schedule.id }] : [schedule], error: null }).then(resolve); },
+    };
+    return query;
+  } };
+  const service = createScheduledReminderService({ db, push: { sendReminder: async () => { throw new Error("relay unavailable"); } }, now: () => new Date("2026-09-15T12:30:05.000Z") });
+  const result = await service.dispatch();
+  assert.equal(result.failed, 1);
+  assert.equal(updates.at(-1).next_run_at, schedule.next_run_at);
+});

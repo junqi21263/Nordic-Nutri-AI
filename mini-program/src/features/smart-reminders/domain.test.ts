@@ -81,10 +81,10 @@ describe("smart reminder domain", () => {
       [meal("2026-09-16", "breakfast")],
       now,
     );
-    expect(candidates.map((candidate) => candidate.mealType)).toEqual(["breakfast", "lunch", "dinner"]);
-    expect(candidates[0]?.at).toEqual(new Date(2026, 8, 17, 8, 30));
-    expect(candidates[1]?.at).toEqual(new Date(2026, 8, 17, 12, 30));
-    expect(candidates[2]?.at).toEqual(new Date(2026, 8, 16, 19, 0));
+    expect(candidates[0]?.at).toEqual(new Date(2026, 8, 16, 19, 0));
+    expect(candidates[1]?.at).toEqual(new Date(2026, 8, 17, 8, 30));
+    expect(candidates[2]?.at).toEqual(new Date(2026, 8, 17, 12, 30));
+    expect(candidates).toHaveLength(19);
   });
 
   it("prefers missed copy, then consistent copy, then ordinary copy", () => {

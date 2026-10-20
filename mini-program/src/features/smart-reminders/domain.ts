@@ -43,6 +43,7 @@ const notificationIds: Record<MealReminderType, number> = {
   lunch: 17_002,
   dinner: 17_003,
 };
+export const LOCAL_REMINDER_DAYS = 7;
 
 function timeToMinutes(value: string) {
   const match = /^(\d{2}):(\d{2})$/.exec(value);
@@ -154,18 +155,21 @@ export function buildNextReminderCandidates(
 ): ReminderCandidate[] {
   if (!settings.enabled) return [];
   const today = localDateString(now);
-  return reminderTypes.flatMap((mealType) => {
-    const mealSettings = settings.meals[mealType];
-    if (!mealSettings.enabled || !isReminderTimeInWindow(mealType, mealSettings.time)) return [];
-    const [hours, minutes] = mealSettings.time.split(":").map(Number);
-    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
-    if (at <= now || hasMeal(meals, today, mealType)) at.setDate(at.getDate() + 1);
-    const copy = getReminderCopy(
-      mealType,
-      consecutiveDays(meals, today, mealType, false),
-      consecutiveDays(meals, today, mealType, true),
-      locale,
-    );
-    return [{ id: getReminderNotificationId(mealType), mealType, ...copy, at }];
+  return Array.from({ length: LOCAL_REMINDER_DAYS }, (_, day) => day).flatMap((day) => {
+    const date = shiftDate(today, day);
+    return reminderTypes.flatMap((mealType) => {
+      const mealSettings = settings.meals[mealType];
+      if (!mealSettings.enabled || !isReminderTimeInWindow(mealType, mealSettings.time) || hasMeal(meals, date, mealType)) return [];
+      const [hours, minutes] = mealSettings.time.split(":").map(Number);
+      const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() + day, hours, minutes);
+      if (at <= now) return [];
+      const copy = getReminderCopy(
+        mealType,
+        consecutiveDays(meals, today, mealType, false),
+        consecutiveDays(meals, today, mealType, true),
+        locale,
+      );
+      return [{ id: getReminderNotificationId(mealType) + day * 10, mealType, ...copy, at }];
+    });
   });
 }

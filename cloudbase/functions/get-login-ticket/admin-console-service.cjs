@@ -75,9 +75,10 @@ function createAdminConsoleService({ db, isAdmin }) {
   }
 
   return {
-    async listUsers(userId, { q = "", limit = 50 } = {}) {
+    async listUsers(userId, { q = "", limit = 50, page = 1 } = {}) {
       await requireAdmin(userId);
       const cap = Math.min(Math.max(Number(limit) || 50, 1), 100);
+      const currentPage = Math.min(Math.max(Number.parseInt(page, 10) || 1, 1), 10000);
       const query = String(q || "").trim();
 
       let profileIds = null;
@@ -85,15 +86,15 @@ function createAdminConsoleService({ db, isAdmin }) {
         const profileResult = await db.from("profiles").select("id,nickname,last_login_at").ilike("nickname", `%${query}%`);
         if (profileResult.error) throw new AdminConsoleError("USERS_LIST_FAILED");
         profileIds = (profileResult.data || []).map((p) => p.id);
-        if (!profileIds.length) return { items: [], nextCursor: null };
+        if (!profileIds.length) return { items: [], nextCursor: null, pagination: { page: currentPage, pageSize: cap, total: 0, hasMore: false } };
       }
 
       let userQuery = db
         .from("app_users")
-        .select("id,is_admin,status,registration_channel,created_platform,email_normalized,email_login_enabled,phone_e164,password_hash,google_sub,created_at")
+        .select("id,is_admin,status,registration_channel,created_platform,email_normalized,email_login_enabled,phone_e164,password_hash,google_sub,created_at", { count: "exact" })
         .neq("status", "deleted")
         .order("created_at", { ascending: false })
-        .limit(cap);
+        .range((currentPage - 1) * cap, currentPage * cap - 1);
       if (UUID_RE.test(query)) userQuery = userQuery.eq("id", query);
       else if (profileIds) userQuery = userQuery.in("id", profileIds);
 
@@ -106,7 +107,7 @@ function createAdminConsoleService({ db, isAdmin }) {
         : { data: [], error: null };
       if (profilesResult.error) throw new AdminConsoleError("USERS_LIST_FAILED");
       const profileMap = new Map((profilesResult.data || []).map((p) => [p.id, p]));
-      return { items: users.map((u) => mapUser(u, profileMap.get(u.id))), nextCursor: null };
+      return { items: users.map((u) => mapUser(u, profileMap.get(u.id))), nextCursor: null, pagination: { page: currentPage, pageSize: cap, total: usersResult.count || 0, hasMore: currentPage * cap < (usersResult.count || 0) } };
     },
 
     async listFeedback(userId, { status, limit = 50 } = {}) {

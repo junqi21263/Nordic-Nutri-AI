@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ActionPerformed } from "@capacitor/local-notifications";
 import type { Meal } from "../meals/domain";
 import type { ReminderCandidate } from "./domain";
-import { DEFAULT_SMART_REMINDER_SETTINGS, getReminderNotificationId } from "./domain";
+import { DEFAULT_SMART_REMINDER_SETTINGS, getReminderNotificationId, LOCAL_REMINDER_DAYS } from "./domain";
 import { createSmartReminderCoordinator } from "./coordinator";
 
 const meal = (date: string, mealType: Meal["mealType"]): Meal => ({
@@ -38,11 +38,12 @@ describe("smart reminder coordinator", () => {
 
     await coordinator.refresh();
 
-    expect(calls).toEqual([`cancel:${getReminderNotificationId("breakfast")},${getReminderNotificationId("lunch")},${getReminderNotificationId("dinner")}`, "schedule:breakfast,lunch,dinner"]);
+    expect(calls[0]?.split(",")).toHaveLength(LOCAL_REMINDER_DAYS * 3);
+    expect(calls[1]?.split(",")).toHaveLength(LOCAL_REMINDER_DAYS * 3 - 1);
   });
 
   it("cancels all reminder ids when the account signs out", async () => {
-    const cancel = vi.fn(async () => undefined);
+    const cancel = vi.fn(async (_ids: number[]) => undefined);
     const coordinator = createSmartReminderCoordinator({
       adapter: {
         isAvailable: () => true,
@@ -59,11 +60,8 @@ describe("smart reminder coordinator", () => {
 
     await coordinator.cancel();
 
-    expect(cancel).toHaveBeenCalledWith([
-      getReminderNotificationId("breakfast"),
-      getReminderNotificationId("lunch"),
-      getReminderNotificationId("dinner"),
-    ]);
+    expect(cancel.mock.calls[0]?.[0]).toHaveLength(LOCAL_REMINDER_DAYS * 3);
+    expect(cancel.mock.calls[0]?.[0]).toContain(getReminderNotificationId("breakfast"));
   });
 
   it("routes a notification tap to manual recording with its meal type", async () => {

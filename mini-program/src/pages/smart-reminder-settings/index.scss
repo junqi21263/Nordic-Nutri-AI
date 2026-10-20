@@ -12,54 +12,6 @@
   min-height: 100vh;
 }
 
-.smart-reminder-settings__header {
-  align-items: center;
-  background: rgba($color-background, 0.92);
-  border-bottom: 1px solid rgba(#edeeeb, 0.6);
-  box-sizing: border-box;
-  display: flex;
-  height: 50px;
-  justify-content: space-between;
-  padding: 12px 20px 8px;
-  position: sticky;
-  top: 0;
-  z-index: 30;
-}
-
-.smart-reminder-settings__back {
-  align-items: center;
-  border-radius: $radius-full;
-  display: flex;
-  flex: 0 0 32px;
-  height: 32px;
-  justify-content: center;
-  width: 32px;
-}
-
-.smart-reminder-settings__back:active {
-  background: rgba($color-forest-green, 0.06);
-}
-
-.smart-reminder-settings__brand {
-  color: #1c3f32;
-  display: block;
-  flex: 1;
-  font-size: 16px;
-  font-weight: $font-weight-medium;
-  letter-spacing: -0.2px;
-  line-height: 1.2;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.smart-reminder-settings__header-spacer {
-  flex: 0 0 32px;
-  height: 32px;
-  width: 32px;
-}
-
 .smart-reminder-settings {
   box-sizing: border-box;
   display: flex;
@@ -78,8 +30,8 @@
 .smart-reminder-settings__intro-title {
   color: #1c3f32;
   display: block;
-  font-size: 29px;
-  font-weight: $font-weight-medium;
+  font-size: 18px;
+  font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.2;
 }
@@ -87,7 +39,7 @@
 .smart-reminder-settings__intro-subtitle {
   color: $color-text-secondary;
   display: block;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.55;
 }
 

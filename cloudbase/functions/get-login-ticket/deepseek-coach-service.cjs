@@ -118,7 +118,7 @@ const { extractContentAndUsage, extractOpenAiUsage } = require("./model-usage.cj
 
 const DEFAULT_STREAM_FIRST_EVENT_TIMEOUT_MS = 10_000;
 const DEFAULT_STREAM_TOTAL_TIMEOUT_MS = 30_000;
-const DEFAULT_COACH_MAX_TOKENS = 256;
+const DEFAULT_COACH_MAX_TOKENS = 1024;
 const DEFAULT_COACH_TEMPERATURE = 0.2;
 
 function positiveInteger(value, fallback = null) {
@@ -179,7 +179,7 @@ function createDeepseekRequestCompletion({ apiKey, model, fetchImpl = globalThis
   };
 }
 
-async function* readSseJson(body, { onPayload = null } = {}) {
+async function* readSseJson(body, { onPayload = null, onDone = null } = {}) {
   const decoder = new TextDecoder();
   let buffer = "";
   for await (const chunk of body) {
@@ -192,6 +192,7 @@ async function* readSseJson(body, { onPayload = null } = {}) {
       buffer = buffer.slice(separator + separatorLength);
       const dataLine = frame.split("\n").find((line) => line.trimStart().startsWith("data:"));
       const data = dataLine?.trimStart().slice(5).trim();
+      if (data === "[DONE]") onDone?.();
       if (data && data !== "[DONE]") {
         try {
           const payload = JSON.parse(data);
@@ -246,12 +247,15 @@ function createDeepseekCoachStreamService({ apiKey, model, fetchImpl = globalThi
       });
       if (!response.ok || !response.body) throw new PublicCoachError("COACH_RETRYABLE");
       let usage = null;
-      for await (const payload of readSseJson(response.body, { onPayload: markFirstEvent })) {
+      let completed = false;
+      for await (const payload of readSseJson(response.body, { onPayload: markFirstEvent, onDone: () => { completed = true; } })) {
         const nextUsage = extractCoachUsage(payload);
         if (nextUsage) usage = nextUsage;
+        if (payload?.choices?.[0]?.finish_reason === "length") throw new PublicCoachError("COACH_RETRYABLE");
         const text = payload?.choices?.[0]?.delta?.content || extractCoachText(payload);
         if (typeof text === "string" && text) yield text;
       }
+      if (!completed) throw new PublicCoachError("COACH_RETRYABLE");
       if (usage) yield { type: "usage", usage, model: selectedModel };
     } catch (error) {
       if (error instanceof PublicCoachError) throw error;

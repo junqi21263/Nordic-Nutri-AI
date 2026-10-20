@@ -5,7 +5,7 @@ import { createAdminConsoleService, AdminConsoleError } from "./admin-console-se
 function makeDb({ users = [], profiles = [], feedback = [], recognition = [] } = {}) {
   return {
     from(table) {
-      const state = { table, filters: [], op: "select", payload: null, limitN: null, singleMode: null };
+      const state = { table, filters: [], op: "select", payload: null, limitN: null, range: null, singleMode: null };
       const run = async () => {
         if (state.table === "app_users") {
           let rows = users.filter((u) => u.status !== "deleted");
@@ -14,12 +14,13 @@ function makeDb({ users = [], profiles = [], feedback = [], recognition = [] } =
             if (op === "eq" && col === "id") rows = rows.filter((u) => u.id === val);
             if (op === "in" && col === "id") rows = rows.filter((u) => val.includes(u.id));
           }
-          rows = rows.slice(0, state.limitN ?? 50);
+          const count = rows.length;
+          rows = state.range ? rows.slice(state.range[0], state.range[1] + 1) : rows.slice(0, state.limitN ?? 50);
           if (state.singleMode === "maybe") return { data: rows[0] ?? null, error: null };
           if (state.singleMode === "single") {
             return rows[0] ? { data: rows[0], error: null } : { data: null, error: { message: "missing" } };
           }
-          return { data: rows, error: null };
+          return { data: rows, count, error: null };
         }
         if (state.table === "profiles") {
           let rows = [...profiles];
@@ -74,6 +75,7 @@ function makeDb({ users = [], profiles = [], feedback = [], recognition = [] } =
         ilike(col, val) { state.filters.push(["ilike", col, val]); return api; },
         order() { return api; },
         limit(n) { state.limitN = n; return api; },
+        range(from, to) { state.range = [from, to]; return api; },
         update(payload) { state.op = "update"; state.payload = payload; return api; },
         maybeSingle() { state.singleMode = "maybe"; return run(); },
         single() { state.singleMode = "single"; return run(); },
@@ -105,6 +107,14 @@ test("lists users with profile nickname and login time", async () => {
   assert.equal(result.items[0].isAdmin, true);
   assert.equal(result.items[0].lastLoginAt, "2026-07-30T01:00:00Z");
   assert.equal(result.items[0].registrationChannel, "phone");
+});
+
+test("paginates users and returns an exact total", async () => {
+  const users = Array.from({ length: 5 }, (_, i) => ({ id: `user-${i}`, status: "active" }));
+  const svc = createAdminConsoleService({ db: makeDb({ users }), isAdmin: async () => true });
+  const result = await svc.listUsers("admin", { limit: 2, page: 2 });
+  assert.deepEqual(result.items.map((item) => item.id), ["user-2", "user-3"]);
+  assert.deepEqual(result.pagination, { page: 2, pageSize: 2, total: 5, hasMore: true });
 });
 
 test("lists current login methods without exposing credentials or treating Google email as email login", async () => {

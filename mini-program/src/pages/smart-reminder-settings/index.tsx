@@ -136,20 +136,10 @@ export default function SmartReminderSettingsPage() {
       title="Nordic Nutri AI"
       showTabs={false}
       hideNavigation
-      showBrandHeader={false}
+      showBack
+      onTopBarBack={() => { void Taro.navigateBack(); }}
     >
       <View className="smart-reminder-settings__screen">
-        <View className="smart-reminder-settings__header">
-          <View
-            className="smart-reminder-settings__back"
-            ariaLabel={t("smartReminders.back")}
-            onClick={() => { void Taro.navigateBack(); }}
-          >
-            <NordicIcon name="back" size={20} ariaLabel={t("smartReminders.back")} />
-          </View>
-          <Text className="smart-reminder-settings__brand">Nordic Nutri AI</Text>
-          <View className="smart-reminder-settings__header-spacer" />
-        </View>
         <View className="smart-reminder-settings">
           <View className="smart-reminder-settings__intro">
             <Text className="smart-reminder-settings__intro-title">{t("smartReminders.title")}</Text>

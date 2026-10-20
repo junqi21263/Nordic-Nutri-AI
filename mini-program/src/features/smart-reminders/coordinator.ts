@@ -1,15 +1,16 @@
 import type { ActionPerformed } from "@capacitor/local-notifications";
 import { useAuthStore } from "../../auth/auth-store";
 import { useMealStore } from "../../stores/meal-store";
-import { buildNextReminderCandidates, getReminderNotificationId, type ReminderCandidate } from "./domain";
+import { buildNextReminderCandidates, getReminderNotificationId, LOCAL_REMINDER_DAYS, type ReminderCandidate } from "./domain";
 import { smartReminderStorage, type SmartReminderStorage } from "./storage";
 import { androidSmartReminderAdapter, type AndroidSmartReminderAdapter } from "../../platform/android-smart-reminders";
 
-const reminderIds = [
+const baseReminderIds = [
   getReminderNotificationId("breakfast"),
   getReminderNotificationId("lunch"),
   getReminderNotificationId("dinner"),
 ];
+const reminderIds = Array.from({ length: LOCAL_REMINDER_DAYS }, (_, day) => baseReminderIds.map((id) => id + day * 10)).flat();
 
 interface CoordinatorDependencies {
   adapter: AndroidSmartReminderAdapter;

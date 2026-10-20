@@ -163,9 +163,8 @@ export default function AccountBindingPage() {
   };
 
   const methods = user?.loginMethods;
-  return <PageLayout title="Nordic Nutri AI" showTabs={false} hideNavigation showBrandHeader={false} className="page-layout--account-binding">
+  return <PageLayout title={t("accountBinding.title")} showTabs={false} hideNavigation showBack onTopBarBack={returnToProfile} className="page-layout--account-binding">
     <View className="account-binding">
-      <Text className="account-binding__back" onClick={returnToProfile}>{t("androidAuth.back")}</Text>
       <Text className="account-binding__title">{t("accountBinding.title")}</Text>
       <Text className="account-binding__intro">{t("accountBinding.intro")}</Text>
       {!user ? <Text>{t("androidAuth.connecting")}</Text> : (["email", "phone", "google"] as const).map((method) => <View className="account-binding__method" key={method}>

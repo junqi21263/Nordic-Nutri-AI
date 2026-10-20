@@ -137,10 +137,24 @@ test("sends a meal reminder through FCM and returns only safe delivery metadata"
       token: "device-token-1",
       android: {
         priority: "HIGH",
+        notification: { channel_id: "meal-reminders" },
       },
+      notification: { title: "午餐还没记录吗？", body: "拍一下就好 📷" },
       data: { deliveryId: "11111111-1111-4111-8111-111111111111", traceId: "trace-push", mealType: "lunch", reminder: "1", source: "admin_test", title: "午餐还没记录吗？", body: "拍一下就好 📷" },
     },
   });
+});
+
+test("marks an FCM transport failure instead of leaving a delivery pending", async () => {
+  const db = createDb({ tokens: [{ id: "token-row-1", token: "device-token-1" }] });
+  const service = createFcmPushService({
+    db,
+    env: { TCB_ENV: "test-dev-d4gyxnn0b5dfa2c8a", FCM_PROJECT_ID: "nordic-nutri", FCM_CLIENT_EMAIL: "firebase-admin@example.iam.gserviceaccount.com", FCM_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nredacted\n-----END PRIVATE KEY-----\n" },
+    authClientFactory: () => ({ getAccessToken: async () => "oauth-access-token" }),
+    fetchImpl: async () => { throw new Error("offline"); },
+  });
+  await assert.rejects(() => service.sendTest({ userId: "user-1", mealType: "lunch" }), { code: "FCM_UNAVAILABLE" });
+  assert.ok(db.calls.some((call) => call.type === "update" && call.payload.status === "failed" && call.payload.last_event === "unavailable"));
 });
 
 for (const [scenario, title, body] of [

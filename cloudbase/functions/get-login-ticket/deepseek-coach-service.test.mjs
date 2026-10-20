@@ -70,7 +70,7 @@ test("keeps APP_CONTEXT in system and preserves the raw current question", async
         ok: true,
         body: new ReadableStream({
           start(controller) {
-            controller.enqueue(new TextEncoder().encode("data: [DONE]\\n\\n"));
+            controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
             controller.close();
           },
         }),
@@ -238,6 +238,33 @@ test("uses a bounded default stream timeout and honours the configured route tim
   });
 });
 
+test("rejects a coach stream stopped by the provider token limit", async () => {
+  const answer = createDeepseekCoachStreamService({
+    apiKey: "test-key",
+    fetchImpl: async () => ({ ok: true, body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"训练前可以"},"finish_reason":"length"}]}\n\n'));
+        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    }) }),
+  });
+  await assert.rejects(async () => { for await (const _part of answer({ prompt: "训练前吃什么？", context: {}, history: [] })) {} }, { code: "COACH_RETRYABLE" });
+});
+
+test("rejects a coach stream whose connection closes before DONE", async () => {
+  const answer = createDeepseekCoachStreamService({
+    apiKey: "test-key",
+    fetchImpl: async () => ({ ok: true, body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"训练前可以"}}]}\n\n'));
+        controller.close();
+      },
+    }) }),
+  });
+  await assert.rejects(async () => { for await (const _part of answer({ prompt: "训练前吃什么？", context: {}, history: [] })) {} }, { code: "COACH_RETRYABLE" });
+});
+
 test("uses the configured route generation controls for a streamed coach reply", async () => {
   let body;
   const answer = createDeepseekCoachStreamService({
@@ -250,7 +277,7 @@ test("uses the configured route generation controls for a streamed coach reply",
         ok: true,
         body: new ReadableStream({
           start(controller) {
-            controller.enqueue(new TextEncoder().encode("data: [DONE]\\n\\n"));
+            controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
             controller.close();
           },
         }),

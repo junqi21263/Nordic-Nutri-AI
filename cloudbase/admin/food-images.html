@@ -634,6 +634,7 @@
             <button id="refreshUsers" class="button secondary" type="button">刷新</button>
           </div>
           <div id="userTable" class="data-table"><p class="muted" style="padding:18px">请先连接后台</p></div>
+          <div id="userPagination" class="food-admin-pagination" hidden><span id="userPageInfo"></span><div class="food-admin-pagination__jump"><button id="userPagePrev" class="button secondary" type="button">上一页</button><button id="userPageNext" class="button secondary" type="button">下一页</button></div></div>
         </section>
 
         <section id="moduleVerification" class="admin-module" hidden>
@@ -2147,24 +2148,35 @@
       const known = Array.isArray(methods) ? methods.filter((method) => Object.hasOwn(labels, method)) : [];
       return known.length ? `<span class="login-methods">${known.map((method) => `<span class="ops-status-pill">${labels[method]}</span>`).join("")}</span>` : "—";
     };
+    let userPage = 1;
     async function loadUsers({ force = false } = {}) {
       const host = $("userTable");
       if (!hasToken()) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">请先登录后台</p>"; return; }
       const bindUserDetailButtons = () => host.querySelectorAll("[data-user-detail]").forEach((button) => { button.onclick = () => openUserDetail(button.dataset.userDetail); });
       const q = ($("userSearch").value || "").trim();
-      const cacheKey = `users:${q}`;
+      const cacheKey = `users:${q}:${userPage}`;
+      const renderPagination = (pagination) => {
+        const total = Number(pagination?.total || 0);
+        const pages = Math.max(1, Math.ceil(total / 50));
+        $("userPagination").hidden = total <= 50;
+        $("userPageInfo").textContent = `第 ${userPage} / ${pages} 页 · 共 ${total} 位用户`;
+        $("userPagePrev").disabled = userPage <= 1;
+        $("userPageNext").disabled = userPage >= pages;
+      };
       if (!force && moduleCache.users?.key === cacheKey && moduleCacheFresh("users")) {
         host.innerHTML = moduleCache.users.html;
+        renderPagination(moduleCache.users.pagination);
         bindUserDetailButtons();
         return;
       }
       try {
-        const data = await api(`/users?q=${encodeURIComponent(q)}&limit=50`);
+        const data = await api(`/users?q=${encodeURIComponent(q)}&limit=50&page=${userPage}`);
         const items = data.items || [];
-        if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">未找到匹配用户</p>"; moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() }; return; }
+        renderPagination(data.pagination);
+        if (!items.length) { host.innerHTML = "<p class=\"muted\" style=\"padding:18px\">未找到匹配用户</p>"; moduleCache.users = { key: cacheKey, html: host.innerHTML, pagination: data.pagination, at: Date.now() }; return; }
         host.innerHTML = `<table><thead><tr><th>昵称</th><th>注册渠道</th><th>当前登录方式</th><th>最近登录</th><th>管理员</th><th>注册时间</th><th>用户 ID</th><th>排障</th></tr></thead><tbody>${items.map((user) => `<tr><td>${escapeHtml(user.nickname || "—")}</td><td>${escapeHtml(registrationChannelLabel(user.registrationChannel))}</td><td>${loginMethodsHtml(user.loginMethods)}</td><td>${escapeHtml(formatTime(user.lastLoginAt))}</td><td>${user.isAdmin ? "是" : "否"}</td><td>${escapeHtml(formatTime(user.createdAt))}</td><td><code>${escapeHtml(user.id)}</code></td><td><button class="button secondary" type="button" data-user-detail="${escapeHtml(user.id)}">查看详情</button></td></tr>`).join("")}</tbody></table>`;
         bindUserDetailButtons();
-        moduleCache.users = { key: cacheKey, html: host.innerHTML, at: Date.now() };
+        moduleCache.users = { key: cacheKey, html: host.innerHTML, pagination: data.pagination, at: Date.now() };
       } catch (error) { host.innerHTML = `<p class="muted" style="padding:18px">${escapeHtml(apiErrorMessage(error))}</p>`; }
     }
     const verificationPurposeLabels = { register: "注册", reset_password: "找回密码" };
@@ -3570,7 +3582,9 @@
     $("loadUserDetail").onclick = () => loadUserDetailModule().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshUserTimeline").onclick = () => loadUserDetailModule().catch((error) => toast(apiErrorMessage(error), true));
     $("refreshUsers").onclick = () => loadUsers({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
-    $("userSearch").onkeydown = (event) => { if (event.key === "Enter") loadUsers({ force: true }).catch((error) => toast(apiErrorMessage(error), true)); };
+    $("userSearch").onkeydown = (event) => { if (event.key === "Enter") { userPage = 1; loadUsers({ force: true }).catch((error) => toast(apiErrorMessage(error), true)); } };
+    $("userPagePrev").onclick = () => { if (userPage > 1) { userPage -= 1; loadUsers().catch((error) => toast(apiErrorMessage(error), true)); } };
+    $("userPageNext").onclick = () => { userPage += 1; loadUsers().catch((error) => toast(apiErrorMessage(error), true)); };
     $("refreshVerification").onclick = () => loadVerifications({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("verificationTypeFilter").onchange = () => loadVerifications({ force: true }).catch((error) => toast(apiErrorMessage(error), true));
     $("verificationPurposeFilter").onchange = () => loadVerifications({ force: true }).catch((error) => toast(apiErrorMessage(error), true));

@@ -112,25 +112,28 @@ function createScheduledReminderService({ db, push, now = () => new Date() }) {
 
   async function dispatch({ limit = 100 } = {}) {
     const instant = now();
-    const due = await db.from("meal_reminder_schedules").select("id,user_id,meal_type,reminder_time,time_zone,locale,next_run_at").eq("enabled", true).lte("next_run_at", instant.toISOString()).order("next_run_at", { ascending: true }).limit(Math.min(Math.max(Number(limit) || 100, 1), 500));
+    const due = await db.from("meal_reminder_schedules").select("id,user_id,meal_type,reminder_time,time_zone,locale,next_run_at,last_dispatched_at").eq("enabled", true).lte("next_run_at", instant.toISOString()).order("next_run_at", { ascending: true }).limit(Math.min(Math.max(Number(limit) || 100, 1), 500));
     if (due?.error) throw Object.assign(new Error("提醒排程读取失败"), { code: "REMINDER_DISPATCH_FAILED" });
-    let sent = 0; let skipped = 0;
+    let sent = 0; let skipped = 0; let failed = 0;
     for (const schedule of due.data || []) {
       const tomorrow = nextRunAt(String(schedule.reminder_time).slice(0, 5), schedule.time_zone, instant);
       const claim = await db.from("meal_reminder_schedules").update({ next_run_at: tomorrow.toISOString(), last_dispatched_at: instant.toISOString(), updated_at: instant.toISOString() }).eq("id", schedule.id).eq("next_run_at", schedule.next_run_at).select("id");
       if (claim?.error || !claim?.data?.length) continue;
+      const retryLater = async () => db.from("meal_reminder_schedules").update({ next_run_at: schedule.next_run_at, last_dispatched_at: schedule.last_dispatched_at || null, updated_at: now().toISOString() }).eq("id", schedule.id).eq("next_run_at", tomorrow.toISOString());
       const today = localDate(instant, schedule.time_zone);
       const dayStart = zonedDateToUtc({ ...zonedParts(instant, schedule.time_zone), hour: 0, minute: 0 }, schedule.time_zone);
       const nextDay = new Date(dayStart); nextDay.setUTCDate(nextDay.getUTCDate() + 1);
       const historyStart = new Date(dayStart); historyStart.setUTCDate(historyStart.getUTCDate() - 7);
       const records = await db.from("meal_records").select("recorded_at").eq("user_id", schedule.user_id).eq("meal_type", schedule.meal_type).is("deleted_at", null).gte("recorded_at", historyStart.toISOString()).lt("recorded_at", nextDay.toISOString());
-      if (records?.error) continue;
+      if (records?.error) { await retryLater(); failed += 1; continue; }
       const decorated = (records.data || []).map((row) => ({ ...row, time_zone: schedule.time_zone }));
       if (decorated.some((row) => localDate(new Date(row.recorded_at), schedule.time_zone) === today)) { skipped += 1; continue; }
-      const result = await push.sendReminder({ userId: schedule.user_id, mealType: schedule.meal_type, copy: reminderCopy(schedule.meal_type, decorated, today, schedule.locale), source: "scheduled" });
-      sent += result.sent || 0;
+      try {
+        const result = await push.sendReminder({ userId: schedule.user_id, mealType: schedule.meal_type, copy: reminderCopy(schedule.meal_type, decorated, today, schedule.locale), source: "scheduled" });
+        sent += result.sent || 0;
+      } catch { await retryLater(); failed += 1; }
     }
-    return { due: due.data?.length || 0, sent, skipped };
+    return { due: due.data?.length || 0, sent, skipped, failed };
   }
   return { sync, dispatch };
 }
