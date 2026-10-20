@@ -358,22 +358,14 @@ function createFcmPushService({
                 assertion,
                 message: {
                   token: row.token,
-                  android: {
-                    priority: "HIGH",
-                    ...(notificationId ? { notification: { channel_id: kind === "feedback" ? "feedback-replies" : "system-announcements" } } : {}),
-                  },
-                  ...(notificationId ? { notification: { title: safeCopy.title, body: safeCopy.body } } : {}),
+                  android: { priority: "HIGH" },
                   data: { deliveryId, traceId: requiredString(traceId), mealType, reminder: notificationId ? "0" : "1", ...(notificationId ? { notificationId, kind, userId } : {}), source, title: safeCopy.title, body: safeCopy.body },
                 },
               }
             : {
               message: {
                 token: row.token,
-                android: {
-                  priority: "HIGH",
-                  ...(notificationId ? { notification: { channel_id: kind === "feedback" ? "feedback-replies" : "system-announcements" } } : {}),
-                },
-                ...(notificationId ? { notification: { title: safeCopy.title, body: safeCopy.body } } : {}),
+                android: { priority: "HIGH" },
                 data: { deliveryId, traceId: requiredString(traceId), mealType, reminder: notificationId ? "0" : "1", ...(notificationId ? { notificationId, kind, userId } : {}), source, title: safeCopy.title, body: safeCopy.body },
               },
             }),
