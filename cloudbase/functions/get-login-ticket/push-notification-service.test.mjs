@@ -257,8 +257,8 @@ test("uses the configured relay without sending the Firebase private key", async
   assert.equal(body.clientEmail, undefined);
   await service.sendNotification({ userId: "user-1", notificationId: "11111111-1111-4111-8111-111111111111", kind: "system", copy: { title: "公告", body: "内容" } });
   const announcement = JSON.parse(requests[1].init.body).message;
-  assert.equal(announcement.notification, undefined);
-  assert.deepEqual(announcement.android, { priority: "HIGH" });
+  assert.deepEqual(announcement.notification, { title: "公告", body: "内容" });
+  assert.equal(announcement.android.notification.channel_id, "system-announcements");
   assert.equal(announcement.data.kind, "system");
   assert.equal(announcement.data.notificationId, "11111111-1111-4111-8111-111111111111");
   const [header, claims, signature] = body.assertion.split(".");
@@ -325,8 +325,8 @@ test("message pushes carry owner and message identity without masquerading as me
  const service=createFcmPushService({db,env:{TCB_ENV:"test-dev-d4gyxnn0b5dfa2c8a",FCM_PROJECT_ID:"project",FCM_CLIENT_EMAIL:"test@example.com",FCM_PRIVATE_KEY:"test"},authClientFactory:()=>({getAccessToken:async()=>"access"}),fetchImpl:async(url,init)=>{payload=JSON.parse(init.body);return {ok:true,json:async()=>({name:"accepted"})};}});
  const result=await service.sendNotification({userId:"owner",notificationId:"11111111-1111-4111-8111-111111111111",generation:2,kind:"feedback",copy:{title:"Feedback reply",body:"Open to view"}});
  assert.equal(result.accepted,1);assert.equal(payload.message.data.reminder,"0");assert.equal(payload.message.data.mealType,"message");assert.equal(payload.message.data.userId,"owner");assert.equal(payload.message.data.traceId,"11111111-1111-4111-8111-111111111111:2");
- assert.equal(payload.message.notification,undefined);
- assert.deepEqual(payload.message.android,{priority:"HIGH"});
+ assert.deepEqual(payload.message.notification,{title:"Feedback reply",body:"Open to view"});
+ assert.equal(payload.message.android.notification.channel_id,"feedback-replies");
  assert.equal(payload.message.data.kind,"feedback");
  assert.equal(payload.message.data.notificationId,"11111111-1111-4111-8111-111111111111");
  assert.ok(db.calls.some(c=>c.type==="insert"&&c.payload.notification_id==="11111111-1111-4111-8111-111111111111"));
