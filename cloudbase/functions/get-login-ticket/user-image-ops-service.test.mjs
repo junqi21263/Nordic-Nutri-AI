@@ -34,64 +34,62 @@ test("isFoodsPath rejects catalog prefixes", () => {
   assert.equal(isFoodsPath("food-images/u1/a.jpg"), false);
 });
 
-test("list merges kinds, dedupes by path preferring vision, and paginates", async () => {
-  const now = new Date().toISOString();
-  const older = new Date(Date.now() - 60_000).toISOString();
-  const db = {
-    from(table) {
-      if (table === "ai_analysis") {
-        return makeThenable({
-          data: [
-            { id: "v1", user_id: "u1", image_path: "cloud://shared", status: "succeeded", review_status: "pending", raw_recognition: { mealName: "粥" }, created_at: now },
-          ],
-          count: 1,
-          error: null,
-        });
-      }
-      if (table === "content_moderation_flags") {
-        return makeThenable({ data: [], count: 0, error: null });
-      }
-      if (table === "profiles") {
-        return makeThenable({
-          data: [
-            { id: "u2", avatar_path: "cloud://avatar-u2", updated_at: older, created_at: older },
-            { id: "u3", avatar_path: "default:food-1", updated_at: older, created_at: older },
-          ],
-          error: null,
-        });
-      }
-      if (table === "uploaded_assets") {
-        return makeThenable({
-          data: [
-            { id: "a1", user_id: "u1", object_path: "cloud://shared", status: "uploaded", created_at: older },
-            { id: "a2", user_id: "u1", object_path: "cloud://asset-only", status: "uploaded", created_at: older },
-          ],
-          count: 2,
-          error: null,
-        });
-      }
-      if (table === "meal_records") {
-        return makeThenable({ data: [], error: null });
-      }
-      throw new Error(`unexpected ${table}`);
-    },
-  };
-
+test("all images use database pagination beyond the first 80 rows", async () => {
+  const rows = Array.from({ length: 213 }, (_, i) => ({
+    id: `v${i}`, user_id: "u1", image_path: `cloud://image-${i}`,
+    created_at: new Date(Date.UTC(2026, 9, 20) - i * 60_000).toISOString(),
+  }));
+  const requests = [];
   const service = createUserImageOpsService({
-    db,
+    db: {
+      from(table) {
+        if (table !== "ai_analysis") return makeThenable({ data: [], count: 0 });
+        let start = 0, end = 79;
+        const query = makeThenable(() => ({ data: rows.slice(start, end + 1), count: rows.length }));
+        query.range = (from, to) => { start = from; end = to; return query; };
+        return query;
+      },
+      async rpc(name, params) {
+        requests.push({ name, params });
+        return { data: { total: rows.length, items: rows.slice(80, 120).map((r) => ({
+          kind: "vision", id: r.id, imagePath: r.image_path, createdAt: r.created_at,
+        })) }, error: null };
+      },
+    },
     deleteFiles: async () => {},
-    resolveTempFileUrls: async (paths) => new Map(paths.map((p) => [p, `https://tmp/${p}`])),
   });
+  const result = await service.list({ kind: "all", page: 3, pageSize: 40 });
+  assert.equal(result.total, 213);
+  assert.equal(result.totalApproximate, false);
+  assert.equal(result.items.length, 40);
+  assert.equal(result.items[0].id, "v80");
+  assert.deepEqual(requests, [{ name: "list_ops_user_images", params: {
+    p_user_id: null, p_status: "all", p_page: 3, p_page_size: 40,
+  } }]);
+});
 
-  const result = await service.list({ kind: "all", page: 1, pageSize: 10 });
-  assert.equal(result.kind, "all");
-  assert.equal(result.totalApproximate, true);
-  const kindsByPath = Object.fromEntries(result.items.map((item) => [item.imagePath, item.kind]));
-  assert.equal(kindsByPath["cloud://shared"], "vision");
-  assert.equal(kindsByPath["cloud://avatar-u2"], "avatar");
-  assert.equal(kindsByPath["cloud://asset-only"], "asset");
-  assert.equal(result.items.some((item) => item.imagePath === "default:food-1"), false);
-  assert.ok(result.items.every((item) => item.imageUrl || item.kind === "avatar"));
+test("all images unwrap the PG RPC envelope and retain meal protection", async () => {
+  const image = { kind: "vision", id: "v1", imagePath: "cloud://shared" };
+  const service = createUserImageOpsService({
+    db: {
+      rpc: async () => ({ data: [{ list_ops_user_images: { items: [image], total: 1 } }] }),
+      from: () => makeThenable({ data: [{ image_path: "cloud://shared" }] }),
+    },
+    deleteFiles: async () => {},
+    resolveTempFileUrls: async () => new Map([["cloud://shared", "https://tmp/image"]]),
+  });
+  const result = await service.list({ kind: "all" });
+  assert.equal(result.totalApproximate, false);
+  assert.equal(result.items[0].protected, true);
+  assert.equal(result.items[0].imageUrl, "https://tmp/image");
+});
+
+test("all images do not hide database errors as an empty list", async () => {
+  const service = createUserImageOpsService({
+    db: { from() {}, rpc: async () => ({ error: { message: "unavailable" } }) },
+    deleteFiles: async () => {},
+  });
+  await assert.rejects(service.list({ kind: "all" }), /merged list failed/);
 });
 
 test("list filters by userId and marks meal-linked images protected", async () => {

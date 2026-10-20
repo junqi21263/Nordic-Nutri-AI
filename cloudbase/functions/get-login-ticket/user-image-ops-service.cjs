@@ -1,7 +1,6 @@
 const { pickDefaultAvatarSentinel } = require("./profile-avatar-service.cjs");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const KIND_PRIORITY = { vision: 0, blocked: 1, avatar: 2, asset: 3 };
 const VALID_KINDS = new Set(["all", "vision", "blocked", "avatar", "asset"]);
 const IN_CHUNK = 80;
 
@@ -316,55 +315,18 @@ function createUserImageOpsService({
     return { items, total: resolvedTotal, totalApproximate: total == null };
   }
 
-  function dedupeByPath(items) {
-    const best = new Map();
-    for (const item of items) {
-      const key = item.imagePath || `${item.kind}:${item.id}`;
-      const existing = best.get(key);
-      if (!existing) {
-        best.set(key, item);
-        continue;
-      }
-      const existingRank = KIND_PRIORITY[existing.kind] ?? 99;
-      const nextRank = KIND_PRIORITY[item.kind] ?? 99;
-      if (nextRank < existingRank) best.set(key, item);
-    }
-    return [...best.values()].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-  }
-
-  async function safeFetch(label, fn) {
-    try {
-      return await fn();
-    } catch (error) {
-      console.error(`[user-image-ops] ${label} failed:`, error?.message || error);
-      return { items: [], total: 0, totalApproximate: true, failed: true, error: error?.message || String(error) };
-    }
-  }
-
   async function fetchAllPage({ userId, page, pageSize, status }) {
-    const pull = Math.min(120, Math.max(pageSize * 2, 40));
-    const [vision, blocked, avatar, asset] = await Promise.all([
-      safeFetch("vision", () => fetchVisionPage({ userId, page: 1, pageSize: pull })),
-      safeFetch("blocked", () => fetchBlockedPage({ userId, page: 1, pageSize: pull, status: status || "all" })),
-      safeFetch("avatar", () => fetchAvatarPage({ userId, page: 1, pageSize: pull })),
-      safeFetch("asset", () => fetchAssetPage({ userId, page: 1, pageSize: pull })),
-    ]);
-    const failures = [vision, blocked, avatar, asset].filter((part) => part.failed);
-    if (failures.length === 4) {
-      throw new Error(failures.map((part) => part.error).filter(Boolean).join("; ") || "User image sources unavailable");
+    const result = await db.rpc("list_ops_user_images", {
+      p_user_id: userId, p_status: status || "all", p_page: page, p_page_size: pageSize,
+    });
+    if (result?.error) throw new Error("User image merged list failed");
+    const raw = result?.data;
+    const data = Array.isArray(raw) && raw.length === 1 && raw[0]?.list_ops_user_images
+      ? raw[0].list_ops_user_images : raw?.list_ops_user_images ?? raw;
+    if (!Array.isArray(data?.items) || !Number.isSafeInteger(data.total) || data.total < 0) {
+      throw new Error("User image merged list response is invalid");
     }
-    const merged = dedupeByPath([
-      ...vision.items,
-      ...blocked.items,
-      ...avatar.items,
-      ...asset.items,
-    ]);
-    const offset = (page - 1) * pageSize;
-    return {
-      items: merged.slice(offset, offset + pageSize),
-      total: merged.length,
-      totalApproximate: true,
-    };
+    return { items: data.items, total: data.total, totalApproximate: false };
   }
 
   async function markAssetDeleted(imagePath) {
@@ -528,7 +490,6 @@ function createUserImageOpsService({
 module.exports = {
   createUserImageOpsService,
   PublicUserImageError,
-  KIND_PRIORITY,
   clampPage,
   clampPageSize,
   isFoodsPath,
