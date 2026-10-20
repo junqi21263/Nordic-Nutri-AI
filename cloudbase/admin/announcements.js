@@ -40,11 +40,26 @@ function announcementStatus(status) {
     status
   );
 }
+function announcementTime(item) {
+  const value = item.status === "published" ? item.published_at : item.updated_at;
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleString("zh-CN", {
+        timeZone: "Asia/Shanghai",
+        hour12: false,
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+}
 async function loadAnnouncements() {
   const result = await api("/announcements");
   announcementItems = result.items || [];
   $("announcementList").innerHTML = announcementItems.length
-    ? `<table><thead><tr><th>标题</th><th>状态</th><th>接收范围</th><th>更新时间</th><th>操作人</th><th>操作</th></tr></thead><tbody>${announcementItems.map((item) => `<tr><td>${escapeHtml(item.title)}</td><td>${announcementStatus(item.status)}</td><td>${item.audience === "all" ? "全部现有用户" : `指定 ${(item.recipient_ids || []).length} 人`}</td><td>${escapeHtml(formatTime(item.updated_at))}</td><td>${escapeHtml(item.updated_by)}</td><td><button class="button secondary" data-announcement-edit="${item.id}">编辑</button><button class="button secondary" data-announcement-stats="${item.id}">发送结果</button>${item.status === "published" ? `<button class="button secondary" data-announcement-action="remind" data-id="${item.id}">再次提醒</button><button class="button secondary" data-announcement-action="retry" data-id="${item.id}">重试失败</button><button class="button secondary" data-announcement-action="retract" data-id="${item.id}">撤回</button>` : ""}</td></tr>`).join("")}</tbody></table>`
+    ? `<table><thead><tr><th>标题</th><th>状态</th><th>接收范围</th><th>发布时间（草稿显示更新时间）</th><th>操作人</th><th>操作</th></tr></thead><tbody>${announcementItems.map((item) => `<tr><td>${escapeHtml(item.title)}</td><td>${announcementStatus(item.status)}</td><td>${item.audience === "all" ? "全部现有用户" : `指定 ${(item.recipient_ids || []).length} 人`}</td><td>${escapeHtml(announcementTime(item))}</td><td>${escapeHtml(item.updated_by)}</td><td><button class="button secondary" data-announcement-edit="${item.id}">编辑</button><button class="button secondary" data-announcement-stats="${item.id}">发送结果</button>${item.status === "published" ? `<button class="button secondary" data-announcement-action="remind" data-id="${item.id}">再次提醒</button><button class="button secondary" data-announcement-action="retry" data-id="${item.id}">重试失败</button><button class="button secondary" data-announcement-action="retract" data-id="${item.id}">撤回</button>` : ""}</td></tr>`).join("")}</tbody></table>`
     : '<p class="muted" style="padding:20px">暂无系统公告</p>';
   $("announcementList")
     .querySelectorAll("[data-announcement-edit]")

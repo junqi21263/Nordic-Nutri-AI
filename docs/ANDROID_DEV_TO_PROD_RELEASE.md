@@ -2,6 +2,29 @@
 
 环境：Dev `test-dev-d4gyxnn0b5dfa2c8a`；Prod `lewis-healthy-d4glgqqzv73a5bc10`。每次远端操作都显式指定并再次核对完整 EnvId。代码合并、云端部署和 APK 发布是三个独立步骤。
 
+## 0. 版本、依赖与 APK 归档约定
+
+- App 版本只以 `android/app/build.gradle` 的 `versionName` 和 `versionCode` 为准；根目录及 `mini-program/package.json` 的版本是 JS 包元数据，不代表 Android App 版本。
+- `versionName` 使用 `主版本.次版本.修订号`；每个新 APK 候选都递增 `versionCode`，该数字在 Dev/Prod 之间全局单调递增，永不回退或复用。Prod 发布沿用已验收 Dev APK 的版本号；验收后若有代码修复，先递增版本并重新构建、验收 Dev。
+- Dev、Prod 使用不同 Android applicationId：Dev `com.lewislee.nordicnutri.dev`，Prod `com.lewislee.nordicnutri`。Dev 用 debug 签名，Prod 只用受控的 Prod 签名。禁止把 Dev 包上传到官网或写入 Prod 的版本元数据。
+- pnpm 版本固定为根 `package.json` 的 `packageManager`（当前 `pnpm@10.33.0`），依赖解析以 `pnpm-lock.yaml` 为准。干净环境安装用 `corepack pnpm install --frozen-lockfile`；改依赖必须一并提交 lockfile。Android 构建使用 Node `24.18.x`。
+- APK 和 manifest 都不进 Git。`output/` 是本地交付物目录，按 `output/android/<dev|prod>/<versionName>-<versionCode>/<sourceCommitShort>/` 保存，每个目录含 APK 与 `manifest.json`。文件名带渠道、版本和提交短 SHA。已归档目录不可覆盖或自动删除；同一提交需要重新打包时先提升版本并提交新源码。
+- manifest 记录环境、分支、完整源码 SHA、App 包名/版本、构建时间、APK SHA-256、签名证书 SHA-256，以及“清单/签名/真机”各自状态。`PASS` 的签名和清单检查不代表真机验收通过。
+
+首次准备 DEV 本地配置：复制仓库根目录 `.env.dev.local.example` 为 `.env.dev.local`，填写 DEV Google Server Client ID。真实配置文件被 Git 忽略。打包脚本固定注入 DEV API、DEV auth/backend flags，并验证 Android 包名、版本与 APK 签名。
+
+标准命令：
+
+```sh
+# 在已推送且干净的 Android-dev 上生成、校验并归档 DEV APK
+corepack pnpm android:dev:package
+
+# 在 Android-prod 上执行 Prod 签名构建与官网版本元数据更新
+corepack pnpm android:prod:release
+```
+
+Prod 命令是正式发布流程，不用于日常打包；它仍要求当前提交等于 `origin/Android-prod`、工作区干净、生产签名配置正确，并会拒绝覆盖既有归档目录。
+
 ## 1. 冻结代码与回滚点
 
 1. 开始下一轮开发前，先把上一轮 Prod 的代码修正回流到 Dev 基线，再在 `Android-dev` 完成开发和 Dev 真机验收。提交本次要发布的改动；不要把未提交文件、日志、APK、密钥或 `google-services.json` 的 release 副本带入发布提交。

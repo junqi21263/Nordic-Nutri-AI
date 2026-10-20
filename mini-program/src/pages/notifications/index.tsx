@@ -247,7 +247,7 @@ export default function NotificationsPage() {
                 </View>
                 <Text className="notifications__preview">{n.body}</Text>
                 <Text className="notifications__muted">
-                  {new Date(n.created_at).toLocaleString()}
+                  {new Date(n.created_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
                 </Text>
               </View>
             ))}

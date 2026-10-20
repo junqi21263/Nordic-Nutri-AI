@@ -62,6 +62,8 @@ pnpm deploy:cloudbase production get-login-ticket
 
 Android APK 的具体构建、签名、配置回读和真机验收顺序见 `docs/ANDROID_DEV_TO_PROD_RELEASE.md`。
 
+Android 版本、依赖锁定、Dev/Prod 包名和 APK 归档按 `docs/ANDROID_DEV_TO_PROD_RELEASE.md` 第 0 节执行。APK 只能保存在被忽略的 `output/android/` 本地目录或既有正式下载目录，不提交 APK、签名材料和本机环境配置。
+
 ## 5. 云函数发布顺序
 
 涉及数据库或接口变更时，固定采用：

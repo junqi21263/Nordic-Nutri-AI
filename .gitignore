@@ -10,6 +10,7 @@ mini-program/.swc/
 .env*
 .env.*
 !.env.example
+!.env.*.example
 !.env.production
 .supabase/
 # WeChat developer-tool local files
@@ -19,6 +20,7 @@ mini-program/miniprogram_npm/
 # Build, test, and runtime artifacts
 coverage/
 dist/
+/output/
 *.log
 __pycache__/
 *.py[cod]

@@ -11,6 +11,8 @@
     "check": "pnpm run test:initialization",
     "test:initialization": "node --test scripts/verify-initialization.test.mjs",
     "deploy:cloudbase": "node scripts/deploy-cloudbase.mjs",
+    "android:dev:package": "node scripts/android-dev-package.mjs",
+    "android:prod:release": "node scripts/android-release.mjs",
     "typecheck:mini-program": "tsc --project mini-program/tsconfig.json --noEmit"
   },
   "devDependencies": {

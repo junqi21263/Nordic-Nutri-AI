@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { constants, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
@@ -132,9 +132,18 @@ function verifyApk(apkPath) {
   const versionCode = readManifest("version-code");
   const signing = capture(apksigner, ["verify", "--verbose", "--print-certs", apkPath], { label: "APK signature verification" });
   const signer = signing.match(/Signer #1 certificate SHA-1 digest:\s*([0-9a-f:]+)/i)?.[1]?.replaceAll(":", "").toLowerCase();
+  const signerSha256 = signing.match(/Signer #1 certificate SHA-256 digest:\s*([0-9a-f:]+)/i)?.[1]?.replaceAll(":", "").toLowerCase();
   const fileSize = statSync(apkPath).size;
   assertReleaseApk({ packageId, versionName, versionCode, signerSha1: signer, fileSize });
-  return { versionName, fileSize, sha256: createHash("sha256").update(readFileSync(apkPath)).digest("hex") };
+  return {
+    packageId,
+    versionName,
+    versionCode: Number(versionCode),
+    fileSize,
+    sha256: createHash("sha256").update(readFileSync(apkPath)).digest("hex"),
+    signerSha1: signer,
+    signerSha256,
+  };
 }
 
 export function buildRelease({ profilePath = process.env.NORDIC_SIGNING_PROFILE || join(projectRoot, "android/signing.local.json") } = {}) {
@@ -142,7 +151,7 @@ export function buildRelease({ profilePath = process.env.NORDIC_SIGNING_PROFILE 
   const branch = capture("git", ["branch", "--show-current"], { cwd: androidRoot, label: "Release source branch" }).trim();
   const commit = capture("git", ["rev-parse", "HEAD"], { cwd: androidRoot, label: "Release source commit" }).trim();
   const prodCommit = capture("git", ["rev-parse", "origin/Android-prod"], { cwd: androidRoot, label: "Android-prod source commit" }).trim();
-  if (commit !== prodCommit) throw new Error(`Release source must match the pushed Android-prod commit (current branch: ${branch})`);
+  if (branch !== "Android-prod" || commit !== prodCommit) throw new Error(`Release source must be the pushed Android-prod commit (current branch: ${branch})`);
   if (capture("git", ["status", "--porcelain"], { cwd: androidRoot, label: "Release source status" }).trim()) {
     throw new Error("Release source must be committed before packaging");
   }
@@ -157,6 +166,8 @@ export function buildRelease({ profilePath = process.env.NORDIC_SIGNING_PROFILE 
   if (!existsSync(apkPath)) throw new Error("Gradle completed without producing the release APK");
   const metadata = verifyApk(apkPath);
   const file = `nordic-nutri-android-${metadata.versionName}-${metadata.sha256.slice(0, 12)}.apk`;
+  const packageDir = join(androidRoot, "output/android/prod", `${metadata.versionName}-${metadata.versionCode}`, commit.slice(0, 8));
+  if (existsSync(packageDir)) throw new Error(`Refusing to overwrite an existing immutable package directory: ${packageDir}`);
   const destination = join(siteRoot, "public/downloads", file);
   if (!existsSync(join(siteRoot, "wrangler.jsonc"))) throw new Error("Production website source is unavailable");
   const temporaryApk = `${destination}.tmp`;
@@ -165,7 +176,25 @@ export function buildRelease({ profilePath = process.env.NORDIC_SIGNING_PROFILE 
   renameSync(temporaryApk, destination);
   writeFileSync(temporaryMetadata, formatReleaseModule(metadata), { mode: 0o600 });
   renameSync(temporaryMetadata, join(siteRoot, "src/release.mjs"));
+  mkdirSync(packageDir, { recursive: true });
+  copyFileSync(apkPath, join(packageDir, file), constants.COPYFILE_EXCL);
+  writeFileSync(join(packageDir, "manifest.json"), `${JSON.stringify({
+    channel: "prod",
+    environment: "lewis-healthy-d4glgqqzv73a5bc10",
+    branch,
+    commit,
+    builtAt: new Date().toISOString(),
+    packageId: metadata.packageId,
+    versionName: metadata.versionName,
+    versionCode: metadata.versionCode,
+    signerSha256: metadata.signerSha256,
+    apkSha256: metadata.sha256,
+    sizeBytes: metadata.fileSize,
+    artifact: file,
+    verification: { manifest: "PASS", signature: "PASS", officialSiteMetadata: "PASS", realDevice: "NOT VERIFIED" },
+  }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
   console.log(`Verified ${file}; SHA-256 ${metadata.sha256}; signer matches the existing production certificate.`);
+  console.log(`Archived immutable production package: ${packageDir}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
