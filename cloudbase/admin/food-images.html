@@ -2158,7 +2158,7 @@
       const renderPagination = (pagination) => {
         const total = Number(pagination?.total || 0);
         const pages = Math.max(1, Math.ceil(total / 50));
-        $("userPagination").hidden = total <= 50;
+        $("userPagination").hidden = total === 0;
         $("userPageInfo").textContent = `第 ${userPage} / ${pages} 页 · 共 ${total} 位用户`;
         $("userPagePrev").disabled = userPage <= 1;
         $("userPageNext").disabled = userPage >= pages;
