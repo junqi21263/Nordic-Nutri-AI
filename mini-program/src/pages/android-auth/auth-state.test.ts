@@ -32,8 +32,8 @@ describe("Android auth navigation", () => {
       ["phone-register", "phone-login"],
       ["phone-register-otp", "phone-register"],
       ["phone-register-password", "phone-register-otp"],
-      ["forgot-email", "email-login"],
-      ["forgot-phone", "phone-login"],
+      ["forgot-email", "landing"],
+      ["forgot-phone", "landing"],
       ["reset-password", "forgot-email"],
     ];
 
