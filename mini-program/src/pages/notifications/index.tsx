@@ -80,6 +80,7 @@ export default function NotificationsPage() {
   useDidShow(() => {
     setDetail(null);
     setItems([]);
+    setTotal(0);
     void load();
   });
   const update = async (key: keyof NotificationPreferences, value: boolean) => {
@@ -113,7 +114,6 @@ export default function NotificationsPage() {
             </AppButton>
           </View>
         ) : null}
-        {loading ? <Text>{t("notifications.loading")}</Text> : null}
         {settings ? (
           <>
             {android ? (
@@ -206,6 +206,8 @@ export default function NotificationsPage() {
                   variant={kind === value ? "primary" : "secondary"}
                   onClick={() => {
                     setKind(value);
+                    setItems([]);
+                    setTotal(0);
                     void load(0, value);
                   }}
                 >
