@@ -14,6 +14,7 @@ import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
 import { setNativeSession } from "../../auth/session-manager";
 import { toAppSession } from "../../api/android-auth-api";
 import { NordicIcon } from "../../components/nordic-icon";
+import { BottomSheet } from "../../components/bottom-sheet";
 import { PageLayout } from "../../layouts/page-layout";
 import { getNativeGoogleIdToken, summarizeGoogleIdToken } from "../../platform/google-auth";
 import { useFeedbackStore } from "../../stores/feedback-store";
@@ -107,6 +108,7 @@ export default function AndroidAuthPage() {
   const [successKind, setSuccessKind] = useState<SuccessKind>("login");
   const [successBackView, setSuccessBackView] = useState<AuthView>("email-login");
   const [resetMethod, setResetMethod] = useState<"email" | "phone">("email");
+  const [forgotMethodSheetOpen, setForgotMethodSheetOpen] = useState(false);
   const showFeedbackModal = useFeedbackStore((state) => state.showModal);
 
   const targetType = view === "reset-password" ? resetMethod : view.includes("phone") ? "phone" : "email";
@@ -418,16 +420,7 @@ export default function AndroidAuthPage() {
           <Text>{t("androidAuth.noAccount")}</Text>
           <Text className="auth-create-account__link" onClick={() => navigate("email-register")}>{t("androidAuth.registerNow")}</Text>
         </View>
-        <Text
-          className="auth-landing__forgot-password"
-          onClick={() => {
-            void Taro.showActionSheet({
-              itemList: [t("androidAuth.email"), t("androidAuth.phone")],
-            }).then(({ tapIndex }) => {
-              navigate(getForgotPasswordView(tapIndex === 1 ? "phone" : "email"));
-            }).catch(() => undefined);
-          }}
-        >
+        <Text className="auth-landing__forgot-password" onClick={() => setForgotMethodSheetOpen(true)}>
           {t("androidAuth.forgotPassword")}
         </Text>
         {error ? <InlineMessage message={error} kind="error" onRetry={error === t("androidAuth.errors.googleLoginFailed") ? () => void signInWithGoogle() : undefined} /> : null}
@@ -462,7 +455,7 @@ export default function AndroidAuthPage() {
       <PasswordInput value={password} onChange={setPassword} />
       <AppButton size="large" loading={busy} onClick={() => void submit()}>{busy ? t("androidAuth.loggingIn") : t("androidAuth.login")}</AppButton>
       {error ? <InlineMessage message={error} kind="error" /> : null}
-      <View className="auth-form__links"><Text onClick={() => navigate(isPhone ? "forgot-phone" : "forgot-email")}>{t("androidAuth.forgotPassword")}</Text><Text onClick={() => navigate(isPhone ? "phone-register" : "email-register")}>{t("androidAuth.registerPrompt")}</Text></View>
+      <View className="auth-form__links"><Text onClick={() => navigate(isPhone ? "phone-register" : "email-register")}>{t("androidAuth.registerPrompt")}</Text></View>
     </View>
   );
 
@@ -551,6 +544,19 @@ export default function AndroidAuthPage() {
   return (
     <PageLayout title="Nordic Nutri AI" showTabs={false} hideNavigation showBrandHeader={false} className={`page-layout--android-auth page-layout--auth-view-${view}`}>
       <View className="android-auth-page"><View className={`auth-view auth-view--${isPhone ? "phone" : "email"}`}>{renderContent()}</View></View>
+      <BottomSheet open={forgotMethodSheetOpen} className="auth-forgot-method-sheet" onDismiss={() => setForgotMethodSheetOpen(false)}>
+        <View className="auth-forgot-method-sheet__options">
+          <Text className="auth-forgot-method-sheet__option" onClick={() => {
+            setForgotMethodSheetOpen(false);
+            navigate(getForgotPasswordView("email"));
+          }}>{t("androidAuth.email")}</Text>
+          <Text className="auth-forgot-method-sheet__option" onClick={() => {
+            setForgotMethodSheetOpen(false);
+            navigate(getForgotPasswordView("phone"));
+          }}>{t("androidAuth.phone")}</Text>
+        </View>
+        <Text className="auth-forgot-method-sheet__cancel" onClick={() => setForgotMethodSheetOpen(false)}>{t("common.cancel")}</Text>
+      </BottomSheet>
     </PageLayout>
   );
 }

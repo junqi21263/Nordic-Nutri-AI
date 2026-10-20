@@ -167,6 +167,11 @@
 .auth-create-account { display: flex; align-items: center; justify-content: center; gap: 6PX; margin-top: 24PX; text-align: center; font-size: 14PX; color: $color-text-secondary; }
 .auth-create-account__link { color: $color-forest-green; text-decoration: underline; }
 .auth-landing__forgot-password { display: block; margin: 14PX auto 0; color: $color-text-secondary; font-size: 13PX; text-align: center; text-decoration: underline; text-underline-offset: 2PX; }
+.bottom-sheet.auth-forgot-method-sheet { padding: 0 0 calc(env(safe-area-inset-bottom) + 16PX); background: transparent; }
+.auth-forgot-method-sheet__options, .auth-forgot-method-sheet__cancel { overflow: hidden; border-radius: 18PX; background: $color-surface; text-align: center; }
+.auth-forgot-method-sheet__option, .auth-forgot-method-sheet__cancel { display: block; box-sizing: border-box; min-height: 64PX; padding: 20PX 16PX; color: $color-text-primary; font-size: 18PX; line-height: 24PX; }
+.auth-forgot-method-sheet__option + .auth-forgot-method-sheet__option { border-top: 1PX solid $color-divider; }
+.auth-forgot-method-sheet__cancel { margin-top: 10PX; font-weight: 600; }
 .auth-methods { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 4PX; padding: 4PX; border-radius: 16PX; background: $color-soft-beige; }
 .auth-methods__indicator { position: absolute; top: 4PX; bottom: 4PX; left: 4PX; width: calc(50% - 6PX); background: $color-surface; border-radius: 12PX; box-shadow: 0 2PX 8PX rgba(22,52,34,0.08); transition: transform 260ms $ease-emphasized; }
 .auth-methods--phone .auth-methods__indicator { transform: translateX(calc(100% + 4PX)); }
