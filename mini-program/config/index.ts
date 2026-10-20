@@ -40,6 +40,13 @@ if (isProductionBuild && (process.env.TARO_APP_API_BASE_URL ?? "").trim().replac
   throw new Error("生产构建的 TARO_APP_API_BASE_URL 必须指向 Prod CloudBase 环境。");
 }
 const isDevelopment = !isProductionBuild && appEnvironment === "development";
+const developmentApiBaseUrl = "https://test-dev-d4gyxnn0b5dfa2c8a.service.tcloudbase.com";
+if (isDevelopment && process.env.TARO_APP_PLATFORM === "android") {
+  const configuredApiBaseUrl = (process.env.TARO_APP_API_BASE_URL ?? "").trim().replace(/\/$/, "");
+  if (configuredApiBaseUrl && configuredApiBaseUrl !== developmentApiBaseUrl) {
+    throw new Error("Android DEV 构建的 TARO_APP_API_BASE_URL 必须指向 DEV CloudBase 环境。");
+  }
+}
 const milestoneAssetCdn = (process.env.TARO_APP_MILESTONE_ASSET_CDN ?? "").trim().replace(/\/$/, "");
 if (isProductionBuild && !milestoneAssetCdn) {
   throw new Error(
