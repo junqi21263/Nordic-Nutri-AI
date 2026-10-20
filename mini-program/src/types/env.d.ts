@@ -15,5 +15,6 @@ interface Window {
     consume?: () => string;
     openSettings?: () => void;
     openLink?: (url: string) => void;
+    testSystemNotification?: () => string;
   };
 }

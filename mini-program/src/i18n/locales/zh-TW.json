@@ -361,6 +361,8 @@
     "permissionOff": "系統通知未開啟",
     "permissionHelp": "若已拒絕授權，請在手機系統設定 → Nordic → 通知中開啟。",
     "enable": "開啟通知",
+    "localTest": "測試本機通知",
+    "localTestResults": { "posted": "已發出本機測試通知，請查看下拉通知欄。此測試不經過 FCM。", "permission_denied": "系統未授予通知權限，請在手機設定中開啟。", "app_blocked": "手機已關閉此應用的通知，請在系統設定中開啟。", "channel_blocked": "手機已關閉「系統公告」通知類別，請在系統設定中開啟。", "unavailable": "本機通知測試暫不可用。" },
     "systemPush": "系統公告提醒",
     "feedbackPush": "意見回覆提醒",
     "settingsHelp": "關閉 Push 後，訊息仍會保留。餐次提醒在原提醒設定中管理。",

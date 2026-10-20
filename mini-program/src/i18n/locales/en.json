@@ -380,6 +380,8 @@
     "permissionOff": "System notifications disabled",
     "permissionHelp": "If permission was denied, enable notifications in your phone settings → Nordic → Notifications.",
     "enable": "Enable notifications",
+    "localTest": "Test notification on this phone",
+    "localTestResults": { "posted": "A local test notification was sent. Check the notification shade. This test does not use FCM.", "permission_denied": "Notification permission is off. Enable it in your phone settings.", "app_blocked": "Notifications for this app are blocked in phone settings.", "channel_blocked": "The Announcements notification channel is blocked in phone settings.", "unavailable": "The local notification test is unavailable." },
     "systemPush": "Announcement alerts",
     "feedbackPush": "Feedback reply alerts",
     "settingsHelp": "Messages remain in your inbox when push alerts are off. Meal reminders have separate settings.",

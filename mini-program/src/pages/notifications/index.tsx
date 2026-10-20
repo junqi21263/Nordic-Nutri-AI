@@ -34,6 +34,7 @@ export default function NotificationsPage() {
     feedbackPush: true,
   });
   const [permission, setPermission] = useState("");
+  const [localTestResult, setLocalTestResult] = useState("");
   const requestVersion = useRef(0);
   const detailId = router.params.id;
   const settings = router.params.settings === "1";
@@ -145,6 +146,19 @@ export default function NotificationsPage() {
                     {t("notifications.enable")}
                   </AppButton>
                 ) : null}
+              </View>
+            ) : null}
+            {android && process.env.TARO_APP_ENV === "development" ? (
+              <View className="notifications__card">
+                <AppButton variant="secondary" onClick={() => {
+                  try {
+                    const result = window.NordicPushIntent?.testSystemNotification?.() ?? "unavailable";
+                    setLocalTestResult(t(`notifications.localTestResults.${result}`));
+                  } catch {
+                    setLocalTestResult(t("notifications.localTestResults.unavailable"));
+                  }
+                }}>{t("notifications.localTest")}</AppButton>
+                {localTestResult ? <Text className="notifications__muted">{localTestResult}</Text> : null}
               </View>
             ) : null}
             {(["systemPush", "feedbackPush"] as const).map((key) => (

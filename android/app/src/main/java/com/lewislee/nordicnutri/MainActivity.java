@@ -7,6 +7,14 @@ import android.view.View;
 import android.view.WindowInsetsController;
 import android.webkit.JavascriptInterface;
 import android.content.Intent;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.pm.PackageManager;
+import android.content.pm.ApplicationInfo;
+
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 
 import org.json.JSONObject;
 
@@ -54,6 +62,34 @@ public class MainActivity extends BridgeActivity {
         public void openSettings() {
             runOnUiThread(() -> startActivity(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                     .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())));
+        }
+        @JavascriptInterface
+        public String testSystemNotification() {
+            if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) return "unavailable";
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    && ContextCompat.checkSelfPermission(MainActivity.this, "android.permission.POST_NOTIFICATIONS")
+                    != PackageManager.PERMISSION_GRANTED) return "permission_denied";
+            NotificationManagerCompat notifications = NotificationManagerCompat.from(MainActivity.this);
+            if (!notifications.areNotificationsEnabled()) return "app_blocked";
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager != null) {
+                NotificationChannel channel = manager.getNotificationChannel("system-announcements");
+                if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) return "channel_blocked";
+                if (channel == null) manager.createNotificationChannel(new NotificationChannel(
+                        "system-announcements", "系统公告", NotificationManager.IMPORTANCE_HIGH));
+            }
+            try {
+                notifications.notify(7601, new NotificationCompat.Builder(MainActivity.this, "system-announcements")
+                        .setSmallIcon(R.drawable.nordic_notification_icon)
+                        .setContentTitle("Nordic DEV 本机通知测试")
+                        .setContentText("这条通知不经过 FCM，用于检查手机通知权限和通道。")
+                        .setPriority(NotificationCompat.PRIORITY_HIGH)
+                        .setAutoCancel(true)
+                        .build());
+                return "posted";
+            } catch (SecurityException error) {
+                return "permission_denied";
+            }
         }
         @JavascriptInterface
         public synchronized String consume() {
