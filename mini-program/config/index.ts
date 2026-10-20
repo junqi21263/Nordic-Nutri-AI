@@ -41,6 +41,9 @@ if (isProductionBuild && (process.env.TARO_APP_API_BASE_URL ?? "").trim().replac
 }
 const isDevelopment = !isProductionBuild && appEnvironment === "development";
 const developmentApiBaseUrl = "https://test-dev-d4gyxnn0b5dfa2c8a.service.tcloudbase.com";
+if (process.env.TARO_APP_PLATFORM === "android" && !(process.env.TARO_APP_GOOGLE_SERVER_CLIENT_ID ?? "").trim()) {
+  throw new Error("Android 构建缺少 TARO_APP_GOOGLE_SERVER_CLIENT_ID，Google 登录将无法使用。");
+}
 if (isDevelopment && process.env.TARO_APP_PLATFORM === "android") {
   const configuredApiBaseUrl = (process.env.TARO_APP_API_BASE_URL ?? "").trim().replace(/\/$/, "");
   if (configuredApiBaseUrl && configuredApiBaseUrl !== developmentApiBaseUrl) {
