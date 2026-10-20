@@ -74,6 +74,24 @@ export function createAndroidPushNotificationAdapter(dependencies: PushAdapterDe
         sound: "default",
         vibration: true,
       });
+      await dependencies.createChannel?.({
+        id: "system-announcements",
+        name: "系统公告",
+        description: "系统通知公告",
+        importance: 4,
+        visibility: 1,
+        sound: "default",
+        vibration: true,
+      });
+      await dependencies.createChannel?.({
+        id: "feedback-replies",
+        name: "反馈回复",
+        description: "问题反馈回复提醒",
+        importance: 4,
+        visibility: 1,
+        sound: "default",
+        vibration: true,
+      });
       await dependencies.register();
       const launchIntent = dependencies.consumeLaunchIntent?.();
       if (launchIntent) await onLaunchIntent?.(launchIntent);

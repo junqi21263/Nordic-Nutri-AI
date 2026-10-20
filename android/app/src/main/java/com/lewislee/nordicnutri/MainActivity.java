@@ -65,7 +65,9 @@ public class MainActivity extends BridgeActivity {
     }
 
     private synchronized void capturePushIntent(Intent intent) {
-        if (intent == null || !"com.lewislee.nordicnutri.PUSH_OPEN".equals(intent.getAction())) return;
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (!"com.lewislee.nordicnutri.PUSH_OPEN".equals(action) && !Intent.ACTION_MAIN.equals(action)) return;
         String deliveryId = intent.getStringExtra("deliveryId");
         String mealType = intent.getStringExtra("mealType");
         if (deliveryId == null || deliveryId.trim().isEmpty() || mealType == null || mealType.trim().isEmpty()) return;

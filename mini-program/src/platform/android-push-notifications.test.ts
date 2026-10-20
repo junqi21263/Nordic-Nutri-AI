@@ -27,6 +27,8 @@ describe("Android push notification adapter", () => {
       sound: "default",
       vibration: true,
     });
+    expect(createChannel).toHaveBeenCalledWith(expect.objectContaining({ id: "system-announcements", name: "系统公告" }));
+    expect(createChannel).toHaveBeenCalledWith(expect.objectContaining({ id: "feedback-replies", name: "反馈回复" }));
     expect(addListener).toHaveBeenCalledWith("registration", expect.any(Function));
     expect(addListener).toHaveBeenCalledWith("pushNotificationReceived", expect.any(Function));
   });
