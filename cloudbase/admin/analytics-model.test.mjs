@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { reportViews, formatValue, reportColumns, reportQuery, reportPageCount } from './analytics-model.mjs';
 
-test('all eight approved reports are available with stable API keys', () => {
-  assert.deepEqual(Object.keys(reportViews), ['overview','acquisition','funnels','retention','features','errors','reports','quality']);
+test('all eight approved reports and report history are available with stable API keys', () => {
+  assert.deepEqual(Object.keys(reportViews), ['overview','acquisition','funnels','retention','features','versions','errors','quality','reports']);
 });
 test('unobserved or immature rates stay unknown rather than becoming zero', () => {
   assert.equal(formatValue(null), '—');
