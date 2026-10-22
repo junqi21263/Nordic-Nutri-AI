@@ -2,7 +2,7 @@ import { reportViews, metricLabels, formatValue, reportColumns, reportQuery, rep
 
 const host = document.getElementById('moduleAnalytics');
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g,(char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
-const state = { view:'overview', page:1, pageSize:25, generation:0, report:null };
+const state = { view:'overview', page:1, pageSize:25, generation:0, report:null, history:new Map() };
 const dateKey = (value) => new Date(value + 8*3600_000).toISOString().slice(0,10);
 const today = dateKey(Date.now());
 const start = dateKey(Date.now()-6*86400_000);
@@ -93,12 +93,20 @@ async function load() {
     node('analyticsPage').textContent = '';
   }
 }
+function reportHistoryRow(item) {
+  const expired = Number.isFinite(Date.parse(item.expires_at)) && Date.parse(item.expires_at) <= Date.now();
+  const retry = expired || item.status === 'failed' || item.status === 'expired';
+  const action = retry ? `<button type="button" class="button secondary" data-report-retry="${escape(item.id)}">重新生成</button>`
+    : item.status === 'completed' || item.status === 'ready' ? `<button type="button" class="button secondary" data-report-preview="${escape(item.id)}">预览</button> <button type="button" class="button secondary" data-report-download="${escape(item.id)}">下载</button>` : '生成中';
+  return `<tr><td>${escape(reportTemplates[item.view] || item.view || '分析报告')}</td><td>${escape(expired ? 'expired' : item.status || '未知')}</td><td>${escape(item.created_at || '—')}</td><td>${escape(item.watermark || '—')}</td><td>${escape(item.expires_at || '—')}</td><td>${action}</td></tr>`;
+}
 function renderHistory(result) {
   const items = Array.isArray(result.items) ? result.items : [];
+  state.history = new Map(items.map((item) => [item.id,item]));
   node('analyticsSummary').replaceChildren();
   node('analyticsSeries').replaceChildren();
   node('analyticsWatermark').textContent = '报告仅包含聚合数据，快照保留 7 天；下载时重新验证当前管理员权限。';
-  node('analyticsRows').innerHTML = `<div class="analytics-report-create"><label>报告模板 <select id="analyticsTemplate">${Object.entries(reportTemplates).map(([key,value]) => `<option value="${key}">${value}</option>`).join('')}</select></label><span>先在对应分析页预览当前口径，再使用上方按钮生成 CSV 或打印版报告。</span></div>${items.length ? `<table><thead><tr><th>报告</th><th>状态</th><th>创建时间</th><th>数据水位</th><th>有效期</th><th>操作</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escape(reportTemplates[item.view] || item.view || '分析报告')}</td><td>${escape(item.status || '未知')}</td><td>${escape(item.created_at || '—')}</td><td>${escape(item.watermark || '—')}</td><td>${escape(item.expires_at || '—')}</td><td>${item.status === 'completed' || item.status === 'ready' ? `<button type="button" class="button secondary" data-report-preview="${escape(item.id)}">预览</button> <button type="button" class="button secondary" data-report-download="${escape(item.id)}">下载</button>` : item.status === 'failed' || item.status === 'expired' ? `<button type="button" class="button secondary" data-report-retry="${escape(item.id)}">重新生成</button>` : '生成中'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted analytics-empty">当前环境尚无手动生成的报告。</p>'}`;
+  node('analyticsRows').innerHTML = `<div class="analytics-report-create"><label>报告模板 <select id="analyticsTemplate">${Object.entries(reportTemplates).map(([key,value]) => `<option value="${key}">${value}</option>`).join('')}</select></label><span>先在对应分析页预览当前口径，再使用上方按钮生成 CSV 或打印版报告。</span></div>${items.length ? `<table><thead><tr><th>报告</th><th>状态</th><th>创建时间</th><th>数据水位</th><th>有效期</th><th>操作</th></tr></thead><tbody>${items.map(reportHistoryRow).join('')}</tbody></table>` : '<p class="muted analytics-empty">当前环境尚无手动生成的报告。</p>'}`;
   const pages = reportPageCount(result);
   state.page = Math.max(1,Number(result.page) || state.page);
   node('analyticsPage').textContent = `第 ${state.page} / ${pages} 页 · 共 ${Number(result.total || 0).toLocaleString('zh-CN')} 份`;
@@ -128,7 +136,8 @@ async function reportAction(button) {
   button.disabled = true;
   try {
     if (button.dataset.reportRetry) {
-      const job = await api(`/analytics/reports/${encodeURIComponent(id)}`);
+      const job = state.history.get(id);
+      if (!job?.view || !job.filters) throw new Error('报告元信息不可用');
       await api('/analytics/reports',{ method:'POST',body:{ view:job.view,filters:job.filters,format:job.format || 'csv' } });
       await load();
       node('analyticsExportStatus').textContent = '已重新提交报告生成任务。';

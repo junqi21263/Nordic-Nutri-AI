@@ -81,3 +81,7 @@ Files: get-login-ticket/index.js routing and factory; deployment scripts/config 
 ## Review
 
 AC01–AC04, AC13, AC16 → Tasks 1/2/3/4; AC05/06/11/15/17 → Task 2 plus real-device gate; AC07–AC10/12/18 → Task 1 and integration fixtures; AC14 → environment-bound build/deploy/readback. No historical activity is invented. Missing source observability must be labelled unknown.
+
+## Execution status (2026-10-22)
+
+Tasks 1–3 and the DEV build/deploy portion of Task 4 are implemented. Detailed evidence is in [the DEV verification report](./2026-10-22-product-analytics-dev-verification.md). The real-device gate and authenticated remote admin export remain open and must not be inferred from builds or route tests.

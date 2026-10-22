@@ -84,7 +84,7 @@ test('report history is paginated and contains only the requesting admin jobs',a
  const listed=await s.listReports({actorUserId:aid,page:2,pageSize:5});
  assert.deepEqual(checks.find(x=>x.key==='actor_user_id'),{key:'actor_user_id',value:aid});
  assert.deepEqual(checks.find(x=>x.from!==undefined),{from:5,to:9});
- assert.equal(listed.total,1);assert.equal(listed.items[0].metric_version,'1');assert.equal('snapshot' in listed.items[0],false);assert.equal(checks[0].columns.includes('snapshot'),false);
+ assert.equal(listed.total,1);assert.equal(listed.items[0].metric_version,'1');assert.equal('snapshot' in listed.items[0],false);assert.equal(checks[0].columns.includes('snapshot'),false);assert.equal(checks[0].columns.includes('format'),true);
 });
 test('web attribution filters are exact and only accepted on acquisition',async()=>{
  const calls=[];const s=createAnalyticsService({db:{rpc:async(name,args)=>{calls.push(args);return{data:{rows:[]}};}},environment:'dev',secret:'s'.repeat(32),now:()=>now});

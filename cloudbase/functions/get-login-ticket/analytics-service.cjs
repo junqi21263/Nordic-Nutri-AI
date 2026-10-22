@@ -97,7 +97,7 @@ function createAnalyticsService({db,environment,secret,enabled=true,now=()=>new 
  async function getReport(input){const {snapshot,...row}=await reportRow(input);return row;}
  async function listReports({actorUserId,page=1,pageSize=25}={}){
   if(!UUID.test(actorUserId)||!Number.isInteger(page)||page<1||page>10000||!Number.isInteger(pageSize)||pageSize<1||pageSize>100)throw new AnalyticsError('ANALYTICS_REPORT_INVALID');
-  const result=await db.from('analytics_report_jobs').select('id,status,view,created_at,expires_at,watermark,filters,metric_version',{count:'exact'})
+  const result=await db.from('analytics_report_jobs').select('id,status,view,format,created_at,expires_at,watermark,filters,metric_version',{count:'exact'})
    .eq('actor_user_id',actorUserId).eq('environment',environment).order('created_at',{ascending:false}).range((page-1)*pageSize,page*pageSize-1);
   if(result.error)throw new AnalyticsError('ANALYTICS_DATABASE_UNAVAILABLE',503);
   return {items:(result.data||[]).map(row=>({...row,completed_at:row.created_at})),total:result.count||0,page,pageSize};

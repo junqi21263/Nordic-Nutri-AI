@@ -21,3 +21,9 @@ test('export download never passes credentials in URL and is manually initiated'
   assert.match(module,/analyticsExportHtml/);
   assert.doesNotMatch(module,/setInterval|mailto:|window\.open/);
 });
+test('expired report retry uses listed metadata because expired detail is unavailable', async () => {
+  const module = await read('./analytics.js');
+  assert.match(module,/Date\.parse\(item\.expires_at\) <= Date\.now\(\)/);
+  assert.match(module,/state\.history\.get\(id\)/);
+  assert.doesNotMatch(module,/const job = await api\(`\/analytics\/reports\/\$\{encodeURIComponent\(id\)\}`\)/);
+});
