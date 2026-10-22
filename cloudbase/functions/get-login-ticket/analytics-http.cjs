@@ -38,8 +38,9 @@ async function readBody(req, includeRaw = false) {
     return includeRaw ? {body:value,raw:Buffer.concat(chunks).toString('utf8')} : value;
   } catch { throw fail('ANALYTICS_INVALID_JSON'); }
 }
-function originAllowed(origin, environment) {
+function originAllowed(origin, environment, isAdmin = false) {
   if (!origin || origin === 'https://localhost' || origin === 'http://localhost' || origin === 'capacitor://localhost') return true;
+  if (isAdmin && environment === DEV_ENV && origin === 'https://test-dev-d4gyxnn0b5dfa2c8a-1420560890.tcloudbaseapp.com') return true;
   if (environment === DEV_ENV) return ['https://nutri-preview.lewislee.online','http://localhost:10086','http://127.0.0.1:10086','http://localhost:4173','http://127.0.0.1:4173'].includes(origin);
   return environment === PROD_ENV && origin === 'https://nutri.lewislee.online';
 }
@@ -65,7 +66,7 @@ async function handleAnalyticsHttp({req,res,url,service}) {
       return true;
     }
     const origin=req.headers.origin;
-    if (!originAllowed(origin,service.analyticsEnvironment)) throw fail('ANALYTICS_ORIGIN_DENIED',403);
+    if (!originAllowed(origin,service.analyticsEnvironment,isAdmin)) throw fail('ANALYTICS_ORIGIN_DENIED',403);
     if (req.method==='OPTIONS') {
       res.writeHead(204,{'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization, X-Analytics-Collection','Cache-Control':'no-store'}); res.end(); return true;
     }

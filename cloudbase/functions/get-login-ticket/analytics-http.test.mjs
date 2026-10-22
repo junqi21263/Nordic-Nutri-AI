@@ -63,6 +63,13 @@ test('collection origin allowlist and methods fail closed',async()=>withServer(a
   assert.equal((await fetch(`${base}/analytics/batch`)).status,405);
   assert.equal(calls.length,1);
 }));
+test('DEV admin hosting origin can read admin reports but cannot use collection routes',async()=>withServer(async(base,calls)=>{
+  const origin='https://test-dev-d4gyxnn0b5dfa2c8a-1420560890.tcloudbaseapp.com';
+  assert.equal((await fetch(`${base}/api/admin/analytics/report?view=overview`,{headers:{origin,authorization:'Bearer admin'}})).status,200);
+  assert.equal((await fetch(`${base}/analytics/consent`,{...json({anonymous_id:'random',platform:'web',analytics:true,diagnostics:false}),headers:{origin,'content-type':'application/json'}})).status,403);
+  assert.equal((await fetch(`${base}/api/admin/analytics/report?view=overview`,{headers:{origin:'https://test-dev-d4gyxnn0b5dfa2c8a.tcloudbaseapp.com',authorization:'Bearer admin'}})).status,403);
+  assert.equal(calls.length,1);
+}));
 test('invalid JSON and oversized bodies are safely rejected',async()=>withServer(async(base,calls)=>{
   const options=json({}); options.body='{broken';
   assert.equal((await fetch(`${base}/analytics/batch`,options)).status,400);

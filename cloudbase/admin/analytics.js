@@ -85,7 +85,7 @@ async function load() {
   } catch (error) {
     if (generation !== state.generation) return;
     state.report = null;
-    node('analyticsStatus').textContent = error?.status === 403 ? '当前账号无权查看使用分析。' : `报告暂不可用：${apiErrorMessage(error)}`;
+    node('analyticsStatus').textContent = error?.json?.code === 'ANALYTICS_ORIGIN_DENIED' ? '当前后台地址未获分析接口授权。' : error?.status === 401 ? '后台登录已失效，请重新登录。' : error?.status === 403 ? '当前账号无权查看使用分析。' : `报告暂不可用：${apiErrorMessage(error)}`;
     node('analyticsSummary').replaceChildren();
     node('analyticsSeries').replaceChildren();
     node('analyticsRows').replaceChildren();
