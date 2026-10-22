@@ -9,6 +9,7 @@ describe("Android auth flow UI contract", () => {
   it("keeps the reference-inspired landing hierarchy and stable provider layout", () => {
     const page = readFileSync(resolve(root, "pages/android-auth/index.tsx"), "utf8");
     const styles = readFileSync(resolve(root, "pages/android-auth/index.scss"), "utf8");
+    expect(page).toContain('const [termsAccepted, setTermsAccepted] = useState(true);');
     const loginBlock = page.slice(page.indexOf("const renderLogin"), page.indexOf("const renderRegisterStart"));
     const registerBlock = page.slice(page.indexOf("const renderRegisterStart"), page.indexOf("const renderOtp"));
 
@@ -34,6 +35,8 @@ describe("Android auth flow UI contract", () => {
     expect(styles).toMatch(/\.auth-create-account \{[\s\S]*?align-items: center;[\s\S]*?justify-content: center;/);
     expect(styles).toContain(".auth-create-account__link { color: $color-forest-green; text-decoration: underline; }");
     expect(loginBlock).not.toContain("renderCaptcha()");
+    expect(loginBlock).toContain("{renderAgreement()}");
+    expect(page.slice(page.indexOf("const renderLanding"), page.indexOf("const renderCaptcha"))).toContain("{renderAgreement()}");
     expect(loginBlock).not.toContain('onClick={() => switchMethod(isPhone ? "email" : "phone")}');
     expectLocalizedCopy(registerBlock, "已有账号？");
     expectLocalizedCopy(registerBlock, "去登录");

@@ -110,7 +110,7 @@ export default function AndroidAuthPage() {
   const [successKind, setSuccessKind] = useState<SuccessKind>("login");
   const [successBackView, setSuccessBackView] = useState<AuthView>("email-login");
   const [resetMethod, setResetMethod] = useState<"email" | "phone">("email");
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(true);
   const showFeedbackModal = useFeedbackStore((state) => state.showModal);
 
   const targetType = view === "reset-password" ? resetMethod : view.includes("phone") ? "phone" : "email";

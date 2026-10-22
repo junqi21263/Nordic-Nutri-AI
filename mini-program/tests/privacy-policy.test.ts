@@ -52,6 +52,13 @@ describe("privacy policy and disclaimer", () => {
     );
   });
 
+  it("keeps both legal pages within the safe area while lifting their content slightly", () => {
+    const styles = read("styles/page.scss");
+    const terms = read("pages/terms-of-service/index.tsx");
+    expect(styles).toContain("padding-top: calc(env(safe-area-inset-top) + #{$space-8});");
+    expect(terms).toContain('className="page-layout--privacy-policy"');
+  });
+
   it("keeps the account-cancellation card copy in a responsive, non-overlapping layout", () => {
     const policy = read("pages/privacy-policy/index.tsx");
     const styles = read("styles/page.scss");

@@ -8671,7 +8671,7 @@
   padding-top: 0;
 }
 .page-layout--privacy-policy .privacy-policy-page {
-  padding-top: calc(env(safe-area-inset-top) + #{$space-16});
+  padding-top: calc(env(safe-area-inset-top) + #{$space-8});
 }
 .privacy-policy-page__back {
   align-items: center;
