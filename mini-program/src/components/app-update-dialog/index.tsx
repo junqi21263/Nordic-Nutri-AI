@@ -1,3 +1,4 @@
+import { trackAnalytics } from "../../features/analytics/runtime";
 import { Text, View } from "@tarojs/components";
 import { useTranslation } from "react-i18next";
 import { AppButton } from "../app-button";
@@ -20,6 +21,7 @@ export function AppUpdateDialog() {
             : "";
   const download = () => {
     if (!release.apkUrl || !release.apkSha256) return;
+    trackAnalytics("update_clicked", { target_version: release.versionName });
     if (installVerifiedApk(release.apkUrl, release.apkSha256, release.versionCode, release.versionName)) setProgress("downloading", 0);
     else setProgress("failed", 0);
   };
@@ -36,7 +38,7 @@ export function AppUpdateDialog() {
         {status ? <Text className="app-update-dialog__status">{status}</Text> : null}
         <View className="app-update-dialog__actions">
           {release.marketUrl ? (
-            <AppButton disabled={busy} onClick={() => openNativeMarket(release.marketUrl!)}>{t("appUpdate.market")}</AppButton>
+            <AppButton disabled={busy} onClick={() => { trackAnalytics("update_clicked", { target_version: release.versionName }); openNativeMarket(release.marketUrl!); }}>{t("appUpdate.market")}</AppButton>
           ) : null}
           {release.apkUrl && release.apkSha256 ? (
             <AppButton variant={release.marketUrl ? "outline" : "primary"} loading={busy} onClick={download}>

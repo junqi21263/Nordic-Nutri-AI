@@ -50,6 +50,8 @@ const { createGoogleTokenService } = require("./services/google.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
 const { getVisionQuotaPolicy } = require("./vision-quota-policy.cjs");
 const { createObservabilityService } = require("./observability-service.cjs");
+const { createAnalyticsService } = require("./analytics-service.cjs");
+const { handleAnalyticsHttp } = require("./analytics-http.cjs");
 const { sanitizeTraceMeta, sanitizeTracePayload } = require("./observability-sanitizer.cjs");
 const { createAdminAuditService } = require("./admin-audit-service.cjs");
 const { recordModelUsage } = require("./model-usage.cjs");
@@ -1770,6 +1772,14 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   });
 
   return {
+    analyticsEnvironment: config.cloudbaseEnvId,
+    analyticsDispatchSecret: env.ANALYTICS_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
+    analytics: typeof db.rpc === "function" && typeof config.sessionSecret === "string" && config.sessionSecret.length >= 16 ? createAnalyticsService({
+      db,
+      environment: config.cloudbaseEnvId,
+      secret: env.ANALYTICS_SIGNING_SECRET || config.sessionSecret,
+      enabled: env.ANALYTICS_ENABLED === "true" || (env.ANALYTICS_ENABLED !== "false" && config.cloudbaseEnvId === "test-dev-d4gyxnn0b5dfa2c8a"),
+    }) : null,
     issue: session.issue,
     verifySession: (token) => verifyAccessToken(token, config.sessionSecret),
     auth,
@@ -2139,6 +2149,7 @@ function getAdminFoodRoute(pathname) {
   const jobRunMatch = path.match(/^\/jobs\/([a-z0-9_-]+)\/run-now$/i);
   if (jobRunMatch) return { operation: "jobRunNow", jobKey: jobRunMatch[1] };
   if (path === "/system/health") return { operation: "systemHealth" };
+  if (path === "/dashboard/summary") return { operation: "dashboardSummary" };
   if (path === "/audit-logs") return { operation: "auditLogs" };
   if (path === "/traces") return { operation: "traceList" };
   const diagnosticMatch = path.match(/^\/diagnostics\/([^/]+)$/i);
@@ -2332,13 +2343,14 @@ function sendMealError(res, error) {
 
 function createHttpServer({ service }) {
   return http.createServer(async (req, res) => {
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    if (await handleAnalyticsHttp({ req, res, url, service })) return;
     if (req.method === "OPTIONS") {
       res.writeHead(204, CORS_HEADERS);
       res.end();
       return;
     }
 
-    const url = new URL(req.url || "/", "http://127.0.0.1");
     const dataOperation = getDataOperation(url.pathname);
     const mealRoute = getMealRoute(url.pathname);
     const pushRoute = getPushRoute(url.pathname);
@@ -2833,6 +2845,19 @@ function createHttpServer({ service }) {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.systemHealth?.getHealth) return sendJson(res, 503, { code: "SYSTEM_HEALTH_UNAVAILABLE" });
           return sendJson(res, 200, await service.systemHealth.getHealth());
+        }
+        if (adminFoodRoute.operation === "dashboardSummary") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.systemHealth?.getDashboardSummary) return sendJson(res, 503, { code: "DASHBOARD_UNAVAILABLE" });
+          const summary = await service.systemHealth.getDashboardSummary();
+          let todayActiveAccounts = null;
+          if (service.analytics?.report) {
+            try {
+              const report = await service.analytics.report({ view: "overview", from: summary.day, to: summary.day, platform: "android", includeTest: service.analyticsEnvironment === "test-dev-d4gyxnn0b5dfa2c8a" });
+              todayActiveAccounts = report.summary?.active_accounts ?? null;
+            } catch (error) { console.warn("[dashboard-summary] analytics unavailable:", error?.code || "unknown"); }
+          }
+          return sendJson(res, 200, { ...summary, todayActiveAccounts });
         }
         if (adminFoodRoute.operation === "auditLogs") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });

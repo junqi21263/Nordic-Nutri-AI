@@ -1,7 +1,9 @@
+import { pauseAnalytics, setAnalyticsPreference, trackAnalytics } from "../../features/analytics/runtime";
+import { nativeGoogleErrorType } from "../../features/analytics/observations";
 import { useTranslation } from "react-i18next";
 import { t } from "../../i18n";
 import Taro from "@tarojs/taro";
-import { Text, View } from "@tarojs/components";
+import { Checkbox, CheckboxGroup, Text, View } from "@tarojs/components";
 import { useEffect, useState } from "react";
 import {
   androidAuthApi,
@@ -107,6 +109,7 @@ export default function AndroidAuthPage() {
   const [successKind, setSuccessKind] = useState<SuccessKind>("login");
   const [successBackView, setSuccessBackView] = useState<AuthView>("email-login");
   const [resetMethod, setResetMethod] = useState<"email" | "phone">("email");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const showFeedbackModal = useFeedbackStore((state) => state.showModal);
 
   const targetType = view === "reset-password" ? resetMethod : view.includes("phone") ? "phone" : "email";
@@ -220,24 +223,33 @@ export default function AndroidAuthPage() {
 
   const signInWithGoogle = async () => {
     if (busy) return;
+    if (!termsAccepted) { setError(t("androidAuth.termsRequired")); return; }
     setBusy(true);
     setView("google-connecting");
       setError("");
+    const releaseAnalytics = pauseAnalytics();
+    let credentialReceived = false;
+    trackAnalytics("auth_started", { method: "google", entry: "login" });
     try {
       const idToken = await getNativeGoogleIdToken(googleServerClientId);
+      credentialReceived = true;
+      trackAnalytics("google_credential_result", { outcome: "succeeded", stage: "native_callback" });
       console.info("[android-auth][google-token-diagnostics]", summarizeGoogleIdToken(idToken, googleServerClientId));
       await finishLogin((await androidAuthApi.loginGoogle(idToken)) as AndroidAuthSessionResult, "login");
     } catch (requestError) {
+      if (!credentialReceived) trackAnalytics("google_credential_result", { outcome: "failed", stage: "native_callback", error_type: nativeGoogleErrorType(requestError) });
       setView("landing");
       const message = userMessage(requestError, "google");
       setError(message === t("androidAuth.errors.failed") ? t("androidAuth.errors.googleLoginFailed") : message);
     } finally {
+      releaseAnalytics();
       setBusy(false);
     }
   };
 
   const sendCode = async () => {
     if (busy || cooldown > 0) return;
+    if (isRegister && !termsAccepted) { setError(t("androidAuth.termsRequired")); return; }
     if (isOtp || view === "reset-password") {
       navigate(view === "reset-password" ? successBackView : isPhone ? "phone-register" : "email-register");
       setSuccess(t("androidAuth.completeCaptchaRetry"));
@@ -313,6 +325,7 @@ export default function AndroidAuthPage() {
 
   const submit = async () => {
     if (busy) return;
+    if ((isLogin || isRegisterPassword) && !termsAccepted) { setError(t("androidAuth.termsRequired")); return; }
     if (isLogin) {
       const inputError = getAuthInputError(targetType, isPhone ? phoneWithCountry(phone) : email, undefined, "", false);
       if (inputError) { setError(t(inputError)); return; }
@@ -385,6 +398,24 @@ export default function AndroidAuthPage() {
     navigate(next as AuthView);
   };
 
+  const renderAgreement = () => (
+    <CheckboxGroup className="auth-terms" onChange={(event) => {
+      const accepted = event.detail.value.includes("agreed");
+      setTermsAccepted(accepted);
+      setAnalyticsPreference({ analytics: accepted, diagnostics: accepted });
+      setError("");
+    }}>
+      <Checkbox value="agreed" checked={termsAccepted} color="#153f2b" ariaLabel={`${t("androidAuth.termsLead")}${t("androidAuth.termsOfService")}${t("androidAuth.termsJoin")}${t("androidAuth.privacyPolicy")}${t("androidAuth.termsTail")}`} />
+      <Text className="auth-terms__copy">
+        {t("androidAuth.termsLead")}
+        <Text className="auth-terms__link" onClick={() => void Taro.navigateTo({ url: "/pages/terms-of-service/index" })}>{t("androidAuth.termsOfService")}</Text>
+        {t("androidAuth.termsJoin")}
+        <Text className="auth-terms__link" onClick={() => void Taro.navigateTo({ url: "/pages/privacy-policy/index" })}>{t("androidAuth.privacyPolicy")}</Text>
+        {t("androidAuth.termsTail")}
+      </Text>
+    </CheckboxGroup>
+  );
+
   const renderLanding = () => (
     <View className="auth-landing">
       <AuthHero />
@@ -419,13 +450,7 @@ export default function AndroidAuthPage() {
           <Text className="auth-create-account__link" onClick={() => navigate("email-register")}>{t("androidAuth.registerNow")}</Text>
         </View>
         {error ? <InlineMessage message={error} kind="error" onRetry={error === t("androidAuth.errors.googleLoginFailed") ? () => void signInWithGoogle() : undefined} /> : null}
-        <Text className="auth-terms">
-          {t("androidAuth.termsLead")}
-          <Text className="auth-terms__link" onClick={() => void Taro.navigateTo({ url: "/pages/terms-of-service/index" })}>{t("androidAuth.termsOfService")}</Text>
-          {t("androidAuth.termsJoin")}
-          <Text className="auth-terms__link" onClick={() => void Taro.navigateTo({ url: "/pages/privacy-policy/index" })}>{t("androidAuth.privacyPolicy")}</Text>
-          {t("androidAuth.termsTail")}
-        </Text>
+        {renderAgreement()}
       </View>
     </View>
   );
@@ -448,6 +473,7 @@ export default function AndroidAuthPage() {
       {renderMethods()}
       {renderTargetInput()}
       <PasswordInput value={password} onChange={setPassword} />
+      {renderAgreement()}
       <AppButton size="large" loading={busy} onClick={() => void submit()}>{busy ? t("androidAuth.loggingIn") : t("androidAuth.login")}</AppButton>
       {error ? <InlineMessage message={error} kind="error" /> : null}
       <View className="auth-form__links">
@@ -462,6 +488,7 @@ export default function AndroidAuthPage() {
       {renderMethods()}
       {renderTargetInput()}
       {renderCaptcha()}
+      {renderAgreement()}
       <AppButton size="large" loading={busy} disabled={cooldown > 0} onClick={() => void sendCode()}>{busy ? t("androidAuth.sending") : cooldown > 0 ? t("androidAuth.resendAfter", { count: cooldown }) : t("androidAuth.getCode")}</AppButton>
       {error ? <InlineMessage message={error} kind="error" /> : null}
       <Text className="auth-switch">{t("androidAuth.haveAccount")}<Text onClick={() => navigate(isPhone ? "phone-login" : "email-login")}>{t("androidAuth.goToLogin")}</Text></Text>
@@ -493,6 +520,7 @@ export default function AndroidAuthPage() {
       <Text className="auth-form__title">{t("androidAuth.setLoginPassword")}</Text>
       <PasswordInput value={password} onChange={setPassword} />
       <PasswordInput label={t("androidAuth.confirmPassword")} value={confirmPassword} onChange={setConfirmPassword} />
+      {renderAgreement()}
       <AppButton size="large" loading={busy} onClick={() => void submit()}>{busy ? t("androidAuth.registering") : t("androidAuth.register")}</AppButton>
       {error ? <InlineMessage message={error} kind="error" /> : null}
     </View>

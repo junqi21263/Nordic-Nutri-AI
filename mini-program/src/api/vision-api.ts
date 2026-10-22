@@ -1,3 +1,4 @@
+import { pauseAnalytics, trackAnalytics } from "../features/analytics/runtime";
 import Taro from "@tarojs/taro";
 import { productTransport } from "../platform/product-transport";
 import { readWebImageBase64, compressWebImage } from "../platform/food-media";
@@ -393,7 +394,7 @@ async function prepareImagePath(
   return { path, originalSize, original, imagePrepareDurationMs };
 }
 
-export async function analyzeProductImage(
+async function analyzeProductImageAttempt(
   sourcePath: string,
   options: {
     source?: VisionSource;
@@ -489,8 +490,10 @@ export async function analyzeProductImage(
       },
       timeout: requestTimeout,
     });
+    trackAnalytics("image_upload_result", { entry: options.source ?? "unknown", outcome: response.statusCode === 200 || response.statusCode === 202 ? "succeeded" : "unknown", duration_ms: Date.now() - requestStartedAt }, { operation_id: clientRequestId });
     onTiming?.({ stage: "request", ms: Date.now() - requestStartedAt });
   } catch (err) {
+    trackAnalytics("image_upload_result", { entry: options.source ?? "unknown", outcome: "failed", error_code: "network_failed", duration_ms: Date.now() - requestStartedAt }, { operation_id: clientRequestId });
     console.error("[vision] network request failed:", err);
     const detail = String(
       (err as { errMsg?: unknown })?.errMsg || (err as Error)?.message || "",
@@ -559,3 +562,9 @@ export async function analyzeProductImage(
   return meal;
 }
 import { getLocale } from "../i18n";
+
+export async function analyzeProductImage(...args: Parameters<typeof analyzeProductImageAttempt>): Promise<ScannerMealFixture> {
+  const release = pauseAnalytics();
+  try { return await analyzeProductImageAttempt(...args); }
+  finally { release(); }
+}

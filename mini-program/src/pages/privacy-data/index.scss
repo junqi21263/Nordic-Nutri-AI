@@ -1,0 +1,11 @@
+/*postcss-pxtransform disable*/
+.analytics-privacy { display: flex; flex-direction: column; gap: 16px; color: #263b32; font-size: 15px; line-height: 1.7; }
+.analytics-privacy__heading { color: #263b32; font-size: 18px; font-weight: 600; }
+.analytics-privacy__subtitle { color: #627267; font-size: 13px; }
+.analytics-privacy__setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px; border-radius: 18px; background: #edf3eb; }
+.analytics-privacy__copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 7px; }
+.analytics-privacy__title { font-size: 16px; font-weight: 600; }
+.analytics-privacy__description { font-size: 13px; color: #627267; }
+.analytics-privacy__setting > taro-switch-core { flex: none; }
+.analytics-privacy__notice { display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: 18px; background: #fff; font-size: 13px; color: #627267; }
+.analytics-privacy__link { padding: 12px 4px; font-size: 14px; color: #315f47; }

@@ -65,7 +65,27 @@ function summarizeWindow(rows, sinceMs) {
   };
 }
 
-function createSystemHealthService({ db, observability, jobOps, providerConfig = {} } = {}) {
+function createSystemHealthService({ db, observability, jobOps, providerConfig = {}, clock = Date.now } = {}) {
+  async function getDashboardSummary() {
+    const day = new Date(clock() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const from = new Date(`${day}T00:00:00+08:00`).toISOString();
+    const to = new Date(Date.parse(from) + 86400_000).toISOString();
+    const count = async (query) => {
+      const result = await query;
+      if (result?.error || !Number.isSafeInteger(result?.count)) throw new Error("Dashboard count unavailable");
+      return result.count;
+    };
+    const [totalUsers, todayNewUsers, currentMeals, todayMeals, terminalRequests, successfulRequests] = await Promise.all([
+      count(db.from("app_users").select("id", { count: "exact", head: true }).neq("status", "deleted")),
+      count(db.from("app_users").select("id", { count: "exact", head: true }).neq("status", "deleted").gte("created_at", from).lt("created_at", to)),
+      count(db.from("meal_records").select("id", { count: "exact", head: true }).is("deleted_at", null)),
+      count(db.from("meal_records").select("id", { count: "exact", head: true }).is("deleted_at", null).gte("created_at", from).lt("created_at", to)),
+      count(db.from("ops_request_traces").select("id", { count: "exact", head: true }).gte("started_at", from).lt("started_at", to).neq("status", "processing")),
+      count(db.from("ops_request_traces").select("id", { count: "exact", head: true }).gte("started_at", from).lt("started_at", to).eq("status", "succeeded")),
+    ]);
+    return { day, totalUsers, todayNewUsers, currentMeals, todayMeals, terminalRequests, successfulRequests,
+      todayApiSuccessRate: terminalRequests ? successfulRequests / terminalRequests : null };
+  }
   async function probeDatabase() {
     try {
       const result = await db.from("ops_metric_events").select("metric").limit(1);
@@ -146,7 +166,7 @@ function createSystemHealthService({ db, observability, jobOps, providerConfig =
     };
   }
 
-  return { getHealth };
+  return { getHealth, getDashboardSummary };
 }
 
 module.exports = { HEALTH_STATUSES, createSystemHealthService, percentile, summarizeWindow, statusForProvider };

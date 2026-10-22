@@ -82,3 +82,26 @@ test("database and trace data failure produces partial unhealthy response withou
   assert.equal(health.components.traces.status, "unavailable");
   assert.equal(JSON.stringify(health).includes("secret"), false);
 });
+
+test("dashboard counts authoritative records and today's completed requests in Beijing time", async () => {
+  const requests = [];
+  const counts = { app_users: [12, 2], meal_records: [34, 3], ops_request_traces: [10, 8] };
+  const db = { from(table) {
+    const filters = [];
+    const chain = {
+      select(columns, options) { assert.deepEqual(options, { count: "exact", head: true }); return chain; },
+      neq(key, value) { filters.push(["neq", key, value]); return chain; },
+      eq(key, value) { filters.push(["eq", key, value]); return chain; },
+      is(key, value) { filters.push(["is", key, value]); return chain; },
+      gte(key, value) { filters.push(["gte", key, value]); return chain; },
+      lt(key, value) { filters.push(["lt", key, value]); return chain; },
+      then(resolve) { requests.push({ table, filters }); resolve({ count: counts[table].shift(), error: null }); },
+    };
+    return chain;
+  } };
+  const summary = await createSystemHealthService({ db, clock: () => Date.parse("2026-10-21T17:00:00Z") }).getDashboardSummary();
+  assert.deepEqual(summary, { day: "2026-10-22", totalUsers: 12, todayNewUsers: 2, currentMeals: 34, todayMeals: 3,
+    terminalRequests: 10, successfulRequests: 8, todayApiSuccessRate: 0.8 });
+  assert.equal(requests.filter(({ filters }) => filters.some(([operation, key, value]) => operation === "gte" && value === "2026-10-21T16:00:00.000Z")).length, 4);
+  assert.equal(requests.filter(({ filters }) => filters.some(([operation, key, value]) => operation === "lt" && value === "2026-10-22T16:00:00.000Z")).length, 4);
+});

@@ -16,6 +16,8 @@ import { useMealSavedCelebrationStore } from "../../stores/meal-saved-celebratio
 import { MealSavedCelebration } from "../../components/meal-saved-celebration";
 import { getCelebrationOverlayPriority } from "../../features/coach/celebration-overlay-priority";
 import Taro from "@tarojs/taro";
+import { trackAnalytics } from "../../features/analytics/runtime";
+import { analyticsPageKey } from "../../features/analytics/observations";
 
 export interface PageLayoutProps extends PropsWithChildren {
   title: string;
@@ -125,6 +127,24 @@ export function PageLayout({
   useEffect(() => {
     if (showTabs) setActiveKey(activeTab ?? "home");
   }, [activeTab, setActiveKey, showTabs]);
+
+  useEffect(() => {
+    if (!pageVisible) return undefined;
+    const pages = Taro.getCurrentPages();
+    const pageKey = analyticsPageKey(pages[pages.length - 1]?.route);
+    const started = performance.now();
+    let recorded = false;
+    const timer = setTimeout(() => {
+      recorded = true;
+      trackAnalytics("screen_view", {}, { page_key: pageKey });
+      if (pageKey === "food-scanner") trackAnalytics("scan_opened", { entry: "scanner" }, { page_key: pageKey });
+      if (pageKey === "analysis-result") trackAnalytics("vision_result_viewed", {}, { page_key: pageKey });
+    }, 500);
+    return () => {
+      clearTimeout(timer);
+      if (recorded) trackAnalytics("screen_engagement", { duration_ms: Math.min(30 * 60_000, Math.round(performance.now() - started)) }, { page_key: pageKey });
+    };
+  }, [pageVisible]);
 
   const cssVars = {
     "--app-status-bar-height": `${layout.statusBarHeight}px`,

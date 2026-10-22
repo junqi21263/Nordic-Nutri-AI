@@ -1,3 +1,4 @@
+import { pauseAnalytics, trackAnalytics } from "../features/analytics/runtime";
 import { productApiEndpoint } from "./product-api-config";
 import type { AppAuthSession, AppAuthUser } from "../auth/auth-store";
 import { useAuthStore } from "../auth/auth-store";
@@ -117,7 +118,7 @@ function updateNativeNetworkRecord(
   }
 }
 
-async function defaultRequest(
+async function defaultRequestAttempt(
   path: string,
   data: Record<string, unknown> = {},
   method: "GET" | "POST" = "POST",
@@ -204,6 +205,21 @@ async function defaultRequest(
     );
   }
   return response.data;
+}
+
+async function defaultRequest(path: string, data: Record<string, unknown> = {}, method: "GET" | "POST" = "POST") {
+  const release = pauseAnalytics();
+  const login = /^\/auth\/login\/(email|phone)$/.exec(path);
+  const binding = /^\/auth\/bind\/(email|phone|google)$/.exec(path);
+  if (login) trackAnalytics("auth_started", { method: login[1], entry: "login" });
+  try {
+    const result = await defaultRequestAttempt(path, data, method);
+    if (binding) trackAnalytics("account_binding_result", { method: binding[1], outcome: "succeeded" });
+    return result;
+  } catch (error) {
+    if (binding) trackAnalytics("account_binding_result", { method: binding[1], outcome: "failed", error_code: "unknown" });
+    throw error;
+  } finally { release(); }
 }
 
 function createApi(request: AndroidAuthRequest) {

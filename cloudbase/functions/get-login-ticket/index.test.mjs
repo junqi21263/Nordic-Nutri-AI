@@ -1998,6 +1998,22 @@ test("admin users and feedback routes require session and accept admin", async (
   });
 });
 
+test("dashboard summary requires admin session and keeps visitor scope to Android analytics", async () => {
+  const server = createHttpServer({ service: {
+    verifySession: (token) => token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null,
+    analyticsEnvironment: "test-dev-d4gyxnn0b5dfa2c8a",
+    systemHealth: { getDashboardSummary: async () => ({ day: "2026-10-22", totalUsers: 3, todayNewUsers: 1, currentMeals: 8, todayMeals: 2, todayApiSuccessRate: 0.9 }) },
+    analytics: { report: async (input) => { assert.equal(input.platform, "android"); assert.equal(input.includeTest, true); return { summary: { active_accounts: 2 } }; } },
+  } });
+  await withServer(server, async (baseUrl) => {
+    const path = `${baseUrl}/get-login-ticket/api/admin/dashboard/summary`;
+    assert.equal((await fetch(path)).status, 401);
+    const response = await fetch(path, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).todayActiveAccounts, 2);
+  });
+});
+
 test("admin diagnostic package is read-only and admin-session protected", async () => {
   const calls = [];
   const server = createHttpServer({

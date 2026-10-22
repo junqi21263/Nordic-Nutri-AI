@@ -1,3 +1,4 @@
+import { trackAnalytics } from "../../features/analytics/runtime";
 import { Image, Text, View } from "@tarojs/components";
 import { useTranslation } from "react-i18next";
 import { t } from "../../i18n";
@@ -166,10 +167,12 @@ export default function AnalysisResultPage() {
   const meal = analysisStore.analysis;
   const setMealType = (mealType: MealType) => {
     if (!analysisStore.analysis) return;
+    trackAnalytics("vision_result_edited", { edited_fields: ["meal_type"] }, { page_key: "analysis-result" });
     analysisStore.setAnalysis({ ...analysisStore.analysis, mealType });
   };
   const syncRecognitionCorrection = (correctedMeal: typeof meal) => {
     if (!correctedMeal) return;
+    trackAnalytics("vision_result_edited", { edited_fields: ["ingredients"] }, { page_key: "analysis-result" });
     if (portion.meal?.id === correctedMeal.id && portion.editingMealId === null) {
       const multiplier = portion.multiplier;
       portion.reset();

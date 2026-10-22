@@ -48,6 +48,9 @@
 .nn-page-header h2 { margin: 2px 0 4px; }
 .nn-status-hero { min-height: 104px; align-items: center; }
 .nn-metric-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--nn-space-3); margin: var(--nn-space-4) 0; }
+.nn-dashboard-summary { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.nn-dashboard-summary .nn-metric-card { min-height: 126px; align-content: space-between; }
+.nn-dashboard-summary .nn-metric-card__hint { color: var(--nn-text-muted); font-weight: 400; }
 .nn-dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--nn-space-3); margin-top: var(--nn-space-3); }
 .nn-dashboard-grid--health { margin-top: var(--nn-space-4); }
 .nn-compact-panel { min-width: 0; padding: var(--nn-space-4); }
@@ -140,12 +143,14 @@
 
 @media (max-width: 1024px) {
   .nn-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nn-dashboard-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
   .nn-page-header { align-items: stretch; flex-direction: column; }
   .nn-metric-strip,
   .nn-dashboard-grid { grid-template-columns: 1fr; }
+  .nn-dashboard-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nn-drawer__panel { width: 100%; padding: var(--nn-space-4); }
   .nn-jobs-panel,
   .nn-jobs-list-panel,
