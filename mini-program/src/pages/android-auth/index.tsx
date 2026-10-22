@@ -1,4 +1,4 @@
-import { pauseAnalytics, trackAnalytics } from "../../features/analytics/runtime";
+import { pauseAnalytics, setAnalyticsPreference, trackAnalytics } from "../../features/analytics/runtime";
 import { nativeGoogleErrorType } from "../../features/analytics/observations";
 import { useTranslation } from "react-i18next";
 import { t } from "../../i18n";
@@ -399,8 +399,13 @@ export default function AndroidAuthPage() {
   };
 
   const renderAgreement = () => (
-    <CheckboxGroup className="auth-terms" onChange={(event) => { setTermsAccepted(event.detail.value.includes("agreed")); setError(""); }}>
-      <Checkbox value="agreed" checked={termsAccepted} color="#153f2b" ariaLabel={t("androidAuth.termsLead") + t("androidAuth.termsOfService") + t("androidAuth.termsJoin") + t("androidAuth.privacyPolicy")} />
+    <CheckboxGroup className="auth-terms" onChange={(event) => {
+      const accepted = event.detail.value.includes("agreed");
+      setTermsAccepted(accepted);
+      setAnalyticsPreference({ analytics: accepted, diagnostics: accepted });
+      setError("");
+    }}>
+      <Checkbox value="agreed" checked={termsAccepted} color="#153f2b" ariaLabel={`${t("androidAuth.termsLead")}${t("androidAuth.termsOfService")}${t("androidAuth.termsJoin")}${t("androidAuth.privacyPolicy")}${t("androidAuth.termsTail")}`} />
       <Text className="auth-terms__copy">
         {t("androidAuth.termsLead")}
         <Text className="auth-terms__link" onClick={() => void Taro.navigateTo({ url: "/pages/terms-of-service/index" })}>{t("androidAuth.termsOfService")}</Text>

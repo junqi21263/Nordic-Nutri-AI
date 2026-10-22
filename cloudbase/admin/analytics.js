@@ -1,4 +1,4 @@
-import { reportViews, metricLabels, formatValue, localizeNote, reportColumns, reportQuery, reportPageCount } from './analytics-model.mjs?v=20261022-6';
+import { reportViews, metricLabels, formatValue, localizeNote, reportColumns, reportQuery, reportPageCount } from './analytics-model.mjs?v=20261022-7';
 
 const host = document.getElementById('moduleAnalytics');
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g,(char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
@@ -17,7 +17,8 @@ const node = (id) => document.getElementById(id);
 const reportTemplates = { overview:'产品运营报告', acquisition:'官网推广效果报告', versions:'版本体验报告' };
 function filters() {
   const form = new FormData(node('analyticsFilters'));
-  return { from:form.get('from'),to:form.get('to'),platform:form.get('platform'),page:state.page,pageSize:state.pageSize };
+  const isDev = /\bDEV\b/i.test(node('adminEnvironmentBadge')?.textContent || '');
+  return { from:form.get('from'),to:form.get('to'),platform:form.get('platform'),includeTest:isDev,page:state.page,pageSize:state.pageSize };
 }
 function label(key) { return metricLabels[key] || key; }
 function table(rows) {

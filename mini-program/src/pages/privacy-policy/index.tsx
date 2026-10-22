@@ -1,12 +1,17 @@
-import { Text, View } from "@tarojs/components";
+import { Switch, Text, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PageLayout } from "../../layouts/page-layout";
 import { NordicIcon } from "../../components/nordic-icon";
 import { navigateBackOrHome } from "../../utils/navigation";
+import { getAnalyticsPreference, setAnalyticsPreference, subscribeAnalyticsPreference } from "../../features/analytics/runtime";
+import "../privacy-data/index.scss";
 
 export default function PrivacyPolicyPage() {
   const { t } = useTranslation();
+  const [preference, setPreference] = useState(getAnalyticsPreference);
+  useEffect(() => subscribeAnalyticsPreference(() => setPreference(getAnalyticsPreference())), []);
   const sections = t("privacyPolicy.sections", { returnObjects: true }) as Array<{ title: string; content: string }>;
   return (
     <PageLayout
@@ -26,6 +31,26 @@ export default function PrivacyPolicyPage() {
         </View>
         <Text className="privacy-policy-page__title">{t("privacyPolicy.title")}</Text>
         <Text className="privacy-policy-page__lead">{t("privacyPolicy.lead")}</Text>
+        <View className="analytics-privacy">
+          <Text className="analytics-privacy__heading">{t("analyticsPrivacy.title")}</Text>
+          <Text className="analytics-privacy__subtitle">{t("analyticsPrivacy.subtitle")}</Text>
+          {(['analytics', 'diagnostics'] as const).map(key => (
+            <View className="analytics-privacy__setting" key={key}>
+              <View className="analytics-privacy__copy">
+                <Text className="analytics-privacy__title">{t(`analyticsPrivacy.${key}`)}</Text>
+                <Text className="analytics-privacy__description">{t(`analyticsPrivacy.${key}Description`)}</Text>
+              </View>
+              <Switch checked={preference[key]} color="#153f2b" ariaLabel={t(`analyticsPrivacy.${key}`)} onChange={event => setAnalyticsPreference({ ...preference, [key]: event.detail.value })} />
+            </View>
+          ))}
+          <View className="analytics-privacy__notice">
+            <Text>{t("analyticsPrivacy.collection")}</Text>
+            <Text>{t("analyticsPrivacy.exclusions")}</Text>
+            <Text>{t("analyticsPrivacy.retention")}</Text>
+            <Text>{t("analyticsPrivacy.withdraw")}</Text>
+          </View>
+          <View className="analytics-privacy__link" onClick={() => void Taro.navigateTo({ url: "/pages/account-cancellation/index" })}><Text>{t("analyticsPrivacy.rights")} ›</Text></View>
+        </View>
         <Text className="privacy-policy-page__contact">{t("privacyPolicy.contact")}</Text>
 
         {sections.map((section) => (
