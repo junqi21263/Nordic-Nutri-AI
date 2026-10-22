@@ -644,6 +644,13 @@ test("feedback console uses Chinese statuses and exposes a reply action", async 
   assert.match(source, /body: \{ reply \}/);
 });
 
+test("overview visitor and registration cards include App and Mini Program backend users", async () => {
+  const source = await readFile(new URL("./food-images.html", import.meta.url), "utf8");
+  assert.match(source, /App 与小程序访问账号，按 Trace 用户去重/);
+  assert.match(source, /App 与小程序新注册账号，来自用户数据表/);
+  assert.doesNotMatch(source, /已开启分析的 App 活跃账号/);
+});
+
 test("AI management uses the complete quota feature catalog and feature-first routing", async () => {
   const source = await pageSource();
   for (const feature of [

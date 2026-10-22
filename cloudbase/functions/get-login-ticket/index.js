@@ -1911,6 +1911,8 @@ async function authorizeProductRequest(service, req, res) {
     sendJson(res, resolved.error.status, resolved.error.body);
     return null;
   }
+  const trace = res.__traceContext?.trace;
+  if (trace && typeof service?.hashTraceUserId === "function") trace.userHash = service.hashTraceUserId(resolved.session.sub);
   return resolved.session;
 }
 
@@ -2849,15 +2851,7 @@ function createHttpServer({ service }) {
         if (adminFoodRoute.operation === "dashboardSummary") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.systemHealth?.getDashboardSummary) return sendJson(res, 503, { code: "DASHBOARD_UNAVAILABLE" });
-          const summary = await service.systemHealth.getDashboardSummary();
-          let todayActiveAccounts = null;
-          if (service.analytics?.report) {
-            try {
-              const report = await service.analytics.report({ view: "overview", from: summary.day, to: summary.day, platform: "android", includeTest: service.analyticsEnvironment === "test-dev-d4gyxnn0b5dfa2c8a" });
-              todayActiveAccounts = report.summary?.active_accounts ?? null;
-            } catch (error) { console.warn("[dashboard-summary] analytics unavailable:", error?.code || "unknown"); }
-          }
-          return sendJson(res, 200, { ...summary, todayActiveAccounts });
+          return sendJson(res, 200, await service.systemHealth.getDashboardSummary());
         }
         if (adminFoodRoute.operation === "auditLogs") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });

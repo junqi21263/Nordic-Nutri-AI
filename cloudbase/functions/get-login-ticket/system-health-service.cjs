@@ -66,6 +66,23 @@ function summarizeWindow(rows, sinceMs) {
 }
 
 function createSystemHealthService({ db, observability, jobOps, providerConfig = {}, clock = Date.now } = {}) {
+  async function countTodayTraceUsers(from, to) {
+    const users = new Set();
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const result = await db.from("ops_request_traces")
+        .select("user_hash")
+        .gte("started_at", from)
+        .lt("started_at", to)
+        .order("trace_id", { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      if (result?.error) throw new Error("Dashboard trace count unavailable");
+      const rows = result?.data || [];
+      for (const row of rows) if (typeof row.user_hash === "string" && row.user_hash) users.add(row.user_hash);
+      if (rows.length < pageSize) return users.size;
+    }
+  }
+
   async function getDashboardSummary() {
     const day = new Date(clock() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const from = new Date(`${day}T00:00:00+08:00`).toISOString();
@@ -75,16 +92,17 @@ function createSystemHealthService({ db, observability, jobOps, providerConfig =
       if (result?.error || !Number.isSafeInteger(result?.count)) throw new Error("Dashboard count unavailable");
       return result.count;
     };
-    const [totalUsers, todayNewUsers, currentMeals, todayMeals, terminalRequests, successfulRequests] = await Promise.all([
+    const [totalUsers, todayNewUsers, currentMeals, todayMeals, terminalRequests, successfulRequests, todayActiveAccounts] = await Promise.all([
       count(db.from("app_users").select("id", { count: "exact", head: true }).neq("status", "deleted")),
       count(db.from("app_users").select("id", { count: "exact", head: true }).neq("status", "deleted").gte("created_at", from).lt("created_at", to)),
       count(db.from("meal_records").select("id", { count: "exact", head: true }).is("deleted_at", null)),
       count(db.from("meal_records").select("id", { count: "exact", head: true }).is("deleted_at", null).gte("created_at", from).lt("created_at", to)),
       count(db.from("ops_request_traces").select("id", { count: "exact", head: true }).gte("started_at", from).lt("started_at", to).neq("status", "processing")),
       count(db.from("ops_request_traces").select("id", { count: "exact", head: true }).gte("started_at", from).lt("started_at", to).eq("status", "succeeded")),
+      countTodayTraceUsers(from, to),
     ]);
     return { day, totalUsers, todayNewUsers, currentMeals, todayMeals, terminalRequests, successfulRequests,
-      todayApiSuccessRate: terminalRequests ? successfulRequests / terminalRequests : null };
+      todayApiSuccessRate: terminalRequests ? successfulRequests / terminalRequests : null, todayActiveAccounts };
   }
   async function probeDatabase() {
     try {

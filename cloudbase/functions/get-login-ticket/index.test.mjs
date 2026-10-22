@@ -1998,12 +1998,13 @@ test("admin users and feedback routes require session and accept admin", async (
   });
 });
 
-test("dashboard summary requires admin session and keeps visitor scope to Android analytics", async () => {
+test("dashboard summary requires admin session and uses backend visitor totals", async () => {
+  let analyticsCalls = 0;
   const server = createHttpServer({ service: {
     verifySession: (token) => token === "valid-session" ? { sub: "admin-1", role: "admin_console" } : null,
     analyticsEnvironment: "test-dev-d4gyxnn0b5dfa2c8a",
-    systemHealth: { getDashboardSummary: async () => ({ day: "2026-10-22", totalUsers: 3, todayNewUsers: 1, currentMeals: 8, todayMeals: 2, todayApiSuccessRate: 0.9 }) },
-    analytics: { report: async (input) => { assert.equal(input.platform, "android"); assert.equal(input.includeTest, true); return { summary: { active_accounts: 2 } }; } },
+    systemHealth: { getDashboardSummary: async () => ({ day: "2026-10-22", totalUsers: 3, todayNewUsers: 1, currentMeals: 8, todayMeals: 2, todayApiSuccessRate: 0.9, todayActiveAccounts: 2 }) },
+    analytics: { report: async () => { analyticsCalls += 1; throw new Error("dashboard must not depend on opt-in analytics"); } },
   } });
   await withServer(server, async (baseUrl) => {
     const path = `${baseUrl}/get-login-ticket/api/admin/dashboard/summary`;
@@ -2012,6 +2013,28 @@ test("dashboard summary requires admin session and keeps visitor scope to Androi
     assert.equal(response.status, 200);
     assert.equal((await response.json()).todayActiveAccounts, 2);
   });
+  assert.equal(analyticsCalls, 0);
+});
+
+test("authenticated App and Mini Program API requests attach only a hashed identity to Trace", async () => {
+  const traces = [];
+  const server = createHttpServer({ service: {
+    verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+    hashTraceUserId: (userId) => `hashed:${userId}`,
+    meals: { listMeals: async () => [] },
+    observability: {
+      startTrace: (input) => { const trace = { ...input }; traces.push(trace); return trace; },
+      recordStage: () => {},
+      finishTrace: async () => {},
+    },
+  } });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/meals?date=2026-10-22`, { headers: { authorization: "Bearer valid-session" } });
+    assert.equal(response.status, 200);
+  });
+  assert.equal(traces.length, 1);
+  assert.equal(traces[0].userHash, "hashed:user-1");
+  assert.equal(traces[0].sub, undefined);
 });
 
 test("admin diagnostic package is read-only and admin-session protected", async () => {
