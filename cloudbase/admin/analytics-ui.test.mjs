@@ -12,6 +12,7 @@ test('admin analytics is mounted as a separate module using existing authenticat
   const module = await read('./analytics.js');
   assert.match(module,/api\(/);
   assert.doesNotMatch(module,/localStorage|Bearer|sessionToken|confirm\(/);
+  assert.doesNotMatch(module,/当前环境尚未开始可选分析采集|北京时间自然日 · 数据水位/);
   const modelPath = module.match(/from ['"]\.\/(analytics-model\.mjs)\?/ )?.[1];
   assert.ok(modelPath, 'analytics module must use its local model module');
   await Promise.all(['analytics.css','analytics.js',modelPath].map((asset) => access(new URL(`./${asset}`,import.meta.url))));

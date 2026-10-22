@@ -647,8 +647,8 @@ test("feedback console uses Chinese statuses and exposes a reply action", async 
 test("overview visitor and registration cards include App and Mini Program backend users", async () => {
   const source = await readFile(new URL("./food-images.html", import.meta.url), "utf8");
   assert.doesNotMatch(source, /按 Trace 用户去重|来自用户数据表/);
-  assert.match(source, /\["今日访问人数", count\(data\.todayActiveAccounts\), ""\]/);
-  assert.match(source, /\["今日新增用户人数", count\(data\.todayNewUsers\), ""\]/);
+  assert.match(source, /\["今日访问人数", count\(data\.todayActiveAccounts\), "App 与小程序访问账号"\]/);
+  assert.match(source, /\["今日新增用户人数", count\(data\.todayNewUsers\), "App 与小程序新注册账号"\]/);
   assert.match(source, /hint \? `<span class="nn-metric-card__hint">/);
   assert.doesNotMatch(source, /已开启分析的 App 活跃账号/);
 });

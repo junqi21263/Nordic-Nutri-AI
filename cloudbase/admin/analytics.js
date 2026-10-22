@@ -51,7 +51,7 @@ function render(report) {
   node('analyticsPage').textContent = `第 ${state.page} / ${pages} 页 · 共 ${Number(report.total || 0).toLocaleString('zh-CN')} 条`;
   node('analyticsPrevious').disabled = state.page <= 1;
   node('analyticsNext').disabled = state.page >= pages;
-  node('analyticsWatermark').textContent = `北京时间自然日 · 数据水位 ${report.watermark || '暂无'} · 采集起点 ${report.collection_started_at || '尚无事件'} · 口径 ${report.metric_version || 'v1'} · 仅代表已启用分析且可观测的用户`;
+  node('analyticsWatermark').textContent = '';
   const notes = [
     '旧版本、未启用分析以及未成功送达的行为不在观测范围，历史数据无法补回。',
     '官网漏斗与 App 漏斗独立统计；下载点击不代表安装。留存观察期未满显示 —；多日独立用户按整体去重。',
@@ -77,7 +77,7 @@ async function load() {
     if (state.view === 'reports') renderHistory(report);
     else render(report);
     const hasSummary = Object.values(report.summary || {}).some((value) => typeof value === 'number' && value > 0);
-    node('analyticsStatus').textContent = state.view === 'reports' ? '' : !report.collection_started_at ? '当前环境尚未开始可选分析采集。' : Number(report.total || 0) === 0 && !hasSummary ? '当前筛选范围没有可观测数据。' : '';
+    node('analyticsStatus').textContent = state.view === 'reports' ? '' : Number(report.total || 0) === 0 && !hasSummary ? '当前筛选范围没有可观测数据。' : '';
   } catch (error) {
     if (generation !== state.generation) return;
     state.report = null;

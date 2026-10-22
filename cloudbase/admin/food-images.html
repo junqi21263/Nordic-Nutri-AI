@@ -3305,8 +3305,8 @@
         const rate = data.todayApiSuccessRate == null ? "—" : `${Math.round(Number(data.todayApiSuccessRate) * 10000) / 100}%`;
         const cards = [
           ["用户总数", count(data.totalUsers), "未注销账号"],
-          ["今日访问人数", count(data.todayActiveAccounts), ""],
-          ["今日新增用户人数", count(data.todayNewUsers), ""],
+          ["今日访问人数", count(data.todayActiveAccounts), "App 与小程序访问账号"],
+          ["今日新增用户人数", count(data.todayNewUsers), "App 与小程序新注册账号"],
           ["当前上传餐食数", count(data.currentMeals), "当前未删除的餐食记录"],
           ["今日上传餐食数", count(data.todayMeals), "今日创建且未删除"],
           ["今日接口请求成功率", rate, data.terminalRequests ? `成功 ${count(data.successfulRequests)} / 已结束 ${count(data.terminalRequests)}` : "今日暂无已结束请求"],
@@ -3850,6 +3850,6 @@
     if (hasToken()) connect().catch(() => {});
   </script>
   <script src="./announcements.js?v=20261020-1"></script>
-  <script type="module" src="./analytics.js?v=20261022-8"></script>
+  <script type="module" src="./analytics.js?v=20261022-9"></script>
 </body>
 </html>
