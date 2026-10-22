@@ -5,7 +5,7 @@
 ## 0. 版本、依赖与 APK 归档约定
 
 - App 版本只以 `android/app/build.gradle` 的 `versionName` 和 `versionCode` 为准；根目录及 `mini-program/package.json` 的版本是 JS 包元数据，不代表 Android App 版本。
-- `versionName` 使用 `主版本.次版本.修订号`；每个新 APK 候选都递增 `versionCode`，该数字在 Dev/Prod 之间全局单调递增，永不回退或复用。Prod 发布沿用已验收 Dev APK 的版本号；验收后若有代码修复，先递增版本并重新构建、验收 Dev。
+- `versionName` 使用 `主版本.次版本.修订号`；Dev 与 Prod 是独立版本流，DEV 调试可自行递增，不要求与 Prod 对齐。Prod 的 `versionCode` 只按当前已发布的 Prod APK 加 1，`versionName` 也从当前 Prod 版本递增；发布时不因 DEV 版本较高而跳号。每个渠道内的 `versionCode` 必须严格递增且不可复用。Prod 候选代码仍需完成目标环境验证；若验收后有代码修复，应重新构建候选包。
 - Dev、Prod 使用不同 Android applicationId：Dev `com.lewislee.nordicnutri.dev`，Prod `com.lewislee.nordicnutri`。Dev 用 debug 签名，Prod 只用受控的 Prod 签名。禁止把 Dev 包上传到官网或写入 Prod 的版本元数据。
 - pnpm 版本固定为根 `package.json` 的 `packageManager`（当前 `pnpm@10.33.0`），依赖解析以 `pnpm-lock.yaml` 为准。干净环境安装用 `corepack pnpm install --frozen-lockfile`；改依赖必须一并提交 lockfile。Android 构建使用 Node `24.18.x`。
 - APK 和 manifest 都不进 Git。`output/` 是本地交付物目录，按 `output/android/<dev|prod>/<versionName>-<versionCode>/<sourceCommitShort>/` 保存，每个目录含 APK 与 `manifest.json`。文件名带渠道、版本和提交短 SHA。已归档目录不可覆盖或自动删除；同一提交需要重新打包时先提升版本并提交新源码。
@@ -49,7 +49,7 @@ GitHub Actions 的 `Android release checks` 只核对分支/函数配置契约�
 
 ## 4. 构建 Prod APK
 
-1. 将 `android/app/build.gradle` 的 `versionCode` 调高到高于所有已发布版本，按需要更新 `versionName`。确认 `.env.production` 的 API Base URL、Google Server Client ID、正式插画 CDN 和登录开关指向 Prod；不要把服务端密钥放进前端环境文件。
+1. 将 `android/app/build.gradle` 的 `versionCode` 设为当前已发布 Prod APK 的 `versionCode + 1`，按 Prod 自己的版本流递增 `versionName`。确认 `.env.production` 的 API Base URL、Google Server Client ID、正式插画 CDN 和登录开关指向 Prod；不要把服务端密钥放进前端环境文件。
 2. 将非秘密签名元数据写入被 Git 忽略的 `android/signing.local.json`，密码从本机 Keychain 读取。密码不能写进命令行参数、Git 或聊天。使用项目要求的 Node 24.18.x 和 `node scripts/android-release.mjs` 从干净的 `Android-prod` 提交构建、验签并同步官网 APK/版本元数据。
 3. 在 `android/app/src/release/google-services.json` 放入包含 `com.lewislee.nordicnutri` 的 Firebase 配置，并确认该 Android 应用登记了 Prod 签名证书 SHA-1/SHA-256。此文件被 Git 忽略；新工作区需重新安全配置。仓库根目录下的 `android/app/google-services.json` 当前仅含 Dev 包名，不可代替 release 文件。
 4. 从仓库根目录依次运行：
