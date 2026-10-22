@@ -1,3 +1,5 @@
+import { pauseAnalytics, trackAnalytics } from "../../features/analytics/runtime";
+import { nativeGoogleErrorType } from "../../features/analytics/observations";
 import { useTranslation } from "react-i18next";
 import { t } from "../../i18n";
 import Taro from "@tarojs/taro";
@@ -223,15 +225,22 @@ export default function AndroidAuthPage() {
     setBusy(true);
     setView("google-connecting");
       setError("");
+    const releaseAnalytics = pauseAnalytics();
+    let credentialReceived = false;
+    trackAnalytics("auth_started", { method: "google", entry: "login" });
     try {
       const idToken = await getNativeGoogleIdToken(googleServerClientId);
+      credentialReceived = true;
+      trackAnalytics("google_credential_result", { outcome: "succeeded", stage: "native_callback" });
       console.info("[android-auth][google-token-diagnostics]", summarizeGoogleIdToken(idToken, googleServerClientId));
       await finishLogin((await androidAuthApi.loginGoogle(idToken)) as AndroidAuthSessionResult, "login");
     } catch (requestError) {
+      if (!credentialReceived) trackAnalytics("google_credential_result", { outcome: "failed", stage: "native_callback", error_type: nativeGoogleErrorType(requestError) });
       setView("landing");
       const message = userMessage(requestError, "google");
       setError(message === t("androidAuth.errors.failed") ? t("androidAuth.errors.googleLoginFailed") : message);
     } finally {
+      releaseAnalytics();
       setBusy(false);
     }
   };

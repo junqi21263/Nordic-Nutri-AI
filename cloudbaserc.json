@@ -74,6 +74,25 @@
       "installDependency": false,
       "triggers": [{"name":"push-reminder-dispatcher-every-minute","type":"timer","config":"0 * * * * * *"}],
       "ignore": ["*.test.mjs", ".git/**"]
+    },
+    {
+      "name": "analytics-dispatcher",
+      "type": "Event",
+      "timeout": 60,
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "installDependency": false,
+      "triggers": [
+        {
+          "name": "analytics-every-five-minutes",
+          "type": "timer",
+          "config": "0 */5 * * * * *"
+        }
+      ],
+      "ignore": [
+        "*.test.mjs",
+        ".git/**"
+      ]
     }
   ]
 }

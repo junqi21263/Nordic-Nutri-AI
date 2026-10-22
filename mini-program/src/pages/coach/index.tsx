@@ -1,3 +1,5 @@
+import { pauseAnalytics, trackAnalytics } from "../../features/analytics/runtime";
+import { createNovaObservation } from "../../features/analytics/nova-observation";
 import { useTranslation } from "react-i18next";
 import { t } from "../../i18n";
 import { Image, Text, View } from "@tarojs/components";
@@ -134,6 +136,8 @@ export default function CoachPage() {
   const [selectedImagePath, setSelectedImagePath] = useState<string | null>(null);
   const [dailyUsage, setDailyUsage] = useState<ProductCoachDailyUsage>(defaultDailyUsage);
   const [completedReplyVersion, setCompletedReplyVersion] = useState(0);
+  const completedObservationRef = useRef<ReturnType<typeof createNovaObservation> | null>(null);
+  const analyticsCancellationRef = useRef<"navigation_cancelled" | "background_cancelled" | undefined>(undefined);
   const activeStreamRef = useRef<{ id: string; abort: () => void } | null>(null);
   const pageActiveRef = useRef(true);
   const [expandedSections, setExpandedSections] = useState({
@@ -196,6 +200,8 @@ export default function CoachPage() {
 
   useEffect(() => {
     if (!completedReplyVersion) return undefined;
+    completedObservationRef.current?.completed();
+    completedObservationRef.current = null;
     const timer = setTimeout(() => {
       scrollToCoachBottom();
     }, 0);
@@ -297,6 +303,7 @@ export default function CoachPage() {
   });
 
   useDidHide(() => {
+    analyticsCancellationRef.current = typeof document !== "undefined" && document.visibilityState === "hidden" ? "background_cancelled" : "navigation_cancelled";
     activeStreamRef.current?.abort();
     activeStreamRef.current = null;
   });
@@ -359,6 +366,9 @@ export default function CoachPage() {
       }
     }
     const requestId = createClientRequestId();
+    const releaseAnalytics = pauseAnalytics();
+    const observation = createNovaObservation(trackAnalytics, requestId);
+    analyticsCancellationRef.current = undefined;
     const optimisticId = "pending-" + requestId;
     const streamingId = "stream-" + requestId;
     let analysis = createAnalysisProgress(userPrompt || t("coachPage.analyzeImage"), Date.now());
@@ -399,6 +409,7 @@ export default function CoachPage() {
           if (activeStreamRef.current?.id !== requestId) return;
           if (event.type === "delta") {
             if (!event.text) return;
+            observation.delta();
             if (!receivedDelta) {
               receivedDelta = true;
               analysis = completeAnalysisForAnswer(analysis, Date.now());
@@ -420,6 +431,7 @@ export default function CoachPage() {
           }
           if (event.type === "complete") {
             completed = true;
+            completedObservationRef.current = observation;
             analysis = analysis.completedAt ? analysis : completeAnalysisForAnswer(analysis, Date.now());
             mergeServerMessages(event, [optimisticId, streamingId], attachment, analysis);
           }
@@ -432,8 +444,9 @@ export default function CoachPage() {
       await streamRequest.promise;
       if (!completed) throw new Error("流式回复未完成");
     } catch (streamError) {
-      if (streamError instanceof Error && streamError.name === "COACH_STREAM_ABORTED") return;
+      if (streamError instanceof Error && streamError.name === "COACH_STREAM_ABORTED") { observation.failed(streamError, analyticsCancellationRef.current); return; }
       if (streamError instanceof Error && streamError.name === "COACH_DAILY_LIMIT_REACHED") {
+        observation.failed(streamError);
         setMessages((current) => current.filter((message) => message.id !== optimisticId && message.id !== streamingId));
         setDailyUsage((current) => ({ ...current, used: current.limit, remaining: 0 }));
         feedback.showModal({
@@ -450,8 +463,10 @@ export default function CoachPage() {
         const result = await sendProductCoachMessage(content, date, requestId);
         if (!pageActiveRef.current) return;
         analysis = completeAnalysisForFallback(analysis, Date.now());
+        completedObservationRef.current = observation;
         mergeServerMessages(result, [optimisticId, streamingId], attachment, analysis);
       } catch (sendError) {
+        observation.failed(sendError, analyticsCancellationRef.current);
         setMessages((current) =>
           current.filter((message) => message.id !== optimisticId && message.id !== streamingId),
         );
@@ -475,6 +490,7 @@ export default function CoachPage() {
         }
       }
     } finally {
+      releaseAnalytics();
       if (activeStreamRef.current?.id === requestId) activeStreamRef.current = null;
       if (pageActiveRef.current) {
         setSending(false);

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="./admin-ui-v2-tokens.css" />
   <link rel="stylesheet" href="./admin-ui-v2-components.css" />
   <link rel="stylesheet" href="./admin-ui-v2-shell.css" />
+  <link rel="stylesheet" href="./analytics.css?v=20261021-1" />
   <style>
     :root {
       --ink: #173d2a;
@@ -619,7 +620,7 @@
         <div class="admin-nav__group" data-nav-domain="dashboard"><span class="admin-nav__label">概览</span><button type="button" class="admin-nav__item" data-module="dashboard">总览</button></div>
         <div class="admin-nav__group" data-nav-domain="users"><span class="admin-nav__label">用户</span><button type="button" class="admin-nav__item" data-module="users">用户数据</button><button type="button" class="admin-nav__item" data-module="verification">验证码中心</button></div>
         <div class="admin-nav__group" data-nav-domain="food-library"><span class="admin-nav__label">食材库</span><button type="button" class="admin-nav__item" data-module="foods">食材管理</button><button type="button" class="admin-nav__item active" data-module="images">食材生图</button><button type="button" class="admin-nav__item" data-module="audit">旧图审计</button></div>
-        <div class="admin-nav__group" data-nav-domain="ai-operations"><span class="admin-nav__label">AI 运营</span><button type="button" class="admin-nav__item" data-module="ops">运营总览</button><button type="button" class="admin-nav__item" data-module="quota">额度管理</button></div>
+        <div class="admin-nav__group" data-nav-domain="ai-operations"><span class="admin-nav__label">AI 运营</span><button type="button" class="admin-nav__item" data-module="ops">运营总览</button><button type="button" class="admin-nav__item" data-module="quota">额度管理</button><button type="button" class="admin-nav__item" data-module="analytics">使用分析</button></div>
         <div class="admin-nav__group" data-nav-domain="jobs"><span class="admin-nav__label">任务</span><button type="button" class="admin-nav__item" data-module="jobs">Jobs</button><button type="button" class="admin-nav__item" data-module="push">推送测试</button></div>
         <div class="admin-nav__group" data-nav-domain="moderation"><span class="admin-nav__label">内容安全</span><button type="button" class="admin-nav__item" data-module="moderation">内容安全</button><button type="button" class="admin-nav__item" data-module="user-images">用户图片</button></div>
         <div class="admin-nav__group" data-nav-domain="feedback"><span class="admin-nav__label">反馈</span><button type="button" class="admin-nav__item" data-module="feedback">问题反馈</button><button type="button" class="admin-nav__item" data-module="announcements">系统通知公告</button></div>
@@ -627,7 +628,8 @@
       </nav>
 
       <div class="admin-main nn-content">
-        <section id="moduleUsers" class="admin-module" hidden>
+        <section id="moduleAnalytics" class="module-page" hidden aria-label="使用分析"></section>
+      <section id="moduleUsers" class="admin-module" hidden>
           <div class="module-toolbar nn-verification-toolbar">
             <h2>用户数据</h2>
             <input id="userSearch" type="search" placeholder="搜索昵称或用户 ID" autocomplete="off" />
@@ -3460,11 +3462,12 @@
       try { const [detail, timeline] = await Promise.all([api(`/users/${encodeURIComponent(id)}`), api(`/users/${encodeURIComponent(id)}/timeline`)]); renderUserDetail(detail); renderUserTimeline(timeline); } catch (error) { setOpsMessage($("userDetailSummary"), apiErrorMessage(error), "danger"); setOpsMessage($("userTimeline"), "Timeline 暂时不可用", "danger"); }
     }
     function openUserDetail(userId) { $("userDetailId").value = userId || ""; setModule("user-detail"); loadUserDetailModule().catch(() => {}); }
-    const MODULE_LABELS = { dashboard: "总览", users: "用户数据", verification: "验证码中心", "user-detail": "用户详情", foods: "食材管理", images: "食材生图", audit: "旧图审计", ops: "运营总览", quota: "额度管理", jobs: "Jobs", push: "推送测试", moderation: "内容安全", "user-images": "用户图片", feedback: "问题反馈", announcements: "系统通知公告", health: "系统健康", traces: "Traces", "audit-logs": "审计日志", system: "系统配置" };
+    const MODULE_LABELS = { analytics: "使用分析", dashboard: "总览", users: "用户数据", verification: "验证码中心", "user-detail": "用户详情", foods: "食材管理", images: "食材生图", audit: "旧图审计", ops: "运营总览", quota: "额度管理", jobs: "Jobs", push: "推送测试", moderation: "内容安全", "user-images": "用户图片", feedback: "问题反馈", announcements: "系统通知公告", health: "系统健康", traces: "Traces", "audit-logs": "审计日志", system: "系统配置" };
     function setModule(name) {
       document.querySelectorAll(".admin-nav__item[data-module]").forEach((btn) => { btn.classList.toggle("active", btn.dataset.module === name); });
       if ($("currentArea")) $("currentArea").textContent = MODULE_LABELS[name] || "管理后台";
       $("moduleUsers").hidden = name !== "users";
+      $("moduleAnalytics").hidden = name !== "analytics";
       $("moduleVerification").hidden = name !== "verification";
       $("moduleFeedback").hidden = name !== "feedback";
       $("moduleAnnouncements").hidden = name !== "announcements";
@@ -3486,6 +3489,7 @@
       $("moduleSystem").hidden = name !== "system";
       if (name === "users") loadUsers().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "verification") loadVerifications().catch((error) => toast(apiErrorMessage(error), true));
+      if (name === "analytics") window.NordicAnalytics?.load();
       if (name === "announcements") loadAnnouncements().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "feedback") loadFeedback().catch((error) => toast(apiErrorMessage(error), true));
       if (name === "foods") loadFoodAdminList().catch((error) => toast(apiErrorMessage(error), true));
@@ -3831,5 +3835,6 @@
     if (hasToken()) connect().catch(() => {});
   </script>
   <script src="./announcements.js?v=20261020-1"></script>
+  <script type="module" src="./analytics.js?v=20261021-1"></script>
 </body>
 </html>

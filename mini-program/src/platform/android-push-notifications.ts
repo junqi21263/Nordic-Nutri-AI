@@ -1,3 +1,4 @@
+import { recordNotificationPermission } from "../features/analytics/runtime";
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications, type ActionPerformed, type PermissionStatus, type PushNotificationSchema, type Token } from "@capacitor/push-notifications";
 
@@ -64,6 +65,7 @@ export function createAndroidPushNotificationAdapter(dependencies: PushAdapterDe
       dependencies.addLaunchIntentListener?.((intent) => onLaunchIntent?.(intent));
       const current = await dependencies.checkPermissions();
       const permission = current.receive === "granted" ? current : await dependencies.requestPermissions();
+      recordNotificationPermission(permission.receive);
       if (permission.receive !== "granted") return false;
       await dependencies.createChannel?.({
         id: "meal-reminders",

@@ -1,3 +1,5 @@
+import { pauseAnalytics, trackAnalytics } from "../features/analytics/runtime";
+import { productRequestObservation } from "../features/analytics/observations";
 import { productTransport } from "../platform/product-transport";
 import { getLocale, t } from "../i18n";
 import { useAuthStore } from "../auth/auth-store";
@@ -18,7 +20,15 @@ interface ProductApiRequest {
 const DEFAULT_PRODUCT_API_TIMEOUT_MS = 15_000;
 
 export async function requestProductApi<T>(path: string, request: ProductApiRequest): Promise<T> {
-  return requestProductApiAttempt<T>(path, request, true);
+  const release = pauseAnalytics();
+  const start = productRequestObservation(path, request.method, "start", Boolean(request.data?.analysisId), Boolean(request.data?.templateId));
+  if (start) trackAnalytics(start.name, start.properties);
+  try {
+    const result = await requestProductApiAttempt<T>(path, request, true);
+    const success = productRequestObservation(path, request.method, "success");
+    if (success) trackAnalytics(success.name, success.properties);
+    return result;
+  } finally { release(); }
 }
 
 async function requestProductApiAttempt<T>(path: string, request: ProductApiRequest, allowRefresh: boolean): Promise<T> {

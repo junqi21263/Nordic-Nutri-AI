@@ -24,6 +24,7 @@ const pages = [
   "pages/profile/index",
   "pages/notifications/index",
   "pages/privacy-policy/index",
+  "pages/privacy-data/index",
   "pages/terms-of-service/index",
   "pages/recommend-friends/index",
   "pages/account-cancellation/index",

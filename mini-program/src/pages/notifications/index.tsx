@@ -1,3 +1,4 @@
+import { recordNotificationPermission } from "../../features/analytics/runtime";
 import { Switch, Text, View } from "@tarojs/components";
 import Taro, { useDidShow, useRouter } from "@tarojs/taro";
 import { useRef, useState } from "react";
@@ -57,6 +58,7 @@ export default function NotificationsPage() {
         if (android) {
           const p = await PushNotifications.checkPermissions();
           setPermission(p.receive);
+          recordNotificationPermission(p.receive);
           if (p.receive === "granted") await PushNotifications.register();
         }
       } else if (detailId) {

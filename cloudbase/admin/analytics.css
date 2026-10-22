@@ -1,0 +1,38 @@
+#moduleAnalytics{min-width:0}
+#moduleAnalytics .analytics-actions,#moduleAnalytics .analytics-tabs,#moduleAnalytics .analytics-pagination{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#moduleAnalytics .analytics-tabs{margin:16px 0;border-bottom:1px solid var(--line);padding-bottom:12px}
+#moduleAnalytics .analytics-tabs [aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#moduleAnalytics .analytics-filters{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+#moduleAnalytics .analytics-filters label{display:grid;gap:6px;font-size:12px;flex:1 1 130px;min-width:0}
+#moduleAnalytics .analytics-filters input,#moduleAnalytics .analytics-filters select{width:100%;min-width:0;height:40px;border:1px solid var(--line);border-radius:9px;background:var(--linen);padding:0 10px;color:var(--ink);font:inherit}
+#moduleAnalytics .analytics-filters label:has(input[type="checkbox"]){display:flex;align-items:center;gap:8px;flex:0 1 auto;white-space:nowrap}
+#moduleAnalytics .analytics-filters input[type="checkbox"]{width:auto;height:auto;margin:0;accent-color:var(--green)}
+#moduleAnalytics .analytics-watermark{font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+#moduleAnalytics .analytics-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:16px 0}
+#moduleAnalytics .analytics-stat{padding:16px;background:var(--paper);border:1px solid var(--line);border-radius:12px;min-width:0}
+#moduleAnalytics .analytics-stat span{display:block;font-size:12px;color:var(--muted)}
+#moduleAnalytics .analytics-stat strong{display:block;font-size:27px;line-height:1.4;color:var(--ink);overflow-wrap:anywhere}
+#moduleAnalytics .analytics-table,#moduleAnalytics .analytics-series{overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:12px;margin:14px 0;background:var(--paper)}
+#moduleAnalytics .analytics-series:empty{display:none}
+#moduleAnalytics .analytics-series h3{font:inherit;font-weight:600;padding:14px 16px;margin:0}
+#moduleAnalytics table{width:100%;border-collapse:collapse;font-size:12px}
+#moduleAnalytics th,#moduleAnalytics td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;max-width:400px;overflow:hidden;text-overflow:ellipsis}
+#moduleAnalytics th{background:var(--linen);font-weight:600;color:var(--muted)}
+#moduleAnalytics .analytics-empty{padding:24px 16px;margin:0}
+#moduleAnalytics .analytics-report-create{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px;font-size:12px;color:var(--muted)}
+#moduleAnalytics .analytics-report-create label{display:flex;align-items:center;gap:8px;color:var(--ink)}
+#moduleAnalytics .analytics-report-create select{min-height:36px;border:1px solid var(--line);border-radius:8px;background:var(--linen);padding:0 8px}
+#moduleAnalytics .analytics-pagination{justify-content:flex-end;font-size:12px}
+#moduleAnalytics .analytics-notes{margin-top:24px;padding:16px;border-left:3px solid var(--green);background:var(--linen);font-size:12px;line-height:1.8;color:var(--muted)}
+#moduleAnalytics .analytics-notes h3{font:inherit;font-weight:600;color:var(--ink);margin:0}
+#moduleAnalytics .analytics-notes ul{padding-left:18px;margin-bottom:0}
+@media(max-width:760px){#moduleAnalytics .module-toolbar{align-items:flex-start;flex-wrap:wrap}#moduleAnalytics .analytics-summary{grid-template-columns:repeat(2,minmax(0,1fr))}#moduleAnalytics .analytics-pagination{justify-content:space-between}}
+
+#moduleAnalytics .analytics-trend{margin:16px;color:var(--green)}
+#moduleAnalytics .analytics-trend figcaption{color:var(--ink);font-size:12px;font-weight:600}
+#moduleAnalytics .analytics-trend svg{display:block;width:100%;max-height:240px}
+#moduleAnalytics .analytics-line{fill:none;stroke:currentColor;stroke-width:2}
+#moduleAnalytics .analytics-axis{fill:none;stroke:var(--line);stroke-width:1}
+#moduleAnalytics .analytics-trend circle{fill:currentColor}
+#moduleAnalytics .analytics-trend text{font:11px sans-serif;fill:var(--muted)}
+#moduleAnalytics .analytics-series details>summary{padding:12px 16px;color:var(--muted);font-size:12px;cursor:pointer}

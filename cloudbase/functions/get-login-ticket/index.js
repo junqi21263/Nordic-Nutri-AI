@@ -50,6 +50,8 @@ const { createGoogleTokenService } = require("./services/google.cjs");
 const { createOperationGuard, PublicOperationError } = require("./operation-guard.cjs");
 const { getVisionQuotaPolicy } = require("./vision-quota-policy.cjs");
 const { createObservabilityService } = require("./observability-service.cjs");
+const { createAnalyticsService } = require("./analytics-service.cjs");
+const { handleAnalyticsHttp } = require("./analytics-http.cjs");
 const { sanitizeTraceMeta, sanitizeTracePayload } = require("./observability-sanitizer.cjs");
 const { createAdminAuditService } = require("./admin-audit-service.cjs");
 const { recordModelUsage } = require("./model-usage.cjs");
@@ -1770,6 +1772,14 @@ function createRuntimeService(env = process.env, dependencies = {}) {
   });
 
   return {
+    analyticsEnvironment: config.cloudbaseEnvId,
+    analyticsDispatchSecret: env.ANALYTICS_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
+    analytics: typeof db.rpc === "function" && typeof config.sessionSecret === "string" && config.sessionSecret.length >= 16 ? createAnalyticsService({
+      db,
+      environment: config.cloudbaseEnvId,
+      secret: env.ANALYTICS_SIGNING_SECRET || config.sessionSecret,
+      enabled: env.ANALYTICS_ENABLED === "true" || (env.ANALYTICS_ENABLED !== "false" && config.cloudbaseEnvId === "test-dev-d4gyxnn0b5dfa2c8a"),
+    }) : null,
     issue: session.issue,
     verifySession: (token) => verifyAccessToken(token, config.sessionSecret),
     auth,
@@ -2332,13 +2342,14 @@ function sendMealError(res, error) {
 
 function createHttpServer({ service }) {
   return http.createServer(async (req, res) => {
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    if (await handleAnalyticsHttp({ req, res, url, service })) return;
     if (req.method === "OPTIONS") {
       res.writeHead(204, CORS_HEADERS);
       res.end();
       return;
     }
 
-    const url = new URL(req.url || "/", "http://127.0.0.1");
     const dataOperation = getDataOperation(url.pathname);
     const mealRoute = getMealRoute(url.pathname);
     const pushRoute = getPushRoute(url.pathname);

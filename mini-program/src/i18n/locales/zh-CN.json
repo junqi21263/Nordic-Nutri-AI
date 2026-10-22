@@ -370,5 +370,18 @@
     "reply": "我们的回复",
     "empty": "暂时没有消息",
     "more": "加载更多"
+  },
+  "analyticsPrivacy": {
+    "title": "隐私与数据",
+    "subtitle": "由你选择，随时调整。",
+    "analytics": "使用情况分析",
+    "analyticsDescription": "帮助了解页面与功能的使用情况，改进产品体验。",
+    "diagnostics": "诊断数据分享",
+    "diagnosticsDescription": "帮助定位登录、Nova 和客户端异常，仅分享脱敏的错误类型与性能数据。",
+    "collection": "可选数据由 Nordic 通过腾讯云 CloudBase 处理，包含页面、操作类型、版本、语言、耗时及随机分析标识。",
+    "exclusions": "不采集照片、对话正文、邮箱、手机号、体重、营养数值、定位或设备广告标识。",
+    "retention": "行为明细最长保留 90 天，分析汇总最长 366 天；本机待发送队列最长 72 小时。",
+    "withdraw": "关闭后立即停止本机采集并清空待发送数据，联网后同步撤回。分析与诊断均为可选，不影响正常使用和通知提醒。",
+    "rights": "账号与数据删除"
   }
 }

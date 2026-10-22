@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import Taro, { useLaunch, useDidShow } from "@tarojs/taro";
+import Taro, { useLaunch, useDidShow, useDidHide } from "@tarojs/taro";
 import { getLocale, refreshSystemLanguage } from "./i18n";
 import type { PropsWithChildren } from "react";
 import { queryClient } from "./api/query-client";
@@ -12,6 +12,7 @@ import { smartReminderStorage } from "./features/smart-reminders/storage";
 import { syncSmartReminderSchedule } from "./api/push-api";
 import { AppTransitionOverlay } from "./components/app-transition-overlay";
 import { AppUpdateDialog } from "./components/app-update-dialog";
+import { initializeAnalytics, setAnalyticsForeground } from "./features/analytics/runtime";
 import "./app.scss";
 
 let devConsoleStarted = false;
@@ -29,7 +30,9 @@ async function startAndroidDevConsole() {
 }
 
 export default function App({ children }: PropsWithChildren) {
+  useDidHide(() => setAnalyticsForeground(false));
   useDidShow(() => {
+    setAnalyticsForeground(true);
     void (async () => {
       await refreshSystemLanguage();
       const userId = useAuthStore.getState().user?.id;
@@ -47,6 +50,7 @@ export default function App({ children }: PropsWithChildren) {
   });
   useLaunch(() => {
     if (process.env.TARO_APP_PLATFORM === "android") {
+      void initializeAnalytics();
       void startAndroidDevConsole();
       void initializeAndroidSmartReminders();
       void Taro.reLaunch({ url: "/pages/welcome/index" }).then(() => initializeAndroidPushNotifications());

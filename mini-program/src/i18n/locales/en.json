@@ -389,5 +389,18 @@
     "reply": "Our reply",
     "empty": "No messages yet",
     "more": "Load more"
+  },
+  "analyticsPrivacy": {
+    "title": "Privacy & data",
+    "subtitle": "Your choice, adjustable anytime.",
+    "analytics": "Usage analytics",
+    "analyticsDescription": "Help us understand how pages and features are used and improve the experience.",
+    "diagnostics": "Share diagnostics",
+    "diagnosticsDescription": "Help investigate sign-in, Nova and app errors using sanitized error types and performance data.",
+    "collection": "Nordic processes optional data through Tencent CloudBase: pages, action types, version, language, timings and random analytics identifiers.",
+    "exclusions": "No photos, conversations, email, phone number, weight, nutrient values, location or advertising identifiers are collected.",
+    "retention": "Event details are kept for up to 90 days and analytics summaries for up to 366 days. Queued events expire after 72 hours.",
+    "withdraw": "Turning this off immediately stops local collection and clears queued data; withdrawal syncs when online. Both options are voluntary and do not affect the app or reminders.",
+    "rights": "Account & data deletion"
   }
 }

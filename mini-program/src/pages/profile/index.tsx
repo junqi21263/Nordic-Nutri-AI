@@ -499,6 +499,7 @@ export default function ProfilePage() {
                   />
                 </View>
               ) : null}
+              {isAndroidApp ? <View onClick={() => openPage("/pages/privacy-data/index")}><ListItem icon={<NordicIcon name="shield-check" size={20} />} title={t("analyticsPrivacy.title")} trailing="›" /></View> : null}
               <LanguageSettings />
             </View>
           </View>
