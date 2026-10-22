@@ -14,6 +14,7 @@ import {
 import { googleServerClientId } from "../../api/product-api-config";
 import { startApplicationAuth } from "../../auth/app-auth-bootstrap";
 import { setNativeSession } from "../../auth/session-manager";
+import { applyLoginConsentAfterSessionBootstrap } from "./login-consent";
 import { toAppSession } from "../../api/android-auth-api";
 import { NordicIcon } from "../../components/nordic-icon";
 import { PageLayout } from "../../layouts/page-layout";
@@ -208,8 +209,10 @@ export default function AndroidAuthPage() {
     setError("");
     try {
       await startApplicationAuth({ force: true, allowSilentLogin: false });
+      return true;
     } catch {
       setError(t("androidAuth.errors.sessionLaunch"));
+      return false;
     }
   };
 
@@ -218,7 +221,7 @@ export default function AndroidAuthPage() {
     setSuccessKind(kind);
     setView("success");
     await delay(400);
-    await retrySessionLaunch();
+    await applyLoginConsentAfterSessionBootstrap(termsAccepted, retrySessionLaunch, setAnalyticsPreference);
   };
 
   const signInWithGoogle = async () => {
@@ -402,7 +405,6 @@ export default function AndroidAuthPage() {
     <CheckboxGroup className="auth-terms" onChange={(event) => {
       const accepted = event.detail.value.includes("agreed");
       setTermsAccepted(accepted);
-      setAnalyticsPreference({ analytics: accepted, diagnostics: accepted });
       setError("");
     }}>
       <Checkbox value="agreed" checked={termsAccepted} color="#153f2b" ariaLabel={`${t("androidAuth.termsLead")}${t("androidAuth.termsOfService")}${t("androidAuth.termsJoin")}${t("androidAuth.privacyPolicy")}${t("androidAuth.termsTail")}`} />
