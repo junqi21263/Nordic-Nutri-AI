@@ -1,4 +1,4 @@
-import { reportViews, metricLabels, formatValue, localizeNote, reportColumns, reportQuery, reportPageCount } from './analytics-model.mjs?v=20261022-5';
+import { reportViews, metricLabels, formatValue, localizeNote, reportColumns, reportQuery, reportPageCount } from './analytics-model.mjs?v=20261022-6';
 
 const host = document.getElementById('moduleAnalytics');
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g,(char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
@@ -9,7 +9,7 @@ const start = dateKey(Date.now()-6*86400_000);
 if (host) {
   host.innerHTML = `<div class="module-toolbar"><div><p class="eyebrow">产品 / 使用分析</p><h2>用户分析 <span id="analyticsEnvironment" class="environment-badge"></span></h2></div><div class="analytics-actions"><button type="button" class="button secondary" id="analyticsExportCsv">导出 CSV</button><button type="button" class="button secondary" id="analyticsExportHtml">报告 / 打印 PDF</button></div></div>
     <nav class="analytics-tabs" aria-label="分析报告">${Object.entries(reportViews).map(([key,label]) => `<button type="button" class="button secondary" data-analytics-view="${key}" aria-pressed="${key === state.view}">${label}</button>`).join('')}</nav>
-    <form id="analyticsFilters" class="analytics-filters"><label>时间范围<select name="preset"><option value="7d">近 7 天</option><option value="today">今天</option><option value="yesterday">昨天</option><option value="30d">近 30 天</option><option value="custom">自定义</option></select></label><label>开始日期<input type="date" name="from" value="${start}" required></label><label>结束日期<input type="date" name="to" value="${today}" required></label><label>平台<select name="platform"><option value="">全部</option><option value="android">安卓应用</option><option value="web">官网</option></select></label><label>版本<input type="text" name="version" placeholder="全部版本" maxlength="40"></label><label>渠道<select name="channel"><option value="">全部</option><option value="direct">直接访问</option><option value="xiaohongshu">小红书</option><option value="douyin">抖音</option><option value="wechat">微信</option><option value="google">Google</option><option value="other">其他 / 未知</option></select></label><label>媒介<select name="medium"><option value="">全部</option><option value="social">社交</option><option value="search">搜索</option><option value="direct">直接</option><option value="referral">引荐</option><option value="other">其他</option></select></label><label>内容编号<select name="content"><option value="">全部</option><option value="launch_1">上线素材 1</option><option value="dev_test">开发测试</option><option value="other">其他</option></select></label><label>语言<select name="locale"><option value="">全部</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="en">英语</option></select></label><label><input type="checkbox" name="includeTest">包含内部测试</label><button class="button" type="submit">应用筛选</button></form>
+    <form id="analyticsFilters" class="analytics-filters"><label>时间范围<select name="preset"><option value="7d">近 7 天</option><option value="today">今天</option><option value="yesterday">昨天</option><option value="30d">近 30 天</option><option value="custom">自定义</option></select></label><label>开始日期<input type="date" name="from" value="${start}" required></label><label>结束日期<input type="date" name="to" value="${today}" required></label><label>平台<select name="platform"><option value="">全部</option><option value="android">安卓应用</option><option value="web">官网</option></select></label><button class="button" type="submit">应用筛选</button></form>
     <p id="analyticsStatus" class="muted" role="status" aria-live="polite"></p><p id="analyticsWatermark" class="analytics-watermark muted"></p><div id="analyticsSummary" class="analytics-summary"></div><div id="analyticsSeries" class="analytics-series"></div><div id="analyticsRows" class="analytics-table"></div><div class="analytics-pagination"><button type="button" class="button secondary" id="analyticsPrevious">上一页</button><span id="analyticsPage"></span><button type="button" class="button secondary" id="analyticsNext">下一页</button></div><div id="analyticsNotes" class="analytics-notes"></div><p id="analyticsExportStatus" class="muted" role="status" aria-live="polite"></p>`;
   document.getElementById('analyticsEnvironment').textContent = document.getElementById('adminEnvironmentBadge')?.textContent || '';
 }
@@ -17,12 +17,7 @@ const node = (id) => document.getElementById(id);
 const reportTemplates = { overview:'产品运营报告', acquisition:'官网推广效果报告', versions:'版本体验报告' };
 function filters() {
   const form = new FormData(node('analyticsFilters'));
-  const acquisition = state.view === 'acquisition' || state.view === 'reports' && node('analyticsTemplate')?.value === 'acquisition';
-  return { from:form.get('from'),to:form.get('to'),platform:form.get('platform'),version:String(form.get('version') || '').trim(),channel:form.get('channel'),...(acquisition ? { medium:form.get('medium'),content:form.get('content'),locale:form.get('locale') } : {}),includeTest:form.has('includeTest'),page:state.page,pageSize:state.pageSize };
-}
-function syncAcquisitionFilters() {
-  const allowed = state.view === 'acquisition' || state.view === 'reports' && node('analyticsTemplate')?.value === 'acquisition';
-  for (const name of ['medium','content','locale']) node('analyticsFilters').elements[name].disabled = !allowed;
+  return { from:form.get('from'),to:form.get('to'),platform:form.get('platform'),page:state.page,pageSize:state.pageSize };
 }
 function label(key) { return metricLabels[key] || key; }
 function table(rows) {
@@ -31,7 +26,7 @@ function table(rows) {
   return `<table><thead><tr>${columns.map((key) => `<th>${escape(label(key))}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${columns.map((key) => `<td>${escape(formatValue(row[key],key))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 function summary(report) {
-  return Object.entries(report.summary || {}).filter(([,value]) => value === null || typeof value !== 'object').map(([key,value]) => `<div class="analytics-stat"><span>${escape(label(key))}</span><strong>${escape(formatValue(value,key))}</strong></div>`).join('');
+  return Object.entries(report.summary || {}).filter(([key,value]) => key !== 'anonymous_active_installs' && (value === null || typeof value !== 'object')).map(([key,value]) => `<div class="analytics-stat"><span>${escape(label(key))}</span><strong>${escape(formatValue(value,key))}</strong></div>`).join('');
 }
 function trendChart(series) {
   const metric = reportColumns(series).find((key) => !['date','day','timestamp'].includes(key) && series.some((row) => typeof row[key] === 'number'));
@@ -114,8 +109,6 @@ function renderHistory(result) {
   node('analyticsNext').disabled = state.page >= pages;
   node('analyticsNotes').replaceChildren();
   node('analyticsRows').querySelectorAll('[data-report-preview],[data-report-download],[data-report-retry]').forEach((button) => button.addEventListener('click',() => { void reportAction(button); }));
-  node('analyticsTemplate').addEventListener('change',syncAcquisitionFilters);
-  syncAcquisitionFilters();
 }
 async function deliverFile(id, preview = false) {
   const file = await api(`/analytics/reports/${encodeURIComponent(id)}/download`);
@@ -183,7 +176,6 @@ if (host) {
   for (const field of ['from','to']) node('analyticsFilters').elements[field].addEventListener('change',() => { node('analyticsFilters').elements.preset.value = 'custom'; });
   host.querySelectorAll('[data-analytics-view]').forEach((button) => button.addEventListener('click',() => {
     state.view = button.dataset.analyticsView; state.page = 1;
-    syncAcquisitionFilters();
     host.querySelectorAll('[data-analytics-view]').forEach((tab) => tab.setAttribute('aria-pressed',String(tab === button)));
     void load();
   }));
@@ -193,6 +185,5 @@ if (host) {
   node('analyticsExportCsv').addEventListener('click',() => { void exportReport('csv'); });
   node('analyticsExportHtml').addEventListener('click',() => { void exportReport('html'); });
   window.NordicAnalytics = { load };
-  syncAcquisitionFilters();
   if (!host.hidden) void load();
 }
