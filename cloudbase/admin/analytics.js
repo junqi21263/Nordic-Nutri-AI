@@ -1,4 +1,4 @@
-import { reportViews, metricLabels, formatValue, localizeNote, reportColumns, reportQuery, reportPageCount } from './analytics-model.mjs?v=20261022-7';
+import { reportViews, metricLabels, formatValue, localizeNote, reportColumns, reportQuery, reportPageCount } from './analytics-model.mjs?v=20261022-8';
 
 const host = document.getElementById('moduleAnalytics');
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g,(char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));

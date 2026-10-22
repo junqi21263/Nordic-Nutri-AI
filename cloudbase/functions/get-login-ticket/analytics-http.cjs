@@ -41,6 +41,7 @@ async function readBody(req, includeRaw = false) {
 function originAllowed(origin, environment, isAdmin = false) {
   if (!origin || origin === 'https://localhost' || origin === 'http://localhost' || origin === 'capacitor://localhost') return true;
   if (isAdmin && environment === DEV_ENV && origin === 'https://test-dev-d4gyxnn0b5dfa2c8a-1420560890.tcloudbaseapp.com') return true;
+  if (isAdmin && environment === PROD_ENV && origin === 'https://lewis-healthy-d4glgqqzv73a5bc10-1420560890.tcloudbaseapp.com') return true;
   if (environment === DEV_ENV) return ['https://nutri-preview.lewislee.online','http://localhost:10086','http://127.0.0.1:10086','http://localhost:4173','http://127.0.0.1:4173'].includes(origin);
   return environment === PROD_ENV && origin === 'https://nutri.lewislee.online';
 }

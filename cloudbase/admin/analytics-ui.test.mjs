@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 const read = (file) => readFile(new URL(file,import.meta.url),'utf8');
 
 test('admin analytics is mounted as a separate module using existing authenticated API', async () => {
@@ -12,6 +12,9 @@ test('admin analytics is mounted as a separate module using existing authenticat
   const module = await read('./analytics.js');
   assert.match(module,/api\(/);
   assert.doesNotMatch(module,/localStorage|Bearer|sessionToken|confirm\(/);
+  const modelPath = module.match(/from ['"]\.\/(analytics-model\.mjs)\?/ )?.[1];
+  assert.ok(modelPath, 'analytics module must use its local model module');
+  await Promise.all(['analytics.css','analytics.js',modelPath].map((asset) => access(new URL(`./${asset}`,import.meta.url))));
 });
 test('export download never passes credentials in URL and is manually initiated', async () => {
   const module = await read('./analytics.js');

@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="./admin-ui-v2-tokens.css" />
   <link rel="stylesheet" href="./admin-ui-v2-components.css?v=20261022-1" />
   <link rel="stylesheet" href="./admin-ui-v2-shell.css" />
-  <link rel="stylesheet" href="./analytics.css?v=20261021-1" />
+  <link rel="stylesheet" href="./analytics.css?v=20261022-2" />
   <style>
     :root {
       --ink: #173d2a;
@@ -3305,13 +3305,13 @@
         const rate = data.todayApiSuccessRate == null ? "—" : `${Math.round(Number(data.todayApiSuccessRate) * 10000) / 100}%`;
         const cards = [
           ["用户总数", count(data.totalUsers), "未注销账号"],
-          ["今日访问人数", count(data.todayActiveAccounts), "App 与小程序访问账号，按 Trace 用户去重"],
-          ["今日新增用户人数", count(data.todayNewUsers), "App 与小程序新注册账号，来自用户数据表"],
+          ["今日访问人数", count(data.todayActiveAccounts), ""],
+          ["今日新增用户人数", count(data.todayNewUsers), ""],
           ["当前上传餐食数", count(data.currentMeals), "当前未删除的餐食记录"],
           ["今日上传餐食数", count(data.todayMeals), "今日创建且未删除"],
           ["今日接口请求成功率", rate, data.terminalRequests ? `成功 ${count(data.successfulRequests)} / 已结束 ${count(data.terminalRequests)}` : "今日暂无已结束请求"],
         ];
-        host.innerHTML = cards.map(([label, value, hint]) => `<div class="nn-metric-card"><span class="nn-metric-card__label">${escapeHtml(label)}</span><strong class="nn-metric-card__value">${escapeHtml(value)}</strong><span class="nn-metric-card__hint">${escapeHtml(hint)}</span></div>`).join("");
+        host.innerHTML = cards.map(([label, value, hint]) => `<div class="nn-metric-card"><span class="nn-metric-card__label">${escapeHtml(label)}</span><strong class="nn-metric-card__value">${escapeHtml(value)}</strong>${hint ? `<span class="nn-metric-card__hint">${escapeHtml(hint)}</span>` : ""}</div>`).join("");
       } catch (error) { setOpsMessage(host, apiErrorMessage(error), "danger"); }
     }
     function renderTraceList(data) {
@@ -3850,6 +3850,6 @@
     if (hasToken()) connect().catch(() => {});
   </script>
   <script src="./announcements.js?v=20261020-1"></script>
-  <script type="module" src="./analytics.js?v=20261022-7"></script>
+  <script type="module" src="./analytics.js?v=20261022-8"></script>
 </body>
 </html>

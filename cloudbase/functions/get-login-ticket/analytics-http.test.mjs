@@ -70,6 +70,13 @@ test('DEV admin hosting origin can read admin reports but cannot use collection 
   assert.equal((await fetch(`${base}/api/admin/analytics/report?view=overview`,{headers:{origin:'https://test-dev-d4gyxnn0b5dfa2c8a.tcloudbaseapp.com',authorization:'Bearer admin'}})).status,403);
   assert.equal(calls.length,1);
 }));
+test('PROD admin hosting origin can read admin reports while unrelated origins stay blocked',async()=>withServer(async(base,calls)=>{
+  const origin='https://lewis-healthy-d4glgqqzv73a5bc10-1420560890.tcloudbaseapp.com';
+  assert.equal((await fetch(`${base}/api/admin/analytics/report?view=overview`,{headers:{origin,authorization:'Bearer admin'}})).status,200);
+  assert.equal((await fetch(`${base}/api/admin/analytics/report?view=overview`,{headers:{origin:'https://lewis-healthy-d4glgqqzv73a5bc10.tcloudbaseapp.com',authorization:'Bearer admin'}})).status,403);
+  assert.equal((await fetch(`${base}/api/admin/analytics/report?view=overview`,{headers:{origin:'https://attacker.example',authorization:'Bearer admin'}})).status,403);
+  assert.equal(calls.length,1);
+},{analyticsEnvironment:'lewis-healthy-d4glgqqzv73a5bc10'}));
 test('invalid JSON and oversized bodies are safely rejected',async()=>withServer(async(base,calls)=>{
   const options=json({}); options.body='{broken';
   assert.equal((await fetch(`${base}/analytics/batch`,options)).status,400);
