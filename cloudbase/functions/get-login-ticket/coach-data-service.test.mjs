@@ -66,6 +66,20 @@ function createDb() {
       };
       return {
         select() { return chain; },
+        delete() {
+          const filters = [];
+          const query = {
+            eq(column, value) { filters.push([column, value]); return query; },
+            select() { return query; },
+            then(resolve) {
+              const matches = (row) => filters.every(([column, value]) => row[column] === value);
+              const deleted = rows[table].filter(matches);
+              rows[table] = rows[table].filter((row) => !matches(row));
+              return Promise.resolve({ data: deleted, error: null }).then(resolve);
+            },
+          };
+          return query;
+        },
         update(payload) {
           for (const row of selectedRows) Object.assign(row, payload);
           return chain;
@@ -485,6 +499,17 @@ test("archives the active conversation, creates a new one, and keeps history", a
   assert.ok(rows.coach_conversations.find((row) => row.id === "conversation-1").archived_at);
   assert.ok(rows.coach_messages.find((row) => row.id === "old-message"));
   assert.equal((await service.getMessages("user-1")).length, 0);
+});
+
+test("deletes all coach history scoped to the requested user", async () => {
+  const { db, rows } = createDb();
+  rows.coach_conversations.push({ id: "other-conversation", user_id: "user-2", archived_at: null });
+  rows.coach_messages.push({ id: "other-message", user_id: "user-2", conversation_id: "other-conversation", role: "user", content: "keep me" });
+  const service = createCoachDataService({ db, ...dependencies(), answer: null });
+
+  assert.deepEqual(await service.deleteAllConversations("user-1"), { deletedMessages: 1, deletedConversations: 1 });
+  assert.deepEqual(rows.coach_messages.map((row) => row.id), ["other-message"]);
+  assert.deepEqual(rows.coach_conversations.map((row) => row.id), ["other-conversation"]);
 });
 
 test("maps missing app_users foreign-key failures to SESSION_USER_MISSING", async () => {

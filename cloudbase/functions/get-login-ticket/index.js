@@ -2092,6 +2092,7 @@ function getCoachRoute(pathname) {
   if (path === "/coach-answer") return "sendMessage";
   if (path === "/coach-answer/stream") return "streamMessage";
   if (path === "/coach/restart") return "restartConversation";
+  if (path === "/coach/conversations/delete-all") return "deleteAllConversations";
   if (path === "/coach/daily-tip") return "getDailyTip";
   if (path === "/coach/daily-brief") return "getDailyBrief";
   return null;
@@ -3790,6 +3791,9 @@ function createHttpServer({ service }) {
         }
         if (coachOperation === "restartConversation" && req.method === "POST") {
           return sendJson(res, 200, await service.coach.restartConversation(session.sub));
+        }
+        if (coachOperation === "deleteAllConversations" && req.method === "POST") {
+          return sendJson(res, 200, await service.coach.deleteAllConversations(session.sub));
         }
         if (coachOperation === "sendMessage" && req.method === "POST") {
           const body = await readJsonBody(req);

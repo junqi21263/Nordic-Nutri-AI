@@ -1062,6 +1062,39 @@ test("reads, writes, and summarizes coach data only for the signed-in user", asy
   assert.deepEqual(calls.map((call) => call.slice(0, 2)), [["read", "user-1"], ["write", "user-1"], ["brief", "user-1"], ["daily-brief", "user-1"], ["daily-tip", "user-1"], ["restart", "user-1"]]);
 });
 
+test("deletes NOVA conversation history only for the signed-in user", async () => {
+  const calls = [];
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      coach: {
+        deleteAllConversations: async (userId) => {
+          calls.push(["delete-all", userId]);
+          return { deletedMessages: 2, deletedConversations: 1 };
+        },
+      },
+    },
+  });
+
+  const handler = server.listeners("request")[0];
+  async function invoke(method, authorization) {
+    const response = {
+      writeHead(statusCode) { this.statusCode = statusCode; return this; },
+      end(body) { this.body = body; },
+    };
+    await handler({ method, url: "/get-login-ticket/coach/conversations/delete-all", headers: authorization ? { authorization } : {} }, response);
+    return response;
+  }
+
+  const response = await invoke("POST", "Bearer valid-session");
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(JSON.parse(response.body), { deletedMessages: 2, deletedConversations: 1 });
+  assert.equal((await invoke("GET", "Bearer valid-session")).statusCode, 405);
+  assert.equal((await invoke("POST")).statusCode, 401);
+
+  assert.deepEqual(calls, [["delete-all", "user-1"]]);
+});
+
 test("streams coach events only for the authenticated product user", async () => {
   const server = createHttpServer({
     service: {

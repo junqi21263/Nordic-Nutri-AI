@@ -517,6 +517,17 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     return { conversationId: created.data.id, messages: [] };
   }
 
+  async function deleteAllConversations(userId) {
+    const messages = await db.from("coach_messages").delete().eq("user_id", userId).select("id");
+    if (messages.error) throw new Error("Coach message history delete failed");
+    const conversations = await db.from("coach_conversations").delete().eq("user_id", userId).select("id");
+    if (conversations.error) throw new Error("Coach conversation history delete failed");
+    return {
+      deletedMessages: messages.data?.length ?? 0,
+      deletedConversations: conversations.data?.length ?? 0,
+    };
+  }
+
   async function buildContext(userId, date) {
     const key = `${userId}:${date}`;
     const pending = contextInflight.get(key);
@@ -949,7 +960,7 @@ function createCoachDataService({ db, getDailySummary, getWeeklyReview, getAccou
     if (persisted.error) throw new Error("NOVA daily brief cache write failed");
   }
 
-  return { getMessages, sendMessage, streamMessage, getBrief, restartConversation, getDailyTip, getDailyBrief, getDailyUsage };
+  return { getMessages, sendMessage, streamMessage, getBrief, restartConversation, deleteAllConversations, getDailyTip, getDailyBrief, getDailyUsage };
 }
 
 module.exports = {
