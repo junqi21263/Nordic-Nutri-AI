@@ -80,7 +80,9 @@
 .auth-divider { display: flex; align-items: center; gap: 12PX; margin: 23PX 0 16PX; color: $color-neutral-gray; font-size: 11PX; letter-spacing: 2PX; white-space: nowrap; }
 .auth-divider__line { height: 1PX; flex: 1; background: rgba(66, 72, 67, 0.18); }
 .auth-landing__providers { display: grid; grid-template-columns: 1fr 1fr; gap: 12PX; }
-.auth-terms { display: block; margin-top: 24PX; color: $color-neutral-gray; font-size: 12PX; line-height: 1.45; text-align: center; }
+.auth-terms { display: flex; align-items: flex-start; gap: 8PX; margin-top: 16PX; color: $color-neutral-gray; font-size: 12PX; line-height: 1.45; }
+.auth-terms__copy { flex: 1; }
+.auth-terms checkbox { flex: 0 0 auto; }
 .auth-terms__link { color: $color-text-secondary; cursor: pointer; text-decoration-line: underline; text-decoration-color: currentColor; text-underline-offset: 2PX; }
 .auth-terms__link:active { opacity: 0.72; }
 

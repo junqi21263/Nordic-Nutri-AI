@@ -2149,6 +2149,7 @@ function getAdminFoodRoute(pathname) {
   const jobRunMatch = path.match(/^\/jobs\/([a-z0-9_-]+)\/run-now$/i);
   if (jobRunMatch) return { operation: "jobRunNow", jobKey: jobRunMatch[1] };
   if (path === "/system/health") return { operation: "systemHealth" };
+  if (path === "/dashboard/summary") return { operation: "dashboardSummary" };
   if (path === "/audit-logs") return { operation: "auditLogs" };
   if (path === "/traces") return { operation: "traceList" };
   const diagnosticMatch = path.match(/^\/diagnostics\/([^/]+)$/i);
@@ -2844,6 +2845,19 @@ function createHttpServer({ service }) {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.systemHealth?.getHealth) return sendJson(res, 503, { code: "SYSTEM_HEALTH_UNAVAILABLE" });
           return sendJson(res, 200, await service.systemHealth.getHealth());
+        }
+        if (adminFoodRoute.operation === "dashboardSummary") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.systemHealth?.getDashboardSummary) return sendJson(res, 503, { code: "DASHBOARD_UNAVAILABLE" });
+          const summary = await service.systemHealth.getDashboardSummary();
+          let todayActiveAccounts = null;
+          if (service.analytics?.report) {
+            try {
+              const report = await service.analytics.report({ view: "overview", from: summary.day, to: summary.day, platform: "android", includeTest: service.analyticsEnvironment === "test-dev-d4gyxnn0b5dfa2c8a" });
+              todayActiveAccounts = report.summary?.active_accounts ?? null;
+            } catch (error) { console.warn("[dashboard-summary] analytics unavailable:", error?.code || "unknown"); }
+          }
+          return sendJson(res, 200, { ...summary, todayActiveAccounts });
         }
         if (adminFoodRoute.operation === "auditLogs") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
