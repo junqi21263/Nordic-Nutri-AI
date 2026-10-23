@@ -3,6 +3,22 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { createQwenVisionService, shouldEscalate, PublicQwenVisionError } from "./qwen-vision-service.cjs";
+import { createRoutedOpenAiFetch } from "./text-model-adapter-registry.cjs";
+
+test("routed DeepSeek vision sends inline images with thinking disabled", async () => {
+  let sent;
+  const route = { providerKey: "deepseek", modelKey: "deepseek-v4-flash-vision-exp", credential: "test-key" };
+  const analyze = createQwenVisionService({
+    apiKey: route.credential, provider: route.providerKey, flashModel: route.modelKey,
+    fetchImpl: createRoutedOpenAiFetch(route, { fetchImpl: async (_url, init) => {
+      sent = JSON.parse(init.body);
+      return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(result()) } }] }) };
+    } }),
+  });
+  await analyze({ imageUrl: "https://example.test/image.jpg", imageDataUrl: "data:image/jpeg;base64,aW1hZ2U=" });
+  assert.deepEqual(sent.thinking, { type: "disabled" });
+  assert.equal(sent.messages.find(message => message.role === "user").content[1].image_url.url, "data:image/jpeg;base64,aW1hZ2U=");
+});
 
 test("prompt distinguishes multi-food photos without inventing hidden ingredients", () => {
   const source = readFileSync(new URL("./qwen-vision-service.cjs", import.meta.url), "utf8");

@@ -217,6 +217,9 @@ test("requests DeepSeek SSE and emits parsed nutrition text deltas", async () =>
   assert.equal(body.response_format, undefined);
   assert.match(body.messages[0].content, /一般营养知识/);
   assert.match(body.messages[0].content, /不说教/);
+  assert.match(body.messages[0].content, /运动训练、恢复、睡眠和生活方式/);
+  assert.match(body.messages[0].content, /不要把所有问题都转回/);
+  assert.doesNotMatch(body.messages[0].content, /最多三条|不要超过 500/);
 });
 
 test("uses a bounded default stream timeout and honours the configured route timeout", () => {

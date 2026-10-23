@@ -251,6 +251,26 @@ test("keeps unrelated questions inside the nutrition-coach boundary without call
   assert.match(result.messages[1].content, /更擅长日常饮食建议|蓝莓营养怎么样|晚餐怎么补蛋白/);
 });
 
+test("routes training, sleep and lifestyle questions to the coach instead of rejecting them", async () => {
+  for (const prompt of ["新手怎么安排力量训练？", "熬夜后白天困怎么办？", "久坐上班怎么安排活动？", "How can I improve my sleep schedule?", "睡眠品質怎麼改善？"]) {
+    const { db } = createDb();
+    let calls = 0;
+    const service = createCoachDataService({ db, ...dependencies(), answer: async () => { calls += 1; return validReply; } });
+    await service.sendMessage("user-1", { ...validRequest, prompt });
+    assert.equal(calls, 1, prompt);
+  }
+});
+
+test("streams a detailed lifestyle plan without the old 500-character rejection", async () => {
+  const { db } = createDb();
+  const content = "保持规律作息，逐步调整入睡时间。".repeat(40);
+  const service = createCoachDataService({ db, ...dependencies(), streamAnswer: async function* () { yield content; } });
+  const events = [];
+  for await (const event of service.streamMessage("user-1", { ...validRequest, prompt: "怎么改善睡眠和作息？" })) events.push(event);
+  assert.equal(events.at(-1).reply.source, "deepseek");
+  assert.equal(events.filter(event => event.type === "delta").map(event => event.text).join(""), content);
+});
+
 test("treats a food's daily nutrition value as an in-scope coach question", async () => {
   const { db } = createDb();
   let calls = 0;
