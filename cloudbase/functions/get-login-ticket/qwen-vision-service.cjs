@@ -62,13 +62,16 @@ function validateResult(payload) {
     needsEscalation: result.needsEscalation === true,
     portionConfidence: Number.isFinite(result.portionConfidence) ? Math.min(1, Math.max(0, result.portionConfidence)) : 1,
     uncertaintyReasons: reasons,
+    sceneComplexity: result.sceneComplexity === "complex" ? "complex" : "simple",
+    visibleFoodCount: Number.isInteger(result.visibleFoodCount) && result.visibleFoodCount > 0 ? Math.min(20, result.visibleFoodCount) : items.length,
   };
 }
 
 function shouldEscalate(result) {
-  // Keep flash for most plates; only upgrade when the first pass is clearly weak.
-  // Escalating on item count / any uncertainty often doubles latency and hits SCF timeout.
-  return result.needsEscalation === true || result.confidence < 0.55 || result.portionConfidence < 0.5;
+  // Review uncertainty or missing visible foods, not the number of items alone.
+  return result.needsEscalation === true || result.confidence < 0.55 || result.portionConfidence < 0.5
+    || result.visibleFoodCount > result.items.length
+    || (result.sceneComplexity === "complex" && (result.confidence < 0.85 || result.portionConfidence < 0.7));
 }
 
 const { extractContentAndUsage } = require("./model-usage.cjs");
@@ -84,7 +87,7 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "h
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("QWEN_API_KEY configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "qwen3-vl-flash";
-  return async ({ imageUrl, locale, model: requestModel, timeoutMs: requestTimeoutMs, onRequestEvent = () => {} }) => {
+  return async ({ imageUrl, locale, model: requestModel, timeoutMs: requestTimeoutMs, reasoningEffort = "low", onRequestEvent = () => {} }) => {
     const controller = new AbortController();
     const startedAt = new Date().toISOString();
     const startedMs = Date.now();
@@ -102,10 +105,11 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "h
         body: JSON.stringify({
           model: typeof requestModel === "string" && requestModel.trim() ? requestModel.trim() : selectedModel,
           temperature: 0,
-          ...(provider === "deepseek" ? { thinking: { type: "enabled" }, reasoning_effort: "low" } : {}),
+          ...(provider === "deepseek" ? { thinking: { type: "enabled" }, reasoning_effort: reasoningEffort } : {}),
+          ...(provider === "qwen" && /^qwen3\.8-/i.test(requestModel || selectedModel) ? { reasoning_effort: reasoningEffort } : {}),
           messages: [{ role: "system", content: require("./locale.cjs").localeInstruction(locale) }, { role: "user", content: [
-            { type: "text", text: "你是专业营养分析视觉模型。仅返回 JSON，不要 Markdown。第一步判断图片是否为食物或饮品；若是风景、文字、物品、人物或截图，返回 {\"isFood\": false}。先判断图片是单一食物主体，还是明显包含两个或以上视觉独立的食物、菜品、碗碟或餐盘区域。对多食物照片从左到右、前到后逐区观察，分别枚举清晰可见的主食、蛋白质、蔬菜、配菜、酱汁和饮品，明显存在多个独立食物时 items 应输出多个项目。混合后无法视觉区分原料的组合菜可以保留为一个项目，不要强拆隐藏原料；只报告图中可见或有充分视觉依据的食物，不得为了凑数量猜测完全不可见的食材。对遮挡、混合、火锅、便当和多拼盘场景，在 uncertaintyReasons 中写明不确定项，并给出合理份量估算，不要为了追求绝对确定而持续重试。字段必须为 mealName、mealType(breakfast/lunch/dinner/snack)、confidence(0到1)、portionConfidence(0到1)、needsEscalation(boolean)、uncertaintyReasons(string数组)、advice、items。advice 必须用中文撰写，简明扼要，不超过100字。items 每项含 name、quantityG、caloriesPer100g、proteinPer100g、carbsPer100g、fatPer100g；营养值是估算，不作医疗诊断。" },
-            { type: "image_url", image_url: { url: imageUrl, ...(provider === "deepseek" ? { detail: "low" } : {}) } },
+            { type: "text", text: "你是专业营养分析视觉模型。仅返回 JSON，不要 Markdown。第一步判断图片是否为食物或饮品；若是风景、文字、物品、人物或截图，返回 {\"isFood\": false}。按实际场景判断复杂程度，多碗碟、遮挡或混合菜标为 complex；可分辨的沙拉、燕麦碗和开放吐司主要食材应分项列出，避免用一个组合项目掩盖清晰可见的成分。先判断图片是单一食物主体，还是明显包含两个或以上视觉独立的食物、菜品、碗碟或餐盘区域。对多食物照片从左到右、前到后逐区观察，分别枚举清晰可见的主食、蛋白质、蔬菜、配菜、酱汁和饮品，明显存在多个独立食物时 items 应输出多个项目。混合后无法视觉区分原料的组合菜可以保留为一个项目，不要强拆隐藏原料；只报告图中可见或有充分视觉依据的食物，不得为了凑数量猜测完全不可见的食材。对遮挡、混合、火锅、便当和多拼盘场景，在 uncertaintyReasons 中写明不确定项，并给出合理份量估算，不要为了追求绝对确定而持续重试。字段必须为 sceneComplexity(simple/complex)、visibleFoodCount(能辨认的食物主体数量，不猜隐藏食材)、mealName、mealType(breakfast/lunch/dinner/snack)、confidence(0到1)、portionConfidence(0到1)、needsEscalation(boolean)、uncertaintyReasons(string数组)、advice、items。advice 必须用中文撰写，简明扼要，不超过100字。items 每项含 name、quantityG、caloriesPer100g、proteinPer100g、carbsPer100g、fatPer100g；营养值是估算，不作医疗诊断。" },
+            { type: "image_url", image_url: { url: imageUrl, ...(provider === "deepseek" ? { detail: "auto" } : {}) } },
           ] }],
         }),
         signal: controller.signal,
@@ -275,8 +279,9 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
     const first = validateResult(firstRaw.content);
     let usage = firstRaw.usage;
     const flashTrace = { valid: true, ...summarizeResult(first) };
-    // Data-URL payloads are already large; a second plus pass often exceeds the cloud timeout.
-    let canEscalate = !/^data:image\//i.test(providerImageUrl) && shouldEscalate(first);
+    const uncertain = shouldEscalate(first);
+    const largeInlineImage = /^data:image\//i.test(providerImageUrl) && providerImageUrl.length > 1_200_000;
+    let canEscalate = !largeInlineImage && uncertain;
     let plusTimeoutMs = PLUS_MAX_TIMEOUT_MS;
     let plusSkipReason = null;
     const plusTrace = {
@@ -289,14 +294,14 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
     };
     if (canEscalate && budget?.remainingAfterReserve) {
       plusTimeoutMs = Math.min(PLUS_MAX_TIMEOUT_MS, budget.remainingAfterReserve(DOWNSTREAM_MANDATORY_RESERVE_MS));
-      if (plusTimeoutMs <= 0) {
+      if (plusTimeoutMs < 8_000) {
         canEscalate = false;
         plusSkipReason = "insufficient_budget";
       }
     }
     if (!canEscalate) {
-      plusTrace.skipReason = plusSkipReason || (/^data:image\//i.test(providerImageUrl) ? "data_url" : "not_needed");
-      observe({ stage: "plus", plusAttempted: false, plusSkipReason: plusSkipReason || (/^data:image\//i.test(providerImageUrl) ? "data_url" : "not_needed") });
+      plusTrace.skipReason = plusSkipReason || (largeInlineImage ? "data_url" : "not_needed");
+      observe({ stage: "plus", plusAttempted: false, plusSkipReason: plusTrace.skipReason });
     }
     let selected = first;
     if (canEscalate) {
@@ -304,9 +309,9 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       observe({ stage: "plus", plusAttempted: true });
       const plusStartedAt = Date.now();
       try {
-        const plusRaw = unwrapVisionCompletion(await plusComplete({ imageUrl, model: routeModel || plusModel, timeoutMs: plusTimeoutMs }));
+        const plusRaw = unwrapVisionCompletion(await plusComplete({ imageUrl: providerImageUrl, locale, model: routeModel || plusModel, timeoutMs: plusTimeoutMs, reasoningEffort: "high" }));
         const validatedPlus = validateResult(plusRaw.content);
-        selected = validatedPlus;
+        if (validatedPlus.confidence >= first.confidence && validatedPlus.items.length >= first.items.length) selected = validatedPlus;
         Object.assign(plusTrace, { success: true, valid: true, ...summarizeResult(validatedPlus) });
         usage = mergeUsage(usage, plusRaw.usage);
         observe({ stage: "plus", ms: Date.now() - plusStartedAt, plusSuccess: true });
@@ -321,6 +326,9 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
           fallbackReason: plusTrace.fallbackReason,
         });
       }
+    }
+    if (uncertain && selected === first) {
+      Object.assign(first, { needsEscalation: true, advice: `请核对食物明细和份量，图片中的部分内容仍不确定。${first.advice}`.slice(0, 1000) });
     }
     onTrace({
       selectedSource: selected === first ? "flash" : "plus",

@@ -82,7 +82,7 @@ class PublicFoodCatalogError extends Error {
 
 function normalizeQuery(query) {
   const normalized = typeof query === "string" ? query.trim().replace(/\s+/g, " ") : "";
-  if (normalized.length < 2 || normalized.length > 80) throw new PublicFoodCatalogError("FOOD_QUERY_INVALID");
+  if (!normalized || normalized.length > 80 || (normalized.length < 2 && !HAN_PATTERN.test(normalized))) throw new PublicFoodCatalogError("FOOD_QUERY_INVALID");
   return normalized;
 }
 
