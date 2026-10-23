@@ -405,10 +405,12 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
     // to the console admin actor so patrol / timer dispatch can resume.
     const executionUserId = await resolveExecutionUserId(userId, batch, { trusted });
     if (batch.status !== "running") throw new FoodImageBatchError("FOOD_IMAGE_BATCH_STATE_INVALID");
-    const candidateQuery = db.from("food_image_batch_items").select("*").eq("batch_id", batchId).in("status", CLAIMABLE_ITEM_STATUSES)
-      .or(`next_retry_at.is.null,next_retry_at.lte.${new Date().toISOString()}`);
-    if (itemId) candidateQuery.eq("id", itemId);
-    const candidate = await candidateQuery.order("created_at", { ascending: true }).limit(1).maybeSingle();
+    const candidate = await withDbReadRetry(() => {
+      const candidateQuery = db.from("food_image_batch_items").select("*").eq("batch_id", batchId).in("status", CLAIMABLE_ITEM_STATUSES)
+        .or(`next_retry_at.is.null,next_retry_at.lte.${new Date().toISOString()}`);
+      if (itemId) candidateQuery.eq("id", itemId);
+      return candidateQuery.order("created_at", { ascending: true }).limit(1).maybeSingle();
+    });
     if (candidate.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_ITEM_LIST_FAILED", undefined, { cause: { code: candidate.error.code } });
     if (!candidate.data) return { processed: 0, batch: await refreshSummary(batchId) };
     if (Number(candidate.data.attempt_count || 0) >= Number(batch.max_attempts || 3)) {
