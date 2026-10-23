@@ -9,7 +9,7 @@ const WORKER_DIAGNOSTIC_STAGES = new Set([
   "worker.checkpoint_resume",
 ]);
 
-const ASYNC_PROVIDER_MAX_TIMEOUT_MS = 18_000;
+const ASYNC_PROVIDER_MAX_TIMEOUT_MS = 22_000;
 
 function createWorkerDiagnosticEmitter(diagnostics) {
   const onStage = typeof diagnostics?.onStage === "function" ? diagnostics.onStage : null;
