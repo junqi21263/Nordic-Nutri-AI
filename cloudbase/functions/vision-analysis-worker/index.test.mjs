@@ -149,9 +149,9 @@ test("wired worker resumes stored enriching jobs without calling provider again"
     }],
     resolveImageUrl: async (path) => `https://storage.example/${path.split("/").pop()}`,
     vision: {
-      analyzeImage: async (userId, input) => {
+      analyzeImage: async (userId, input, { budget }) => {
         providerCalls += 1;
-        events.push({ userId, input });
+        events.push({ userId, input, budget });
         return { analysisId: input.analysisId, mealName: "套餐", items: [], providerAttempt: input.providerAttempt };
       },
     },
@@ -164,6 +164,7 @@ test("wired worker resumes stored enriching jobs without calling provider again"
   const result = await worker.processOnce();
   assert.equal(result.claimed, 1);
   assert.equal(events[0].input.storedImageUrl, "https://storage.example/image.jpg");
+  assert.equal(events[0].budget.providerTimeoutMs, 22_000);
   assert.equal(events[0].input.providerCheckpoint.mealName, "套餐");
   assert.equal(events.some((event) => event.commitQuota === "analysis-5"), true);
   assert.equal(events.some((event) => event.completeJob === "analysis-5"), true);
