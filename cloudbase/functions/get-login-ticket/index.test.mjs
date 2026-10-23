@@ -1324,6 +1324,7 @@ test("correlates vision timeout diagnostics across request, image, and provider 
 
   assert.equal(finished[0].status, "timed_out");
   assert.equal(finished[0].providerRequestIdHash, null);
+  assert.equal(finished[0].meta.internalError.code, "VISION_TIMEOUT");
   assert.equal(finished[0].meta.source, "camera");
   assert.equal(finished[0].meta.originalContentType, "image/heic");
   assert.equal(finished[0].meta.finalWidth, 1280);
@@ -2122,5 +2123,26 @@ test("distinguishes an unavailable app-version service from a failed release loo
     const response = await fetch(`${baseUrl}/get-login-ticket/app/version`);
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), { code: "APP_VERSION_SERVICE_NOT_CONFIGURED" });
+  });
+});
+
+test("onboarding failures retain database codes without leaking database messages", async () => {
+  const finished=[];
+  const server=createHttpServer({service:{
+    verifySession:()=>({sub:'user-1'}),
+    data:{saveOnboarding:async()=>{throw Object.assign(new Error('duplicate email private@example.com'),{code:'23505',cause:{code:'ECONNRESET'}});}},
+    observability:{startTrace:()=>({traceId:'trace_onboarding',startedAt:new Date().toISOString(),stages:[]}),recordStage:()=>{},finishTrace:async(_trace,result)=>{finished.push(result);}},
+  }});
+  await withServer(server,async base=>{const response=await fetch(base+'/onboarding',{method:'POST',headers:{authorization:'Bearer valid','content-type':'application/json'},body:'{}'});assert.equal(response.status,503);});
+  assert.equal(finished[0].meta.internalError.code,'23505');
+  assert.equal(finished[0].meta.internalError.causeCode,'ECONNRESET');
+  assert.doesNotMatch(JSON.stringify(finished),/private@example.com/);
+});
+
+test("invalid onboarding input is a client error instead of a service outage", async()=>{
+  const server=createHttpServer({service:{verifySession:()=>({sub:'user-1'}),data:{saveOnboarding:async()=>{throw Object.assign(new Error('age invalid'),{code:'PRODUCT_DATA_INVALID'});}}}});
+  await withServer(server,async base=>{
+    const response=await fetch(base+'/onboarding',{method:'POST',headers:{authorization:'Bearer valid','content-type':'application/json'},body:'{}'});
+    assert.equal(response.status,400);assert.deepEqual(await response.json(),{code:'PRODUCT_DATA_INVALID'});
   });
 });
