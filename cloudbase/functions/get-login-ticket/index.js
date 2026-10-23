@@ -2299,6 +2299,8 @@ function isVisionRoute(pathname) {
 
 function getVisionAnalysisStatusRoute(pathname) {
   const path = pathname.replace(/^\/get-login-ticket/, "");
+  const requestMatch = path.match(/^\/vision-analysis\/request\/([0-9a-f-]{36})$/i);
+  if (requestMatch) return { clientRequestId: requestMatch[1] };
   const match = path.match(/^\/vision-analysis\/([0-9a-f-]{36})$/i);
   return match ? { analysisId: match[1] } : null;
 }
@@ -2523,10 +2525,13 @@ function createHttpServer({ service }) {
       const session = await authorizeProductRequest(service, req, res);
       if (!session) return;
       try {
-        const analysis = await service.visionAnalysisFoundation?.getOwnedAnalysis?.(
-          session.sub,
-          visionAnalysisStatusRoute.analysisId,
-        );
+        const analysis = visionAnalysisStatusRoute.clientRequestId
+          ? await service.visionAnalysisFoundation?.getOwnedAnalysisByRequestId?.(
+            session.sub, visionAnalysisStatusRoute.clientRequestId,
+          )
+          : await service.visionAnalysisFoundation?.getOwnedAnalysis?.(
+            session.sub, visionAnalysisStatusRoute.analysisId,
+          );
         if (!analysis) return sendJson(res, 404, { code: "NOT_FOUND" });
         return sendJson(res, 200, analysis);
       } catch (error) {

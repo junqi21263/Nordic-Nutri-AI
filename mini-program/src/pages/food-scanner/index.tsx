@@ -192,7 +192,7 @@ export default function FoodScannerPage() {
         setFallbackMessage(userMessage);
         feedback.showModal({
           variant: isDailyLimitReached ? "limit" : feedbackVariantForError(error),
-          title: t(isDailyLimitReached ? "scannerPage.scanLimit" : "scannerPage.failedTitle"),
+          title: t(isDailyLimitReached ? "scannerPage.scanLimit" : isAsyncProcessing ? "scannerPage.processing" : "scannerPage.failedTitle"),
           description: isDailyLimitReached ? t("scannerPage.limitDescription") : userMessage,
           primaryText: t("scannerPage.gotIt"),
           secondaryText: t("scannerPage.manual"),

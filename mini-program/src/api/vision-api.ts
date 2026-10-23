@@ -24,6 +24,7 @@ import {
 } from "../features/scanner/vision-async-client";
 const maxImageBytes = MAX_UPLOAD_HARD_BYTES;
 export const VISION_CLIENT_TOTAL_BUDGET_MS = 35_000;
+const VISION_POST_TIMEOUT_MS = 35_000;
 const VISION_PENDING_ANALYSIS_KEY = "nordic-nutri:vision-pending-analysis:v1";
 /** Network upload target — keep base64 payload small enough for mobile + cloud timeout. */
 const targetUploadBytes = MAX_UPLOAD_IMAGE_BYTES;
@@ -151,9 +152,38 @@ export async function getVisionAnalysisStatus(analysisId: string): Promise<Visio
   return normalizeVisionStatus(response.data);
 }
 
+async function getVisionAnalysisByRequestId(clientRequestId: string): Promise<VisionStatusPayload | null> {
+  const token = useAuthStore.getState().session?.accessToken;
+  if (!token) return null;
+  const response = await productTransport<unknown>({
+    url: `${productApiEndpoint}/vision-analysis/request/${clientRequestId}`,
+    method: "GET",
+    header: { authorization: `Bearer ${token}` },
+    timeout: 10_000,
+  });
+  return response.statusCode === 200 ? normalizeVisionStatus(response.data) : null;
+}
+
 function statusResultToMeal(status: VisionStatusPayload): ScannerMealFixture {
   if (status.status !== "completed" || !status.result) throw new Error("VISION_RESULT_INVALID");
   return mapVisionResult(normalizeVisionResult(status.result, status.analysisId));
+}
+
+async function resolveVisionStatus(status: VisionStatusPayload, onTiming?: (event: { stage: string; ms: number }) => void) {
+  savePendingAnalysis(status.analysisId, status.deadlineAt ? new Date(status.deadlineAt).getTime() : null);
+  if (isVisionTerminalStatus(status.status)) {
+    clearPendingAnalysis(status.analysisId);
+    if (status.status === "completed") return statusResultToMeal(status);
+    const error = new Error(status.message || status.errorCode || "图片识别失败，请重试");
+    error.name = status.errorCode || `VISION_${status.status.toUpperCase()}`;
+    throw error;
+  }
+  const resumed = await resumeVisionAnalysis({
+    deadlineAt: status.deadlineAt ? new Date(status.deadlineAt).getTime() : Date.now() + 30_000,
+    onStatus: (next) => onTiming?.({ stage: `async_${next.currentStage || next.status}`, ms: 0 }),
+  });
+  if (!resumed) throw new Error("VISION_RESULT_INVALID");
+  return resumed;
 }
 
 export async function resumeVisionAnalysis(
@@ -468,7 +498,9 @@ async function analyzeProductImageAttempt(
   );
   throwIfClientDeadlineExceeded(deadlineAt);
   const requestStartedAt = Date.now();
-  const requestTimeout = remainingClientMs(deadlineAt);
+  // Image preparation has its own deadline. Do not shorten the server's
+  // 30-second recognition window by the time spent compressing local media.
+  const requestTimeout = VISION_POST_TIMEOUT_MS;
   const clientRequestId = createClientRequestId();
   let response;
   try {
@@ -493,6 +525,15 @@ async function analyzeProductImageAttempt(
     trackAnalytics("image_upload_result", { entry: options.source ?? "unknown", outcome: response.statusCode === 200 || response.statusCode === 202 ? "succeeded" : "unknown", duration_ms: Date.now() - requestStartedAt }, { operation_id: clientRequestId });
     onTiming?.({ stage: "request", ms: Date.now() - requestStartedAt });
   } catch (err) {
+    // The server can finish after a mobile gateway drops the POST response.
+    // Recover the same request; never upload the image a second time here.
+    let recovered: VisionStatusPayload | null = null;
+    try { recovered = await getVisionAnalysisByRequestId(clientRequestId); }
+    catch (lookupError) { console.warn("[vision] request recovery unavailable:", lookupError); }
+    if (recovered) {
+      trackAnalytics("image_upload_result", { entry: options.source ?? "unknown", outcome: "succeeded", duration_ms: Date.now() - requestStartedAt }, { operation_id: clientRequestId });
+      return resolveVisionStatus(recovered, onTiming);
+    }
     trackAnalytics("image_upload_result", { entry: options.source ?? "unknown", outcome: "failed", error_code: "network_failed", duration_ms: Date.now() - requestStartedAt }, { operation_id: clientRequestId });
     console.error("[vision] network request failed:", err);
     const detail = String(
@@ -511,18 +552,8 @@ async function analyzeProductImageAttempt(
     VisionStatusPayload & { code?: unknown; message?: unknown };
   if (response.statusCode === 202) {
     const processing = normalizeVisionStatus(data);
-    const serverDeadlineAt = processing.deadlineAt
-      ? new Date(processing.deadlineAt).getTime()
-      : null;
-    savePendingAnalysis(processing.analysisId, serverDeadlineAt);
     onTiming?.({ stage: "async_handoff", ms: Date.now() - requestStartedAt });
-    const resumed = await resumeVisionAnalysis({
-      deadlineAt: serverDeadlineAt ?? Date.now() + 30_000,
-      onStatus: (status) =>
-        onTiming?.({ stage: `async_${status.currentStage || status.status}`, ms: 0 }),
-    });
-    if (!resumed) throw new Error("VISION_RESULT_INVALID");
-    return resumed;
+    return resolveVisionStatus(processing, onTiming);
   }
   if (response.statusCode !== 200) {
     const backendMessage = typeof data.message === "string" ? data.message : "";
