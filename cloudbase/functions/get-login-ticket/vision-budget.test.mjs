@@ -6,7 +6,7 @@ test("production vision defaults leave enough time for a slow visual provider", 
   const { VISION_BUDGETS } = await import("./vision-budget.cjs");
 
   assert.equal(VISION_BUDGETS.serverTotalMs, 30_000);
-  assert.equal(VISION_BUDGETS.flashMaxMs, 18_000);
+  assert.equal(VISION_BUDGETS.flashMaxMs, 22_000);
 });
 
 test("vision budget exposes one absolute deadline and remaining time", () => {

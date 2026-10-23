@@ -80,7 +80,7 @@ const DOWNSTREAM_MANDATORY_RESERVE_MS = VISION_BUDGETS.nutritionReserveMs
   + VISION_BUDGETS.evaluationReserveMs
   + VISION_BUDGETS.persistenceReserveMs;
 
-function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", provider = "qwen", timeoutMs = 18_000, fetchImpl = globalThis.fetch }) {
+function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", provider = "qwen", timeoutMs = FLASH_MAX_TIMEOUT_MS, fetchImpl = globalThis.fetch }) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("QWEN_API_KEY configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "qwen3-vl-flash";
@@ -102,7 +102,7 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "h
         body: JSON.stringify({
           model: typeof requestModel === "string" && requestModel.trim() ? requestModel.trim() : selectedModel,
           temperature: 0,
-          ...(provider === "deepseek" ? { thinking: { type: "disabled" } } : {}),
+          ...(provider === "deepseek" ? { thinking: { type: "enabled" }, reasoning_effort: "low" } : {}),
           messages: [{ role: "system", content: require("./locale.cjs").localeInstruction(locale) }, { role: "user", content: [
             { type: "text", text: "你是专业营养分析视觉模型。仅返回 JSON，不要 Markdown。第一步判断图片是否为食物或饮品；若是风景、文字、物品、人物或截图，返回 {\"isFood\": false}。先判断图片是单一食物主体，还是明显包含两个或以上视觉独立的食物、菜品、碗碟或餐盘区域。对多食物照片从左到右、前到后逐区观察，分别枚举清晰可见的主食、蛋白质、蔬菜、配菜、酱汁和饮品，明显存在多个独立食物时 items 应输出多个项目。混合后无法视觉区分原料的组合菜可以保留为一个项目，不要强拆隐藏原料；只报告图中可见或有充分视觉依据的食物，不得为了凑数量猜测完全不可见的食材。对遮挡、混合、火锅、便当和多拼盘场景，在 uncertaintyReasons 中写明不确定项，并给出合理份量估算，不要为了追求绝对确定而持续重试。字段必须为 mealName、mealType(breakfast/lunch/dinner/snack)、confidence(0到1)、portionConfidence(0到1)、needsEscalation(boolean)、uncertaintyReasons(string数组)、advice、items。advice 必须用中文撰写，简明扼要，不超过100字。items 每项含 name、quantityG、caloriesPer100g、proteinPer100g、carbsPer100g、fatPer100g；营养值是估算，不作医疗诊断。" },
             { type: "image_url", image_url: { url: imageUrl, ...(provider === "deepseek" ? { detail: "low" } : {}) } },
@@ -216,7 +216,7 @@ function unwrapVisionCompletion(raw) {
 }
 
 function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-flash", plusModel = "qwen3-vl-plus", endpoint, provider = "qwen", requestCompletion, fetchImpl } = {}) {
-  const complete = requestCompletion ?? createQwenRequestCompletion({ apiKey, workspaceId, model: flashModel, endpoint, provider, timeoutMs: 18_000, fetchImpl });
+  const complete = requestCompletion ?? createQwenRequestCompletion({ apiKey, workspaceId, model: flashModel, endpoint, provider, timeoutMs: FLASH_MAX_TIMEOUT_MS, fetchImpl });
   const plusComplete = requestCompletion ? requestCompletion : createQwenRequestCompletion({ apiKey, workspaceId, model: plusModel, endpoint, provider, timeoutMs: 10_000, fetchImpl });
   return async ({ imageUrl, imageDataUrl, locale, model: routeModel, budget, observe = () => {}, onTrace = () => {} }) => {
     if (typeof imageUrl !== "string" || imageUrl.length > 30_000_000) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
@@ -225,7 +225,7 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
     const flashTimeoutMs = Number.isFinite(explicitProviderTimeoutMs) && explicitProviderTimeoutMs > 0
       ? Math.min(explicitProviderTimeoutMs, typeof budget?.remainingMs === "function" ? budget.remainingMs() : explicitProviderTimeoutMs)
       : budget?.stageTimeout
-        ? budget.stageTimeout(FLASH_MAX_TIMEOUT_MS, 0)
+        ? budget.stageTimeout(FLASH_MAX_TIMEOUT_MS, DOWNSTREAM_MANDATORY_RESERVE_MS)
         : FLASH_MAX_TIMEOUT_MS;
     if (flashTimeoutMs <= 0) throw new PublicQwenVisionError("VISION_TIMEOUT", "图片识别超时，请重试");
     const providerImageUrl = provider === "deepseek" && /^data:image\//i.test(String(imageDataUrl || ""))
