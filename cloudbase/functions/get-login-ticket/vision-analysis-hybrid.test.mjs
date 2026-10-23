@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+test("asset-ready requests queue without a discarded provider attempt", async () => {
+  const handoffs = [];
+  const controller = createHybridVisionController({ featureEnabled: true,
+    createAnalysis: async () => ({ analysisId: "a", status: "created" }),
+    runFast: async () => ({ kind: "queued" }),
+    handoff: async (input) => { handoffs.push(input); return { accepted: true }; },
+  });
+  const response = await controller.post({ supportsAsyncVision: true });
+  assert.equal(response.httpStatus, 202);
+  assert.equal(handoffs[0].triggerReason, "asset_ready");
+  assert.equal(handoffs[0].resumeStage, "analyzing");
+});
+
 import {
   createHybridVisionController,
   classifyAsyncTrigger,

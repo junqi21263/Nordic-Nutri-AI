@@ -4136,6 +4136,7 @@ function createHttpServer({ service }) {
             },
             runFast: async ({ analysisId }) => service.vision.analyzeImage(session.sub, { ...body, analysisId }, {
               budget: fastBudget,
+              deferProvider: true,
               observe: observeVisionStage,
               onAssetReady: async (asset) => {
                 const updated = await service.visionAnalysisFoundation.markAssetReady({ ...asset, analysisId, expectedVersion: hybridVersion });
