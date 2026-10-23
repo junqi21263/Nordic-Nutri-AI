@@ -1257,6 +1257,7 @@ test("accepts authenticated visual analysis without trusting a client user id", 
 
 test("records success metrics for a completed hybrid vision request", async () => {
   const metrics = [];
+  let fastBudgetMs = null;
   const server = createHttpServer({
     service: {
       verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
@@ -1272,7 +1273,10 @@ test("records success metrics for a completed hybrid vision request", async () =
       },
       vision: {
         validateImage: () => {},
-        analyzeImage: async () => ({ mealName: "午餐", items: [{ name: "米饭" }] }),
+        analyzeImage: async (_userId, _body, { budget }) => {
+          fastBudgetMs = budget.deadlineAt - budget.startedAt;
+          return { mealName: "午餐", items: [{ name: "米饭" }] };
+        },
       },
       observability: {
         startTrace: () => ({ traceId: "trace_hybrid_success", stages: [] }),
@@ -1297,7 +1301,41 @@ test("records success metrics for a completed hybrid vision request", async () =
   });
 
   assert.equal(metrics.some((item) => item.metric === "vision_success" && item.value === 1), true);
+  assert.equal(fastBudgetMs, 16_000);
   assert.equal(metrics.some((item) => item.metric === "vision_latency_ms" && Number.isFinite(item.value) && item.value >= 0), true);
+});
+
+test("hands off a slow hybrid scan before the old Mini Program request budget", async () => {
+  let fastBudgetMs = null;
+  let queued = 0;
+  const server = createHttpServer({
+    service: {
+      verifySession: (token) => token === "valid-session" ? { sub: "user-1" } : null,
+      visionAnalysisFoundationEnabled: true,
+      visionAnalysisFoundation: {
+        createVisionAnalysis: async () => ({ analysisId: "11111111-1111-4111-8111-111111111111", status: "created", version: 1 }),
+        queueAsyncAnalysis: async () => { queued += 1; return { accepted: true, version: 2 }; },
+      },
+      vision: {
+        validateImage: () => {},
+        analyzeImage: async (_userId, _body, { budget }) => {
+          fastBudgetMs = budget.deadlineAt - budget.startedAt;
+          throw new PublicVisionDataError("VISION_TIMEOUT", "fast path exceeded budget");
+        },
+      },
+    },
+  });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/get-login-ticket/vision-analysis`, {
+      method: "POST",
+      headers: { authorization: "Bearer valid-session", "content-type": "application/json" },
+      body: JSON.stringify({ clientRequestId: "22222222-2222-4222-8222-222222222222", imageBase64: "AA==", clientCapabilities: { supportsAsyncVision: true } }),
+    });
+    assert.equal(response.status, 202);
+    assert.equal((await response.json()).analysisId, "11111111-1111-4111-8111-111111111111");
+  });
+  assert.equal(fastBudgetMs, 16_000);
+  assert.equal(queued, 1);
 });
 
 test("correlates vision timeout diagnostics across request, image, and provider stages", async () => {

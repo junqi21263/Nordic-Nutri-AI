@@ -4102,6 +4102,7 @@ function createHttpServer({ service }) {
         await service.featureUserQuotaPolicy?.assertAllowed?.({ userId: session.sub, featureKey: "food_recognition" });
         const supportsAsyncVision = body?.clientCapabilities?.supportsAsyncVision === true;
         if (service.visionAnalysisFoundationEnabled && supportsAsyncVision) {
+          const fastBudget = createVisionBudget({ startedAt, totalMs: VISION_BUDGETS.hybridFastPathMs });
           // Keep the synchronous request budget unchanged; the durable async
           // task receives a separately derived lifecycle deadline that covers
           // the dispatcher fallback, worker startup, provider, enrichment,
@@ -4132,7 +4133,7 @@ function createHttpServer({ service }) {
               return created;
             },
             runFast: async ({ analysisId }) => service.vision.analyzeImage(session.sub, { ...body, analysisId }, {
-              budget,
+              budget: fastBudget,
               observe: observeVisionStage,
               onAssetReady: async (asset) => {
                 const updated = await service.visionAnalysisFoundation.markAssetReady({ ...asset, analysisId, expectedVersion: hybridVersion });
@@ -4173,7 +4174,7 @@ function createHttpServer({ service }) {
             model: hybridResult?.model || service.vision?.model || null,
             analysisId: hybridResponse.body.analysisId,
             requestTotalDurationMs: hybridLatencyMs,
-            remainingBudgetMs: budget.remainingMs(),
+            remainingBudgetMs: fastBudget.remainingMs(),
             quotaState: hybridResponse.httpStatus === 202 ? "reserved" : "committed",
             quotaDelta: hybridResponse.httpStatus === 202 ? 0 : 1,
           };
