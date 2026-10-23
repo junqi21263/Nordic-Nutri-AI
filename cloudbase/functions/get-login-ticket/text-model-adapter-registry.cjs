@@ -151,6 +151,7 @@ function createRoutedOpenAiFetch(route = {}, { fetchImpl = globalThis.fetch } = 
     }
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new ModelAdapterError("MODEL_REQUEST_INVALID");
     const { thinking: _legacyThinking, stream_options: _streamOptions, response_format: _responseFormat, ...body } = payload;
+    if (provider === "deepseek" && _legacyThinking) body.thinking = _legacyThinking;
     if (isSenseNovaNativeRoute(route) && body.max_tokens !== undefined) {
       body.max_new_tokens = body.max_tokens;
       delete body.max_tokens;

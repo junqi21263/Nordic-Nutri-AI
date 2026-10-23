@@ -1586,7 +1586,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
         apiKey: route.credential,
         flashModel: route.modelKey,
         plusModel: route.modelKey,
-        provider: "openai-compatible",
+        provider: route.providerKey,
         fetchImpl: createRoutedOpenAiFetch(route),
       }),
       beforeInvoke: ({ route, feature }) => modelQuotaPolicy.assertAllowed({

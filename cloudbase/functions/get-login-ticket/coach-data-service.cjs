@@ -175,6 +175,7 @@ function safetyForPrompt(prompt) {
 }
 
 function isNutritionQuestion(prompt) {
+  if (/睡眠|睡觉|失眠|熬夜|作息|久坐|步行|散步|跑步|力量|健身|拉伸|热身|放松|压力|习惯|習慣|睡覺|作息|壓力|久坐|健身|跑步|拉伸|熱身|恢復|\b(train(?:ing)?|workout|exercise|fitness|strength|cardio|walking|running|sleep|bedtime|recovery|stretch(?:ing)?|stress|sedentary|habits?|lifestyle)\b/i.test(prompt)) return true;
   return nutritionScopePattern.test(prompt) || /營養|飲食|熱量|纖維|體重|訓練|運動|\b(food|meal|eat|eating|diet|nutrition|protein|carbs?|fat|calories|breakfast|lunch|dinner|snack|vegetables?|fruit|weight|fiber|fibre|vitamins?|rice|chicken|eggs?|milk|yogurt|oats?|berries|fish|bread|salad|coffee|water)\b/i.test(prompt);
 }
 
@@ -345,9 +346,9 @@ function createChineseRuleReply(prompt, context, options = {}) {
   if (!inScope) {
     return {
       priority: "regularity",
-      headline: "我更擅长日常饮食建议",
-      actions: [{ label: "可以这样问", detail: "例如：蓝莓营养怎么样？晚餐怎么补蛋白？某样食物适不适合加餐？" }],
-      rationale: "聊聊具体食物、餐次搭配或今日营养进度，我能结合你的记录给出更实用的建议。",
+      headline: "我更擅长日常饮食建议、训练与生活习惯",
+      actions: [{ label: "可以这样问", detail: "例如：晚餐怎么补蛋白？新手怎么开始训练？怎么改善睡眠和久坐？" }],
+      rationale: "可以聊营养、运动、恢复、睡眠和日常习惯，我会结合你的问题与已知信息给出实用建议。",
       safety: "none",
     };
   }
@@ -429,7 +430,7 @@ function addReplyMetadata(reply, source, model) {
 
 function validateStreamedText(value) {
   const content = typeof value === "string" ? value.trim() : "";
-  if (!content || content.length > 500 || unsafeStreamTextPattern.test(content) || streamPresentationPattern.test(content)) {
+  if (!content || content.length > 1500 || unsafeStreamTextPattern.test(content) || streamPresentationPattern.test(content)) {
     throw new PublicCoachDataError("COACH_STREAM_INVALID");
   }
   return content;
