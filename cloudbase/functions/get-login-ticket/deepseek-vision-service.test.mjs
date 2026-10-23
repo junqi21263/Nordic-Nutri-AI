@@ -17,7 +17,7 @@ test("DeepSeek vision uses the OpenAI-compatible endpoint and image content bloc
   assert.equal(request.body.messages[0].role, "system");
   assert.equal(request.body.messages[1].content[0].type, "text");
   assert.equal(request.body.messages[1].content[1].type, "image_url");
-  assert.equal(request.body.messages[1].content[1].image_url.detail, "low");
+  assert.equal(request.body.messages[1].content[1].image_url.detail, "auto");
   assert.equal(result.provider, "deepseek");
   assert.equal(result.items[0].name, "米饭");
 });
@@ -69,7 +69,7 @@ test("DeepSeek vision prefers the inline image when a temporary URL is also avai
     budget: { stageTimeout: () => 5000 },
   });
   assert.equal(body.messages[1].content[1].image_url.url, "data:image/jpeg;base64,inline-image");
-  assert.equal(body.messages[1].content[1].image_url.detail, "low");
+  assert.equal(body.messages[1].content[1].image_url.detail, "auto");
 });
 
 test("DeepSeek adapter honors the model selected by the dynamic vision route", async () => {

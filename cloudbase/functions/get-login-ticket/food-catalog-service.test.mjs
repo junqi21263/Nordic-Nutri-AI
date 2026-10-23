@@ -114,6 +114,20 @@ test("returns fresh cache results without calling USDA or Open Food Facts", asyn
   assert.equal(result.source, "cache");
 });
 
+test("accepts single Chinese food names for search and nutrition backfill", async () => {
+  const queries = [];
+  const service = createFoodCatalogService({
+    cache: { search: async () => [], upsert: async (rows) => rows.map((row) => ({ id: "food-shrimp", ...row })) },
+    translateQuery: async (query) => { queries.push(query); return "shrimp"; },
+    searchUsda: async () => [usdaFood],
+  });
+  for (const name of ["鱼", "虾", "蛋"]) {
+    assert.ok((await service.search("user-1", name, 1)).items.length > 0);
+    assert.ok(await service.lookupNutrition(name));
+  }
+  assert.deepEqual(queries, ["鱼", "鱼", "虾", "虾", "蛋", "蛋"]);
+});
+
 test("fetches USDA and persists a cacheable normalized result on a cache miss", async () => {
   const upserts = [];
   const service = createFoodCatalogService({

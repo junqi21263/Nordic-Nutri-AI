@@ -38,6 +38,35 @@ test("prompt distinguishes multi-food photos without inventing hidden ingredient
   assert.match(source, /不得.*凑数量|不要.*凑数量/);
 });
 
+test("Qwen 3.8 Omni retains bounded thinking instead of its xhigh default", async () => {
+  let sent;
+  const analyze = createQwenVisionService({ apiKey: "test", provider: "qwen", flashModel: "qwen3.8-omni-flash", fetchImpl: async (_url, init) => {
+    sent = JSON.parse(init.body);
+    return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(result()) } }] }) };
+  } });
+  await analyze({ imageUrl: "https://example.test/food.jpg" });
+  assert.equal(sent.reasoning_effort, "low");
+});
+
+test("complex inline meals get at most one stronger review when time is available", async () => {
+  const calls = [];
+  const analyze = createQwenVisionService({ apiKey: "test", provider: "deepseek", requestCompletion: async (input) => {
+    calls.push(input);
+    return calls.length === 1 ? result({ sceneComplexity: "complex", visibleFoodCount: 4, confidence: 0.75, portionConfidence: 0.6 }) : result({ confidence: 0.95 });
+  } });
+  await analyze({ imageUrl: "https://example.test/food.jpg", imageDataUrl: "data:image/jpeg;base64,YQ==", budget: { stageTimeout: () => 22000, remainingAfterReserve: () => 16000 } });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].reasoningEffort, "high");
+  assert.equal(calls[1].imageUrl, "data:image/jpeg;base64,YQ==");
+});
+
+test("a weaker review never overwrites a better first result", async () => {
+  let count = 0;
+  const analyze = createQwenVisionService({ apiKey: "test", requestCompletion: async () => ++count === 1 ? result({ confidence: 0.7, needsEscalation: true }) : result({ confidence: 0.2 }) });
+  const output = await analyze({ imageUrl: "https://example.test/food.jpg" });
+  assert.equal(output.confidence, 0.7);
+});
+
 const result = (overrides = {}) => ({
   mealName: "鸡胸肉沙拉", mealType: "lunch", confidence: 0.9, portionConfidence: 0.9,
   needsEscalation: false, uncertaintyReasons: [], advice: "优先补充蛋白质。",
@@ -82,7 +111,7 @@ test("upgrades uncertain multi-item recognition to plus", async () => {
     apiKey: "qwen-test",
     requestCompletion: async ({ model }) => {
       calls.push(model);
-      return calls.length === 1 ? result({ confidence: 0.45, needsEscalation: true, uncertaintyReasons: ["遮挡"], items: [result().items[0], { ...result().items[0], name: "米饭" }, { ...result().items[0], name: "西兰花" }, { ...result().items[0], name: "鸡蛋" }] }) : result({ confidence: 0.82 });
+      return calls.length === 1 ? result({ confidence: 0.45, needsEscalation: true, uncertaintyReasons: ["遮挡"], items: [result().items[0], { ...result().items[0], name: "米饭" }, { ...result().items[0], name: "西兰花" }, { ...result().items[0], name: "鸡蛋" }] }) : result({ confidence: 0.82, items: [result().items[0], { ...result().items[0], name: "米饭" }, { ...result().items[0], name: "西兰花" }, { ...result().items[0], name: "鸡蛋" }] });
     },
   });
   const output = await service({ imageUrl: "https://example.com/meal.jpg", onTrace: (value) => { trace = value; } });
@@ -178,7 +207,7 @@ test("skips plus escalation for large data-URL payloads", async () => {
       return result({ confidence: 0.4, needsEscalation: true });
     },
   });
-  const output = await service({ imageUrl: "data:image/jpeg;base64,/9j/aaaa" });
+  const output = await service({ imageUrl: "data:image/jpeg;base64," + "a".repeat(1_300_000) });
   assert.deepEqual(calls, ["qwen3-vl-flash"]);
   assert.equal(output.model, "qwen3-vl-flash");
 });
