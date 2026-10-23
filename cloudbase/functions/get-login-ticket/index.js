@@ -4153,8 +4153,15 @@ function createHttpServer({ service }) {
               if (accepted?.version != null) hybridVersion = Number(accepted.version);
               hybridHandoffAccepted = accepted?.accepted === true;
               if (hybridHandoffAccepted && typeof service.kickVisionAnalysis === "function") {
-                try { await service.kickVisionAnalysis(); }
-                catch (error) { console.warn("[vision] immediate dispatch unavailable; timer will recover:", error?.code || "DISPATCH_FAILED"); }
+                const dispatchStartedAt = Date.now();
+                try {
+                  const dispatched = await service.kickVisionAnalysis();
+                  const errorCode = dispatched?.code || dispatched?.result?.errors?.[0]?.code;
+                  observeVisionStage({ stage: "async_dispatch", ms: Date.now() - dispatchStartedAt, status: errorCode ? "failed" : "succeeded", providerErrorCode: errorCode || null });
+                }
+                catch (error) {
+                  observeVisionStage({ stage: "async_dispatch", ms: Date.now() - dispatchStartedAt, status: "failed", providerErrorCode: error?.code || "DISPATCH_FAILED" });
+                }
               }
               return accepted;
             },
