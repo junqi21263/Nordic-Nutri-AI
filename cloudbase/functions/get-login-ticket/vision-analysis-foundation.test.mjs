@@ -76,6 +76,19 @@ test("owned status lookup is read-only and maps terminal response", async () => 
   assert.equal(result.analysisId, analysisId);
 });
 
+test("looks up an ambiguous upload by request ID and owner without changing its state", async () => {
+  const filters = [];
+  const query = {
+    select() { return this; },
+    eq(key, value) { filters.push([key, value]); return this; },
+    async maybeSingle() { return { data: { id: analysisId, status: "completed", raw_recognition: { mealName: "早餐" } }, error: null }; },
+  };
+  const service = createVisionAnalysisService({ db: { from: () => query }, featureEnabled: true });
+  const result = await service.getOwnedAnalysisByRequestId("user-1", clientRequestId);
+  assert.equal(result.result.mealName, "早餐");
+  assert.deepEqual(filters, [["client_request_id", clientRequestId], ["user_id", "user-1"]]);
+});
+
 test("owned completed status exposes the persisted result shape", async () => {
   const service = createVisionAnalysisService({
     db: {

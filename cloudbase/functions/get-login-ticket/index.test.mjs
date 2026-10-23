@@ -258,6 +258,32 @@ test("vision analysis status is read-only and enforces owner isolation", async (
   assert.equal(mutations, 0);
 });
 
+test("vision upload can be recovered by its request ID only by the owner", async () => {
+  let reads = 0;
+  const requestId = "22222222-2222-4222-8222-222222222222";
+  const service = {
+    visionAnalysisFoundationEnabled: true,
+    verifySession: (token) => ({ sub: token === "a" ? "user-a" : "user-b" }),
+    visionAnalysisFoundation: {
+      getOwnedAnalysisByRequestId: async (userId, id) => {
+        reads += 1;
+        assert.equal(id, requestId);
+        return userId === "user-a" ? { analysisId: "11111111-1111-4111-8111-111111111111", status: "completed", result: { mealName: "早餐" } } : null;
+      },
+    },
+  };
+  const server = createHttpServer({ service });
+  await withServer(server, async (baseUrl) => {
+    const url = `${baseUrl}/vision-analysis/request/${requestId}`;
+    const owned = await fetch(url, { headers: { authorization: "Bearer a" } });
+    assert.equal(owned.status, 200);
+    assert.equal((await owned.json()).result.mealName, "早餐");
+    const other = await fetch(url, { headers: { authorization: "Bearer b" } });
+    assert.equal(other.status, 404);
+  });
+  assert.equal(reads, 2);
+});
+
 test("routes food insight through the configured provider and model", async () => {
   const routeFeatures = [];
   const db = createRuntimeDb();
