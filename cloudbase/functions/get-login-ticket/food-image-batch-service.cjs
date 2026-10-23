@@ -1,3 +1,4 @@
+const { withDbReadRetry } = require("./db-read-retry.cjs");
 // Server-side orchestration for reviewable food-image batches. The worker is
 // intentionally pulled from the admin dashboard or a scheduler: no image task
 // is created from client-side state and only an administrator can advance it.
@@ -24,8 +25,8 @@ const FIRST_SAMPLE_FOODS = [
 ].map(([id, nameZh]) => ({ id, nameZh }));
 
 class FoodImageBatchError extends Error {
-  constructor(code, message) {
-    super(message || code);
+  constructor(code, message, options) {
+    super(message || code, options);
     this.code = code;
   }
 }
@@ -240,8 +241,8 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
   }
 
   async function countItems(batchId) {
-    const result = await db.from("food_image_batch_items").select("status").eq("batch_id", batchId);
-    if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_ITEM_LIST_FAILED");
+    const result = await withDbReadRetry(() => db.from("food_image_batch_items").select("status").eq("batch_id", batchId));
+    if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_ITEM_LIST_FAILED", undefined, { cause: { code: result.error.code } });
     return (result.data || []).reduce((counts, row) => {
       counts[row.status] = (counts[row.status] || 0) + 1;
       return counts;
@@ -360,7 +361,7 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
     const current = clampInt(page, 1, 1, 9999);
     const result = await db.from("food_image_batches").select("*").order("created_at", { ascending: false })
       .range((current - 1) * size, current * size - 1);
-    if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_LIST_FAILED");
+    if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_LIST_FAILED", undefined, { cause: { code: result.error.code } });
     const items = [];
     for (const row of result.data || []) items.push(await refreshSummary(row.id));
     return { items, page: current, pageSize: size };
@@ -373,7 +374,7 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
     const current = clampInt(page, 1, 1, 9999);
     const result = await db.from("food_image_batch_items").select("*").eq("batch_id", batchId)
       .order("created_at", { ascending: true }).range((current - 1) * size, current * size - 1);
-    if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_ITEM_LIST_FAILED");
+    if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_ITEM_LIST_FAILED", undefined, { cause: { code: result.error.code } });
     const items = [];
     for (const row of result.data || []) items.push(mapBatchItemRow(row, await repository.getFoodById(row.food_id)));
     return { batch: summary, items, page: current, pageSize: size };
@@ -408,7 +409,7 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
       .or(`next_retry_at.is.null,next_retry_at.lte.${new Date().toISOString()}`);
     if (itemId) candidateQuery.eq("id", itemId);
     const candidate = await candidateQuery.order("created_at", { ascending: true }).limit(1).maybeSingle();
-    if (candidate.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_ITEM_LIST_FAILED");
+    if (candidate.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_ITEM_LIST_FAILED", undefined, { cause: { code: candidate.error.code } });
     if (!candidate.data) return { processed: 0, batch: await refreshSummary(batchId) };
     if (Number(candidate.data.attempt_count || 0) >= Number(batch.max_attempts || 3)) {
       await db.from("food_image_batch_items").update({
@@ -509,9 +510,9 @@ function createFoodImageBatchService({ db, repository, jobs, resolveAdminExecuto
 
   async function dispatchTrusted({ maxItems = 5 } = {}) {
     const limit = clampInt(maxItems, 5, 1, 5);
-    const result = await db.from("food_image_batches").select("*").eq("status", "running")
-      .order("started_at", { ascending: true }).order("created_at", { ascending: true }).limit(20);
-    if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_DISPATCH_LIST_FAILED");
+    const result = await withDbReadRetry(() => db.from("food_image_batches").select("*").eq("status", "running")
+      .order("started_at", { ascending: true }).order("created_at", { ascending: true }).limit(20));
+    if (result.error) throw new FoodImageBatchError("FOOD_IMAGE_BATCH_DISPATCH_LIST_FAILED", undefined, { cause: { code: result.error.code } });
     const attempted = [];
     const outcomes = [];
     for (const batch of result.data || []) {

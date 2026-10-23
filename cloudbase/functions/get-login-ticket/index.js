@@ -2324,7 +2324,8 @@ function captureTraceError(res, error) {
   res.__traceContext.internalError = sanitizeTracePayload({
     name: error?.name,
     code: error?.code,
-    message: error?.message,
+    message: /^[0-9A-Z]{5}$/.test(String(error?.code || "")) ? "Database operation failed" : error?.message,
+    ...(/^[A-Z0-9_:-]{1,80}$/.test(String(error?.cause?.code || "")) ? { causeCode: error.cause.code } : {}),
     authReason: error?.authReason,
     verificationAttempts: error?.verificationAttempts,
   });
@@ -4392,6 +4393,11 @@ function createHttpServer({ service }) {
             quotaDelta: 0,
             sanitizationVersion: "1",
             businessCode: error?.code || "VISION_SERVICE_UNAVAILABLE",
+            internalError: {
+              code: error?.code || null,
+              causeCode: /^[A-Z0-9_:-]{1,80}$/.test(String(error?.cause?.code || "")) ? error.cause.code : null,
+              name: error?.name || null,
+            },
           },
         }).catch(() => {});
         if (error instanceof PublicOperationError && error.code === "RATE_LIMITED") {
@@ -4612,6 +4618,11 @@ function createHttpServer({ service }) {
       const result = await service.issue(body);
       sendJson(res, 200, result);
     } catch (error) {
+      captureTraceError(res, error);
+      if (error?.code === "PRODUCT_DATA_INVALID") {
+        sendJson(res, 400, { code: error.code });
+        return;
+      }
       if (error instanceof PublicLoginError) {
         const statusCode = error.code === "WECHAT_CODE_INVALID" || error.code === "REQUEST_INVALID" || error.code === "REQUEST_TOO_LARGE" ? 400 : 503;
         sendJson(res, statusCode, {

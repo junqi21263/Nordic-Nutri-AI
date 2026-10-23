@@ -1,3 +1,4 @@
+const { withDbReadRetry } = require("./db-read-retry.cjs");
 const MEAL_TYPES = ["breakfast", "lunch", "dinner"];
 const MEAL_LABELS = { breakfast: "早餐", lunch: "午餐", dinner: "晚餐" };
 const PUSH_COPY = {
@@ -112,8 +113,8 @@ function createScheduledReminderService({ db, push, now = () => new Date() }) {
 
   async function dispatch({ limit = 100 } = {}) {
     const instant = now();
-    const due = await db.from("meal_reminder_schedules").select("id,user_id,meal_type,reminder_time,time_zone,locale,next_run_at,last_dispatched_at").eq("enabled", true).lte("next_run_at", instant.toISOString()).order("next_run_at", { ascending: true }).limit(Math.min(Math.max(Number(limit) || 100, 1), 500));
-    if (due?.error) throw Object.assign(new Error("提醒排程读取失败"), { code: "REMINDER_DISPATCH_FAILED" });
+    const due = await withDbReadRetry(() => db.from("meal_reminder_schedules").select("id,user_id,meal_type,reminder_time,time_zone,locale,next_run_at,last_dispatched_at").eq("enabled", true).lte("next_run_at", instant.toISOString()).order("next_run_at", { ascending: true }).limit(Math.min(Math.max(Number(limit) || 100, 1), 500)));
+    if (due?.error) throw Object.assign(new Error("提醒排程读取失败", { cause: { code: due.error.code } }), { code: "REMINDER_DISPATCH_FAILED" });
     let sent = 0; let skipped = 0; let failed = 0;
     for (const schedule of due.data || []) {
       const tomorrow = nextRunAt(String(schedule.reminder_time).slice(0, 5), schedule.time_zone, instant);

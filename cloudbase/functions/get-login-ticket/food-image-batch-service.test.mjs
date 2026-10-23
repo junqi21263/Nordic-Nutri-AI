@@ -635,3 +635,11 @@ test("retryFailedItem reopens needs_review items for regeneration", async () => 
   assert.equal(item.status, "needs_review");
   assert.equal(cancelledFoodId, "food-1");
 });
+
+test("scheduler read retries are bounded and retain the database failure code", async()=>{
+  let reads=0;
+  const db={from(){const query={select(){return query;},eq(){return query;},order(){return query;},limit:async()=>{reads++;return{error:{code:'08006',message:'private SQL'}};}};return query;}};
+  const service=createFoodImageBatchService({db,repository:{},jobs:{}});
+  await assert.rejects(()=>service.dispatchTrusted(),error=>error.code==='FOOD_IMAGE_BATCH_DISPATCH_LIST_FAILED'&&error.cause.code==='08006'&&!error.message.includes('private'));
+  assert.equal(reads,2);
+});

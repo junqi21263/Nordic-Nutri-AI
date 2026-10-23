@@ -63,3 +63,13 @@ test("returns a failed reminder to the due queue when push delivery throws", asy
   assert.equal(result.failed, 1);
   assert.equal(updates.at(-1).next_run_at, schedule.next_run_at);
 });
+
+test("retries only reminder discovery and preserves its final database code", async () => {
+  for (const code of ['08006','42501']) {
+    let reads=0;
+    const db={from(){const query={select(){return query;},eq(){return query;},lte(){return query;},order(){return query;},limit:async()=>{reads++;return{error:{code,message:'private SQL details'}};}};return query;}};
+    const service=createScheduledReminderService({db,push:{sendReminder:()=>assert.fail('must not send')}});
+    await assert.rejects(()=>service.dispatch(),error=>error.code==='REMINDER_DISPATCH_FAILED'&&error.cause.code===code&&!error.message.includes('private'));
+    assert.equal(reads,code==='08006'?2:1);
+  }
+});
