@@ -1,5 +1,8 @@
 const VISION_BUDGETS = Object.freeze({
   serverTotalMs: 30_000,
+  // Return 202 before the existing Mini Program's 35s budget is exhausted;
+  // the async worker retains its separate, longer lifecycle deadline.
+  hybridFastPathMs: 16_000,
   securityMaxMs: 2_000,
   uploadAttemptMaxMs: 2_500,
   flashMaxMs: 22_000,
