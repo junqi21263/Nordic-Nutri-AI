@@ -134,7 +134,7 @@ function createTextModelAdapter(route = {}, { fetchImpl = globalThis.fetch } = {
   return { provider, model, complete };
 }
 
-function createRoutedOpenAiFetch(route = {}, { fetchImpl = globalThis.fetch } = {}) {
+function createRoutedOpenAiFetch(route = {}, { fetchImpl = globalThis.fetch, preserveVisionParameters = false } = {}) {
   const provider = String(route.providerKey || "").trim();
   const model = String(route.modelKey || "").trim();
   const credential = String(route.credential || "").trim();
@@ -151,7 +151,8 @@ function createRoutedOpenAiFetch(route = {}, { fetchImpl = globalThis.fetch } = 
     }
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new ModelAdapterError("MODEL_REQUEST_INVALID");
     const { thinking: _legacyThinking, stream_options: _streamOptions, response_format: _responseFormat, ...body } = payload;
-    if (provider === "deepseek" && _legacyThinking) body.thinking = _legacyThinking;
+    if ((preserveVisionParameters || provider === "deepseek") && _legacyThinking) body.thinking = _legacyThinking;
+    if (preserveVisionParameters && _responseFormat) body.response_format = _responseFormat;
     if (isSenseNovaNativeRoute(route) && body.max_tokens !== undefined) {
       body.max_new_tokens = body.max_tokens;
       delete body.max_tokens;

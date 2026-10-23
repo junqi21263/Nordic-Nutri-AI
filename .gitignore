@@ -32,3 +32,6 @@ __pycache__/
 .superpowers/
 .agents/
 .worktrees/
+
+# Private recognition acceptance photos (not published with source).
+/.local/vision-benchmark/

@@ -1,3 +1,4 @@
+const { resolveVisionProfile } = require("./vision-model-profile.cjs");
 class AiModelConfigError extends Error {
   constructor(code, message = code) {
     super(message);
@@ -64,6 +65,10 @@ function normalizeAiModelConfig(input = {}, { env = process.env, id } = {}) {
     ? { ...input.metadata }
     : {};
   const featureCapabilities = applications.map(featureCapability).filter(Boolean);
+  if (featureCapabilities.includes("vision")) {
+    try { resolveVisionProfile({ providerKey, modelKey, protocol: input.protocol, metadata }); }
+    catch (error) { throw new AiModelConfigError(error.code); }
+  }
   metadata.capabilities = modelCapabilities({
     modelKey,
     capabilities: [...normalizeCapabilities(metadata.capabilities), ...featureCapabilities],

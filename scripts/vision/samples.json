@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "nutritionGroundTruth": null,
+  "samples": [
+    {
+      "id": "simple",
+      "category": "ordinary",
+      "file": "simple.jpg",
+      "source": "https://commons.wikimedia.org/wiki/File:Cooked_Rice.jpg",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Cooked_Rice.jpg",
+      "author": "Ananth Pattabiraman",
+      "license": "CC-BY-SA-4.0",
+      "expected": [
+        [
+          "米饭",
+          "白饭",
+          "rice"
+        ]
+      ],
+      "forbidden": [
+        "龙虾",
+        "牛排"
+      ],
+      "notes": "只评估清晰可见的主体米饭，不推断左侧遮挡配菜。",
+      "sha256": "c4c4952368dbe3cbbfb1b765409cddad46af516dc102cc447fe3e153c7f6b0b5",
+      "requiresHumanReview": true
+    },
+    {
+      "id": "bento",
+      "category": "bento",
+      "file": "bento.jpg",
+      "source": "https://commons.wikimedia.org/wiki/File:Bento_001.jpg",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/Bento_001.jpg/1280px-Bento_001.jpg",
+      "author": "Ocdp",
+      "license": "CC0-1.0",
+      "expected": [
+        [
+          "米饭",
+          "白饭",
+          "rice"
+        ],
+        [
+          "鸡蛋",
+          "玉子",
+          "蛋卷",
+          "厚蛋"
+        ],
+        [
+          "烧卖",
+          "烧麦",
+          "shumai"
+        ],
+        [
+          "胡萝卜",
+          "红萝卜"
+        ],
+        [
+          "炸",
+          "天妇罗",
+          "裹粉"
+        ]
+      ],
+      "forbidden": [
+        "龙虾",
+        "三文鱼刺身"
+      ],
+      "notes": "细分炸物肉种和隐藏馅料须人工复核。下载的是 1280px 缩略图。",
+      "sha256": "6feef47cfcab82c404e087cb3f0851f3d48120713374d5618eb49a68c1b2ef53",
+      "requiresHumanReview": true
+    },
+    {
+      "id": "hotpot",
+      "category": "hotpot",
+      "file": "hotpot.jpg",
+      "source": "https://commons.wikimedia.org/wiki/File:Shabushabu001.jpg",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2a/Shabushabu001.jpg",
+      "author": "Leonardo Sakaki",
+      "license": "CC-BY-SA-3.0",
+      "expected": [
+        [
+          "虾",
+          "shrimp"
+        ],
+        [
+          "豆腐",
+          "豆皮",
+          "油豆腐"
+        ],
+        [
+          "青菜",
+          "白菜",
+          "蔬菜",
+          "叶菜"
+        ],
+        [
+          "香菇",
+          "蘑菇",
+          "菌菇"
+        ]
+      ],
+      "forbidden": [
+        "寿司",
+        "汉堡"
+      ],
+      "notes": "遮挡的粉条、肉片和背景食材另作人工复核，不要求猜隐藏内容。",
+      "sha256": "2779c59a975a1c02e05816f53f7271542439413a23430679fd1ecad089dcc379",
+      "requiresHumanReview": true
+    },
+    {
+      "id": "seafood",
+      "category": "seafood",
+      "file": "seafood.jpg",
+      "source": "user-provided-private",
+      "license": "private-test-only",
+      "expected": [
+        [
+          "米饭",
+          "寿司饭"
+        ],
+        [
+          "三文鱼",
+          "鲑鱼"
+        ],
+        [
+          "鱼籽",
+          "鱼子"
+        ],
+        [
+          "蛋黄"
+        ]
+      ],
+      "forbidden": [
+        "牛排",
+        "汉堡"
+      ],
+      "notes": "黄色区域海胆/蛋类尚无用户确认真值，强制人工核对，不自动判定谁对。",
+      "sha256": "036936e68bc62fe63e32838ff8cfda52f901d45f283f53d134aa22a7d3086d36",
+      "requiresHumanReview": true
+    },
+    {
+      "id": "multi-plate",
+      "category": "multiple-plates",
+      "file": "multi-plate.jpg",
+      "source": "user-provided-private",
+      "license": "private-test-only",
+      "expected": [
+        [
+          "金枪鱼",
+          "吞拿",
+          "鲔鱼"
+        ],
+        [
+          "鱼籽",
+          "鱼子"
+        ],
+        [
+          "三文鱼",
+          "鲑鱼"
+        ]
+      ],
+      "forbidden": [
+        "牛排",
+        "汉堡"
+      ],
+      "notes": "两只手卷、两贯三文鱼握寿司；合并同种食材允许，数量/份量人工核对。",
+      "sha256": "9586ef2adb5f295a1ebf826e73e1df75aeec963f9fc9624db9e6dabf60e015ba",
+      "requiresHumanReview": true
+    }
+  ]
+}

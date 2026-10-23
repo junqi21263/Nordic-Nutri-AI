@@ -370,6 +370,8 @@ test("worker diagnostics records the five pre-provider stages without sensitive 
     "worker.deadline_check:succeeded",
     "worker.provider_start:started",
     "worker.provider_start:succeeded",
+    "worker.complete:started",
+    "worker.complete:succeeded",
   ]);
   for (const event of events.filter((event) => event.stage !== "worker.claim")) {
     assert.equal(event.analysisId, "analysis-diagnostic-1");
@@ -409,7 +411,7 @@ test("worker diagnostics records a safe temp URL failure and stops before provid
 
   await assert.rejects(() => worker.processOnce(), /missing/);
   const failure = events.find((event) => event.stage === "worker.temp_url" && event.status === "failed");
-  assert.equal(failure.safeErrorCode, "VISION_ASSET_NOT_FOUND");
+  assert.equal(failure.errorCode, "VISION_ASSET_NOT_FOUND");
   assert.equal(events.some((event) => event.stage === "worker.provider_start"), false);
 });
 
@@ -441,4 +443,27 @@ test("worker diagnostics records an expired deadline decision and prevents provi
   assert.equal(deadline.decision, "stop");
   assert.equal(providerCalled, false);
   assert.equal(events.some((event) => event.stage === "worker.provider_start"), false);
+});
+
+test('worker forwards bounded downstream stage timings without raw model payloads', async () => {
+  const events=[];
+  const worker=createWiredVisionWorker({
+    claimJob:async()=>[{id:'stage-test',user_id:'u',status:'analyzing',execution_owner:'async',image_path:'cloud://x/y'}],
+    resolveImageUrl:async()=> 'https://x.test/y', diagnostics:{onStage:event=>events.push(event)},
+    vision:{analyzeImage:async(_user,input,{observe})=>{
+      observe({stage:'nutrition',ms:125,nutritionFallbackUsed:false,imageBase64:'private'});
+      return {items:[{name:'rice'}]};
+    }}, completeJob:async()=>({accepted:true}),
+  });
+  await worker.processOnce();
+  const stage=events.find(x=>x.stage==='worker.nutrition');
+  assert.equal(stage.durationMs,125);
+  assert.equal(stage.analysisId,'stage-test');
+  assert.equal(stage.imageBase64,undefined);
+});
+
+test('worker entrypoint drains pending diagnostics before returning',async()=>{
+ let flushed=false;
+ const r=await main({enabled:true,diagnostics:{onStage(){},flush:async()=>{flushed=true;}},recordDiagnostic:async()=>{},runtimeFactory:()=>({visionAnalysisFoundation:{claimQueuedJob:async()=>[]},vision:{analyzeImage:async()=>({})},resolveVisionImageUrl:async()=>''})});
+ assert.equal(r.claimed,0);assert.equal(flushed,true);
 });
