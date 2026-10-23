@@ -89,6 +89,23 @@ test("looks up an ambiguous upload by request ID and owner without changing its 
   assert.deepEqual(filters, [["client_request_id", clientRequestId], ["user_id", "user-1"]]);
 });
 
+test("status lookup retries one transient database read with owner filtering intact", async () => {
+  for (const method of ["getOwnedAnalysis", "getOwnedAnalysisByRequestId"]) {
+    let reads = 0;
+    const filters = [];
+    const service = createVisionAnalysisService({ db: { from: () => ({
+      select() { return this; },
+      eq(key, value) { filters.push([key, value]); return this; },
+      async maybeSingle() { return ++reads === 1
+        ? { error: { code: "08006", message: "connection reset" } }
+        : { data: { id: analysisId, status: "completed" } }; },
+    }) }, featureEnabled: true });
+    assert.equal((await service[method]("user-1", analysisId)).status, "completed");
+    assert.equal(reads, 2);
+    assert.equal(filters.filter(([key, value]) => key === "user_id" && value === "user-1").length, 2);
+  }
+});
+
 test("owned completed status exposes the persisted result shape", async () => {
   const service = createVisionAnalysisService({
     db: {

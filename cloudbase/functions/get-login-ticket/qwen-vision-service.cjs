@@ -281,7 +281,10 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
     const flashTrace = { valid: true, ...summarizeResult(first) };
     const uncertain = shouldEscalate(first);
     const largeInlineImage = /^data:image\//i.test(providerImageUrl) && providerImageUrl.length > 1_200_000;
-    let canEscalate = !largeInlineImage && uncertain;
+    const primaryModel = routeModel || flashModel;
+    const reviewModel = routeModel || plusModel;
+    const sameReviewModel = primaryModel === reviewModel;
+    let canEscalate = !sameReviewModel && !largeInlineImage && uncertain;
     let plusTimeoutMs = PLUS_MAX_TIMEOUT_MS;
     let plusSkipReason = null;
     const plusTrace = {
@@ -300,7 +303,7 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       }
     }
     if (!canEscalate) {
-      plusTrace.skipReason = plusSkipReason || (largeInlineImage ? "data_url" : "not_needed");
+      plusTrace.skipReason = plusSkipReason || (sameReviewModel ? "same_model" : largeInlineImage ? "data_url" : "not_needed");
       observe({ stage: "plus", plusAttempted: false, plusSkipReason: plusTrace.skipReason });
     }
     let selected = first;
@@ -336,7 +339,7 @@ function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-f
       plus: plusTrace,
       selected: summarizeResult(selected),
     });
-    return { ...selected, provider, model: selected === first ? (routeModel || flashModel) : (routeModel || plusModel), usage, modelHops: selected === first ? 1 : 2 };
+    return { ...selected, provider, model: selected === first ? primaryModel : reviewModel, usage, modelHops: plusTrace.attempted ? 2 : 1, review: { attempted: plusTrace.attempted, succeeded: plusTrace.success, skipReason: plusTrace.skipReason, fallbackReason: plusTrace.fallbackReason } };
   };
 }
 

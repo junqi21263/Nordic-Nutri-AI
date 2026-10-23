@@ -1,3 +1,5 @@
+const { withDbReadRetry } = require("./db-read-retry.cjs");
+
 const ANALYSIS_STATUSES = Object.freeze([
   "created",
   "uploaded",
@@ -121,25 +123,30 @@ function createVisionAnalysisService({ db, featureEnabled = false } = {}) {
 
     async getOwnedAnalysis(userId, analysisId) {
       if (!userId || !analysisId) return null;
-      let query = db.from("ai_analysis")
-        .select("id,status,current_stage,error_code,deadline_at,expires_at,execution_owner,dispatch_state,job_id,provider_attempt,resume_stage,raw_recognition,normalized_items,provider_checkpoint,advice,image_path,version")
-        .eq("id", analysisId)
-        .eq("user_id", userId);
-      const result = await (typeof query?.maybeSingle === "function" ? query.maybeSingle() : query);
+      const result = await withDbReadRetry(async () => {
+        const query = db.from("ai_analysis")
+          .select("id,status,current_stage,error_code,deadline_at,expires_at,execution_owner,dispatch_state,job_id,provider_attempt,resume_stage,raw_recognition,normalized_items,provider_checkpoint,advice,image_path,version")
+          .eq("id", analysisId)
+          .eq("user_id", userId);
+        return typeof query?.maybeSingle === "function" ? query.maybeSingle() : query;
+      });
       if (result?.error) throw result.error;
       return mapAnalysisRow(Array.isArray(result?.data) ? result.data[0] : result?.data);
     },
 
     async getOwnedAnalysisByRequestId(userId, clientRequestId) {
       if (!userId || !clientRequestId) return null;
-      const query = db.from("ai_analysis")
-        .select("id,status,current_stage,error_code,deadline_at,expires_at,execution_owner,dispatch_state,job_id,provider_attempt,resume_stage,raw_recognition,normalized_items,provider_checkpoint,advice,image_path,version")
-        .eq("client_request_id", clientRequestId)
-        .eq("user_id", userId);
-      const result = await (typeof query?.maybeSingle === "function" ? query.maybeSingle() : query);
+      const result = await withDbReadRetry(async () => {
+        const query = db.from("ai_analysis")
+          .select("id,status,current_stage,error_code,deadline_at,expires_at,execution_owner,dispatch_state,job_id,provider_attempt,resume_stage,raw_recognition,normalized_items,provider_checkpoint,advice,image_path,version")
+          .eq("client_request_id", clientRequestId)
+          .eq("user_id", userId);
+        return typeof query?.maybeSingle === "function" ? query.maybeSingle() : query;
+      });
       if (result?.error) throw result.error;
       return mapAnalysisRow(Array.isArray(result?.data) ? result.data[0] : result?.data);
     },
+
 
     async markAssetReady(input = {}) {
       if (!input.analysisId || typeof db.from !== "function") throw new Error("VISION_ANALYSIS_ASSET_CONTEXT_MISSING");

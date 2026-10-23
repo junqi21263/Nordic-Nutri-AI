@@ -2537,7 +2537,7 @@ function createHttpServer({ service }) {
       } catch (error) {
         captureTraceError(res, error);
         console.error("[vision-analysis-status] failed:", error?.message || error);
-        return sendJson(res, 503, { code: "VISION_ANALYSIS_STATUS_UNAVAILABLE" });
+        return sendJson(res, 503, { code: "VISION_STATUS_FAILED" });
       }
     }
     if (internalFoodImageRoute) {

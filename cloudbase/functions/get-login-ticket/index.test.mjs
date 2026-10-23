@@ -258,6 +258,19 @@ test("vision analysis status is read-only and enforces owner isolation", async (
   assert.equal(mutations, 0);
 });
 
+test("temporary vision status failures use the existing client's retryable error code", async () => {
+  const server = createHttpServer({ service: {
+    visionAnalysisFoundationEnabled: true,
+    verifySession: () => ({ sub: "user-a" }),
+    visionAnalysisFoundation: { getOwnedAnalysis: async () => { throw new Error("connection reset"); } },
+  } });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/vision-analysis/11111111-1111-4111-8111-111111111111`, { headers: { authorization: "Bearer a" } });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { code: "VISION_STATUS_FAILED" });
+  });
+});
+
 test("vision upload can be recovered by its request ID only by the owner", async () => {
   let reads = 0;
   const requestId = "22222222-2222-4222-8222-222222222222";
