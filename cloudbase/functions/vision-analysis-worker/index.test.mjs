@@ -175,7 +175,7 @@ test("wired worker resumes stored enriching jobs without calling provider again"
   assert.equal(diagnostics.some((event) => event.stage === "worker.checkpoint_resume" && event.status === "succeeded"), true);
 });
 
-test("worker runtime wires foundation claim, quota, and CAS terminal transitions", async () => {
+test("worker runtime relies on atomic result and quota completion without a second write", async () => {
   const calls = [];
   const runtime = createVisionWorkerRuntime({
     foundation: {
@@ -190,7 +190,7 @@ test("worker runtime wires foundation claim, quota, and CAS terminal transitions
   });
   const result = await runtime.processOnce();
   assert.equal(result.results[0].status, "completed");
-  assert.deepEqual(calls, [["complete", "analysis-6", 4], ["commit", "analysis-6"]]);
+  assert.deepEqual(calls, [["complete", "analysis-6", 4]]);
 });
 
 test("missing image path fails the async job and releases its quota reservation", async () => {
@@ -274,7 +274,12 @@ test("delayed dispatcher claim still reaches provider while async deadline remai
       releaseQuota: async () => { throw new Error("must not release"); },
     },
     resolveImageUrl: async () => "https://storage.example/image.jpg",
-    vision: { analyzeImage: async (_userId, input) => { providerCalls += 1; return { analysisId: input.analysisId, items: [] }; } },
+    vision: { analyzeImage: async (_userId, input, { budget }) => {
+      providerCalls += 1;
+      assert.ok(budget.remainingMs() <= 50_000);
+      assert.ok(budget.providerTimeoutMs <= 22_000);
+      return { analysisId: input.analysisId, items: [] };
+    } },
   });
 
   const result = await runtime.processOnce();

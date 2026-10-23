@@ -194,7 +194,8 @@ function createWiredVisionWorker({ claimJob, vision, resolveImageUrl, commitQuot
       }
       const workerRemainingMs = () => {
         const elapsedMs = Date.now() - deadlineStartedMs;
-        return Number.isFinite(remainingMs) ? Math.max(0, remainingMs - elapsedMs) : ASYNC_PROVIDER_MAX_TIMEOUT_MS;
+        // Stay inside the existing 60s lease even when primary and fallback run.
+        return Math.max(0, Math.min(Number.isFinite(remainingMs) ? remainingMs : 50_000, 50_000) - elapsedMs);
       };
       const asyncBudget = {
         providerTimeoutMs: Math.min(ASYNC_PROVIDER_MAX_TIMEOUT_MS, workerRemainingMs()),
@@ -290,7 +291,7 @@ function createVisionWorkerRuntime({ foundation, vision, resolveImageUrl, diagno
     claimJob: foundation.claimQueuedJob,
     vision,
     resolveImageUrl,
-    commitQuota: foundation.commitQuota,
+    // complete_vision_analysis commits the result and quota in one transaction.
     releaseQuota: foundation.releaseQuota,
     diagnostics,
     completeJob: (job, response) => foundation.completeAsyncAnalysis({

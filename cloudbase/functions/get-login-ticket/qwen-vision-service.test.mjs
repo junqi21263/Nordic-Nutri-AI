@@ -74,6 +74,23 @@ const result = (overrides = {}) => ({
   ...overrides,
 });
 
+test("configured primary returns complex food without repeating the same model", async () => {
+  for (const model of ["deepseek-v4-flash-vision-exp", "qwen3.8-omni-flash"]) {
+    const calls = [];
+    const analyze = createQwenVisionService({ apiKey: "test", flashModel: model, plusModel: model,
+      requestCompletion: async (input) => { calls.push(input); return result({ confidence: 0.6, sceneComplexity: "complex", visibleFoodCount: 5, needsEscalation: true }); },
+    });
+    const output = await analyze({ imageUrl: "https://example.test/meal.jpg" });
+    assert.equal(calls.length, 1);
+    assert.notEqual(calls[0].reasoningEffort, "high");
+    assert.equal(output.model, model);
+    assert.equal(output.modelHops, 1);
+    assert.equal(output.review.skipReason, "same_model");
+    assert.equal(output.needsEscalation, true);
+    assert.match(output.advice, /请核对/);
+  }
+});
+
 test("uses flash for a clear simple meal", async () => {
   const calls = [];
   const service = createQwenVisionService({
@@ -140,6 +157,7 @@ test("keeps a valid flash result when plus times out", async () => {
   assert.deepEqual(calls, ["qwen3-vl-flash", "qwen3-vl-plus"]);
   assert.equal(output.model, "qwen3-vl-flash");
   assert.equal(observations.some((event) => event.fallbackReason === "plus_abort"), true);
+  assert.equal(output.modelHops, 2);
   assert.equal(trace.selectedSource, "flash");
   assert.equal(trace.plus.attempted, true);
   assert.equal(trace.plus.valid, false);
