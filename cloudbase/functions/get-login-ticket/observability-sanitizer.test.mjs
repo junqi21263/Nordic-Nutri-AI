@@ -80,3 +80,9 @@ test("redacts OTP and captcha values from traces", () => {
   assert.deepEqual(result.request.body, { code: "[REDACTED]", otp: "[REDACTED]", captchaAnswer: "[REDACTED]" });
   assert.deepEqual(result.response, { debugCode: "[REDACTED]" });
 });
+
+test("async execution diagnostics retain stage timestamps and durations without secrets", () => {
+  assert.deepEqual(sanitizeTraceMeta({ stage: "worker.provider_start", status: "succeeded", startedAt: "2026-10-23T07:20:00Z", durationMs: 13326, token: "secret", imageBase64: "private" }), {
+    stage: "worker.provider_start", status: "succeeded", startedAt: "2026-10-23T07:20:00Z", durationMs: 13326,
+  });
+});

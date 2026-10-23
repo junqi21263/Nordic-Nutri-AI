@@ -46,6 +46,8 @@ const TRACE_META_KEYS = new Set([
   "imageSha256",
   "stage",
   "stageDurationMs",
+  "startedAt",
+  "durationMs",
   "lastSuccessfulStage",
   "providerHttpStatus",
   "sqlstate",

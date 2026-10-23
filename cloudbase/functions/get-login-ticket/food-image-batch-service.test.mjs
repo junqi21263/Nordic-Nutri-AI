@@ -643,3 +643,26 @@ test("scheduler read retries are bounded and retain the database failure code", 
   await assert.rejects(()=>service.dispatchTrusted(),error=>error.code==='FOOD_IMAGE_BATCH_DISPATCH_LIST_FAILED'&&error.cause.code==='08006'&&!error.message.includes('private'));
   assert.equal(reads,2);
 });
+
+test("candidate reads retry transient failures without retrying generation or permission errors", async () => {
+  for (const [code, recovers, expectedReads] of [["08006", true, 2], ["08006", false, 2], ["42501", false, 1]]) {
+    let reads = 0;
+    const batch = { id: "batch-read", created_by: "admin", status: "running" };
+    const db = { from(table) {
+      if (table === "food_image_batches") return {
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: batch }) }) }),
+        update: () => ({ eq: async () => ({ data: batch }) }),
+      };
+      const query = { eq() { return this; }, in() { return this; }, or() { return this; }, order() { return this; }, limit() { return this; },
+        async maybeSingle() { reads++; return recovers && reads > 1 ? { data: null } : { error: { code, message: "private SQL" } }; },
+      };
+      return { select: columns => columns === "status" ? { eq: async () => ({ data: [{ status: "pending" }] }) } : query };
+    } };
+    const service = createFoodImageBatchService({ db, repository: {}, jobs: {
+      createJob: () => { throw new Error("must not generate from a failed or empty read"); },
+    } });
+    if (recovers) assert.equal((await service.processNextTrusted(batch.id)).processed, 0);
+    else await assert.rejects(() => service.processNextTrusted(batch.id), error => error.code === "FOOD_IMAGE_BATCH_ITEM_LIST_FAILED" && error.cause.code === code && !error.message.includes("private SQL"));
+    assert.equal(reads, expectedReads);
+  }
+});
