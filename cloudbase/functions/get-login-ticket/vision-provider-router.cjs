@@ -45,6 +45,10 @@ function normalizeRows(rows, registry) {
     .sort((left, right) => candidateSort(left.row, right.row));
 }
 
+function observeAttempt(input, event) {
+  try { input.observe?.(event); } catch { /* Diagnostics cannot fail recognition. */ }
+}
+
 function createRoutedVisionAnalyzer({ resolver, createService, beforeInvoke = null } = {}) {
   if (!resolver || typeof resolver.resolveCandidates !== "function") throw new Error("Model route resolver is required");
   if (typeof createService !== "function") throw new Error("Routed vision service factory is required");
@@ -58,6 +62,7 @@ function createRoutedVisionAnalyzer({ resolver, createService, beforeInvoke = nu
       try {
         if (typeof beforeInvoke === "function") await beforeInvoke({ route, feature: "food_recognition", attempt: index });
         const result = await createService({ route })(input);
+        observeAttempt(input, { stage: "model_attempt", ms: Date.now() - startedAt, status: "succeeded", provider: route.providerKey, model: route.modelKey, fallbackUsed: index > 0 });
         return {
           ...result,
           provider: result?.provider || route.providerKey,
@@ -66,6 +71,7 @@ function createRoutedVisionAnalyzer({ resolver, createService, beforeInvoke = nu
           fallbackUsed: index > 0,
         };
       } catch (error) {
+        observeAttempt(input, { stage: "model_attempt", ms: Date.now() - startedAt, status: "failed", provider: route.providerKey, model: route.modelKey, fallbackUsed: index > 0, errorCode: error?.code || "VISION_PROVIDER_FAILED" });
         const errorClass = classifyVisionProviderError(error);
         attempts.push({ provider: route.providerKey, model: route.modelKey, durationMs: Date.now() - startedAt, status: "failed", errorClass, errorCode: error?.code || null, providerHttpStatus: error?.providerHttpStatus ?? error?.status ?? null });
         lastError = error;

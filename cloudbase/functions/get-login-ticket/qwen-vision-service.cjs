@@ -1,7 +1,8 @@
+const { resolveVisionProfile, visionRequestParameters, selectVisionImage } = require("./vision-model-profile.cjs");
 const crypto = require("node:crypto");
 
 /**
- * Qwen3-VL food recognition adapter.
+ * Shared food result validation and bounded recognition service.
  * The DashScope key stays in the cloud function environment; callers only
  * receive the normalized recognition result. A cheap flash pass is upgraded
  * to plus when the first pass reports uncertainty or a complex plate.
@@ -83,11 +84,12 @@ const DOWNSTREAM_MANDATORY_RESERVE_MS = VISION_BUDGETS.nutritionReserveMs
   + VISION_BUDGETS.evaluationReserveMs
   + VISION_BUDGETS.persistenceReserveMs;
 
-function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", provider = "qwen", timeoutMs = FLASH_MAX_TIMEOUT_MS, fetchImpl = globalThis.fetch }) {
+function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", provider = "qwen", profile = null, maxTokens = null, temperature = 0, timeoutMs = FLASH_MAX_TIMEOUT_MS, fetchImpl = globalThis.fetch }) {
   if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("QWEN_API_KEY configuration is incomplete");
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
+  const modelProfile = profile || resolveVisionProfile({ providerKey: provider, modelKey: model });
   const selectedModel = typeof model === "string" && model.trim() ? model.trim() : "qwen3-vl-flash";
-  return async ({ imageUrl, locale, model: requestModel, timeoutMs: requestTimeoutMs, reasoningEffort = "low", onRequestEvent = () => {} }) => {
+  return async ({ imageUrl, locale, model: requestModel, timeoutMs: requestTimeoutMs, reasoningEffort = modelProfile.reasoningEffort, onRequestEvent = () => {} }) => {
     const controller = new AbortController();
     const startedAt = new Date().toISOString();
     const startedMs = Date.now();
@@ -104,12 +106,12 @@ function createQwenRequestCompletion({ apiKey, workspaceId, model, endpoint = "h
         headers,
         body: JSON.stringify({
           model: typeof requestModel === "string" && requestModel.trim() ? requestModel.trim() : selectedModel,
-          temperature: 0,
-          ...(provider === "deepseek" ? { thinking: { type: "enabled" }, reasoning_effort: reasoningEffort } : {}),
-          ...(provider === "qwen" && /^qwen3\.8-/i.test(requestModel || selectedModel) ? { reasoning_effort: reasoningEffort } : {}),
+          ...(modelProfile.supportsTemperature ? { temperature } : {}),
+          ...(maxTokens ? { [modelProfile.maxTokensField]: maxTokens } : {}),
+          ...visionRequestParameters(modelProfile, reasoningEffort),
           messages: [{ role: "system", content: require("./locale.cjs").localeInstruction(locale) }, { role: "user", content: [
             { type: "text", text: "你是专业营养分析视觉模型。仅返回 JSON，不要 Markdown。第一步判断图片是否为食物或饮品；若是风景、文字、物品、人物或截图，返回 {\"isFood\": false}。按实际场景判断复杂程度，多碗碟、遮挡或混合菜标为 complex；可分辨的沙拉、燕麦碗和开放吐司主要食材应分项列出，避免用一个组合项目掩盖清晰可见的成分。先判断图片是单一食物主体，还是明显包含两个或以上视觉独立的食物、菜品、碗碟或餐盘区域。对多食物照片从左到右、前到后逐区观察，分别枚举清晰可见的主食、蛋白质、蔬菜、配菜、酱汁和饮品，明显存在多个独立食物时 items 应输出多个项目。混合后无法视觉区分原料的组合菜可以保留为一个项目，不要强拆隐藏原料；只报告图中可见或有充分视觉依据的食物，不得为了凑数量猜测完全不可见的食材。对遮挡、混合、火锅、便当和多拼盘场景，在 uncertaintyReasons 中写明不确定项，并给出合理份量估算，不要为了追求绝对确定而持续重试。字段必须为 sceneComplexity(simple/complex)、visibleFoodCount(能辨认的食物主体数量，不猜隐藏食材)、mealName、mealType(breakfast/lunch/dinner/snack)、confidence(0到1)、portionConfidence(0到1)、needsEscalation(boolean)、uncertaintyReasons(string数组)、advice、items。advice 必须用中文撰写，简明扼要，不超过100字。items 每项含 name、quantityG、caloriesPer100g、proteinPer100g、carbsPer100g、fatPer100g；营养值是估算，不作医疗诊断。" },
-            { type: "image_url", image_url: { url: imageUrl, ...(provider === "deepseek" ? { detail: "auto" } : {}) } },
+            { type: "image_url", image_url: { url: imageUrl, ...(modelProfile.imageDetail ? { detail: modelProfile.imageDetail } : {}) } },
           ] }],
         }),
         signal: controller.signal,
@@ -219,22 +221,21 @@ function unwrapVisionCompletion(raw) {
   return { content: raw, usage: null, ...diagnostics };
 }
 
-function createQwenVisionService({ apiKey, workspaceId, flashModel = "qwen3-vl-flash", plusModel = "qwen3-vl-plus", endpoint, provider = "qwen", requestCompletion, fetchImpl } = {}) {
-  const complete = requestCompletion ?? createQwenRequestCompletion({ apiKey, workspaceId, model: flashModel, endpoint, provider, timeoutMs: FLASH_MAX_TIMEOUT_MS, fetchImpl });
-  const plusComplete = requestCompletion ? requestCompletion : createQwenRequestCompletion({ apiKey, workspaceId, model: plusModel, endpoint, provider, timeoutMs: 10_000, fetchImpl });
+function createQwenVisionService({ apiKey, workspaceId, profile = null, maxTokens = null, temperature = 0, providerTimeoutMs = null, flashModel = "qwen3-vl-flash", plusModel = "qwen3-vl-plus", endpoint, provider = "qwen", requestCompletion, fetchImpl } = {}) {
+  const complete = requestCompletion ?? createQwenRequestCompletion({ apiKey, workspaceId, model: flashModel, endpoint, provider, profile, maxTokens, temperature, timeoutMs: FLASH_MAX_TIMEOUT_MS, fetchImpl });
+  const plusComplete = requestCompletion ? requestCompletion : createQwenRequestCompletion({ apiKey, workspaceId, model: plusModel, endpoint, provider, profile, maxTokens, temperature, timeoutMs: 10_000, fetchImpl });
   return async ({ imageUrl, imageDataUrl, locale, model: routeModel, budget, observe = () => {}, onTrace = () => {} }) => {
     if (typeof imageUrl !== "string" || imageUrl.length > 30_000_000) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
     if (!/^https:\/\//i.test(imageUrl) && !/^data:image\//i.test(imageUrl)) throw new PublicQwenVisionError("VISION_IMAGE_INVALID", "图片无效");
     const explicitProviderTimeoutMs = Number(budget?.providerTimeoutMs);
-    const flashTimeoutMs = Number.isFinite(explicitProviderTimeoutMs) && explicitProviderTimeoutMs > 0
+    let flashTimeoutMs = Number.isFinite(explicitProviderTimeoutMs) && explicitProviderTimeoutMs > 0
       ? Math.min(explicitProviderTimeoutMs, typeof budget?.remainingMs === "function" ? budget.remainingMs() : explicitProviderTimeoutMs)
       : budget?.stageTimeout
         ? budget.stageTimeout(FLASH_MAX_TIMEOUT_MS, DOWNSTREAM_MANDATORY_RESERVE_MS)
         : FLASH_MAX_TIMEOUT_MS;
+    if (providerTimeoutMs) flashTimeoutMs = Math.min(flashTimeoutMs, providerTimeoutMs);
     if (flashTimeoutMs <= 0) throw new PublicQwenVisionError("VISION_TIMEOUT", "图片识别超时，请重试");
-    const providerImageUrl = provider === "deepseek" && /^data:image\//i.test(String(imageDataUrl || ""))
-      ? imageDataUrl
-      : imageUrl;
+    const providerImageUrl = selectVisionImage(profile || resolveVisionProfile({providerKey:provider,modelKey:routeModel || flashModel}), imageUrl, imageDataUrl);
     const flashStartedAt = Date.now();
     const flashStartedIso = new Date().toISOString();
     const providerEvents = [];

@@ -1,3 +1,5 @@
+const { createVisionPerformanceService } = require("./vision-performance-service.cjs");
+const { createVisionModelAdapter } = require("./vision-model-adapter.cjs");
 const { createNotificationService, NotificationError } = require("./notification-service.cjs");
 const http = require("node:http");
 const https = require("node:https");
@@ -1582,13 +1584,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     model: null,
     analyze: createRoutedVisionAnalyzer({
       resolver: modelRouteResolver,
-      createService: ({ route }) => createQwenVisionService({
-        apiKey: route.credential,
-        flashModel: route.modelKey,
-        plusModel: route.modelKey,
-        provider: route.providerKey,
-        fetchImpl: createRoutedOpenAiFetch(route),
-      }),
+      createService: ({ route }) => createVisionModelAdapter(route),
       beforeInvoke: ({ route, feature }) => modelQuotaPolicy.assertAllowed({
         providerKey: route.providerKey,
         modelKey: route.modelKey,
@@ -1849,6 +1845,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
     observability,
     adminAudit,
     systemHealth,
+    visionPerformance: createVisionPerformanceService({ db }),
     jobOps,
     userOps,
     hashTraceUserId,
@@ -2152,6 +2149,7 @@ function getAdminFoodRoute(pathname) {
   const jobRunMatch = path.match(/^\/jobs\/([a-z0-9_-]+)\/run-now$/i);
   if (jobRunMatch) return { operation: "jobRunNow", jobKey: jobRunMatch[1] };
   if (path === "/system/health") return { operation: "systemHealth" };
+  if (path === "/vision-performance") return { operation: "visionPerformance" };
   if (path === "/dashboard/summary") return { operation: "dashboardSummary" };
   if (path === "/audit-logs") return { operation: "auditLogs" };
   if (path === "/traces") return { operation: "traceList" };
@@ -2854,6 +2852,13 @@ function createHttpServer({ service }) {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
           if (!service.systemHealth?.getHealth) return sendJson(res, 503, { code: "SYSTEM_HEALTH_UNAVAILABLE" });
           return sendJson(res, 200, await service.systemHealth.getHealth());
+        }
+        if (adminFoodRoute.operation === "visionPerformance") {
+          if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });
+          if (!service.visionPerformance) return sendJson(res, 503, { code: "VISION_REPORT_UNAVAILABLE" });
+          const hours = Number(url.searchParams.get("hours") || 24);
+          if (!Number.isFinite(hours) || hours < 1 || hours > 168) return sendJson(res, 400, { code: "VISION_REPORT_RANGE_INVALID" });
+          return sendJson(res, 200, await service.visionPerformance.getReport({ hours }));
         }
         if (adminFoodRoute.operation === "dashboardSummary") {
           if (req.method !== "GET") return sendJson(res, 405, { code: "METHOD_NOT_ALLOWED" });

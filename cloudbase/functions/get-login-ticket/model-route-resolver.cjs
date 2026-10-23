@@ -130,6 +130,7 @@ function toBinding(row, { feature, capability, keys, credential }) {
     timeoutMs: positiveInteger(row.timeout_ms ?? row.timeoutMs),
     maxTokens: positiveInteger(row.max_tokens ?? row.maxTokens),
     temperature: finiteNumber(row.temperature),
+    metadata: row.metadata || {},
     role: routeRole(row, keys) || "default",
     credential: credential || null,
   };

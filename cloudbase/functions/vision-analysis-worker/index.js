@@ -1,5 +1,11 @@
 const WORKER_DIAGNOSTIC_STAGES = new Set([
   "worker.entry",
+  "worker.model_attempt",
+  "worker.image_prepare",
+  "worker.nutrition",
+  "worker.evaluation",
+  "worker.persistence",
+  "worker.complete",
   "worker.claimed_job_validate",
   "worker.claim",
   "worker.asset_load",
@@ -30,11 +36,15 @@ function createDefaultWorkerDiagnostics(logger = console) {
 }
 
 function createPersistentWorkerDiagnostics({ logger = console, recordDiagnostic } = {}) {
+  const pending = new Set();
   return {
     onStage: (event) => {
       logger.log(`[vision-worker-stage] ${JSON.stringify(event)}`);
-      Promise.resolve(recordDiagnostic?.(event)).catch(() => {});
+      const write = Promise.resolve(recordDiagnostic?.(event)).catch(() => {});
+      pending.add(write);
+      write.finally(() => pending.delete(write));
     },
+    flush: () => Promise.all(Array.from(pending)),
   };
 }
 
@@ -78,7 +88,7 @@ function createStageRecorder(diagnostics, job) {
           status: "failed",
           startedAt,
           durationMs: Math.max(0, Date.now() - startedMs),
-          safeErrorCode: safeErrorCode(error),
+          errorCode: safeErrorCode(error),
           ...diagnosticIdentity(job),
         });
         throw error;
@@ -113,7 +123,7 @@ function createWorker({ claimJob, processJob, diagnostics } = {}) {
           emit({ stage: "worker.claim", status: "succeeded", startedAt, durationMs: Math.max(0, Date.now() - startedMs), analysisId: null, jobId: null, traceId: null, version: null });
         }
       } catch (error) {
-        emit({ stage: "worker.claim", status: "failed", startedAt, durationMs: Math.max(0, Date.now() - startedMs), safeErrorCode: safeErrorCode(error), analysisId: null, jobId: null, traceId: null, version: null });
+        emit({ stage: "worker.claim", status: "failed", startedAt, durationMs: Math.max(0, Date.now() - startedMs), errorCode: safeErrorCode(error), analysisId: null, jobId: null, traceId: null, version: null });
         throw error;
       }
       const results = [];
@@ -237,7 +247,18 @@ function createWiredVisionWorker({ claimJob, vision, resolveImageUrl, commitQuot
           providerAttempt: checkpointResume
             ? Number(job.provider_attempt || 1)
             : Number(job.provider_attempt || 1) + 1,
-        }, { budget: asyncBudget });
+        }, { budget: asyncBudget, observe: (event = {}) => {
+          if (!Number.isFinite(event.ms) || event.ms < 0) return;
+          createWorkerDiagnosticEmitter(diagnostics)({
+            stage: `worker.${event.stage}`,
+            status: event.status || (event.errorCode ? "failed" : "succeeded"),
+            startedAt: event.startedAt || new Date(Date.now() - event.ms).toISOString(),
+            durationMs: event.ms,
+            provider: event.provider, model: event.model,
+            fallbackUsed: event.fallbackUsed, errorCode: event.errorCode,
+            ...diagnosticIdentity(job),
+          });
+        } });
       } catch (error) {
         createWorkerDiagnosticEmitter(diagnostics)({
           stage: executionStage,
@@ -267,8 +288,11 @@ function createWiredVisionWorker({ claimJob, vision, resolveImageUrl, commitQuot
         ...diagnosticIdentity(job),
       });
       if (typeof completeJob === "function") {
-        const completed = await completeJob(job, completionResult);
-        if (completed?.accepted === false) throw new Error("VISION_ANALYSIS_COMPLETE_CAS_REJECTED");
+        await recordStage("worker.complete", async () => {
+          const completed = await completeJob(job, completionResult);
+          if (completed?.accepted === false) throw new Error("VISION_ANALYSIS_COMPLETE_CAS_REJECTED");
+          return completed;
+        });
       }
       if (typeof commitQuota === "function") await commitQuota(job.id, completionResult);
       return { status: "completed", analysisId: job.id, result: completionResult };
@@ -347,13 +371,18 @@ async function main({ enabled = process.env.VISION_ASYNC_FOUNDATION_ENABLED === 
     version: job?.version ?? null,
     leaseUntil: job?.lease_until || job?.leaseUntil || null,
   });
+  const activeDiagnostics = diagnostics || createPersistentWorkerDiagnostics({ recordDiagnostic });
+  const execute = async (operation) => {
+    try { return await operation(); }
+    finally { await activeDiagnostics.flush?.(); }
+  };
   let runtime;
   try {
     runtime = createProductionVisionWorker({
       env,
       dependencies,
       runtimeFactory,
-      diagnostics: diagnostics || createPersistentWorkerDiagnostics({ recordDiagnostic }),
+      diagnostics: activeDiagnostics,
     });
   } catch (error) {
     const errorCode = safeErrorCode(error);
@@ -382,7 +411,7 @@ async function main({ enabled = process.env.VISION_ASYNC_FOUNDATION_ENABLED === 
       return { failed: true, stage: "worker.claimed_job_load", errorCode };
     }
     if (!claimedJob) return { claimed: 0, results: [{ status: "noop", reason: "claimed_job_not_found" }] };
-    return runtime.processClaimedJob(claimedJob);
+    return execute(() => runtime.processClaimedJob(claimedJob));
   }
   if (job) {
     await recordDiagnostic({
@@ -396,7 +425,7 @@ async function main({ enabled = process.env.VISION_ASYNC_FOUNDATION_ENABLED === 
       errorCode: job.execution_owner === "async" ? null : "VISION_ASYNC_JOB_INVALID",
     });
   }
-  return job ? runtime.processClaimedJob(job) : runtime.processOnce();
+  return execute(() => job ? runtime.processClaimedJob(job) : runtime.processOnce());
 }
 
 exports.main = main;

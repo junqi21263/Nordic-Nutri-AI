@@ -2223,3 +2223,15 @@ test("invalid onboarding input is a client error instead of a service outage", a
     assert.equal(response.status,400);assert.deepEqual(await response.json(),{code:'PRODUCT_DATA_INVALID'});
   });
 });
+
+test('vision performance is admin-only and remains read-only', async () => {
+ let reads=0;
+ const server=createHttpServer({service:{verifySession:token=>token==='admin'?{sub:'admin',role:'admin_console'}:null,visionPerformance:{getReport:async({hours})=>{reads++;return {hours,coverage:{complete:true}};}}}});
+ await withServer(server,async base=>{
+  const no=await fetch(base+'/api/admin/vision-performance');assert.equal(no.status,401);
+  const yes=await fetch(base+'/api/admin/vision-performance?hours=12',{headers:{authorization:'Bearer admin'}});assert.equal(yes.status,200);assert.equal((await yes.json()).hours,12);
+  const invalid=await fetch(base+'/api/admin/vision-performance?hours=999',{headers:{authorization:'Bearer admin'}});assert.equal(invalid.status,400);
+  const write=await fetch(base+'/api/admin/vision-performance',{method:'POST',headers:{authorization:'Bearer admin'}});assert.equal(write.status,405);
+ });
+ assert.equal(reads,1);
+});
