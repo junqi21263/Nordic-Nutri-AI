@@ -5,7 +5,7 @@ import test from "node:test";
 import { createQwenVisionService, shouldEscalate, PublicQwenVisionError } from "./qwen-vision-service.cjs";
 import { createRoutedOpenAiFetch } from "./text-model-adapter-registry.cjs";
 
-test("routed DeepSeek vision sends inline images with thinking disabled", async () => {
+test("routed DeepSeek vision sends inline images with low-effort thinking retained", async () => {
   let sent;
   const route = { providerKey: "deepseek", modelKey: "deepseek-v4-flash-vision-exp", credential: "test-key" };
   const analyze = createQwenVisionService({
@@ -16,8 +16,19 @@ test("routed DeepSeek vision sends inline images with thinking disabled", async 
     } }),
   });
   await analyze({ imageUrl: "https://example.test/image.jpg", imageDataUrl: "data:image/jpeg;base64,aW1hZ2U=" });
-  assert.deepEqual(sent.thinking, { type: "disabled" });
+  assert.deepEqual(sent.thinking, { type: "enabled" });
+  assert.equal(sent.reasoning_effort, "low");
   assert.equal(sent.messages.find(message => message.role === "user").content[1].image_url.url, "data:image/jpeg;base64,aW1hZ2U=");
+});
+
+test("fast vision protects enrichment time while allowing a bounded slow response", async () => {
+  const { createVisionBudget } = await import("./vision-budget.cjs");
+  const timeouts = [];
+  const analyze = createQwenVisionService({ apiKey: "test", requestCompletion: async ({ timeoutMs }) => { timeouts.push(timeoutMs); return result(); } });
+  const budget = createVisionBudget({ startedAt: 0, totalMs: 30_000, now: () => 5000 });
+  await analyze({ imageUrl: "https://example.test/food.jpg", budget });
+  assert.deepEqual(timeouts, [19_500]);
+  assert.ok(timeouts[0] + 5500 <= budget.remainingMs());
 });
 
 test("prompt distinguishes multi-food photos without inventing hidden ingredients", () => {

@@ -2,7 +2,7 @@ const VISION_BUDGETS = Object.freeze({
   serverTotalMs: 30_000,
   securityMaxMs: 2_000,
   uploadAttemptMaxMs: 2_500,
-  flashMaxMs: 18_000,
+  flashMaxMs: 22_000,
   plusMaxMs: 3_000,
   nutritionReserveMs: 1_200,
   evaluationMaxMs: 2_500,
