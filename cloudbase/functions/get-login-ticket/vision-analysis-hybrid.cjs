@@ -78,6 +78,12 @@ function createHybridVisionController({ featureEnabled = false, createAnalysis, 
       let handoffAttempted = false;
       try {
         const result = await runFast({ ...input, analysisId: analysis.analysisId, analysis });
+        if (result?.kind === "queued") {
+          handoffAttempted = true;
+          const accepted = await handoff?.({ analysisId: analysis.analysisId, providerAttempt: 1, resumeStage: "analyzing", triggerReason: "asset_ready" });
+          if (!accepted?.accepted) throw Object.assign(new Error("VISION_ASYNC_HANDOFF_FAILED"), { code: "VISION_TIMEOUT" });
+          return processingResponse(analysis);
+        }
         if (result?.kind === "checkpoint") {
           handoffAttempted = true;
           const accepted = await handoff?.({

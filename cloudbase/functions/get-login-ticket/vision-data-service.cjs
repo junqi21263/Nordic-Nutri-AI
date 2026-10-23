@@ -108,7 +108,7 @@ function createVisionDataService({
     validateImage(input) {
       return readImage(input);
     },
-    async analyzeImage(userId, input, { budget, observe = () => {}, onAssetReady, onProviderSuccess } = {}) {
+    async analyzeImage(userId, input, { budget, observe = () => {}, onAssetReady, onProviderSuccess, deferProvider = false } = {}) {
       if (typeof analyze !== "function") throw new PublicVisionDataError("VISION_SERVICE_NOT_CONFIGURED", "图片识别服务未配置");
       const image = readImage(input);
       if (typeof assertImageSafe === "function" && image.content) {
@@ -172,6 +172,10 @@ function createVisionDataService({
           imageSha256: sha256,
         });
         assetPersisted = assetReady?.assetId != null || assetReady === true;
+      }
+      if (deferProvider) {
+        if (!assetPersisted) throw new Error("VISION_ASYNC_ASSET_NOT_PERSISTED");
+        return { kind: "queued", analysisId: input.analysisId, resumeStage: "analyzing" };
       }
       let modelTrace = null;
       const imageDataUrl = !image.stored && image.content

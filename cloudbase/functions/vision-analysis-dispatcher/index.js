@@ -165,7 +165,24 @@ function createCloudbaseWorkerInvoker({
 
 async function main({ enabled = process.env.VISION_ASYNC_FOUNDATION_ENABLED === "true" } = {}) {
   if (!enabled) return { skipped: true, reason: "feature_disabled" };
-  return dispatchOnce({ invokeWorker: createCloudbaseWorkerInvoker(), recordDiagnostic: createDiagnosticRecorder() });
+  return dispatchOnce({ invokeWorker: createAsyncWorkerInvoker(), recordDiagnostic: createDiagnosticRecorder() });
+}
+
+function createAsyncWorkerInvoker({ env = process.env, client = null } = {}) {
+  if (!client) {
+    const { Client } = require("tencentcloud-sdk-nodejs-scf").scf.v20180416;
+    client = new Client({ credential: {
+      secretId: env.TENCENTCLOUD_SECRETID,
+      secretKey: env.TENCENTCLOUD_SECRETKEY,
+      token: env.TENCENTCLOUD_SESSIONTOKEN,
+    }, region: env.TENCENTCLOUD_REGION || env.SCF_REGION,
+    profile: { httpProfile: { reqTimeout: 3 } } });
+  }
+  return (job) => client.Invoke({
+    FunctionName: env.VISION_ANALYSIS_WORKER_FUNCTION_NAME || DEFAULT_WORKER_NAME,
+    Namespace: env.TCB_ENV || env.CLOUDBASE_ENV_ID || env.ENV_ID,
+    Qualifier: "$LATEST", InvocationType: "Event", ClientContext: JSON.stringify(job),
+  });
 }
 
 exports.DISPATCH_PATH = DISPATCH_PATH;
@@ -174,3 +191,4 @@ exports.getDispatchUrl = getDispatchUrl;
 exports.dispatchOnce = dispatchOnce;
 exports.createCloudbaseWorkerInvoker = createCloudbaseWorkerInvoker;
 exports.main = main;
+exports.createAsyncWorkerInvoker = createAsyncWorkerInvoker;

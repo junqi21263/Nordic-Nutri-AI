@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+test("deferred recognition persists the asset before returning and never calls the model", async () => {
+  let providerCalls = 0;
+  const service = createVisionDataService({ db: { from() { throw new Error("asset callback owns persistence"); } },
+    uploadImage: async () => ({ cloudPath: "food-images/test.jpg", imageUrl: "https://example.com/test.jpg" }),
+    analyze: async () => { providerCalls += 1; throw new Error("must not run on upload request"); },
+  });
+  const result = await service.analyzeImage("test-user", {
+    analysisId: "a", clientRequestId: "11111111-1111-4111-8111-111111111111", contentType: "image/jpeg", imageBase64: "/9j/2w==",
+  }, { deferProvider: true, onAssetReady: async () => ({ assetId: "asset" }) });
+  assert.equal(result.kind, "queued");
+  assert.equal(providerCalls, 0);
+});
+
 import { createVisionDataService } from "./vision-data-service.cjs";
 
 test("uploads, recognizes, and persists an authenticated user's food image", async () => {

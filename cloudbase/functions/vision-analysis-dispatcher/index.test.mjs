@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createCloudbaseWorkerInvoker, dispatchOnce, main, makeSignature } from "./index.js";
+import { createAsyncWorkerInvoker, createCloudbaseWorkerInvoker, dispatchOnce, main, makeSignature } from "./index.js";
+
+test("async worker invocation waits only for platform admission and keeps the claimed identity", async () => {
+  let submitted;
+  const invoke = createAsyncWorkerInvoker({ env: { TCB_ENV: "test-env" }, client: { Invoke: async (input) => { submitted = input; return { RequestId: "accepted" }; } } });
+  const job = { analysisId: "a", jobId: "j", version: 3 };
+  await invoke(job);
+  assert.equal(submitted.InvocationType, "Event");
+  assert.equal(submitted.Namespace, "test-env");
+  assert.deepEqual(JSON.parse(submitted.ClientContext), job);
+});
 
 test("main skips before any dispatch work when the feature is disabled", async () => {
   const result = await main({ enabled: false });

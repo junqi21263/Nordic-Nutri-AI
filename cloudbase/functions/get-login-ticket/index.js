@@ -1773,6 +1773,7 @@ function createRuntimeService(env = process.env, dependencies = {}) {
 
   return {
     analyticsEnvironment: config.cloudbaseEnvId,
+    kickVisionAnalysis: () => admin.callFunction({ name: "vision-analysis-dispatcher", data: {} }, { timeout: 4_000 }),
     analyticsDispatchSecret: env.ANALYTICS_DISPATCH_SECRET || env.AI_WORKER_SHARED_SECRET || "",
     analytics: typeof db.rpc === "function" && typeof config.sessionSecret === "string" && config.sessionSecret.length >= 16 ? createAnalyticsService({
       db,
@@ -4134,6 +4135,7 @@ function createHttpServer({ service }) {
             },
             runFast: async ({ analysisId }) => service.vision.analyzeImage(session.sub, { ...body, analysisId }, {
               budget: fastBudget,
+              deferProvider: true,
               observe: observeVisionStage,
               onAssetReady: async (asset) => {
                 const updated = await service.visionAnalysisFoundation.markAssetReady({ ...asset, analysisId, expectedVersion: hybridVersion });
@@ -4150,6 +4152,10 @@ function createHttpServer({ service }) {
               const accepted = await service.visionAnalysisFoundation.queueAsyncAnalysis({ ...handoff, expectedVersion: hybridVersion });
               if (accepted?.version != null) hybridVersion = Number(accepted.version);
               hybridHandoffAccepted = accepted?.accepted === true;
+              if (hybridHandoffAccepted && typeof service.kickVisionAnalysis === "function") {
+                try { await service.kickVisionAnalysis(); }
+                catch (error) { console.warn("[vision] immediate dispatch unavailable; timer will recover:", error?.code || "DISPATCH_FAILED"); }
+              }
               return accepted;
             },
           });
